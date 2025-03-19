@@ -1,21 +1,72 @@
-import * as React from "react"
+import React, { ReactNode } from 'react'
+import createRandomString from '@/helper/createRandomString'
+import { cn } from '@/lib/utils'
 
-import { cn } from "@/lib/utils"
+type InputProps = {
+  id?: string,
+  children: ReactNode,
+  type?: 'text' | 'number' | 'date' | 'time' | 'url' | 'email' | 'search',
+  value: string | number,
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+  placeholder?: string,
+  errors?: string & Record<string, string>,
+  min?: number,
+  max?: number,
+  step?: number,
+  ref?: React.RefObject<HTMLInputElement>,
+  className?: string
+}
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+export const Input: React.FC<InputProps> = ({
+                                              id = createRandomString(24),
+                                              children,
+                                              type = 'text',
+                                              value,
+                                              placeholder,
+                                              onChange,
+                                              errors = '',
+                                              min,
+                                              max,
+                                              step,
+                                              ref,
+                                              className
+                                            }) => {
+
+  const handleClear = () => {
+    // Create a synthetic event with an empty string value
+    const syntheticEvent = { target: { value: '' } } as React.ChangeEvent<HTMLInputElement>
+    onChange(syntheticEvent)
+    ref?.current?.focus()
+  }
+
   return (
-    <input
-      type={type}
-      data-slot="input"
-      className={cn(
-        "border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-        className
+    <div className={cn('w-full relative', className)}>
+      <label className={'label'} htmlFor={id}>{children}</label>
+      <input className={'input w-full'}
+             ref={ref}
+             id={id}
+             type={type}
+             value={value}
+             onChange={onChange}
+             placeholder={placeholder}
+             min={min}
+             max={max}
+             step={step}
+      >
+
+      </input>
+      {type === 'search' && String(value).length > 0 && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="btn btn-ghost btn-sm absolute right-1 bottom-1"
+        >
+          Clear
+        </button>
       )}
-      {...props}
-    />
+
+      {errors && <p className={'fieldset-label text-error'}>{errors}</p>}
+    </div>
   )
 }
 
-export { Input }
