@@ -1,8 +1,6 @@
 import React, { useState, ReactNode } from 'react'
 import { XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { usePage } from '@inertiajs/react'
-import { PageProps } from '@/types'
 
 type ModalProps = { children: ReactNode, isOpen?: boolean }
 type ModalTriggerProps = { children: ReactNode }
