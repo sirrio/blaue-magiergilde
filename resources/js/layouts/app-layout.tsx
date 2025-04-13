@@ -13,10 +13,12 @@ const menuLinks = [
   {
     name: 'Characters',
     route: 'characters.index',
+    method: 'get' as const,
   },
   {
     name: 'Game Master',
     route: 'games.index',
+    method: 'get' as const,
   },
 ]
 
@@ -24,6 +26,7 @@ const profileLinks = [
   {
     name: 'Logout',
     route: 'logout',
+    method: 'post' as const,
   },
 ]
 
@@ -31,14 +34,17 @@ const adminLinks = [
   {
     name: 'Items',
     route: 'items.index',
+    method: 'get' as const,
   },
   {
     name: 'Spells',
     route: 'spells.index',
+    method: 'get' as const,
   },
   {
     name: 'Shop',
     route: 'shops.index',
+    method: 'get' as const,
   },
 ]
 
@@ -72,7 +78,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <ul className="menu menu-horizontal gap-1 px-1">
             {menuLinks.map((menuLink) => (
               <li key={menuLink.route}>
-                <Link className={cn(route().current(menuLink.route) ? 'menu-active' : undefined)} href={route(menuLink.route)}>
+                <Link
+                  method={menuLink.method}
+                  className={cn(route().current(menuLink.route) ? 'menu-active' : undefined)}
+                  href={route(menuLink.route)}
+                >
                   {menuLink.name}
                 </Link>
               </li>
@@ -87,7 +97,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <ul tabIndex={0} className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {adminLinks.map((adminLink) => (
                 <li key={adminLink.route}>
-                  <Link href={route(adminLink.route)}>{adminLink.name}</Link>
+                  <Link method={adminLink.method} href={route(adminLink.route)}>
+                    {adminLink.name}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -102,7 +114,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <ul tabIndex={0} className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {profileLinks.map((profileLink) => (
                 <li key={profileLink.route}>
-                  <Link href={route(profileLink.route)}>{profileLink.name}</Link>
+                  <Link method={profileLink.method} href={route(profileLink.route)}>
+                    {profileLink.name}
+                  </Link>
                 </li>
               ))}
             </ul>

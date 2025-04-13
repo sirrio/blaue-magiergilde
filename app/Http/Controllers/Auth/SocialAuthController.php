@@ -15,7 +15,9 @@ class SocialAuthController extends Controller
    */
   public function redirectToProvider(): RedirectResponse
   {
-    return Socialite::driver('discord')->redirect();
+    return Socialite::driver('discord')
+      ->setScopes(['identify'])
+      ->redirect();
   }
 
   /**
@@ -26,10 +28,11 @@ class SocialAuthController extends Controller
     $discordUser = Socialite::driver('discord')->user();
 
     $user = User::query()->updateOrCreate(
-      ['email' => $discordUser->getEmail()],
+      [
+        'discord_id' => $discordUser->getId(),
+      ],
       [
         'name' => $discordUser->getName(),
-        'discord_id' => $discordUser->getId(),
         'avatar' => $discordUser->getAvatar(),
         'password' => '',
       ]

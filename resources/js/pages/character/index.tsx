@@ -1,4 +1,6 @@
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import Toast from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import AppLayout from '@/layouts/app-layout'
@@ -9,7 +11,7 @@ import { Character } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router } from '@inertiajs/react'
-import { Copy } from 'lucide-react'
+import { BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Index({ characters }: { characters: Character[] }) {
@@ -74,35 +76,88 @@ export default function Index({ characters }: { characters: Character[] }) {
 
   const activeCharacterCount = characters.filter((char) => !char.deleted_at && !(char.is_filler || calculateTier(char) === 'et')).length
 
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const test = () => {
+    return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
+  }
+
   return (
     <AppLayout>
       <Head title="Characters" />
       <Toast />
-      <div className="container mx-auto max-w-7xl px-4 py-6">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
+        <section className="flex flex-col justify-between gap-2 border-b pb-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-xl font-semibold">
-              Your characters
-              <span className="ml-1 text-xs font-normal">{activeCharacterCount}/8</span>
-              <Button className="ml-2" variant="ghost" modifier="square" size="xs" onClick={() => copyCharactersToClipboard(characters)}>
-                <Copy size={14} />
-              </Button>
+            <h1 className="text-2xl font-bold">
+              Your Characters <span className="text-base-content/50 ml-1 text-sm font-normal">{activeCharacterCount}/8 Active</span>
             </h1>
-            <p className="text-xs">Here you can manage all your characters.</p>
+            <p className="text-base-content/70 text-sm">Manage all your characters easily below.</p>
           </div>
-          <div>
-            <StoreCharacterModal></StoreCharacterModal>
+          <div className="flex items-center gap-4">
+            <Button size="sm" variant="ghost" className="flex items-center space-x-1" onClick={() => copyCharactersToClipboard(characters)}>
+              <Copy size={16} /> <span>Copy Characters</span>
+            </Button>
+            {chars.length > 0 && (
+              <StoreCharacterModal>
+                <Button size="sm" variant="outline" className="flex items-center space-x-2">
+                  <Plus size={16} />
+                  <span>Add Character</span>
+                </Button>
+              </StoreCharacterModal>
+            )}
           </div>
-        </div>
-        <div className={cn('mt-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={chars} strategy={rectSortingStrategy}>
-              {chars.map((char: Character) => (
-                <CharacterCard key={char.id} character={char} />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
+        </section>
+        {chars.length === 0 ? (
+          <div className="py-10 text-center">
+            <BookUser size={64} className="text-base-content mx-auto mb-4" />
+            <h2 className="text-base-content text-lg font-semibold">No characters yet</h2>
+            <p className="text-base-content/70 text-sm">Start by creating or syncing your characters.</p>
+            <div className="mt-6 flex justify-center gap-4">
+              <StoreCharacterModal>
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <Plus size={16} />
+                  <span>Create Character</span>
+                </Button>
+              </StoreCharacterModal>
+              <Modal>
+                <ModalTrigger>
+                  <Button variant={'outline'} className="flex items-center space-x-2">
+                    <RefreshCw size={16} />
+                    <span>Sync Characters</span>
+                  </Button>
+                </ModalTrigger>
+                <ModalTitle>Sync characters</ModalTitle>
+                <ModalContent>
+                  <Input type="email" placeholder="Enter your email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)}>
+                    Email
+                  </Input>
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    className="w-full"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  >
+                    Password
+                  </Input>
+                </ModalContent>
+                <ModalAction onClick={() => test()}>Sync now</ModalAction>
+              </Modal>
+            </div>
+          </div>
+        ) : (
+          <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={chars} strategy={rectSortingStrategy}>
+                {chars.map((char: Character) => (
+                  <CharacterCard key={char.id} character={char} />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
       </div>
     </AppLayout>
   )

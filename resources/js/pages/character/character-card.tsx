@@ -15,6 +15,7 @@ import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { cn } from '@/lib/utils'
+import { AlliesModal } from '@/pages/character/allies-modal'
 import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
@@ -22,7 +23,7 @@ import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, BookHeart, BookOpen, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, Swords } from 'lucide-react'
+import { Anvil, BookOpen, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, Swords } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -142,9 +143,7 @@ export function CharacterCard({ character }: { character: Character }) {
               </Button>
               <StoreAdventureModal character={character}></StoreAdventureModal>
               <StoreDowntimeModal character={character}></StoreDowntimeModal>
-              <Button onClick={() => alert('test')} size="sm">
-                <BookHeart size={14} />
-              </Button>
+              <AlliesModal character={character} />
               <Button as="a" size="sm" href={character.external_link} target="_blank">
                 <ExternalLink size={14} />
               </Button>

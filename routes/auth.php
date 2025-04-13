@@ -2,18 +2,21 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\SocialAuthController;
+use App\Http\Controllers\Character\SyncAccountController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('/auth/redirect', [SocialAuthController::class, 'redirectToProvider'])
-        ->name('discord.login');
+  Route::get('/auth/redirect', [SocialAuthController::class, 'redirectToProvider'])
+    ->name('discord.login');
 
-    Route::get('/auth/callback', [SocialAuthController::class, 'handleProviderCallback'])
-        ->name('discord.callback');
+  Route::get('/auth/callback', [SocialAuthController::class, 'handleProviderCallback'])
+    ->name('discord.callback');
 });
 
+Route::post('/auth/sync', SyncAccountController::class)
+  ->middleware(['auth'])
+  ->name('auth.sync');
 
-Route::middleware('auth')->group(function () {
-    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
-        ->name('logout');
-});
+Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
+  ->middleware(['auth'])
+  ->name('logout');

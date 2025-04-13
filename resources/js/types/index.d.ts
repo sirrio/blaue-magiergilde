@@ -99,6 +99,10 @@ export interface Ally {
   name: string
   standing: 'best' | 'good' | 'normal' | 'bad'
   character_id: number
+  avatar: string
+  notes: string
+  classes: string
+  species: string
 }
 
 export interface Adventure {

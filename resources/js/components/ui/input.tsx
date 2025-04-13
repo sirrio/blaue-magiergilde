@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 type InputProps = {
   id?: string,
   children: ReactNode,
-  type?: 'text' | 'number' | 'date' | 'time' | 'url' | 'email' | 'search',
+  type?: 'text' | 'number' | 'date' | 'time' | 'url' | 'email' | 'search' | 'password',
   value: string | number,
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
   placeholder?: string,
