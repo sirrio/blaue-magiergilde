@@ -25,11 +25,12 @@ class GameController extends Controller
       ->get();
     $games = Game::query()
       ->where('user_id', Auth::user()->getAuthIdentifier())
+      ->orderby('start_date', 'desc')
       ->get();
 
     return Inertia::render('game/index', [
       'user' => Auth::user(),
-      'character' => $characters,
+      'characters' => $characters,
       'games' => $games,
     ]);
   }

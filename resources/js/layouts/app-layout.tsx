@@ -2,7 +2,7 @@ import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
-import { Menu, ShieldUser } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { ReactNode } from 'react'
 
 interface AppLayoutProps {
@@ -10,42 +10,16 @@ interface AppLayoutProps {
 }
 
 const menuLinks = [
-  {
-    name: 'Characters',
-    route: 'characters.index',
-    method: 'get' as const,
-  },
-  {
-    name: 'Game Master',
-    route: 'games.index',
-    method: 'get' as const,
-  },
+  { name: 'Characters', route: 'characters.index', method: 'get' as const },
+  { name: 'Mastered Games', route: 'games.index', method: 'get' as const },
 ]
 
-const profileLinks = [
-  {
-    name: 'Logout',
-    route: 'logout',
-    method: 'post' as const,
-  },
-]
+const profileLinks = [{ name: 'Logout', route: 'logout', method: 'post' as const }]
 
 const adminLinks = [
-  {
-    name: 'Items',
-    route: 'items.index',
-    method: 'get' as const,
-  },
-  {
-    name: 'Spells',
-    route: 'spells.index',
-    method: 'get' as const,
-  },
-  {
-    name: 'Shop',
-    route: 'shops.index',
-    method: 'get' as const,
-  },
+  { name: 'Items', route: 'items.index', method: 'get' as const },
+  { name: 'Spells', route: 'spells.index', method: 'get' as const },
+  { name: 'Shop', route: 'shops.index', method: 'get' as const },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -54,67 +28,100 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className={cn('bg-base-200 min-h-screen')}>
-      <div className="navbar bg-base-100 shadow-sm">
+      <nav className="navbar bg-base-100 shadow-sm" role="navigation" aria-label="Main Navigation">
         <div className="navbar-start">
           <div className="dropdown">
-            <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden">
-              <Menu></Menu>
-            </div>
-            <ul tabIndex={0} className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
+            <button tabIndex={0} role="button" aria-label="Open mobile menu" className="btn btn-ghost lg:hidden">
+              <Menu size={20} />
+            </button>
+            <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {menuLinks.map((menuLink) => (
-                <li key={menuLink.route}>
-                  <Link className={cn(route().current(menuLink.route) ? 'menu-active' : undefined)} href={route(menuLink.route)}>
+                <li key={menuLink.route} role="none">
+                  <Link role="menuitem" className={cn(route().current(menuLink.route) ? 'menu-active' : '')} href={route(menuLink.route)}>
                     {menuLink.name}
                   </Link>
                 </li>
               ))}
+              {auth.user.is_admin && (
+                <li role="none">
+                  <a>Administration</a>
+                  <ul className="p-2">
+                    {adminLinks.map((adminLink) => (
+                      <li key={adminLink.route} role="none">
+                        <Link
+                          role="menuitem"
+                          method={adminLink.method}
+                          href={route(adminLink.route)}
+                          className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
+                        >
+                          {adminLink.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )}
             </ul>
           </div>
-          <div className={cn('size-12')}>
+          <a href="/" className="btn btn-ghost text-xl">
             <img className={cn('h-full')} alt={'Blaue Magiergilde'} src={'/images/logo.webp'} />
-          </div>
+            Blaue Magiergilde
+          </a>
         </div>
+
         <div className="navbar-center hidden lg:flex">
-          <ul className="menu menu-horizontal gap-1 px-1">
+          <ul className="menu menu-horizontal space-x-1 px-1" role="menubar">
             {menuLinks.map((menuLink) => (
-              <li key={menuLink.route}>
+              <li key={menuLink.route} role="none">
                 <Link
+                  role="menuitem"
                   method={menuLink.method}
-                  className={cn(route().current(menuLink.route) ? 'menu-active' : undefined)}
                   href={route(menuLink.route)}
+                  className={cn(route().current(menuLink.route) ? 'menu-active' : '')}
                 >
                   {menuLink.name}
                 </Link>
               </li>
             ))}
+            {auth.user.is_admin && (
+              <li role="none">
+                <details>
+                  <summary>Administration</summary>
+                  <ul className="z-30 w-52 p-2">
+                    {adminLinks.map((adminLink) => (
+                      <li key={adminLink.route} role="none">
+                        <Link
+                          role="menuitem"
+                          method={adminLink.method}
+                          href={route(adminLink.route)}
+                          className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
+                        >
+                          {adminLink.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            )}
           </ul>
         </div>
-        <div className="navbar-end">
-          <div className="dropdown dropdown-end mr-4">
-            <div tabIndex={0} role="button" className="btn btn-outline btn-circle h-6 w-6">
-              <ShieldUser size={18}></ShieldUser>
-            </div>
-            <ul tabIndex={0} className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
-              {adminLinks.map((adminLink) => (
-                <li key={adminLink.route}>
-                  <Link method={adminLink.method} href={route(adminLink.route)}>
-                    {adminLink.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
 
+        <div className="navbar-end space-x-2">
           <div className="dropdown dropdown-end">
-            <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
+            <button tabIndex={0} aria-label="User menu" className="btn btn-ghost btn-circle avatar">
               <div className="w-10 rounded-full">
-                <img alt={getInitials(auth.user.name)} src={auth.user.avatar} />
+                {auth.user.avatar ? (
+                  <img alt={auth.user.name} src={auth.user.avatar} />
+                ) : (
+                  <span className="text-base-content text-lg font-bold">{getInitials(auth.user.name)}</span>
+                )}
               </div>
-            </div>
-            <ul tabIndex={0} className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
+            </button>
+            <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
               {profileLinks.map((profileLink) => (
-                <li key={profileLink.route}>
-                  <Link method={profileLink.method} href={route(profileLink.route)}>
+                <li key={profileLink.route} role="none">
+                  <Link role="menuitem" method={profileLink.method} href={route(profileLink.route)}>
                     {profileLink.name}
                   </Link>
                 </li>
@@ -122,8 +129,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </ul>
           </div>
         </div>
-      </div>
-      <div>{children}</div>
+      </nav>
+      <main>{children}</main>
     </div>
   )
 }
