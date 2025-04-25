@@ -14,6 +14,8 @@ import AppLayout from '@/layouts/app-layout'
 import { Head } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { AlertCircle, Coins, Droplets, PartyPopper, Plus, Settings, Swords } from 'lucide-react'
+import StoreGameModal from '@/pages/game/store-game-modal'
+import UpdateGameModal from '@/pages/game/update-game-modal'
 
 export default function MasteredGames({ games, user, characters }) {
   const totalBubbles =
@@ -52,10 +54,12 @@ export default function MasteredGames({ games, user, characters }) {
             </h1>
             <p className="text-base-content/70 text-sm">Manage your progress with a summary of all mastered games.</p>
           </div>
-          <Button variant="outline" size="sm" className="flex items-center" onClick={() => alert('Create new game')}>
-            <Plus size={18} />
-            <span>Create New Game</span>
-          </Button>
+          <StoreGameModal>
+            <Button variant="outline" size="sm" className="flex items-center">
+              <Plus size={18} />
+              <span>Create New Game</span>
+            </Button>
+          </StoreGameModal>
         </section>
 
         <Card>
@@ -214,11 +218,11 @@ export default function MasteredGames({ games, user, characters }) {
                     {calculateCoins([game])} <Coins size={13} className="inline" />
                   </p>
                   <div className={'text-base-content/70 font-mono'}>{format(new Date(game.start_date), 'dd.MM.yyyy')}</div>
-                  <div>
+                  <UpdateGameModal game={game}>
                     <Button size={'xs'} modifier={'square'} variant={'ghost'}>
                       <Settings size={14}></Settings>
                     </Button>
-                  </div>
+                  </UpdateGameModal>
                 </ListRow>
               ))}
             </List>
