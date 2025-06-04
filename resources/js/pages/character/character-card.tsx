@@ -29,7 +29,7 @@ import { useImage } from 'react-image'
 
 function CharacterImage({ character, className }: { character: Character; className?: string }) {
   const { src } = useImage({
-    srcList: [character.avatar, '/images/no-avatar.svg'],
+    srcList: ['storage/' + character.avatar, '/images/no-avatar.svg'],
   })
   return <img className={cn('aspect-square w-full rounded-full', className)} src={src} alt={character.name} />
 }
