@@ -15,7 +15,7 @@ return new class extends Migration {
       $table->timestamps();
       $table->string('name');
       $table->enum('standing', ['good', 'normal', 'bad'])->default('normal');
-      $table->foreignId('character_id')->constrained('character')->cascadeOnDelete();
+      $table->foreignId('character_id')->constrained('characters')->cascadeOnDelete();
     });
   }
 

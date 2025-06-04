@@ -10,7 +10,7 @@ return new class extends Migration {
    */
   public function up(): void
   {
-    Schema::table('character', function (Blueprint $table) {
+    Schema::table('characters', function (Blueprint $table) {
       $table->enum('start_tier', ['bt', 'lt', 'ht'])->change();
     });
   }
@@ -20,7 +20,7 @@ return new class extends Migration {
    */
   public function down(): void
   {
-    Schema::table('character', function (Blueprint $table) {
+    Schema::table('characters', function (Blueprint $table) {
       $table->string('start_tier')->change();
     });
   }
