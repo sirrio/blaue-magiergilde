@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '@tiptap/starter-kit/dist/style.css';
 
 @plugin 'tailwindcss-animate';
 @plugin "daisyui" {
