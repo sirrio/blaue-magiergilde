@@ -137,6 +137,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
           })}
         </div>
       </div>
+      <label className="fieldset-label">Species</label>
       <input
         type="text"
         value={editData.species}
@@ -153,6 +154,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
+      <label className="fieldset-label">Standing</label>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
@@ -251,6 +253,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
           })}
         </div>
       </div>
+      <label className="fieldset-label">Species</label>
       <input
         type="text"
         value={editData.species}
@@ -267,6 +270,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
+      <label className="fieldset-label">Standing</label>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
