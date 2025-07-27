@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -22,9 +23,9 @@ return new class extends Migration {
                 'unterhalter',
                 'logistiker',
                 'flora & fauna',
-                "waffenmeister",
-                "ermittler",
-                "arkanisten",
+                'waffenmeister',
+                'ermittler',
+                'arkanisten',
             ])->default('none')->change();
         });
     }

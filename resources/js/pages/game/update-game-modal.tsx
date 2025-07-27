@@ -1,9 +1,9 @@
-import { Input } from '@/components/ui/input';
-import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal';
-import { TextArea } from '@/components/ui/text-area';
-import { useForm, usePage } from '@inertiajs/react';
-import React from 'react';
-import { Game } from '@/types';
+import { Input } from '@/components/ui/input'
+import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { TextArea } from '@/components/ui/text-area'
+import { Game } from '@/types'
+import { useForm, usePage } from '@inertiajs/react'
+import React from 'react'
 
 const UpdateGameModal = ({ game, children }: { game: Game; children: React.ReactNode }) => {
   const initialFormData = {
@@ -12,17 +12,17 @@ const UpdateGameModal = ({ game, children }: { game: Game; children: React.React
     duration: game.duration,
     start_date: game.start_date,
     notes: game.notes,
-  };
+  }
 
-  const { data, setData, post } = useForm(initialFormData);
-  const { errors } = usePage().props;
+  const { data, setData, post } = useForm(initialFormData)
+  const { errors } = usePage().props
 
   const handleFormSubmit = () => {
     post(route('games.update', { game, _method: 'put' }), {
       preserveState: 'errors',
       preserveScroll: true,
-    });
-  };
+    })
+  }
 
   return (
     <Modal>
@@ -30,22 +30,10 @@ const UpdateGameModal = ({ game, children }: { game: Game; children: React.React
       <ModalTitle>Update Game</ModalTitle>
       <ModalContent>
         <form>
-          <Input
-            placeholder="Game Title"
-            errors={errors.title}
-            type="text"
-            value={data.title}
-            onChange={(e) => setData('title', e.target.value)}
-          >
+          <Input placeholder="Game Title" errors={errors.title} type="text" value={data.title} onChange={(e) => setData('title', e.target.value)}>
             Title
           </Input>
-          <Input
-            placeholder="Game Tier"
-            errors={errors.tier}
-            type="text"
-            value={data.tier}
-            onChange={(e) => setData('tier', e.target.value)}
-          >
+          <Input placeholder="Game Tier" errors={errors.tier} type="text" value={data.tier} onChange={(e) => setData('tier', e.target.value)}>
             Tier
           </Input>
           <Input
@@ -66,19 +54,14 @@ const UpdateGameModal = ({ game, children }: { game: Game; children: React.React
           >
             Start Date
           </Input>
-          <TextArea
-            placeholder="Notes"
-            errors={errors.notes}
-            value={data.notes}
-            onChange={(e) => setData('notes', e.target.value)}
-          >
+          <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
     </Modal>
-  );
-};
+  )
+}
 
-export default UpdateGameModal;
+export default UpdateGameModal

@@ -19,7 +19,7 @@ class SpellFactory extends Factory
             'url' => $this->faker->optional()->url(),
             'legacy_url' => $this->faker->optional()->url(),
             'spell_school' => $this->faker->randomElement([
-                'abjuration', 'conjuration', 'divination', 'enchantment', 'evocation', 'illusion', 'necromancy', 'transmutation'
+                'abjuration', 'conjuration', 'divination', 'enchantment', 'evocation', 'illusion', 'necromancy', 'transmutation',
             ]),
             'spell_level' => $this->faker->numberBetween(0, 9),
         ];

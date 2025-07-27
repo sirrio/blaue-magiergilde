@@ -11,36 +11,36 @@ use Inertia\Inertia;
 
 class AuthenticatedSessionController extends Controller
 {
-  /**
-   * Display the login page.
-   */
-  public function create()
-  {
-    return Inertia::render('login');
-  }
+    /**
+     * Display the login page.
+     */
+    public function create()
+    {
+        return Inertia::render('login');
+    }
 
-  /**
-   * Handle an authentication request.
-   */
-  public function store(LoginRequest $request): RedirectResponse
-  {
-    $request->authenticate();
-    $request->session()->regenerate();
+    /**
+     * Handle an authentication request.
+     */
+    public function store(LoginRequest $request): RedirectResponse
+    {
+        $request->authenticate();
+        $request->session()->regenerate();
 
-    return redirect()->route('characters.index');
-  }
+        return redirect()->route('characters.index');
+    }
 
-  /**
-   * Destroy an authenticated session.
-   */
-  public function destroy(Request $request): RedirectResponse
-  {
-    Auth::guard('web')->logout();
+    /**
+     * Destroy an authenticated session.
+     */
+    public function destroy(Request $request): RedirectResponse
+    {
+        Auth::guard('web')->logout();
 
-    $request->session()->invalidate();
+        $request->session()->invalidate();
 
-    $request->session()->regenerateToken();
+        $request->session()->regenerateToken();
 
-    return redirect('/');
-  }
+        return redirect('/');
+    }
 }

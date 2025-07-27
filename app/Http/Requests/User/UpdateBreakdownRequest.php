@@ -21,34 +21,34 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class UpdateBreakdownRequest extends FormRequest
 {
-  /**
-   * Determine if the user is authorized to make this request.
-   */
-  public function authorize(): bool
-  {
-    return true;
-  }
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
 
-  /**
-   * Get the validation rules that apply to the request.
-   *
-   * @return array<string, ValidationRule|array|string>
-   */
-  public function rules(): array
-  {
-    return [
-      'event_bubbles' => 'required|integer|min:0',
-      'event_coins' => 'required|integer|min:0',
-      'bt_bubbles' => 'required|integer|min:0',
-      'bt_coins' => 'required|integer|min:0',
-      'lt_bubbles' => 'required|integer|min:0',
-      'lt_coins' => 'required|integer|min:0',
-      'ht_bubbles' => 'required|integer|min:0',
-      'ht_coins' => 'required|integer|min:0',
-      'et_bubbles' => 'required|integer|min:0',
-      'et_coins' => 'required|integer|min:0',
-      'other_bubbles' => 'required|integer|min:0',
-      'other_coins' => 'required|integer|min:0',
-    ];
-  }
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'event_bubbles' => 'required|integer|min:0',
+            'event_coins' => 'required|integer|min:0',
+            'bt_bubbles' => 'required|integer|min:0',
+            'bt_coins' => 'required|integer|min:0',
+            'lt_bubbles' => 'required|integer|min:0',
+            'lt_coins' => 'required|integer|min:0',
+            'ht_bubbles' => 'required|integer|min:0',
+            'ht_coins' => 'required|integer|min:0',
+            'et_bubbles' => 'required|integer|min:0',
+            'et_coins' => 'required|integer|min:0',
+            'other_bubbles' => 'required|integer|min:0',
+            'other_coins' => 'required|integer|min:0',
+        ];
+    }
 }

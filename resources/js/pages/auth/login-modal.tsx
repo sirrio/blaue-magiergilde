@@ -23,15 +23,17 @@ export default function LoginModal({ children }: React.PropsWithChildren) {
           <Button as="a" href={route('discord.login')} color="primary" modifier="block">
             Login with Discord
           </Button>
-          <Input type="email" value={data.email} onChange={e => setData('email', e.target.value)} errors={errors.email}>
+          <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email}>
             Email
           </Input>
-          <Input type="password" value={data.password} onChange={e => setData('password', e.target.value)} errors={errors.password}>
+          <Input type="password" value={data.password} onChange={(e) => setData('password', e.target.value)} errors={errors.password}>
             Password
           </Input>
         </div>
       </ModalContent>
-      <ModalAction onClick={submit} disabled={processing}>Login</ModalAction>
+      <ModalAction onClick={submit} disabled={processing}>
+        Login
+      </ModalAction>
     </Modal>
   )
 }

@@ -27,7 +27,7 @@ class CharacterFactory extends Factory
             'bubble_shop_spend' => $this->faker->numberBetween(0, 10),
             'is_filler' => $this->faker->boolean(),
             'faction' => $this->faker->randomElement([
-                'none','heiler','handwerker','feldforscher','bibliothekare','diplomaten','gardisten','unterhalter','logistiker','flora & fauna','waffenmeister','ermittler','arkanisten'
+                'none', 'heiler', 'handwerker', 'feldforscher', 'bibliothekare', 'diplomaten', 'gardisten', 'unterhalter', 'logistiker', 'flora & fauna', 'waffenmeister', 'ermittler', 'arkanisten',
             ]),
             'notes' => $this->faker->sentence(),
             'position' => $this->faker->numberBetween(0, 10),

@@ -5,9 +5,9 @@ use App\Http\Controllers\User\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::resource('user', UserController::class)->only([
-  'destroy'
+    'destroy',
 ])->middleware(['auth']);
 
 Route::resource('breakdowns', BreakdownController::class)->only([
-  'update'
+    'update',
 ])->middleware(['auth']);

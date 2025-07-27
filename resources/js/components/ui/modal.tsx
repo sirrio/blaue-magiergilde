@@ -28,13 +28,13 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false 
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     if (onClose) {
       onClose();
     } else {
       setInternalOpen(false);
     }
-  };
+  }, [onClose]);
   const openModal = () => {
     if (controlledOpen === undefined) {
       setInternalOpen(true);
@@ -58,7 +58,7 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false 
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [closeModal, isOpen]);
 
   return (
     <>

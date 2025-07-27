@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Downtime;
 use App\Models\Character;
+use App\Models\Downtime;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,7 +20,7 @@ class DowntimeFactory extends Factory
             'duration' => $this->faker->numberBetween(1, 10),
             'start_date' => $this->faker->date(),
             'notes' => $this->faker->paragraph(),
-            'type' => $this->faker->randomElement(['faction','other']),
+            'type' => $this->faker->randomElement(['faction', 'other']),
         ];
     }
 }

@@ -18,7 +18,7 @@ class AllyFactory extends Factory
         return [
             'character_id' => Character::factory(),
             'name' => $this->faker->name(),
-            'standing' => $this->faker->randomElement(['best','good','normal','bad']),
+            'standing' => $this->faker->randomElement(['best', 'good', 'normal', 'bad']),
             'avatar' => $this->faker->imageUrl(200, 200, 'people'),
             'notes' => $this->faker->sentence(),
             'species' => $this->faker->word(),

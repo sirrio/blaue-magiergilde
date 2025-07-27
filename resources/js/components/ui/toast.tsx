@@ -1,4 +1,11 @@
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react'
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react'
 import { cn } from '@/lib/utils'
 import { Info, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
@@ -19,11 +26,11 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [message, setMessage] = useState<ReactNode>(null)
   const [variant, setVariant] = useState<ToastVariant>('info')
 
-  const show = (newMessage: ReactNode, newVariant: ToastVariant = 'info') => {
+  const show = useCallback((newMessage: ReactNode, newVariant: ToastVariant = 'info') => {
     setMessage(newMessage)
     setVariant(newVariant)
     setVisible(true)
-  }
+  }, [])
 
   useEffect(() => {
     toast.show = show

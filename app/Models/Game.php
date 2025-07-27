@@ -18,9 +18,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Game extends Model
 {
-  use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes;
 
-  protected $casts = [
-    'has_additional_bubble' => 'boolean'
-  ];
+    protected $casts = [
+        'has_additional_bubble' => 'boolean',
+    ];
 }
