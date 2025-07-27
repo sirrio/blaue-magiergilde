@@ -5,5 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::resource('allies', AllyController::class)->only([
     'store',
+    'update',
     'destroy',
 ])->middleware(['auth']);
