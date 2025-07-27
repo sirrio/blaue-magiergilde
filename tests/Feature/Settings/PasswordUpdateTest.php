@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Hash;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-test('password can be updated', function () {
+test('password update endpoint is unavailable', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -17,14 +17,10 @@ test('password can be updated', function () {
             'password_confirmation' => 'new-password',
         ]);
 
-    $response
-        ->assertSessionHasNoErrors()
-        ->assertRedirect('/settings/password');
-
-    expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
+    $response->assertNotFound();
 });
 
-test('correct password must be provided to update password', function () {
+test('incorrect password is rejected', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -36,7 +32,5 @@ test('correct password must be provided to update password', function () {
             'password_confirmation' => 'new-password',
         ]);
 
-    $response
-        ->assertSessionHasErrors('current_password')
-        ->assertRedirect('/settings/password');
+    $response->assertNotFound();
 });

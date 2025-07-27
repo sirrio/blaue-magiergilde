@@ -43,8 +43,10 @@
   <link rel="manifest" href="/favicons/site.webmanifest" />
 
   @routes
-  @viteReactRefresh
-  @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
+  @unless(app()->environment('testing'))
+    @viteReactRefresh
+    @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
+  @endunless
   @inertiaHead
 </head>
 <body class="font-sans antialiased">
