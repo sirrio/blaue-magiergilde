@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TextArea } from '@/components/ui/text-area'
 import { useForm, usePage } from '@inertiajs/react'
 import React from 'react'
@@ -10,6 +11,8 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
     tier: '',
     duration: 0,
     start_date: new Date().toISOString().slice(0, 10),
+    sessions: 1,
+    has_additional_bubble: false,
     notes: '',
   }
 
@@ -45,6 +48,15 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
             Duration
           </Input>
           <Input
+            placeholder="Sessions"
+            errors={errors.sessions}
+            type="number"
+            value={data.sessions}
+            onChange={(e) => setData('sessions', Number(e.target.value))}
+          >
+            Sessions
+          </Input>
+          <Input
             placeholder="Start Date"
             errors={errors.start_date}
             type="date"
@@ -53,6 +65,13 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
           >
             Start Date
           </Input>
+          <Checkbox
+            errors={errors.has_additional_bubble}
+            checked={data.has_additional_bubble}
+            onChange={(e) => setData('has_additional_bubble', e.target.checked)}
+          >
+            Additional Bubble
+          </Checkbox>
           <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
