@@ -4,23 +4,22 @@ use App\Models\User;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-test('confirm password screen can be rendered', function () {
+test('confirm password screen is unavailable', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->get('/confirm-password');
 
-    $response->assertStatus(200);
+    $response->assertNotFound();
 });
 
-test('password can be confirmed', function () {
+test('password confirmation endpoint is unavailable', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->post('/confirm-password', [
         'password' => 'password',
     ]);
 
-    $response->assertRedirect();
-    $response->assertSessionHasNoErrors();
+    $response->assertNotFound();
 });
 
 test('password is not confirmed with invalid password', function () {
@@ -30,5 +29,5 @@ test('password is not confirmed with invalid password', function () {
         'password' => 'wrong-password',
     ]);
 
-    $response->assertSessionHasErrors();
+    $response->assertNotFound();
 });
