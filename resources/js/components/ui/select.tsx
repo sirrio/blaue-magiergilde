@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react'
-import createRandomString from '@/helper/createRandomString'
+import React, { ReactNode, useId } from 'react'
+import { findChildByType } from '@/lib/react-helpers'
 import { cn } from '@/lib/utils'
 
 type SelectProps = {
@@ -7,7 +7,7 @@ type SelectProps = {
   children: ReactNode
   value: string | number
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
-  errors?: string & Record<string, string>
+  errors?: ReactNode
   className?: string
 }
 
@@ -19,27 +19,24 @@ type SelectOptionsProps = {
   children: ReactNode
 }
 
-function findChildByType<T>(children: ReactNode, componentType: React.FC<T>): ReactNode | null {
-  return React.Children.toArray(children).find(child =>
-    React.isValidElement(child) && child.type === componentType
-  ) || null
-}
 
 export const Select: React.FC<SelectProps> = ({
-                                                id = createRandomString(24),
+                                                id,
                                                 children,
                                                 value,
                                                 onChange,
                                                 errors = '',
                                                 className = ''
                                               }) => {
+  const generatedId = useId()
+  const selectId = id ?? generatedId
   const labelElement = findChildByType(children, SelectLabel)
   const optionsElement = findChildByType(children, SelectOptions)
 
   return (
     <div className={'w-full'}>
       {labelElement}
-      <select className={cn('select w-full', className)} id={id} value={value} onChange={onChange}>
+      <select className={cn('select w-full', className)} id={selectId} value={value} onChange={onChange}>
         {optionsElement}
       </select>
       {errors && <p className={'fieldset-label text-error'}>{errors}</p>}

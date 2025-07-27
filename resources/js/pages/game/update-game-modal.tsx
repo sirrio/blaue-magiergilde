@@ -2,10 +2,10 @@ import { Input } from '@/components/ui/input';
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal';
 import { TextArea } from '@/components/ui/text-area';
 import { useForm, usePage } from '@inertiajs/react';
-import { Settings } from 'lucide-react';
 import React from 'react';
+import { Game } from '@/types';
 
-const UpdateGameModal = ({ game, children }: { game: any; children: React.ReactNode }) => {
+const UpdateGameModal = ({ game, children }: { game: Game; children: React.ReactNode }) => {
   const initialFormData = {
     title: game.title,
     tier: game.tier,

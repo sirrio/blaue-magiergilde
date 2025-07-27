@@ -1,26 +1,29 @@
 import { cn } from '@/lib/utils'
 import React, { ElementType, ReactNode } from 'react'
 
-type ButtonProps = {
-  as?: ElementType,
+type ButtonProps<C extends ElementType = 'button'> = {
+  as?: C,
   className?: string,
   children?: ReactNode,
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl',
   variant?: 'outline' | 'dash' | 'soft' | 'ghost' | 'link',
   modifier?: 'wide' | 'block' | 'square' | 'circle',
   color?: 'neutral' | 'primary' | 'secondary' | 'accent' | 'info' | 'success' | 'warning' | 'error',
-} & React.ComponentPropsWithoutRef<'a' | 'button'>
+} & React.ComponentPropsWithoutRef<C>
 
-export const Button: React.FC<ButtonProps> = ({
-                                                as: Component = 'button',
-                                                className,
-                                                children,
-                                                size = 'md',
-                                                variant,
-                                                modifier,
-                                                color,
-                                                ...props
-                                              }) => {
+export const Button = <C extends ElementType = 'button'>(
+  {
+    as,
+    className,
+    children,
+    size = 'md',
+    variant,
+    modifier,
+    color,
+    ...props
+  }: ButtonProps<C>
+) => {
+  const Component = as || 'button'
   const buttonClasses = cn(
     'btn',
     `btn-${size}`,

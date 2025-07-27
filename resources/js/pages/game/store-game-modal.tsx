@@ -2,7 +2,6 @@ import { Input } from '@/components/ui/input';
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal';
 import { TextArea } from '@/components/ui/text-area';
 import { useForm, usePage } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
 import React from 'react';
 
 const StoreGameModal = ({ children }: React.PropsWithChildren) => {

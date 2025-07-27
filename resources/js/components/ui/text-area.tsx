@@ -1,28 +1,29 @@
-import React, { ReactNode } from 'react'
-import createRandomString from '@/helper/createRandomString'
+import React, { ReactNode, useId } from 'react'
 
 type InputProps = {
   id?: string
   children: ReactNode
   value: string | number
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
-  errors?: string & Record<string, string>
+  errors?: ReactNode
   placeholder?: string
 }
 
 export const TextArea: React.FC<InputProps> = ({
-                                                 id = createRandomString(24),
+                                                 id,
                                                  children,
                                                  value,
                                                  onChange,
                                                  placeholder,
                                                  errors = ''
                                                }) => {
+  const generatedId = useId()
+  const inputId = id ?? generatedId
   return (
     <div>
-      <label className={'label'} htmlFor={id}>{children}</label>
+      <label className={'label'} htmlFor={inputId}>{children}</label>
       <textarea placeholder={placeholder} className={'textarea w-full'}
-                id={id}
+                id={inputId}
                 value={value}
                 onChange={onChange}
       />
