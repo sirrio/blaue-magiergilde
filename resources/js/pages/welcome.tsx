@@ -2,6 +2,8 @@ import { cn } from '@/lib/utils'
 import { Head } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { z } from 'zod'
+import LoginModal from './auth/login-modal'
+import RegisterModal from './auth/register-modal'
 
 const mySchema = z.string()
 
@@ -25,13 +27,12 @@ export default function Welcome() {
               alles im Blick und kannst dich voll und ganz auf dein Spiele konzentrieren!
             </p>
             <div className={cn('space-x-2')}>
-              <a href={route('discord.login')} className={cn('btn btn-primary')}>
-                Discord
-              </a>
-              <a href={route('login')} className={cn('btn btn-outline')}>Login</a>
-              <a href={route('register')} className={cn('btn btn-outline')}>
-                Register
-              </a>
+              <LoginModal>
+                <button className={cn('btn btn-outline')}>Login</button>
+              </LoginModal>
+              <RegisterModal>
+                <button className={cn('btn btn-outline')}>Register</button>
+              </RegisterModal>
             </div>
           </div>
         </div>
