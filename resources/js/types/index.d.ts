@@ -4,6 +4,7 @@ export interface PageProps {
   name: string
   quote: { message: string; author: string }
   auth: Auth
+  appearance: string
   classes: CharacterClass[]
   tiers: object
   versions: string[]

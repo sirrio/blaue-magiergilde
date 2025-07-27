@@ -4,6 +4,7 @@ import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
 import { Menu } from 'lucide-react'
 import { ReactNode } from 'react'
+import ThemeSwitcher from '@/components/theme-switcher'
 
 interface AppLayoutProps {
   children: ReactNode
@@ -119,6 +120,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
+              <li role="none">
+                <ThemeSwitcher />
+              </li>
               {profileLinks.map((profileLink) => (
                 <li key={profileLink.route} role="none">
                   <Link role="menuitem" method={profileLink.method} href={route(profileLink.route)}>
