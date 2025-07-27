@@ -22,7 +22,7 @@ export default function Welcome() {
       <Head title="Welcome"></Head>
       <div className={cn('hero bg-base-200 min-h-screen')}>
         <div className={cn('hero-content flex-col lg:flex-row-reverse')}>
-          <img src="/images/logo.webp" className={cn('max-w-sm rounded-lg')} />
+          <img src="/images/icon_magiergilde.svg" className={cn('max-w-sm rounded-lg')} />
           <div>
             <h1 className={cn('text-5xl font-bold')}>Blaue Magiergilde</h1>
             <p className={cn('py-6')}>
@@ -35,14 +35,14 @@ export default function Welcome() {
                   Zur Characterverwaltung
                 </Button>
               ) : (
-                <>
+                <div className={cn('flex gap-2')}>
                   <LoginModal>
-                    <button className={cn('btn btn-outline')}>Login</button>
+                    <button className={cn('btn btn-accent')}>Login</button>
                   </LoginModal>
                   <RegisterModal>
                     <button className={cn('btn btn-outline')}>Register</button>
                   </RegisterModal>
-                </>
+                </div>
               )}
             </div>
           </div>
