@@ -100,7 +100,7 @@ export interface Ally {
   name: string
   standing: 'best' | 'good' | 'normal' | 'bad'
   character_id: number
-  avatar: string
+  avatar: string | File
   notes: string
   classes: string
   species: string
