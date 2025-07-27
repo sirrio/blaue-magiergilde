@@ -26,9 +26,12 @@ export default function Welcome() {
             </p>
             <div className={cn('space-x-2')}>
               <a href={route('discord.login')} className={cn('btn btn-primary')}>
-                Login
+                Discord
               </a>
-              <button className={cn('btn btn-primary')}>Discord</button>
+              <a href={route('login')} className={cn('btn btn-outline')}>Login</a>
+              <a href={route('register')} className={cn('btn btn-outline')}>
+                Register
+              </a>
             </div>
           </div>
         </div>

@@ -1,0 +1,29 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Head, useForm } from '@inertiajs/react'
+
+export default function Login() {
+  const { data, setData, post, processing, errors } = useForm({
+    email: '',
+    password: '',
+  })
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    post(route('login'))
+  }
+
+  return (
+    <>
+      <Head title="Login" />
+      <div className="hero bg-base-200 min-h-screen">
+        <form onSubmit={submit} className="hero-content card w-full max-w-sm flex-col space-y-4 p-6">
+          <h1 className="text-2xl font-bold">Login</h1>
+          <Input type="email" value={data.email} onChange={e => setData('email', e.target.value)} errors={errors.email}>Email</Input>
+          <Input type="password" value={data.password} onChange={e => setData('password', e.target.value)} errors={errors.password}>Password</Input>
+          <Button type="submit" disabled={processing} className="btn-primary w-full">Login</Button>
+        </form>
+      </div>
+    </>
+  )
+}

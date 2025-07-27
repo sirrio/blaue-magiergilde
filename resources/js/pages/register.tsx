@@ -1,0 +1,33 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Head, useForm } from '@inertiajs/react'
+
+export default function Register() {
+  const { data, setData, post, processing, errors } = useForm({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+  })
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    post(route('register'))
+  }
+
+  return (
+    <>
+      <Head title="Register" />
+      <div className="hero bg-base-200 min-h-screen">
+        <form onSubmit={submit} className="hero-content card w-full max-w-sm flex-col space-y-4 p-6">
+          <h1 className="text-2xl font-bold">Register</h1>
+          <Input type="text" value={data.name} onChange={e => setData('name', e.target.value)} errors={errors.name}>Name</Input>
+          <Input type="email" value={data.email} onChange={e => setData('email', e.target.value)} errors={errors.email}>Email</Input>
+          <Input type="password" value={data.password} onChange={e => setData('password', e.target.value)} errors={errors.password}>Password</Input>
+          <Input type="password" value={data.password_confirmation} onChange={e => setData('password_confirmation', e.target.value)} errors={errors.password_confirmation}>Confirm Password</Input>
+          <Button type="submit" disabled={processing} className="btn-primary w-full">Register</Button>
+        </form>
+      </div>
+    </>
+  )
+}
