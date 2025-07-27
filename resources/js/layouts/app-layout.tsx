@@ -121,15 +121,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
-              <li className="px-4 py-2" role="none">
-                <p className="font-semibold leading-tight">{auth.user.name}</p>
-                <p className="text-xs text-neutral-content">{auth.user.email}</p>
+              <li className="cursor-default px-4 py-2" role="none">
+                <p className="font-semibold leading-tight text-base-content">
+                  {auth.user.name}
+                </p>
+                <p className="text-xs text-base-content/70">{auth.user.email}</p>
               </li>
-              <li role="separator" className="my-1"><hr /></li>
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
+              </li>
               <li role="none">
                 <ThemeSwitcher />
               </li>
-              <li role="separator" className="my-1"><hr /></li>
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
+              </li>
               {profileLinks.map((profileLink) => (
                 <li key={profileLink.route} role="none">
                   <Link role="menuitem" method={profileLink.method} href={route(profileLink.route)}>
