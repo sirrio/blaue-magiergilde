@@ -35,7 +35,9 @@ class AllyController extends Controller
         $ally->name = $request->name;
         $ally->standing = $request->standing;
         $ally->character_id = $request->character_id;
-        $ally->avatar = $request->avatar;
+        if ($request->file('avatar')) {
+            $ally->avatar = $request->file('avatar')->store('avatars', 'public');
+        }
         $ally->notes = $request->notes;
         $ally->species = $request->species;
         $ally->classes = $request->classes;
@@ -67,7 +69,9 @@ class AllyController extends Controller
     {
         $ally->name = $request->name;
         $ally->standing = $request->standing;
-        $ally->avatar = $request->avatar;
+        if ($request->file('avatar')) {
+            $ally->avatar = $request->file('avatar')->store('avatars', 'public');
+        }
         $ally->notes = $request->notes;
         $ally->species = $request->species;
         $ally->classes = $request->classes;
