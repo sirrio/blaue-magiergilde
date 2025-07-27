@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
 import { Menu } from 'lucide-react'
-import { ReactNode } from 'react'
+import { ReactNode, useRef } from 'react'
+import { useClickOutside } from '@/hooks/use-click-outside'
 import ThemeSwitcher from '@/components/theme-switcher'
 
 interface AppLayoutProps {
@@ -29,6 +30,10 @@ const adminLinks = [
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth } = usePage<PageProps>().props
   const getInitials = useInitials()
+  const adminDetailsRef = useRef<HTMLDetailsElement>(null)
+  useClickOutside(adminDetailsRef, () =>
+    adminDetailsRef.current?.removeAttribute('open')
+  )
 
   return (
     <div className={cn('bg-base-200 min-h-screen')}>
@@ -46,7 +51,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </Link>
                 </li>
               ))}
-              {auth.user.is_admin && (
+              {Boolean(auth.user.is_admin) && (
                 <li role="none">
                   <a>Administration</a>
                   <ul className="p-2">
@@ -87,9 +92,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </Link>
               </li>
             ))}
-            {auth.user.is_admin && (
+            {Boolean(auth.user.is_admin) && (
               <li role="none">
-                <details>
+                <details ref={adminDetailsRef}>
                   <summary>Administration</summary>
                   <ul className="z-30 w-52 p-2">
                     {adminLinks.map((adminLink) => (
