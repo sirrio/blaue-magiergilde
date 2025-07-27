@@ -1,0 +1,47 @@
+import type { Config } from 'tailwindcss'
+import animate from 'tailwindcss-animate'
+import daisyui from 'daisyui'
+
+export default {
+  content: [],
+  plugins: [animate, daisyui],
+  daisyui: {
+    themes: [
+      'abyss',
+      'acid',
+      'aqua',
+      'autumn',
+      'black',
+      'bumblebee',
+      'business',
+      'caramellatte',
+      'cmyk',
+      'coffee',
+      'corporate',
+      'cupcake',
+      'cyberpunk',
+      'dark',
+      'dim',
+      'dracula',
+      'emerald',
+      'fantasy',
+      'forest',
+      'garden',
+      'halloween',
+      'lemonade',
+      'light',
+      'lofi',
+      'luxury',
+      'night',
+      'nord',
+      'pastel',
+      'retro',
+      'silk',
+      'sunset',
+      'synthwave',
+      'valentine',
+      'winter',
+      'wireframe',
+    ],
+  },
+} satisfies Config

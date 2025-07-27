@@ -12,7 +12,9 @@ export default defineConfig({
       refresh: true,
     }),
     react(),
-    tailwindcss(),
+    tailwindcss({
+      config: 'tailwind.config.ts',
+    }),
   ],
   esbuild: {
     jsx: 'automatic',
