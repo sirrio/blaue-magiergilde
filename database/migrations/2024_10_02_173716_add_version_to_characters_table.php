@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('character', function (Blueprint $table) {
+        Schema::table('characters', function (Blueprint $table) {
             $table->string('version')->after('name')->default('2024');
         });
     }
@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('character', function (Blueprint $table) {
+        Schema::table('characters', function (Blueprint $table) {
             $table->dropColumn('version');
         });
     }
