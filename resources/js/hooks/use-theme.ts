@@ -38,6 +38,23 @@ export const themes = [
   'wireframe',
 ] as const
 
+const darkThemes = new Set<Theme>([
+  'abyss',
+  'aqua',
+  'black',
+  'business',
+  'coffee',
+  'dark',
+  'dim',
+  'dracula',
+  'forest',
+  'halloween',
+  'luxury',
+  'night',
+  'sunset',
+  'synthwave',
+])
+
 export type Theme = (typeof themes)[number]
 
 export function useTheme() {
@@ -51,7 +68,13 @@ export function useTheme() {
   })
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
+    const root = document.documentElement
+    root.setAttribute('data-theme', theme)
+    if (darkThemes.has(theme)) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
     localStorage.setItem('theme', theme)
   }, [theme])
 
