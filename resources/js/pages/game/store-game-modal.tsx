@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
-import { TextArea } from '@/components/ui/text-area'
+import { MarkdownArea } from '@/components/ui/markdown-area'
 import { useForm, usePage } from '@inertiajs/react'
 import React from 'react'
 
@@ -53,9 +53,9 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
           >
             Start Date
           </Input>
-          <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+          <MarkdownArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
-          </TextArea>
+          </MarkdownArea>
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

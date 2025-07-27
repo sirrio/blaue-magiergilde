@@ -5,6 +5,7 @@ import LogoLt from '@/components/logo-lt'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { List, ListRow } from '@/components/ui/list'
+import MarkdownRenderer from '@/components/markdown-renderer'
 import { calculateBubbleByFillerCharacters, calculateBubbleByGames } from '@/helper/calculateBubble'
 import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
@@ -208,7 +209,13 @@ export default function MasteredGames({ games, user, characters }) {
                     {game.tier === 'ht' && <LogoHt width={16} />}
                     {game.tier === 'et' && <LogoEt width={16} />} {game.title ?? 'Game'}
                   </h3>
-                  <p className={'text-base-content/50 truncate text-xs'}>{game.notes ?? 'No notes'}</p>
+                  <div className={'text-base-content/50 text-xs max-w-xs overflow-hidden'}>
+                    {game.notes ? (
+                      <MarkdownRenderer>{game.notes}</MarkdownRenderer>
+                    ) : (
+                      'No notes'
+                    )}
+                  </div>
                   <p className={'text-xs'}>
                     {calculateBubbleByGames([game])} <Droplets size={13} className="inline" />
                   </p>
