@@ -30,6 +30,7 @@ class StoreAllyRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'standing' => 'required|string',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
         ];
     }
 }

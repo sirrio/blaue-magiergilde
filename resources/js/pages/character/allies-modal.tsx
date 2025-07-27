@@ -1,9 +1,11 @@
 import { Button } from '@/components/ui/button'
+import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
-import { Ally, Character } from '@/types'
+import createRandomString from '@/helper/createRandomString'
+import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
-import { router } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 
 interface AlliesModalProps {
   character: Character
@@ -22,10 +24,12 @@ interface AllyCardProps {
 
 const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, onCancel, onRemove }) => {
   const [editData, setEditData] = useState<Ally>({ ...ally })
+  const { classes } = usePage<PageProps>().props
   useEffect(() => {
     setEditData({ ...ally })
   }, [ally])
-  const handleChange = (key: keyof Ally, value: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleChange = (key: keyof Ally, value: any) => {
     setEditData({ ...editData, [key]: value })
   }
   if (!isEditing) {
@@ -72,13 +76,39 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
           onChange={(e) => handleChange('name', e.target.value)}
         />
       </div>
-      <input
-        type="text"
-        value={editData.classes}
-        placeholder="Classes"
-        className="input input-bordered input-xs mb-1 w-full"
-        onChange={(e) => handleChange('classes', e.target.value)}
-      />
+      <div className="mb-1">
+        <label className="fieldset-label">Classes</label>
+        <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
+          {classes.map((cc: CharacterClass) => {
+            const id = createRandomString(24)
+            const selected = editData.classes
+              ? editData.classes.split(',').map((c) => c.trim()).includes(cc.name)
+              : false
+            return (
+              <div className="flex items-center gap-1" key={cc.id}>
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  id={id}
+                  checked={selected}
+                  onChange={(e) => {
+                    const list = editData.classes
+                      ? editData.classes.split(',').map((c) => c.trim()).filter(Boolean)
+                      : []
+                    const updated = e.target.checked
+                      ? [...list, cc.name]
+                      : list.filter((n) => n !== cc.name)
+                    handleChange('classes', updated.join(', '))
+                  }}
+                />
+                <label htmlFor={id} className="fieldset-label cursor-pointer">
+                  {cc.name}
+                </label>
+              </div>
+            )
+          })}
+        </div>
+      </div>
       <input
         type="text"
         value={editData.species}
@@ -92,13 +122,9 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
         className="textarea textarea-bordered textarea-xs mb-1 w-full"
         onChange={(e) => handleChange('notes', e.target.value)}
       />
-      <input
-        type="text"
-        value={editData.avatar}
-        placeholder="Avatar URL"
-        className="input input-bordered input-xs mb-1 w-full"
-        onChange={(e) => handleChange('avatar', e.target.value)}
-      />
+      <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
+        Avatar
+      </FileInput>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
@@ -142,7 +168,9 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
     species: '',
     standing: 'normal',
   })
-  const handleChange = (key: keyof Ally, value: string) => {
+  const { classes } = usePage<PageProps>().props
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleChange = (key: keyof Ally, value: any) => {
     setEditData({ ...editData, [key]: value })
   }
   if (!isEditing) {
@@ -162,13 +190,39 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
         className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('name', e.target.value)}
       />
-      <input
-        type="text"
-        value={editData.classes}
-        placeholder="Classes"
-        className="input input-bordered input-xs mb-1 w-full"
-        onChange={(e) => handleChange('classes', e.target.value)}
-      />
+      <div className="mb-1">
+        <label className="fieldset-label">Classes</label>
+        <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
+          {classes.map((cc: CharacterClass) => {
+            const id = createRandomString(24)
+            const selected = editData.classes
+              ? editData.classes.split(',').map((c) => c.trim()).includes(cc.name)
+              : false
+            return (
+              <div className="flex items-center gap-1" key={cc.id}>
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  id={id}
+                  checked={selected}
+                  onChange={(e) => {
+                    const list = editData.classes
+                      ? editData.classes.split(',').map((c) => c.trim()).filter(Boolean)
+                      : []
+                    const updated = e.target.checked
+                      ? [...list, cc.name]
+                      : list.filter((n) => n !== cc.name)
+                    handleChange('classes', updated.join(', '))
+                  }}
+                />
+                <label htmlFor={id} className="fieldset-label cursor-pointer">
+                  {cc.name}
+                </label>
+              </div>
+            )
+          })}
+        </div>
+      </div>
       <input
         type="text"
         value={editData.species}
@@ -182,13 +236,9 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
         className="textarea textarea-bordered textarea-xs mb-1 w-full"
         onChange={(e) => handleChange('notes', e.target.value)}
       />
-      <input
-        type="text"
-        value={editData.avatar}
-        placeholder="Avatar URL"
-        className="input input-bordered input-xs mb-1 w-full"
-        onChange={(e) => handleChange('avatar', e.target.value)}
-      />
+      <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
+        Avatar
+      </FileInput>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
