@@ -4,6 +4,7 @@ import { Ally, Character } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { router } from '@inertiajs/react'
+import { SimpleEditor } from '@/components/tiptap-templates/simple/simple-editor'
 
 interface AlliesModalProps {
   character: Character
@@ -86,12 +87,8 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
         className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
       />
-      <textarea
-        value={editData.notes}
-        placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+      <label className="label">Notes</label>
+      <SimpleEditor value={editData.notes} onChange={(val) => handleChange('notes', val)} />
       <input
         type="text"
         value={editData.avatar}
@@ -176,12 +173,8 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
         className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
       />
-      <textarea
-        value={editData.notes}
-        placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+      <label className="label">Notes</label>
+      <SimpleEditor value={editData.notes} onChange={(val) => handleChange('notes', val)} />
       <input
         type="text"
         value={editData.avatar}
