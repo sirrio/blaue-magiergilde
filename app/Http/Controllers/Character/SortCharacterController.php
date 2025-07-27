@@ -9,15 +9,15 @@ use Illuminate\Http\RedirectResponse;
 
 class SortCharacterController extends Controller
 {
-  public function __invoke(SortCharacterRequest $request): RedirectResponse
-  {
-    $list = $request->list;
-    foreach ($list as $key => $value) {
-      $char = Character::query()->find($value['id']);
-      $char->position = $key;
-      $char->save();
-    }
+    public function __invoke(SortCharacterRequest $request): RedirectResponse
+    {
+        $list = $request->list;
+        foreach ($list as $key => $value) {
+            $char = Character::query()->find($value['id']);
+            $char->position = $key;
+            $char->save();
+        }
 
-    return redirect()->back();
-  }
+        return redirect()->back();
+    }
 }

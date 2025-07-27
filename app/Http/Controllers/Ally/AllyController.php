@@ -10,67 +10,67 @@ use Illuminate\Http\RedirectResponse;
 
 class AllyController extends Controller
 {
-  /**
-   * Display a listing of the resource.
-   */
-  public function index()
-  {
-    //
-  }
+    /**
+     * Display a listing of the resource.
+     */
+    public function index()
+    {
+        //
+    }
 
-  /**
-   * Show the form for creating a new resource.
-   */
-  public function create()
-  {
-    //
-  }
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        //
+    }
 
-  /**
-   * Store a newly created resource in storage.
-   */
-  public function store(StoreAllyRequest $request): RedirectResponse
-  {
-    $ally = new Ally();
-    $ally->name = $request->name;
-    $ally->standing = $request->standing;
-    $ally->character_id = $request->character_id;
-    $ally->save();
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(StoreAllyRequest $request): RedirectResponse
+    {
+        $ally = new Ally;
+        $ally->name = $request->name;
+        $ally->standing = $request->standing;
+        $ally->character_id = $request->character_id;
+        $ally->save();
 
-    return redirect()->back();
-  }
+        return redirect()->back();
+    }
 
-  /**
-   * Display the specified resource.
-   */
-  public function show(Ally $ally)
-  {
-    //
-  }
+    /**
+     * Display the specified resource.
+     */
+    public function show(Ally $ally)
+    {
+        //
+    }
 
-  /**
-   * Show the form for editing the specified resource.
-   */
-  public function edit(Ally $ally)
-  {
-    //
-  }
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(Ally $ally)
+    {
+        //
+    }
 
-  /**
-   * Update the specified resource in storage.
-   */
-  public function update(UpdateAllyRequest $request, Ally $ally)
-  {
-    //
-  }
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(UpdateAllyRequest $request, Ally $ally)
+    {
+        //
+    }
 
-  /**
-   * Remove the specified resource from storage.
-   */
-  public function destroy(Ally $ally): RedirectResponse
-  {
-    $ally->delete();
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Ally $ally): RedirectResponse
+    {
+        $ally->delete();
 
-    return redirect()->back();
-  }
+        return redirect()->back();
+    }
 }

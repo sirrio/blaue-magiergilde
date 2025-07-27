@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Shop extends Model
 {
-  /** @use HasFactory<ShopFactory> */
-  use HasFactory;
+    /** @use HasFactory<ShopFactory> */
+    use HasFactory;
 
-  public function items(): BelongsToMany
-  {
-    return $this->belongsToMany(Item::class);
-  }
+    public function items(): BelongsToMany
+    {
+        return $this->belongsToMany(Item::class);
+    }
 }

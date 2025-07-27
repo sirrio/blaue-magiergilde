@@ -15,5 +15,5 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Downtime extends Model
 {
-  use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes;
 }

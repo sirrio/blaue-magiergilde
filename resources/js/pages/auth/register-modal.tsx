@@ -25,21 +25,28 @@ export default function RegisterModal({ children }: React.PropsWithChildren) {
           <Button as="a" href={route('discord.login')} color="primary" modifier="block">
             Register with Discord
           </Button>
-          <Input type="text" value={data.name} onChange={e => setData('name', e.target.value)} errors={errors.name}>
+          <Input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name}>
             Name
           </Input>
-          <Input type="email" value={data.email} onChange={e => setData('email', e.target.value)} errors={errors.email}>
+          <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email}>
             Email
           </Input>
-          <Input type="password" value={data.password} onChange={e => setData('password', e.target.value)} errors={errors.password}>
+          <Input type="password" value={data.password} onChange={(e) => setData('password', e.target.value)} errors={errors.password}>
             Password
           </Input>
-          <Input type="password" value={data.password_confirmation} onChange={e => setData('password_confirmation', e.target.value)} errors={errors.password_confirmation}>
+          <Input
+            type="password"
+            value={data.password_confirmation}
+            onChange={(e) => setData('password_confirmation', e.target.value)}
+            errors={errors.password_confirmation}
+          >
             Confirm Password
           </Input>
         </div>
       </ModalContent>
-      <ModalAction onClick={submit} disabled={processing}>Register</ModalAction>
+      <ModalAction onClick={submit} disabled={processing}>
+        Register
+      </ModalAction>
     </Modal>
   )
 }

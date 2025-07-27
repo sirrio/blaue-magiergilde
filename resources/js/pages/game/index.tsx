@@ -10,11 +10,11 @@ import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
 import { calculateCoinsSpend } from '@/helper/calculateCoinsSpend'
 import AppLayout from '@/layouts/app-layout'
+import StoreGameModal from '@/pages/game/store-game-modal'
+import UpdateGameModal from '@/pages/game/update-game-modal'
 import { Head } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { AlertCircle, Coins, Droplets, PartyPopper, Plus, Settings, Swords } from 'lucide-react'
-import StoreGameModal from '@/pages/game/store-game-modal'
-import UpdateGameModal from '@/pages/game/update-game-modal'
 
 export default function MasteredGames({ games, user, characters }) {
   const totalBubbles =

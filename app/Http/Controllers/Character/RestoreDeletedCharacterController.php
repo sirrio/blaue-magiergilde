@@ -10,16 +10,16 @@ use Illuminate\Http\RedirectResponse;
 
 class RestoreDeletedCharacterController extends Controller
 {
-  public function __invoke(Character $character): RedirectResponse
-  {
-    $character->adventures()->withTrashed()->each(function (Adventure $adventure) {
-      $adventure->restore();
-    });
-    $character->downtimes()->withTrashed()->each(function (Downtime $downtime) {
-      $downtime->restore();
-    });
-    $character->restore();
+    public function __invoke(Character $character): RedirectResponse
+    {
+        $character->adventures()->withTrashed()->each(function (Adventure $adventure) {
+            $adventure->restore();
+        });
+        $character->downtimes()->withTrashed()->each(function (Downtime $downtime) {
+            $downtime->restore();
+        });
+        $character->restore();
 
-    return to_route('characters.index');
-  }
+        return to_route('characters.index');
+    }
 }

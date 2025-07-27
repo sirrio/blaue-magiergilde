@@ -1,9 +1,9 @@
 import '../css/app.css'
 
+import { ToastProvider } from '@/components/ui/toast'
 import { createInertiaApp } from '@inertiajs/react'
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers'
 import { createRoot } from 'react-dom/client'
-import { ToastProvider } from '@/components/ui/toast'
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel'
 
@@ -16,7 +16,7 @@ createInertiaApp({
     root.render(
       <ToastProvider>
         <App {...props} />
-      </ToastProvider>
+      </ToastProvider>,
     )
   },
   progress: {

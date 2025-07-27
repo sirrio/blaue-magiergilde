@@ -23,7 +23,7 @@ class GameFactory extends Factory
             'has_additional_bubble' => $this->faker->boolean(),
             'sessions' => $this->faker->numberBetween(1, 5),
             'notes' => $this->faker->paragraph(),
-            'tier' => $this->faker->randomElement(['bt','lt','ht']),
+            'tier' => $this->faker->randomElement(['bt', 'lt', 'ht']),
         ];
     }
 }
