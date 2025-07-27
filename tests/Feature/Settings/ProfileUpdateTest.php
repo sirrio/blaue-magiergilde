@@ -4,17 +4,17 @@ use App\Models\User;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-test('profile page route is unavailable', function () {
+test('profile page can be rendered', function () {
     $user = User::factory()->create();
 
     $response = $this
         ->actingAs($user)
         ->get('/settings/profile');
 
-    $response->assertNotFound();
+    $response->assertOk();
 });
 
-test('profile information cannot be updated', function () {
+test('profile information can be updated', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -24,10 +24,11 @@ test('profile information cannot be updated', function () {
             'email' => 'test@example.com',
         ]);
 
-    $response->assertNotFound();
+    $response->assertRedirect(route('profile.edit', absolute: false));
+    expect($user->refresh()->email)->toBe('test@example.com');
 });
 
-test('user cannot delete account via profile route', function () {
+test('user can delete account via profile route', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -36,8 +37,8 @@ test('user cannot delete account via profile route', function () {
             'password' => 'password',
         ]);
 
-    $response->assertNotFound();
-    expect($user->fresh())->not->toBeNull();
+    $response->assertRedirect('/');
+    expect(User::find($user->id))->toBeNull();
 });
 
 test('incorrect password on delete is rejected', function () {
@@ -50,6 +51,6 @@ test('incorrect password on delete is rejected', function () {
             'password' => 'wrong-password',
         ]);
 
-    $response->assertNotFound();
+    $response->assertSessionHasErrors('password');
     expect($user->fresh())->not->toBeNull();
 });

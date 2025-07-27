@@ -15,7 +15,10 @@ const menuLinks = [
   { name: 'Mastered Games', route: 'games.index', method: 'get' as const },
 ]
 
-const profileLinks = [{ name: 'Logout', route: 'logout', method: 'post' as const }]
+const profileLinks = [
+  { name: 'Profile', route: 'profile.edit', method: 'get' as const },
+  { name: 'Logout', route: 'logout', method: 'post' as const },
+]
 
 const adminLinks = [
   { name: 'Items', route: 'items.index', method: 'get' as const },
