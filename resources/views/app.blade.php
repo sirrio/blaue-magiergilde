@@ -24,29 +24,7 @@
     (function() {
       const theme = localStorage.getItem('theme')
       if (theme) {
-        const darkThemes = [
-          'abyss',
-          'aqua',
-          'black',
-          'business',
-          'coffee',
-          'dark',
-          'dim',
-          'dracula',
-          'forest',
-          'halloween',
-          'luxury',
-          'night',
-          'sunset',
-          'synthwave',
-        ]
-        const root = document.documentElement
-        root.setAttribute('data-theme', theme)
-        if (darkThemes.includes(theme)) {
-          root.classList.add('dark')
-        } else {
-          root.classList.remove('dark')
-        }
+        document.documentElement.setAttribute('data-theme', theme)
       }
     })()
   </script>

@@ -38,22 +38,6 @@ export const themes = [
   'caramellatte',
 ] as const
 
-const darkThemes = new Set<Theme>([
-  'abyss',
-  'aqua',
-  'black',
-  'business',
-  'coffee',
-  'dark',
-  'dim',
-  'dracula',
-  'forest',
-  'halloween',
-  'luxury',
-  'night',
-  'sunset',
-  'synthwave',
-])
 
 export type Theme = (typeof themes)[number]
 
@@ -68,13 +52,7 @@ export function useTheme() {
   })
 
   useEffect(() => {
-    const root = document.documentElement
-    root.setAttribute('data-theme', theme)
-    if (darkThemes.has(theme)) {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
+    document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
 

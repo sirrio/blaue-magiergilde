@@ -13,7 +13,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss({
-      config: 'tailwind.config.ts',
+      config: 'tailwind.config.js',
     }),
   ],
   esbuild: {

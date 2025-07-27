@@ -1,7 +1,7 @@
-import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
 import daisyui from 'daisyui'
 
+/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './resources/views/**/*.blade.php',
@@ -47,4 +47,4 @@ export default {
       'caramellatte',
     ],
   },
-} satisfies Config
+}
