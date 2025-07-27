@@ -1,5 +1,7 @@
 import { cn } from '@/lib/utils'
-import { Head } from '@inertiajs/react'
+import { Head, Link, usePage } from '@inertiajs/react'
+import { PageProps } from '@/types'
+import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import { z } from 'zod'
 import LoginModal from './auth/login-modal'
@@ -14,6 +16,7 @@ mySchema.safeParse(12) // => { success: false; error: ZodError }
 format(new Date(), "'Today is a' eeee")
 
 export default function Welcome() {
+  const { auth } = usePage<PageProps>().props
   return (
     <>
       <Head title="Welcome"></Head>
@@ -27,12 +30,20 @@ export default function Welcome() {
               alles im Blick und kannst dich voll und ganz auf dein Spiele konzentrieren!
             </p>
             <div className={cn('space-x-2')}>
-              <LoginModal>
-                <button className={cn('btn btn-outline')}>Login</button>
-              </LoginModal>
-              <RegisterModal>
-                <button className={cn('btn btn-outline')}>Register</button>
-              </RegisterModal>
+              {auth.user ? (
+                <Button as={Link} href={route('characters.index')} color="primary">
+                  Zur Characterverwaltung
+                </Button>
+              ) : (
+                <>
+                  <LoginModal>
+                    <button className={cn('btn btn-outline')}>Login</button>
+                  </LoginModal>
+                  <RegisterModal>
+                    <button className={cn('btn btn-outline')}>Register</button>
+                  </RegisterModal>
+                </>
+              )}
             </div>
           </div>
         </div>
