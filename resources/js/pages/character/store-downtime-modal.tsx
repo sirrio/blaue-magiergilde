@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
-import { TextArea } from '@/components/ui/text-area'
+import RichTextEditor from '@/components/ui/rich-text-editor'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { FlameKindling } from 'lucide-react'
@@ -65,9 +65,14 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
           <Input errors={errors.start_date} type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)}>
             Date
           </Input>
-          <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+          <RichTextEditor
+            placeholder="Your notes"
+            errors={errors.notes}
+            value={data.notes}
+            onChange={(content) => setData('notes', content)}
+          >
             Notes
-          </TextArea>
+          </RichTextEditor>
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

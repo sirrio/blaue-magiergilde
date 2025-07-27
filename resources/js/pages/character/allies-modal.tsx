@@ -4,6 +4,7 @@ import { Ally, Character } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { router } from '@inertiajs/react'
+import RichTextEditor from '@/components/ui/rich-text-editor'
 
 interface AlliesModalProps {
   character: Character
@@ -86,12 +87,13 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
         className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
       />
-      <textarea
-        value={editData.notes}
+      <RichTextEditor
         placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+        value={editData.notes}
+        onChange={(content) => handleChange('notes', content)}
+      >
+        Notes
+      </RichTextEditor>
       <input
         type="text"
         value={editData.avatar}
@@ -176,12 +178,13 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
         className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
       />
-      <textarea
-        value={editData.notes}
+      <RichTextEditor
         placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+        value={editData.notes}
+        onChange={(content) => handleChange('notes', content)}
+      >
+        Notes
+      </RichTextEditor>
       <input
         type="text"
         value={editData.avatar}

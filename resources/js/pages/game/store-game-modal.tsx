@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Checkbox } from '@/components/ui/checkbox'
-import { TextArea } from '@/components/ui/text-area'
+import RichTextEditor from '@/components/ui/rich-text-editor'
 import { useForm, usePage } from '@inertiajs/react'
 import React from 'react'
 
@@ -72,9 +72,14 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
           >
             Additional Bubble
           </Checkbox>
-          <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+          <RichTextEditor
+            placeholder="Notes"
+            errors={errors.notes}
+            value={data.notes}
+            onChange={(content) => setData('notes', content)}
+          >
             Notes
-          </TextArea>
+          </RichTextEditor>
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

@@ -3,7 +3,7 @@ import { FileInput } from '@/components/ui/file-input'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
-import { TextArea } from '@/components/ui/text-area'
+import RichTextEditor from '@/components/ui/rich-text-editor'
 import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Character, PageProps } from '@/types'
@@ -97,9 +97,14 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
           <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
             Avatar
           </FileInput>
-          <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+          <RichTextEditor
+            placeholder="Your notes"
+            errors={errors.notes}
+            value={data.notes ?? ''}
+            onChange={(content) => setData('notes', content)}
+          >
             Notes
-          </TextArea>
+          </RichTextEditor>
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
