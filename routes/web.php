@@ -2,10 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\AppearanceController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
+
+Route::post('appearance', [AppearanceController::class, 'update'])->name('appearance.update');
 
 require __DIR__.'/auth.php';
 require __DIR__.'/web/adventure.php';
