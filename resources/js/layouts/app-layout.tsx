@@ -1,4 +1,3 @@
-import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
@@ -29,7 +28,6 @@ const adminLinks = [
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth } = usePage<PageProps>().props
-  const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   useClickOutside(adminDetailsRef, () =>
     adminDetailsRef.current?.removeAttribute('open')
@@ -123,13 +121,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 {auth.user.avatar ? (
                   <img alt={auth.user.name} src={auth.user.avatar} />
                 ) : (
-                  <span className="text-base-content text-lg font-bold">{getInitials(auth.user.name)}</span>
+                  <img alt="Avatar placeholder" src="/images/no-avatar.svg" />
                 )}
               </div>
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
+              <li className="cursor-default px-4 py-2" role="none">
+                <p className="font-semibold leading-tight text-base-content">
+                  {auth.user.name}
+                </p>
+                <p className="text-xs text-base-content/70">{auth.user.email}</p>
+              </li>
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
+              </li>
               <li role="none">
                 <ThemeSwitcher />
+              </li>
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
               </li>
               {profileLinks.map((profileLink) => (
                 <li key={profileLink.route} role="none">

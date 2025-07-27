@@ -24,10 +24,38 @@ interface AllyCardProps {
 
 const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, onCancel, onRemove }) => {
   const [editData, setEditData] = useState<Ally>({ ...ally })
+  const [avatarSrc, setAvatarSrc] = useState('')
+  const [editAvatarSrc, setEditAvatarSrc] = useState('')
   const { classes } = usePage<PageProps>().props
   useEffect(() => {
     setEditData({ ...ally })
   }, [ally])
+  useEffect(() => {
+    if (!ally.avatar) {
+      setAvatarSrc('')
+      return
+    }
+    if (typeof ally.avatar === 'string') {
+      setAvatarSrc(ally.avatar)
+      return
+    }
+    const url = URL.createObjectURL(ally.avatar)
+    setAvatarSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [ally.avatar])
+  useEffect(() => {
+    if (!editData.avatar) {
+      setEditAvatarSrc('')
+      return
+    }
+    if (typeof editData.avatar === 'string') {
+      setEditAvatarSrc(editData.avatar)
+      return
+    }
+    const url = URL.createObjectURL(editData.avatar)
+    setEditAvatarSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [editData.avatar])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleChange = (key: keyof Ally, value: any) => {
     setEditData({ ...editData, [key]: value })
@@ -41,8 +69,8 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       >
         <div className="flex items-center gap-2">
           <div className="bg-base-200 h-10 w-10 flex-shrink-0 overflow-hidden rounded-full">
-            {ally.avatar ? (
-              <img src={ally.avatar} alt={`${ally.name}'s avatar`} className="h-full w-full object-cover" />
+          {avatarSrc ? (
+              <img src={avatarSrc} alt={`${ally.name}'s avatar`} className="h-full w-full object-cover" />
             ) : (
               <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
             )}
@@ -62,8 +90,8 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
     <div className="card bg-base-200 border p-2 shadow">
       <div className="mb-2 flex items-center gap-2">
         <div className="bg-base-200 h-10 w-10 flex-shrink-0 overflow-hidden rounded-full">
-          {editData.avatar ? (
-            <img src={editData.avatar} alt={`${editData.name}'s avatar`} className="h-full w-full object-cover" />
+          {editAvatarSrc ? (
+            <img src={editAvatarSrc} alt={`${editData.name}'s avatar`} className="h-full w-full object-cover" />
           ) : (
             <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
           )}
@@ -109,6 +137,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
           })}
         </div>
       </div>
+      <label className="fieldset-label">Species</label>
       <input
         type="text"
         value={editData.species}
@@ -125,6 +154,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
+      <label className="fieldset-label">Standing</label>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
@@ -223,6 +253,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
           })}
         </div>
       </div>
+      <label className="fieldset-label">Species</label>
       <input
         type="text"
         value={editData.species}
@@ -239,6 +270,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
+      <label className="fieldset-label">Standing</label>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
