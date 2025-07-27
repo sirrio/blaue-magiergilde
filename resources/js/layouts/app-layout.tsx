@@ -4,6 +4,7 @@ import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
 import { Menu } from 'lucide-react'
 import { ReactNode } from 'react'
+import { useTheme, themes as daisyThemes, type Theme } from '@/hooks/use-theme'
 
 interface AppLayoutProps {
   children: ReactNode
@@ -25,6 +26,7 @@ const adminLinks = [
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth } = usePage<PageProps>().props
   const getInitials = useInitials()
+  const { theme, setTheme } = useTheme()
 
   return (
     <div className={cn('bg-base-200 min-h-screen')}>
@@ -118,7 +120,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
             </button>
-            <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
+            <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow space-y-2">
+              <li role="none">
+                <label className="label">
+                  <span className="label-text">Theme</span>
+                </label>
+                <select
+                  className="select select-sm w-full"
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as Theme)}
+                >
+                  {daisyThemes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </li>
               {profileLinks.map((profileLink) => (
                 <li key={profileLink.route} role="none">
                   <Link role="menuitem" method={profileLink.method} href={route(profileLink.route)}>

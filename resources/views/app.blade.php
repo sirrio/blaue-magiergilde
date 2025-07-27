@@ -19,6 +19,16 @@
     })()
   </script>
 
+  {{-- Apply saved daisyUI theme --}}
+  <script>
+    (function() {
+      const theme = localStorage.getItem('theme')
+      if (theme) {
+        document.documentElement.setAttribute('data-theme', theme)
+      }
+    })()
+  </script>
+
   {{-- Inline style to set the HTML background color based on our theme in app.css --}}
   <style>
     html {
