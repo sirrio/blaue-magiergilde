@@ -22,5 +22,11 @@ Route::resource('characters', CharacterController::class)->only([
 Route::post('characters/sort', SortCharacterController::class)
     ->middleware(['auth'])
     ->name('characters.sort');
-Route::post('characters/{character}/permanent-delete', PermanentDeleteCharacterController::class)->middleware(['auth'])->name('characters.permanent-delete');
-Route::post('characters/{character}/restore-deleted', RestoreDeletedCharacterController::class)->middleware(['auth'])->name('characters.restore-deleted');
+Route::post('characters/{character}/permanent-delete', PermanentDeleteCharacterController::class)
+    ->withTrashed()
+    ->middleware(['auth'])
+    ->name('characters.permanent-delete');
+Route::post('characters/{character}/restore-deleted', RestoreDeletedCharacterController::class)
+    ->withTrashed()
+    ->middleware(['auth'])
+    ->name('characters.restore-deleted');
