@@ -64,10 +64,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
               )}
             </ul>
           </div>
-          <a href="/" className="btn btn-ghost text-xl">
+          <Link href={route('characters.index')} className="btn btn-ghost text-xl">
             <img className={cn('h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
             Blaue Magiergilde
-          </a>
+          </Link>
         </div>
 
         <div className="navbar-center hidden lg:flex">
