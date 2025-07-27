@@ -1,5 +1,4 @@
-import React, { ReactNode } from 'react'
-import createRandomString from '@/helper/createRandomString'
+import React, { ReactNode, useId } from 'react'
 import { cn } from '@/lib/utils'
 
 type InputProps = {
@@ -9,7 +8,7 @@ type InputProps = {
   value: string | number,
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
   placeholder?: string,
-  errors?: string & Record<string, string>,
+  errors?: ReactNode,
   min?: number,
   max?: number,
   step?: number,
@@ -18,7 +17,7 @@ type InputProps = {
 }
 
 export const Input: React.FC<InputProps> = ({
-                                              id = createRandomString(24),
+                                              id,
                                               children,
                                               type = 'text',
                                               value,
@@ -30,7 +29,9 @@ export const Input: React.FC<InputProps> = ({
                                               step,
                                               ref,
                                               className
-                                            }) => {
+                                              }) => {
+  const generatedId = useId()
+  const inputId = id ?? generatedId
 
   const handleClear = () => {
     // Create a synthetic event with an empty string value
@@ -41,10 +42,10 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <div className={cn('w-full relative', className)}>
-      <label className={'label'} htmlFor={id}>{children}</label>
+      <label className={'label'} htmlFor={inputId}>{children}</label>
       <input className={'input w-full'}
              ref={ref}
-             id={id}
+             id={inputId}
              type={type}
              value={value}
              onChange={onChange}
@@ -52,9 +53,7 @@ export const Input: React.FC<InputProps> = ({
              min={min}
              max={max}
              step={step}
-      >
-
-      </input>
+      />
       {type === 'search' && String(value).length > 0 && (
         <button
           type="button"

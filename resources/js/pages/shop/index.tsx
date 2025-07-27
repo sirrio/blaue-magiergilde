@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { List } from '@/components/ui/list'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
-import Toast from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
 import { Shop } from '@/types'
@@ -28,7 +27,6 @@ export default function Index({ shops }: { shops: Shop[] }) {
   return (
     <AppLayout>
       <Head title="Shop" />
-      <Toast />
       <div className="container mx-auto max-w-2xl px-2 py-4 md:px-0">
         <div className="join mb-6 flex items-end">
           <Select className="join-item w-full" value={selectedShop?.id || ''} onChange={onShopSelectChange}>

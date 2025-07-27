@@ -2,6 +2,7 @@ import React, { useState, ReactNode, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { findChildByType } from '@/lib/react-helpers';
 
 type ModalProps = {
   children: ReactNode;
@@ -17,18 +18,6 @@ type ModalActionProps = {
   variant?: '' | 'success' | 'error';
   onClick?: () => void;
 };
-
-function findChildByType<T>(
-  children: ReactNode,
-  componentType: React.FC<T>
-): ReactNode | null {
-  return (
-    React.Children.toArray(children).find(
-      (child) =>
-        React.isValidElement(child) && child.type === componentType
-    ) || null
-  );
-}
 
 export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false }: ModalProps) => {
   const triggerElement = findChildByType(children, ModalTrigger);

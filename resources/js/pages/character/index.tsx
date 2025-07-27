@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
-import Toast from '@/components/ui/toast'
+import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
@@ -70,7 +70,7 @@ export default function Index({ characters }: { characters: Character[] }) {
       formatBlock(':Plus1:', charactersByTier.filler, 'Filler Character')
 
     navigator.clipboard.writeText(result).then(() => {
-      Toast.show('Characters copied to clipboard', 'info')
+      toast.show('Characters copied to clipboard', 'info')
     })
   }
 
@@ -86,7 +86,6 @@ export default function Index({ characters }: { characters: Character[] }) {
   return (
     <AppLayout>
       <Head title="Characters" />
-      <Toast />
       <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
         <section className="flex flex-col justify-between gap-2 border-b pb-4 sm:flex-row sm:items-center">
           <div>

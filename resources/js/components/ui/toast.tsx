@@ -1,30 +1,40 @@
-import React, { ReactNode, useEffect, useState } from 'react'
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Info, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
-type ToastVariant = 'info' | 'warning' | 'success' | 'error'
+export type ToastVariant = 'info' | 'warning' | 'success' | 'error'
 
-
-const Toast: React.FC & {
+interface ToastContextValue {
   show: (message: ReactNode, variant?: ToastVariant) => void
-} = () => {
+}
+
+const ToastContext = createContext<ToastContextValue>({ show: () => {} })
+
+export const useToast = () => useContext(ToastContext)
+
+export const toast: ToastContextValue = { show: () => {} }
+
+export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [visible, setVisible] = useState(false)
   const [message, setMessage] = useState<ReactNode>(null)
   const [variant, setVariant] = useState<ToastVariant>('info')
+
+  const show = (newMessage: ReactNode, newVariant: ToastVariant = 'info') => {
+    setMessage(newMessage)
+    setVariant(newVariant)
+    setVisible(true)
+  }
+
+  useEffect(() => {
+    toast.show = show
+    return () => { toast.show = () => {} }
+  }, [show])
 
   useEffect(() => {
     if (!visible) return
     const timeout = setTimeout(() => setVisible(false), 3000)
     return () => clearTimeout(timeout)
   }, [visible])
-
-  Toast.show = (newMessage: ReactNode, newVariant: ToastVariant = 'info') => {
-    setMessage(newMessage)
-    setVariant(newVariant)
-    setVisible(true)
-  }
-
-  if (!visible) return null
 
   const getIcon = () => {
     switch (variant) {
@@ -40,16 +50,16 @@ const Toast: React.FC & {
   }
 
   return (
-    <div className={cn('toast z-50')}>
-      <div className={cn('alert', `alert-${variant}`, 'flex items-center')}>
-        {getIcon()}
-        <span className={'font-semibold'}>{message}</span>
-      </div>
-    </div>
+    <ToastContext.Provider value={{ show }}>
+      {children}
+      {visible && (
+        <div className={cn('toast z-50')}>
+          <div className={cn('alert', `alert-${variant}`, 'flex items-center')}>
+            {getIcon()}
+            <span className={'font-semibold'}>{message}</span>
+          </div>
+        </div>
+      )}
+    </ToastContext.Provider>
   )
 }
-
-Toast.show = () => {
-} // Default empty function to avoid undefined issues when used immediately
-
-export default Toast

@@ -1,6 +1,5 @@
-import React, { ReactNode } from 'react'
+import React, { ReactNode, useId } from 'react'
 import { cn } from '@/lib/utils'
-import createRandomString from '@/helper/createRandomString'
 
 type CheckboxProps = {
   id?: string
@@ -8,29 +7,32 @@ type CheckboxProps = {
   checked?: boolean
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-  errors?: string & Record<string, string>
+  errors?: ReactNode
 }
 
 export const Checkbox: React.FC<CheckboxProps> = ({
-                                                    id = createRandomString(24),
+                                                    id,
                                                     children,
                                                     checked = false,
                                                     onChange,
                                                     size = 'md',
                                                     errors = ''
                                                   }) => {
+  const generatedId = useId()
+  const inputId = id ?? generatedId
+  const sizeClasses: Record<NonNullable<CheckboxProps['size']>, string> = {
+    xs: 'checkbox-xs',
+    sm: 'checkbox-sm',
+    md: 'checkbox-md',
+    lg: 'checkbox-lg',
+    xl: 'checkbox-xl',
+  }
+
   return (
     <div>
-      <label className={'fieldset-label'} htmlFor={id}>{children}</label>
-      <input className={cn(
-        'checkbox',
-        size === 'xs' ? 'checkbox-xs' : '',
-        size === 'sm' ? 'checkbox-sm' : '',
-        size === 'md' ? 'checkbox-md' : '',
-        size === 'lg' ? 'checkbox-lg' : '',
-        size === 'xl' ? 'checkbox-xl' : ''
-      )}
-             id={id}
+      <label className={'fieldset-label'} htmlFor={inputId}>{children}</label>
+      <input className={cn('checkbox', sizeClasses[size])}
+             id={inputId}
              type={'checkbox'}
              checked={checked}
              value={checked ? '1' : '0'}

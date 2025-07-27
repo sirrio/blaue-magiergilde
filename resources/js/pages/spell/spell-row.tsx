@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import { ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
-import Toast from '@/components/ui/toast'
+import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { PageProps, Spell } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
@@ -26,7 +26,7 @@ const getSpellSchoolTextColor = (school: string): string => {
 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text).then(() => {
-    Toast.show('Text copied to clipboard', 'info')
+    toast.show('Text copied to clipboard', 'info')
   })
 }
 

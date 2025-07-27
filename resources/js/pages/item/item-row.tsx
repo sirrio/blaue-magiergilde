@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import { ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
-import Toast from '@/components/ui/toast'
+import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
@@ -33,7 +33,7 @@ const renderIcon = (type: string): JSX.Element | null => {
 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text).then(() => {
-    Toast.show('Characters copied to clipboard', 'info')
+    toast.show('Characters copied to clipboard', 'info')
   })
 }
 

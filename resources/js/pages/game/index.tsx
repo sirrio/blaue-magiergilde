@@ -5,7 +5,6 @@ import LogoLt from '@/components/logo-lt'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { List, ListRow } from '@/components/ui/list'
-import Toast from '@/components/ui/toast'
 import { calculateBubbleByFillerCharacters, calculateBubbleByGames } from '@/helper/calculateBubble'
 import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
@@ -45,7 +44,6 @@ export default function MasteredGames({ games, user, characters }) {
   return (
     <AppLayout>
       <Head title="Mastered Games" />
-      <Toast />
       <div className="container mx-auto max-w-7xl space-y-8 px-4 py-6">
         <section className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
