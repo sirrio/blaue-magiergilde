@@ -31,9 +31,7 @@ class ProfileController extends Controller
     {
         $request->user()->fill($request->validated());
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
-        }
+        // Email verification is disabled; no further action required
 
         $request->user()->save();
 
