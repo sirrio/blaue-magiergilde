@@ -3,6 +3,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Ally, Character } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
+import { router } from '@inertiajs/react'
 
 interface AlliesModalProps {
   character: Character
@@ -216,12 +217,12 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const handleSave = (ally: Ally) => {
     if (ally.id === 0) {
+      router.post(route('allies.store'), { ...ally, character_id: character.id }, { preserveScroll: true })
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
-      alert(`New ally ${ally.name} added.`)
     } else {
+      router.put(route('allies.update', ally.id), { ...ally, _method: 'put' }, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
-      alert(`Changes saved for ${ally.name}`)
     }
     setEditingId(null)
   }
@@ -230,9 +231,9 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   }
   const handleRemove = (ally: Ally) => {
     if (window.confirm(`Are you sure you want to remove ${ally.name}?`)) {
+      router.delete(route('allies.destroy', ally.id), { preserveScroll: true })
       setAllies(allies.filter((a) => a.id !== ally.id))
       setEditingId(null)
-      alert(`Removed ally ${ally.name}`)
     }
   }
   const grouped = standingOrder.map((standing) => ({
@@ -286,8 +287,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
           ))}
         </div>
       </ModalContent>
-      <ModalAction onClick={() => alert('Changes saved')}>Save</ModalAction>
-      <ModalAction onClick={() => alert('Cancelled')}>Cancel</ModalAction>
+      <ModalAction onClick={() => setEditingId(null)}>Close</ModalAction>
     </Modal>
   )
 }

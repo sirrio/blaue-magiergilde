@@ -35,6 +35,10 @@ class AllyController extends Controller
         $ally->name = $request->name;
         $ally->standing = $request->standing;
         $ally->character_id = $request->character_id;
+        $ally->avatar = $request->avatar;
+        $ally->notes = $request->notes;
+        $ally->species = $request->species;
+        $ally->classes = $request->classes;
         $ally->save();
 
         return redirect()->back();
@@ -59,9 +63,17 @@ class AllyController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAllyRequest $request, Ally $ally)
+    public function update(UpdateAllyRequest $request, Ally $ally): RedirectResponse
     {
-        //
+        $ally->name = $request->name;
+        $ally->standing = $request->standing;
+        $ally->avatar = $request->avatar;
+        $ally->notes = $request->notes;
+        $ally->species = $request->species;
+        $ally->classes = $request->classes;
+        $ally->save();
+
+        return redirect()->back();
     }
 
     /**
