@@ -30,7 +30,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
 
   return (
     <div>
-      <label className={'fieldset-label'} htmlFor={inputId}>{children}</label>
+      <label className={'label'} htmlFor={inputId}>{children}</label>
       <input className={cn('checkbox', sizeClasses[size])}
              id={inputId}
              type={'checkbox'}
