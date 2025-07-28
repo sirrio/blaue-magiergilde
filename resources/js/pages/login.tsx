@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
+import LegalLinks from '@/components/legal-links'
 
 export default function Login() {
   const { features } = usePage<PageProps>().props
@@ -41,6 +42,7 @@ export default function Login() {
           </p>
         </form>
       </div>
+      <LegalLinks />
     </>
   )
 }
