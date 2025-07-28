@@ -4,8 +4,6 @@ import { PageProps } from '@/types'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import { z } from 'zod'
-import LoginModal from './auth/login-modal'
-import RegisterModal from './auth/register-modal'
 
 const mySchema = z.string()
 
@@ -36,12 +34,12 @@ export default function Welcome() {
                 </Button>
               ) : (
                 <div className={cn('flex gap-2')}>
-                  <LoginModal>
-                    <button className={cn('btn btn-accent')}>Login</button>
-                  </LoginModal>
-                  <RegisterModal>
-                    <button className={cn('btn btn-outline')}>Register</button>
-                  </RegisterModal>
+                  <Button as={Link} href={route('login')} color="accent">
+                    Login
+                  </Button>
+                  <Button as={Link} href={route('register')} variant="outline">
+                    Register
+                  </Button>
                 </div>
               )}
             </div>
