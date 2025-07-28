@@ -24,7 +24,9 @@ export default function Welcome() {
         <div className={cn('hero-content flex-col lg:flex-row-reverse')}>
           <img src="/images/icon_magiergilde.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
           <div>
-            <h1 className={cn('text-5xl font-bold')}>Blaue Magiergilde</h1>
+            <h1 className={cn('text-5xl font-bold font-geizer')}>
+              Blaue Magiergilde
+            </h1>
             <p className={cn('py-6')}>
               Hier kannst du deine Charaktere und gespielten Runden speichern. Deine Ressourcen und Level werden automatisch berechnet – so hast du
               alles im Blick und kannst dich voll und ganz auf dein Spiele konzentrieren!

@@ -25,3 +25,17 @@
     border-color: var(--color-gray-200, currentColor);
   }
 }
+
+@font-face {
+  font-family: 'Geizer';
+  src: url('/fonts/geizer.woff2') format('woff2'),
+       url('/fonts/geizer.woff') format('woff'),
+       url('/fonts/geizer.ttf') format('truetype');
+  font-display: swap;
+}
+
+@layer utilities {
+  .font-geizer {
+    font-family: 'Geizer', sans-serif;
+  }
+}

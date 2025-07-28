@@ -81,7 +81,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
               )}
             </ul>
           </div>
-          <Link href={route('characters.index')} className="btn btn-ghost text-xl">
+          <Link
+            href={route('characters.index')}
+            className="btn btn-ghost text-xl font-geizer"
+          >
             <img className={cn('h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
             Blaue Magiergilde
           </Link>

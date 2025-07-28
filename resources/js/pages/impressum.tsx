@@ -8,7 +8,7 @@ export default function Impressum() {
       <div className="min-h-screen bg-base-200 p-6">
         <div className="prose mx-auto">
           <h1>Impressum</h1>
-          <p>Blaue Magiergilde</p>
+          <p className="font-geizer">Blaue Magiergilde</p>
           <p>Example Street 1</p>
           <p>12345 Example City</p>
           <p>Email: info@example.com</p>

@@ -47,3 +47,7 @@ Type-check the frontend:
 ```bash
 npm run types
 ```
+
+## Custom Fonts
+
+Download the Geizer font from [daFont](https://www.dafont.com/geizer.font) and place the `geizer.ttf` (or `woff2`) file into `public/fonts/`. The application styles will automatically load it as the `font-geizer` utility class.
