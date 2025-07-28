@@ -1,10 +1,12 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
-import { useForm } from '@inertiajs/react'
+import { useForm, usePage } from '@inertiajs/react'
 import React from 'react'
+import type { PageProps } from '@/types'
 
 export default function LoginModal({ children }: React.PropsWithChildren) {
+  const { features } = usePage<PageProps>().props
   const { data, setData, post, processing, errors } = useForm({
     email: '',
     password: '',
@@ -20,9 +22,11 @@ export default function LoginModal({ children }: React.PropsWithChildren) {
       <ModalTitle>Login</ModalTitle>
       <ModalContent>
         <div className="flex flex-col space-y-4">
-          <Button as="a" href={route('discord.login')} color="primary" modifier="block">
-            Login with Discord
-          </Button>
+          {features.discord && (
+            <Button as="a" href={route('discord.login')} color="primary" modifier="block">
+              Login with Discord
+            </Button>
+          )}
           <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email}>
             Email
           </Input>

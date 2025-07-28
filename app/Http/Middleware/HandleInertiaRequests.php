@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'features' => config('features'),
             'appearance' => $request->cookie('appearance', 'system'),
             'ziggy' => fn (): array => [
                 ...(new Ziggy)->toArray(),

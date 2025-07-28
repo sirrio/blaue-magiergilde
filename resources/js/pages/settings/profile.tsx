@@ -5,7 +5,7 @@ import { PageProps } from '@/types'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
 
 export default function Profile() {
-  const { auth, discordConnected } = usePage<PageProps & { discordConnected: boolean }>().props
+  const { auth, discordConnected, features } = usePage<PageProps & { discordConnected: boolean; features: { discord: boolean } }>().props
 
   const profileForm = useForm({
     name: auth.user.name,
@@ -43,15 +43,17 @@ export default function Profile() {
       <div className="container mx-auto max-w-xl space-y-6 p-4">
         <h1 className="text-2xl font-bold">Profile</h1>
         <p>Edit your settings here</p>
-        <div>
-          {discordConnected ? (
-            <p>Your account is connected to Discord.</p>
-          ) : (
-            <Link href={route('discord.login')} className="btn">
-              Connect Discord
-            </Link>
-          )}
-        </div>
+        {features.discord && (
+          <div>
+            {discordConnected ? (
+              <p>Your account is connected to Discord.</p>
+            ) : (
+              <Link href={route('discord.login')} className="btn">
+                Connect Discord
+              </Link>
+            )}
+          </div>
+        )}
         <form onSubmit={submitProfile} className="card bg-base-100 space-y-4 p-4">
           <h2 className="text-xl font-semibold">Update your account's profile information and email address.</h2>
           <Input type="text" value={profileForm.data.name} onChange={(e) => profileForm.setData('name', e.target.value)} errors={profileForm.errors.name}>
