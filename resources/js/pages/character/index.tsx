@@ -11,7 +11,7 @@ import { Character } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router } from '@inertiajs/react'
-import { BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
+import { BookUser, Copy, Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Index({ characters }: { characters: Character[] }) {
@@ -99,12 +99,17 @@ export default function Index({ characters }: { characters: Character[] }) {
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>
             {chars.length > 0 && (
-              <StoreCharacterModal>
-                <Button size="sm" variant="outline" className="flex items-center space-x-2">
-                  <Plus size={16} />
-                  <span>Add Character</span>
+              <>
+                <StoreCharacterModal>
+                  <Button size="sm" variant="outline" className="flex items-center space-x-2">
+                    <Plus size={16} />
+                    <span>Add Character</span>
+                  </Button>
+                </StoreCharacterModal>
+                <Button as="a" href={route('characters.deleted')} size="sm" modifier="square" variant="outline">
+                  <RotateCcw size={16} />
                 </Button>
-              </StoreCharacterModal>
+              </>
             )}
           </div>
         </section>
@@ -144,6 +149,9 @@ export default function Index({ characters }: { characters: Character[] }) {
                 </ModalContent>
                 <ModalAction onClick={() => test()}>Sync now</ModalAction>
               </Modal>
+              <Button as="a" href={route('characters.deleted')} variant="outline" modifier="square">
+                <RotateCcw size={16} />
+              </Button>
             </div>
           </div>
         ) : (
