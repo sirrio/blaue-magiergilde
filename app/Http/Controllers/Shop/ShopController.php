@@ -55,7 +55,10 @@ class ShopController extends Controller
     public function index(): Response
     {
         $shops = Shop::query()
-            ->with(['items' => fn ($query) => $query->select(['items.id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count'])])
+            ->with([
+                'shopItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
+                'shopItems.spell' => fn ($query) => $query->select(['id', 'name', 'url', 'legacy_url', 'spell_level']),
+            ])
             ->orderByDesc('created_at')
             ->select(['shops.id', 'created_at'])
             ->get();

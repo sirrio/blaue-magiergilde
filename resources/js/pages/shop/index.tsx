@@ -44,7 +44,11 @@ export default function Index({ shops }: { shops: Shop[] }) {
             Roll a new shop
           </Button>
         </div>
-        <List>{selectedShop?.items.map((item) => <ItemRow key={item.id} item={item} />)}</List>
+        <List>
+          {selectedShop?.shop_items.map((si) => (
+            <ItemRow key={si.id} item={si.item} shopItem={si} />
+          ))}
+        </List>
       </div>
     </AppLayout>
   )

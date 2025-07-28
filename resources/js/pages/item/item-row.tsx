@@ -5,7 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { Item, PageProps } from '@/types'
+import { Item, PageProps, ShopItem } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Sword, XCircle } from 'lucide-react'
 import { JSX } from 'react'
@@ -37,7 +37,38 @@ const copyToClipboard = (text: string) => {
   })
 }
 
-export default function ItemRow({ item }: { item: Item }) {
+const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
+  const { data, setData, post } = useForm({ spell_level: 0 })
+
+  const handleSubmit = () => {
+    post(route('shop-items.add-spell', { shopItem: shopItemId }), {
+      preserveScroll: true,
+    })
+  }
+
+  return (
+    <Modal>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square">
+          +
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Select spell level</ModalTitle>
+      <ModalContent>
+        <Input
+          type="number"
+          value={data.spell_level}
+          onChange={(e) => setData('spell_level', Number(e.target.value))}
+        >
+          Level
+        </Input>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit}>Roll</ModalAction>
+    </Modal>
+  )
+}
+
+export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: ShopItem }) {
   const formData = {
     id: item.id,
     name: item.name,
@@ -57,13 +88,15 @@ export default function ItemRow({ item }: { item: Item }) {
     })
   }
 
+  const spell = shopItem?.spell
   const dndBeyondLink = `https://www.dndbeyond.com/magic-items?filter-type=0&filter-search=${item.name}&filter-partnered-content=t`
 
   return (
     <ListRow>
       <div className={cn(textColor)}>{renderIcon(item.type)}</div>
       <div className={cn(textColor, 'text-xs sm:text-sm')}>
-        {item.name} <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+        {spell ? `${item.name} - ${spell.name}` : item.name}{' '}
+        <span className={'text-xs font-light italic'}>({item.pick_count})</span>
       </div>
       <div className="max-w-20 font-mono text-xs">{item.cost ? item.cost : <span className="text-error">No cost available</span>}</div>
       <Modal>
@@ -112,9 +145,23 @@ export default function ItemRow({ item }: { item: Item }) {
         </ModalContent>
         <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
       </Modal>
-      <Button size="xs" variant="ghost" modifier="square" onClick={() => copyToClipboard(`[${item.name}](<${item.url}>): ${item.cost}`)}>
+      <Button
+        size="xs"
+        variant="ghost"
+        modifier="square"
+        onClick={() =>
+          copyToClipboard(
+            spell
+              ? `[${item.name}](<${item.url}>) - [${spell.name}](<${spell.url}>) - [Legacy](<${spell.legacy_url}>): ${item.cost}`
+              : `[${item.name}](<${item.url}>): ${item.cost}`,
+          )
+        }
+      >
         <Copy size={14} />
       </Button>
+      {shopItem && !spell && item.type === 'spellscroll' && (
+        <AddSpellModal shopItemId={shopItem.id} />
+      )}
       {item.url ? (
         <Button as="a" href={item.url} target="_blank" size="xs" variant="ghost" modifier="square">
           <ExternalLink size={14} />
