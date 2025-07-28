@@ -23,7 +23,7 @@ import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, BookOpen, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, Swords } from 'lucide-react'
+import { Anvil, BookOpen, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, Swords, Download } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -63,6 +63,15 @@ export function CharacterCard({ character }: { character: Character }) {
               <Grip size={14} />
             </Button>
             <UpdateCharacterModal character={character} />
+            <Button
+              className={'hidden group-hover:flex'}
+              as="a"
+              href={route('characters.download', character.id)}
+              modifier="square"
+              size="xs"
+            >
+              <Download size={14} />
+            </Button>
             <DestroyCharacterModal character={character} />
           </CardAction>
           <CardTitle className={cn('pb-0')}>

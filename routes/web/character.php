@@ -5,6 +5,7 @@ use App\Http\Controllers\Character\PermanentDeleteCharacterController;
 use App\Http\Controllers\Character\RestoreDeletedCharacterController;
 use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\SortCharacterController;
+use App\Http\Controllers\Character\DownloadCharacterController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('characters/deleted', DeletedCharacterController::class)
@@ -30,3 +31,6 @@ Route::post('characters/{character}/restore-deleted', RestoreDeletedCharacterCon
     ->withTrashed()
     ->middleware(['auth'])
     ->name('characters.restore-deleted');
+Route::get('characters/{character}/download', DownloadCharacterController::class)
+    ->middleware(['auth'])
+    ->name('characters.download');
