@@ -28,9 +28,7 @@
 
 @font-face {
   font-family: 'Geizer';
-  src: url('/fonts/geizer.woff2') format('woff2'),
-       url('/fonts/geizer.woff') format('woff'),
-       url('/fonts/geizer.ttf') format('truetype');
+  src: url('fonts/Geizer.otf') format('otf');
   font-display: swap;
 }
 
