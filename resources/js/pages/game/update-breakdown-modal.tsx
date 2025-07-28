@@ -5,27 +5,43 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import React from 'react'
 
+interface BreakdownForm {
+  event_bubbles: number
+  event_coins: number
+  bt_bubbles: number
+  bt_coins: number
+  lt_bubbles: number
+  lt_coins: number
+  ht_bubbles: number
+  ht_coins: number
+  et_bubbles: number
+  et_coins: number
+  other_bubbles: number
+  other_coins: number
+  [key: string]: number
+}
+
 const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React.ReactNode }) => {
   const initialFormData = {
-    event_bubbles: user.event_bubbles || 0,
-    event_coins: user.event_coins || 0,
-    bt_bubbles: user.bt_bubbles || 0,
-    bt_coins: user.bt_coins || 0,
-    lt_bubbles: user.lt_bubbles || 0,
-    lt_coins: user.lt_coins || 0,
-    ht_bubbles: user.ht_bubbles || 0,
-    ht_coins: user.ht_coins || 0,
-    et_bubbles: user.et_bubbles || 0,
-    et_coins: user.et_coins || 0,
-    other_bubbles: user.other_bubbles || 0,
-    other_coins: user.other_coins || 0,
+    event_bubbles: Number(user.event_bubbles ?? 0),
+    event_coins: Number(user.event_coins ?? 0),
+    bt_bubbles: Number(user.bt_bubbles ?? 0),
+    bt_coins: Number(user.bt_coins ?? 0),
+    lt_bubbles: Number(user.lt_bubbles ?? 0),
+    lt_coins: Number(user.lt_coins ?? 0),
+    ht_bubbles: Number(user.ht_bubbles ?? 0),
+    ht_coins: Number(user.ht_coins ?? 0),
+    et_bubbles: Number(user.et_bubbles ?? 0),
+    et_coins: Number(user.et_coins ?? 0),
+    other_bubbles: Number(user.other_bubbles ?? 0),
+    other_coins: Number(user.other_coins ?? 0),
   }
 
-  const { data, setData, post } = useForm(initialFormData)
-  const { errors } = usePage().props
+  const { data, setData, put } = useForm(initialFormData)
+  const { errors } = usePage().props as { errors: Record<string, string> }
 
   const handleFormSubmit = () => {
-    post(route('breakdowns.update', { breakdown: user.id, _method: 'put' }), {
+    put(route('breakdowns.update', { breakdown: user.id }), {
       preserveState: 'errors',
       preserveScroll: true,
     })
