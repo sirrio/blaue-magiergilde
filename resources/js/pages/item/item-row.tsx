@@ -6,9 +6,9 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem } from '@/types'
-import { useForm, usePage } from '@inertiajs/react'
+import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Sword, XCircle } from 'lucide-react'
-import { JSX } from 'react'
+import React, { useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
   common: 'text-gray-700',
@@ -38,30 +38,103 @@ const copyToClipboard = (text: string) => {
 }
 
 const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
-  const { data, setData, post } = useForm({ spell_level: 0 })
+  const levels = Array.from({ length: 10 }, (_, i) => i)
+  const schools = [
+    'abjuration',
+    'conjuration',
+    'divination',
+    'enchantment',
+    'evocation',
+    'illusion',
+    'necromancy',
+    'transmutation',
+  ] as const
+
+  const { data, setData, post } = useForm({ spell_levels: [] as number[], spell_schools: [] as string[] })
+
+  const [isOpen, setIsOpen] = useState(false)
+
+  const toggleLevel = (level: number) => {
+    setData(
+      'spell_levels',
+      data.spell_levels.includes(level)
+        ? data.spell_levels.filter((l) => l !== level)
+        : [...data.spell_levels, level],
+    )
+  }
+
+  const toggleSchool = (school: string) => {
+    setData(
+      'spell_schools',
+      data.spell_schools.includes(school)
+        ? data.spell_schools.filter((s) => s !== school)
+        : [...data.spell_schools, school],
+    )
+  }
 
   const handleSubmit = () => {
     post(route('shop-items.add-spell', { shopItem: shopItemId }), {
       preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        router.reload({ preserveScroll: true })
+      },
     })
   }
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square">
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
           +
         </Button>
       </ModalTrigger>
-      <ModalTitle>Select spell level</ModalTitle>
+      <ModalTitle>Select spell options</ModalTitle>
       <ModalContent>
-        <Input
-          type="number"
-          value={data.spell_level}
-          onChange={(e) => setData('spell_level', Number(e.target.value))}
-        >
-          Level
-        </Input>
+        <div className="mb-2">
+          <p className="fieldset-label">Levels</p>
+          <div className="grid grid-cols-5 gap-1">
+            {levels.map((lvl) => {
+              const id = `lvl-${lvl}`
+              return (
+                <div className="flex items-center gap-1" key={lvl}>
+                  <input
+                    type="checkbox"
+                    id={id}
+                    className="checkbox checkbox-xs"
+                    checked={data.spell_levels.includes(lvl)}
+                    onChange={() => toggleLevel(lvl)}
+                  />
+                  <label htmlFor={id} className="fieldset-label cursor-pointer">
+                    {lvl}
+                  </label>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className="mb-2">
+          <p className="fieldset-label">Schools</p>
+          <div className="grid grid-cols-2 gap-1">
+            {schools.map((sc) => {
+              const id = `sc-${sc}`
+              return (
+                <div className="flex items-center gap-1" key={sc}>
+                  <input
+                    type="checkbox"
+                    id={id}
+                    className="checkbox checkbox-xs"
+                    checked={data.spell_schools.includes(sc)}
+                    onChange={() => toggleSchool(sc)}
+                  />
+                  <label htmlFor={id} className="fieldset-label cursor-pointer">
+                    {sc}
+                  </label>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit}>Roll</ModalAction>
     </Modal>
@@ -159,9 +232,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       >
         <Copy size={14} />
       </Button>
-      {shopItem && !spell && item.type === 'spellscroll' && (
-        <AddSpellModal shopItemId={shopItem.id} />
-      )}
+      {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
       {item.url ? (
         <Button as="a" href={item.url} target="_blank" size="xs" variant="ghost" modifier="square">
           <ExternalLink size={14} />
