@@ -4,6 +4,7 @@ import { Link, usePage } from '@inertiajs/react'
 import { Menu } from 'lucide-react'
 import { ReactNode, useRef } from 'react'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { useInitials } from '@/hooks/use-initials'
 import ThemeSwitcher from '@/components/theme-switcher'
 
 interface AppLayoutProps {
@@ -15,10 +16,16 @@ const menuLinks = [
   { name: 'Mastered Games', route: 'games.index', method: 'get' as const },
 ]
 
-const profileLinks = [
+const accountLinks = [
   { name: 'Profile', route: 'profile.edit', method: 'get' as const },
+]
+
+const legalLinks = [
   { name: 'Impressum', route: 'impressum', method: 'get' as const },
   { name: 'Privacy', route: 'privacy', method: 'get' as const },
+]
+
+const authLinks = [
   { name: 'Logout', route: 'logout', method: 'post' as const },
 ]
 
@@ -31,6 +38,7 @@ const adminLinks = [
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth } = usePage<PageProps>().props
+  const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   useClickOutside(adminDetailsRef, () =>
     adminDetailsRef.current?.removeAttribute('open')
@@ -124,16 +132,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 {auth.user.avatar ? (
                   <img alt={auth.user.name} src={auth.user.avatar} />
                 ) : (
-                  <img alt="Avatar placeholder" src="/images/no-avatar.svg" />
+                  <span className="flex h-full w-full items-center justify-center rounded-full bg-base-300 text-base-content">
+                    {getInitials(auth.user.name)}
+                  </span>
                 )}
               </div>
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
-              <li className="cursor-default px-4 py-2" role="none">
-                <p className="font-semibold leading-tight text-base-content">
-                  {auth.user.name}
-                </p>
-                <p className="text-xs text-base-content/70">{auth.user.email}</p>
+              <li className="flex items-center space-x-3 px-4 py-2" role="none">
+                <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-base-300 text-base-content flex items-center justify-center">
+                  {auth.user.avatar ? (
+                    <img alt={auth.user.name} src={auth.user.avatar} className="h-10 w-10 object-cover" />
+                  ) : (
+                    getInitials(auth.user.name)
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold leading-tight text-base-content truncate">{auth.user.name}</p>
+                  <p className="text-xs text-base-content/70 truncate">{auth.user.email}</p>
+                </div>
               </li>
               <li role="separator" className="my-1 p-0">
                 <hr className="border-base-300 pointer-events-none" />
@@ -144,10 +161,30 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <li role="separator" className="my-1 p-0">
                 <hr className="border-base-300 pointer-events-none" />
               </li>
-              {profileLinks.map((profileLink) => (
-                <li key={profileLink.route} role="none">
-                  <Link role="menuitem" method={profileLink.method} href={route(profileLink.route)}>
-                    {profileLink.name}
+              {accountLinks.map((link) => (
+                <li key={link.route} role="none">
+                  <Link role="menuitem" method={link.method} href={route(link.route)}>
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
+              </li>
+              {legalLinks.map((link) => (
+                <li key={link.route} role="none">
+                  <Link role="menuitem" method={link.method} href={route(link.route)}>
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
+              </li>
+              {authLinks.map((link) => (
+                <li key={link.route} role="none">
+                  <Link role="menuitem" method={link.method} href={route(link.route)}>
+                    {link.name}
                   </Link>
                 </li>
               ))}
