@@ -2,7 +2,11 @@ import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { User } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Settings } from 'lucide-react'
+import { Coins, Droplets, PartyPopper, Settings } from 'lucide-react'
+import LogoBt from '@/components/logo-bt'
+import LogoLt from '@/components/logo-lt'
+import LogoHt from '@/components/logo-ht'
+import LogoEt from '@/components/logo-et'
 import React from 'react'
 
 interface BreakdownForm extends Record<string, number> {
@@ -59,35 +63,79 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
       <ModalTitle>Edit Breakdown</ModalTitle>
       <ModalContent>
         <form className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Input type="number" value={data.event_bubbles} onChange={e => setData('event_bubbles', Number(e.target.value))} errors={errors.event_bubbles}>
-            Event Bubbles
+          <Input
+            type="number"
+            value={data.event_bubbles}
+            onChange={(e) => setData('event_bubbles', Number(e.target.value))}
+            errors={errors.event_bubbles}
+          >
+            <span className="flex items-center">
+              <PartyPopper size={16} className="mr-2" /> Event Bubbles{' '}
+              <Droplets size={14} className="ml-1" />
+            </span>
           </Input>
-          <Input type="number" value={data.event_coins} onChange={e => setData('event_coins', Number(e.target.value))} errors={errors.event_coins}>
-            Event Coins
+          <Input
+            type="number"
+            value={data.event_coins}
+            onChange={(e) => setData('event_coins', Number(e.target.value))}
+            errors={errors.event_coins}
+          >
+            <span className="flex items-center">
+              <PartyPopper size={16} className="mr-2" /> Event Coins{' '}
+              <Coins size={14} className="ml-1" />
+            </span>
           </Input>
-          <Input type="number" value={data.other_bubbles} onChange={e => setData('other_bubbles', Number(e.target.value))} errors={errors.other_bubbles}>
-            Other Bubbles
+          <Input
+            type="number"
+            value={data.other_bubbles}
+            onChange={(e) => setData('other_bubbles', Number(e.target.value))}
+            errors={errors.other_bubbles}
+          >
+            <span className="flex items-center">
+              Other Bubbles <Droplets size={14} className="ml-1" />
+            </span>
           </Input>
-          <Input type="number" value={data.other_coins} onChange={e => setData('other_coins', Number(e.target.value))} errors={errors.other_coins}>
-            Other Coins
+          <Input
+            type="number"
+            value={data.other_coins}
+            onChange={(e) => setData('other_coins', Number(e.target.value))}
+            errors={errors.other_coins}
+          >
+            <span className="flex items-center">
+              Other Coins <Coins size={14} className="ml-1" />
+            </span>
           </Input>
           {(['bt', 'lt', 'ht', 'et'] as const).map((type) => (
             <React.Fragment key={type}>
               <Input
                 type="number"
                 value={data[`${type}_bubbles`]}
-                onChange={e => setData(`${type}_bubbles`, Number(e.target.value))}
+                onChange={(e) => setData(`${type}_bubbles`, Number(e.target.value))}
                 errors={errors[`${type}_bubbles`]}
               >
-                {type.toUpperCase()} Bubbles
+                <span className="flex items-center">
+                  {type === 'bt' && <LogoBt width={16} />}
+                  {type === 'lt' && <LogoLt width={16} />}
+                  {type === 'ht' && <LogoHt width={16} />}
+                  {type === 'et' && <LogoEt width={16} />}
+                  <span className="ml-2">{type.toUpperCase()} Bubbles</span>{' '}
+                  <Droplets size={14} className="ml-1" />
+                </span>
               </Input>
               <Input
                 type="number"
                 value={data[`${type}_coins`]}
-                onChange={e => setData(`${type}_coins`, Number(e.target.value))}
+                onChange={(e) => setData(`${type}_coins`, Number(e.target.value))}
                 errors={errors[`${type}_coins`]}
               >
-                {type.toUpperCase()} Coins
+                <span className="flex items-center">
+                  {type === 'bt' && <LogoBt width={16} />}
+                  {type === 'lt' && <LogoLt width={16} />}
+                  {type === 'ht' && <LogoHt width={16} />}
+                  {type === 'et' && <LogoEt width={16} />}
+                  <span className="ml-2">{type.toUpperCase()} Coins</span>{' '}
+                  <Coins size={14} className="ml-1" />
+                </span>
               </Input>
             </React.Fragment>
           ))}
