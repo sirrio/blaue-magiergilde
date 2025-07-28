@@ -12,6 +12,7 @@ import { calculateCoinsSpend } from '@/helper/calculateCoinsSpend'
 import AppLayout from '@/layouts/app-layout'
 import StoreGameModal from '@/pages/game/store-game-modal'
 import UpdateGameModal from '@/pages/game/update-game-modal'
+import UpdateBreakdownModal from '@/pages/game/update-breakdown-modal'
 import { Head } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { AlertCircle, Coins, Droplets, PartyPopper, Plus, Settings, Swords } from 'lucide-react'
@@ -110,7 +111,10 @@ export default function MasteredGames({ games, user, characters }) {
 
         <Card>
           <CardBody>
-            <CardTitle>Breakdown</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              Breakdown
+              <UpdateBreakdownModal user={user} />
+            </CardTitle>
             <CardContent>
               <div className="grid grid-cols-1 gap-6 text-sm md:grid-cols-2">
                 <div className="space-y-4 md:border-r md:pr-4">
