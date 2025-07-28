@@ -185,15 +185,21 @@ interface NewAllyCardProps {
   isEditing: boolean
   onSave: (ally: Ally) => void
   onCancel: () => void
+  onEdit?: () => void
 }
 
-const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }) => {
+const NewAllyCard: React.FC<NewAllyCardProps> = ({
+  isEditing,
+  onSave,
+  onCancel,
+  onEdit,
+}) => {
   const [editData, setEditData] = useState<Ally>({
     character_id: 0,
     id: 0,
     name: '',
     notes: '',
-    avatar: '',
+    avatar: undefined,
     classes: '',
     species: '',
     standing: 'normal',
@@ -205,7 +211,10 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
   }
   if (!isEditing) {
     return (
-      <div className="card bg-base-100 hover:bg-base-200 cursor-pointer border-2 border-dashed p-4 text-center shadow-sm" onClick={onCancel}>
+      <div
+        className="card bg-base-100 hover:bg-base-200 cursor-pointer border-2 border-dashed p-4 text-center shadow-sm"
+        onClick={onEdit}
+      >
         <PlusCircle size={24} className="mx-auto" />
         <p className="mt-2 text-sm">Add Ally</p>
       </div>
