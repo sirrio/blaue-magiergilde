@@ -25,7 +25,7 @@ export const Button = <C extends ElementType = 'button'>(
 ) => {
   const Component = as || 'button'
   const buttonClasses = cn(
-    'btn',
+    'btn transition-colors duration-150 hover:shadow-lg',
     `btn-${size}`,
     variant && `btn-${variant}`,
     modifier && `btn-${modifier}`,

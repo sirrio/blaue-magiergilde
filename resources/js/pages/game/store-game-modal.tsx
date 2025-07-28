@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Toggle } from '@/components/ui/toggle'
 import { TextArea } from '@/components/ui/text-area'
 import { useForm, usePage } from '@inertiajs/react'
 import React from 'react'
@@ -32,6 +32,7 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
       <ModalTitle>Add Game</ModalTitle>
       <ModalContent>
         <form>
+          <h3 className="mb-2 mt-2 font-semibold">Game Details</h3>
           <Input placeholder="Game Title" errors={errors.title} type="text" value={data.title} onChange={(e) => setData('title', e.target.value)}>
             Title
           </Input>
@@ -39,6 +40,7 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
             Tier
           </Input>
           <Input
+            className="w-24"
             placeholder="Duration"
             errors={errors.duration}
             type="number"
@@ -48,6 +50,7 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
             Duration
           </Input>
           <Input
+            className="w-24"
             placeholder="Sessions"
             errors={errors.sessions}
             type="number"
@@ -57,7 +60,7 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
             Sessions
           </Input>
           <Input
-            placeholder="Start Date"
+            placeholder="DD.MM.YYYY"
             errors={errors.start_date}
             type="date"
             value={data.start_date}
@@ -65,13 +68,14 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
           >
             Start Date
           </Input>
-          <Checkbox
+          <h3 className="mb-2 mt-4 font-semibold">Economy</h3>
+          <Toggle
+            label="Additional Bubble"
             errors={errors.has_additional_bubble}
             checked={data.has_additional_bubble}
             onChange={(e) => setData('has_additional_bubble', e.target.checked)}
-          >
-            Additional Bubble
-          </Checkbox>
+          />
+          <h3 className="mb-2 mt-4 font-semibold">Metadata</h3>
           <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>

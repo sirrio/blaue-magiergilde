@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Tooltip } from '@/components/ui/tooltip'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { Character, PageProps } from '@/types'
@@ -39,9 +40,16 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button size="sm" className={'w-full'} disabled={character.is_filler}>
-          <FlameKindling size={14} />
-        </Button>
+        <Tooltip text="Add Downtime">
+          <Button
+            aria-label="Add Downtime"
+            size="sm"
+            className={'w-full'}
+            disabled={character.is_filler}
+          >
+            <FlameKindling size={14} />
+          </Button>
+        </Tooltip>
       </ModalTrigger>
       <ModalTitle>Add downtime</ModalTitle>
       <ModalContent>

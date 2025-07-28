@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Tooltip } from '@/components/ui/tooltip'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
@@ -325,9 +326,11 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   return (
     <Modal wide>
       <ModalTrigger>
-        <Button size="sm" className="w-full">
-          <BookHeart size={14} />
-        </Button>
+        <Tooltip text="Manage Allies">
+          <Button aria-label="Manage Allies" size="sm" className="w-full">
+            <BookHeart size={14} />
+          </Button>
+        </Tooltip>
       </ModalTrigger>
       <ModalTitle>Manage Allies</ModalTitle>
       <ModalContent>

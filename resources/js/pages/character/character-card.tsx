@@ -2,6 +2,7 @@ import LogoFiller from '@/components/logo-filler'
 import LogoTier from '@/components/logo-tier'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardBody, CardContent, CardTitle } from '@/components/ui/card'
+import { Tooltip } from '@/components/ui/tooltip'
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Progress } from '@/components/ui/progress'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
@@ -59,13 +60,22 @@ export function CharacterCard({ character }: { character: Character }) {
       <Card className={cn('group')}>
         <CardBody>
           <CardAction className={cn('absolute top-2 right-2 gap-1')}>
-            <Button className={'hidden group-hover:flex'} size="xs" modifier="square" {...attributes} {...listeners}>
-              <Grip size={14} />
-            </Button>
+            <Tooltip text="Move">
+              <Button
+                aria-label="Move"
+                className={"hidden group-hover:flex"}
+                size="xs"
+                modifier="square"
+                {...attributes}
+                {...listeners}
+              >
+                <Grip size={14} />
+              </Button>
+            </Tooltip>
             <UpdateCharacterModal character={character} />
             <DestroyCharacterModal character={character} />
           </CardAction>
-          <CardTitle className={cn('pb-0')}>
+          <CardTitle className="pb-2 mb-2 border-b">
             {character.name} <LogoTier tier={tier} />
           </CardTitle>
           <CardContent>
@@ -81,8 +91,8 @@ export function CharacterCard({ character }: { character: Character }) {
                   <Droplets size={13} />
                   <span> to next level</span>
                 </div>
-                <div className={cn('mt-4 grid grid-cols-2 gap-0.5')}>
-                  <InfoBox>
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <InfoBox className="bg-base-200 border-accent">
                     <InfoBoxTitle>
                       <Swords size={15} /> Adventures
                     </InfoBoxTitle>
@@ -95,14 +105,14 @@ export function CharacterCard({ character }: { character: Character }) {
                       <Droplets size={13} />
                     </InfoBoxLine>
                   </InfoBox>
-                  <InfoBox>
+                  <InfoBox className="bg-base-200 border-accent">
                     <InfoBoxTitle>
                       <Anvil size={15} /> Factions
                     </InfoBoxTitle>
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
                     <InfoBoxLine>Level: {calculateFactionLevel(character)}</InfoBoxLine>
                   </InfoBox>
-                  <InfoBox>
+                  <InfoBox className="bg-base-200 border-accent">
                     <InfoBoxTitle>
                       <FlameKindling size={15} /> Downtime
                     </InfoBoxTitle>
@@ -111,7 +121,7 @@ export function CharacterCard({ character }: { character: Character }) {
                     <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
                     <InfoBoxLine className="font-semibold">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
                   </InfoBox>
-                  <InfoBox>
+                  <InfoBox className="bg-base-200 border-accent">
                     <InfoBoxTitle>
                       <Crown size={15} /> Game Master
                     </InfoBoxTitle>
@@ -144,9 +154,11 @@ export function CharacterCard({ character }: { character: Character }) {
               <StoreAdventureModal character={character}></StoreAdventureModal>
               <StoreDowntimeModal character={character}></StoreDowntimeModal>
               <AlliesModal character={character} />
-              <Button as="a" size="sm" href={character.external_link} target="_blank">
-                <ExternalLink size={14} />
-              </Button>
+              <Tooltip text="Open Sheet">
+                <Button as="a" size="sm" aria-label="Open Sheet" href={character.external_link} target="_blank">
+                  <ExternalLink size={14} />
+                </Button>
+              </Tooltip>
             </div>
           </CardContent>
         </CardBody>

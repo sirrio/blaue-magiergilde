@@ -7,7 +7,16 @@ type CardProps = {
 }
 
 export const Card: React.FC<CardProps> = ({ className, children }) => {
-  return <div className={cn('relative card bg-base-100 shadow-sm', className)}>{children}</div>
+  return (
+    <div
+      className={cn(
+        'relative card rounded-lg bg-base-100 shadow-xl transition-colors duration-150 hover:shadow-lg',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
 }
 
 export const CardBody: React.FC<CardProps> = ({ className, children }) => {

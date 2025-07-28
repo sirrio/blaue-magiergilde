@@ -52,7 +52,7 @@ export default function Profile() {
             </Link>
           )}
         </div>
-        <form onSubmit={submitProfile} className="card bg-base-100 space-y-4 p-4">
+        <form onSubmit={submitProfile} className="card bg-base-100 rounded-lg shadow-xl space-y-4 p-4">
           <h2 className="text-xl font-semibold">Update your account's profile information and email address.</h2>
           <Input type="text" value={profileForm.data.name} onChange={(e) => profileForm.setData('name', e.target.value)} errors={profileForm.errors.name}>
             Name
@@ -60,11 +60,13 @@ export default function Profile() {
           <Input type="email" value={profileForm.data.email} onChange={(e) => profileForm.setData('email', e.target.value)} errors={profileForm.errors.email}>
             Email
           </Input>
-          <Button type="submit" className="btn-primary" disabled={profileForm.processing}>
-            Save
-          </Button>
+          <div className="flex justify-end">
+            <Button type="submit" className="btn-primary" disabled={profileForm.processing}>
+              Save
+            </Button>
+          </div>
         </form>
-        <form onSubmit={submitPassword} className="card bg-base-100 space-y-4 p-4">
+        <form onSubmit={submitPassword} className="card bg-base-100 rounded-lg shadow-xl space-y-4 p-4">
           <h2 className="text-xl font-semibold">Update Password.</h2>
           <Input type="password" value={passwordForm.data.current_password} onChange={(e) => passwordForm.setData('current_password', e.target.value)} errors={passwordForm.errors.current_password}>
             Current Password
@@ -75,19 +77,23 @@ export default function Profile() {
           <Input type="password" value={passwordForm.data.password_confirmation} onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)} errors={passwordForm.errors.password_confirmation}>
             Confirm Password
           </Input>
-          <Button type="submit" className="btn-primary" disabled={passwordForm.processing}>
-            Save
-          </Button>
+          <div className="flex justify-end">
+            <Button type="submit" className="btn-primary" disabled={passwordForm.processing}>
+              Save
+            </Button>
+          </div>
         </form>
-        <form onSubmit={submitDelete} className="card bg-base-100 space-y-4 p-4">
+        <form onSubmit={submitDelete} className="card bg-base-100 rounded-lg shadow-xl space-y-4 p-4">
           <h2 className="text-xl font-semibold">Delete Account</h2>
           <p>Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.</p>
           <Input type="password" value={deleteForm.data.password} onChange={(e) => deleteForm.setData('password', e.target.value)} errors={deleteForm.errors.password}>
             Password
           </Input>
-          <Button type="submit" className="btn-error" disabled={deleteForm.processing}>
-            Delete Account
-          </Button>
+          <div className="flex justify-end">
+            <Button type="submit" className="btn-error" disabled={deleteForm.processing}>
+              Delete Account
+            </Button>
+          </div>
         </form>
       </div>
     </AppLayout>

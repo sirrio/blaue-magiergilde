@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
-import { Menu } from 'lucide-react'
+import { Menu, Package, Sparkles, Store } from 'lucide-react'
 import { ReactNode, useRef } from 'react'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import ThemeSwitcher from '@/components/theme-switcher'
@@ -20,10 +20,20 @@ const profileLinks = [
   { name: 'Logout', route: 'logout', method: 'post' as const },
 ]
 
-const adminLinks = [
-  { name: 'Items', route: 'items.index', method: 'get' as const },
-  { name: 'Spells', route: 'spells.index', method: 'get' as const },
-  { name: 'Shop', route: 'shops.index', method: 'get' as const },
+const adminGroups = [
+  {
+    title: 'Game Data',
+    links: [
+      { name: 'Items', icon: Package, route: 'items.index', method: 'get' as const },
+      { name: 'Spells', icon: Sparkles, route: 'spells.index', method: 'get' as const },
+    ],
+  },
+  {
+    title: 'Economy',
+    links: [
+      { name: 'Shop', icon: Store, route: 'shops.index', method: 'get' as const },
+    ],
+  },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -44,7 +54,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {menuLinks.map((menuLink) => (
                 <li key={menuLink.route} role="none">
-                  <Link role="menuitem" className={cn(route().current(menuLink.route) ? 'menu-active' : '')} href={route(menuLink.route)}>
+                  <Link
+                    role="menuitem"
+                    className={cn(
+                      'btn btn-ghost btn-sm w-full justify-start relative after:absolute after:left-0 after:-bottom-1 after:h-0.5 after:w-0 after:bg-primary after:transition-all duration-300',
+                      route().current(menuLink.route) ? 'btn-active after:w-full' : 'hover:after:w-full',
+                    )}
+                    href={route(menuLink.route)}
+                  >
                     {menuLink.name}
                   </Link>
                 </li>
@@ -53,16 +70,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <li role="none">
                   <a>Administration</a>
                   <ul className="p-2">
-                    {adminLinks.map((adminLink) => (
-                      <li key={adminLink.route} role="none">
-                        <Link
-                          role="menuitem"
-                          method={adminLink.method}
-                          href={route(adminLink.route)}
-                          className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
-                        >
-                          {adminLink.name}
-                        </Link>
+                    {adminGroups.map((group) => (
+                      <li key={group.title} role="none">
+                        <h3 className="menu-title">{group.title}</h3>
+                        <ul>
+                          {group.links.map((link) => (
+                            <li key={link.route} role="none">
+                              <Link
+                                role="menuitem"
+                                method={link.method}
+                                href={route(link.route)}
+                                className={cn(route().current(link.route) ? 'menu-active' : '')}
+                              >
+                                <link.icon size={14} className="mr-2" />
+                                {link.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>
@@ -70,8 +95,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               )}
             </ul>
           </div>
-          <Link href={route('characters.index')} className="btn btn-ghost text-xl">
-            <img className={cn('h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
+          <Link
+            href={route('characters.index')}
+            className="btn btn-ghost text-xl gap-2 items-center"
+          >
+            <img className="h-full" alt="Blaue Magiergilde" src="/images/icon_magiergilde.svg" />
             Blaue Magiergilde
           </Link>
         </div>
@@ -84,7 +112,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   role="menuitem"
                   method={menuLink.method}
                   href={route(menuLink.route)}
-                  className={cn(route().current(menuLink.route) ? 'menu-active' : '')}
+                  className={cn(
+                    'btn btn-ghost btn-sm relative after:absolute after:left-0 after:-bottom-1 after:h-0.5 after:w-0 after:bg-primary after:transition-all duration-300',
+                    route().current(menuLink.route)
+                      ? 'btn-active after:w-full'
+                      : 'hover:after:w-full',
+                  )}
                 >
                   {menuLink.name}
                 </Link>
@@ -95,16 +128,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <details ref={adminDetailsRef}>
                   <summary>Administration</summary>
                   <ul className="z-30 w-52 p-2">
-                    {adminLinks.map((adminLink) => (
-                      <li key={adminLink.route} role="none">
-                        <Link
-                          role="menuitem"
-                          method={adminLink.method}
-                          href={route(adminLink.route)}
-                          className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
-                        >
-                          {adminLink.name}
-                        </Link>
+                    {adminGroups.map((group) => (
+                      <li key={group.title} role="none">
+                        <h3 className="menu-title">{group.title}</h3>
+                        <ul>
+                          {group.links.map((link) => (
+                            <li key={link.route} role="none">
+                              <Link
+                                role="menuitem"
+                                method={link.method}
+                                href={route(link.route)}
+                                className={cn(route().current(link.route) ? 'menu-active' : '')}
+                              >
+                                <link.icon size={14} className="mr-2" />
+                                {link.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>

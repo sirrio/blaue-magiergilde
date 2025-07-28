@@ -4,7 +4,8 @@ import LogoHt from '@/components/logo-ht'
 import LogoLt from '@/components/logo-lt'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
-import { List, ListRow } from '@/components/ui/list'
+import { Progress } from '@/components/ui/progress'
+import { EmptyState } from '@/components/ui/empty-state'
 import { calculateBubbleByFillerCharacters, calculateBubbleByGames } from '@/helper/calculateBubble'
 import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
@@ -40,6 +41,30 @@ export default function MasteredGames({ games, user, characters }) {
   const spentCoins = calculateCoinsSpend(characters)
   const remainingBubbles = totalBubbles - spentBubbles
   const remainingCoins = totalCoins - spentCoins
+
+  const bonusRows = [
+    {
+      key: 'filler',
+      label: 'Filler Character',
+      bubbles: calculateBubbleByFillerCharacters(characters),
+      coins: 0,
+      icon: <Plus size={16} className="mr-2" />,
+    },
+    {
+      key: 'event',
+      label: 'Event Bonuses',
+      bubbles: user.event_bubbles || 0,
+      coins: user.event_coins || 0,
+      icon: <PartyPopper size={18} className="mr-2" />,
+    },
+    {
+      key: 'other',
+      label: 'Other Bonuses',
+      bubbles: user.other_bubbles || 0,
+      coins: user.other_coins || 0,
+      icon: null,
+    },
+  ].filter((r) => r.bubbles !== 0 || r.coins !== 0)
 
   return (
     <AppLayout>
@@ -88,12 +113,10 @@ export default function MasteredGames({ games, user, characters }) {
                       {icon}
                       <span>{title}</span>
                     </div>
-                    <progress className={'progress w-full'} value={spent} max={total} />
-                    <div className="text-base-content/70 -mt-0.5 flex justify-between text-xs">
-                      <span>Remaining: {remaining}</span>
-                      <span>
-                        Spent: {spent} / {total}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">Remaining: {remaining}</span>
+                      <Progress value={spent} max={total} className="flex-1" />
+                      <span className="text-xs">Spent: {spent} / {total}</span>
                     </div>
                     {spent > total && (
                       <p className="text-error mt-2 flex items-center text-xs">
@@ -128,47 +151,28 @@ export default function MasteredGames({ games, user, characters }) {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Plus size={16} className="mr-2" />
-                      Filler Character
-                    </div>
-                    <div className="flex items-center space-x-4 text-right">
-                      <span className="w-20">
-                        {calculateBubbleByFillerCharacters(characters)} <Droplets size={16} className="inline" />
-                      </span>
-                      <span className="w-20">
-                        <Coins size={16} className="text-base-content/50 inline" />
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <PartyPopper size={18} className="mr-2" />
-                      Event Bonuses
-                    </div>
-                    <div className="flex items-center space-x-4 text-right">
-                      <span className="w-20">
-                        {user.event_bubbles || 0} <Droplets size={16} className="inline" />
-                      </span>
-                      <span className="w-20">
-                        {user.event_coins || 0} <Coins size={16} className="inline" />
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <span className="">Other Bonuses</span>
-                    </div>
-                    <div className="flex items-center space-x-4 text-right">
-                      <span className="w-20">
-                        {user.other_bubbles || 0} <Droplets size={16} className="inline" />
-                      </span>
-                      <span className="w-20">
-                        {user.other_coins || 0} <Coins size={16} className="inline" />
-                      </span>
-                    </div>
-                  </div>
+                  {bonusRows.length === 0 ? (
+                    <EmptyState icon={PartyPopper}>
+                      No bonuses yet—play your first game to earn bubbles!
+                    </EmptyState>
+                  ) : (
+                    bonusRows.map((row) => (
+                      <div key={row.key} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {row.icon}
+                          <span>{row.label}</span>
+                        </div>
+                        <div className="flex items-center space-x-4 text-right">
+                          <span className="w-20">
+                            {row.bubbles} <Droplets size={16} className="inline" />
+                          </span>
+                          <span className="w-20">
+                            {row.coins} <Coins size={16} className="inline" />
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
                 <div className="space-y-4">
                   {['bt', 'lt', 'ht', 'et'].map((type) => (
@@ -199,33 +203,63 @@ export default function MasteredGames({ games, user, characters }) {
         <div>
           <h2 className="mb-6 text-xl font-semibold">Your Games</h2>
           {games.length > 0 ? (
-            <List>
-              {games.map((game, index) => (
-                <ListRow key={game.id}>
-                  <h3>
-                    #{games.length - index} {game.tier === 'bt' && <LogoBt width={16} />}
-                    {game.tier === 'lt' && <LogoLt width={16} />}
-                    {game.tier === 'ht' && <LogoHt width={16} />}
-                    {game.tier === 'et' && <LogoEt width={16} />} {game.title ?? 'Game'}
-                  </h3>
-                  <p className={'text-base-content/50 truncate text-xs'}>{game.notes ?? 'No notes'}</p>
-                  <p className={'text-xs'}>
-                    {calculateBubbleByGames([game])} <Droplets size={13} className="inline" />
-                  </p>
-                  <p className={'text-xs'}>
-                    {calculateCoins([game])} <Coins size={13} className="inline" />
-                  </p>
-                  <div className={'text-base-content/70 font-mono'}>{format(new Date(game.start_date), 'dd.MM.yyyy')}</div>
-                  <UpdateGameModal game={game}>
-                    <Button size={'xs'} modifier={'square'} variant={'ghost'}>
-                      <Settings size={14}></Settings>
-                    </Button>
-                  </UpdateGameModal>
-                </ListRow>
-              ))}
-            </List>
+            <table className="table table-zebra w-full">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Title</th>
+                  <th>Notes</th>
+                  <th>Bubbles</th>
+                  <th>Coins</th>
+                  <th>Date</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {games.map((game, index) => (
+                  <tr key={game.id} className="transition-colors duration-150 hover:shadow-lg">
+                    <td>{games.length - index}</td>
+                    <td>
+                      {game.tier === 'bt' && <LogoBt width={16} />} {game.tier === 'lt' && <LogoLt width={16} />}
+                      {game.tier === 'ht' && <LogoHt width={16} />} {game.tier === 'et' && <LogoEt width={16} />}{' '}
+                      {game.title ?? 'Game'}
+                    </td>
+                    <td className="text-xs" dangerouslySetInnerHTML={{ __html: game.notes || 'No notes' }} />
+                    <td className="text-xs">
+                      {calculateBubbleByGames([game])} <Droplets size={13} className="inline" />
+                    </td>
+                    <td className="text-xs">
+                      {calculateCoins([game])} <Coins size={13} className="inline" />
+                    </td>
+                    <td className="text-base-content/70 font-mono">
+                      {format(new Date(game.start_date), 'dd.MM.yyyy')}
+                    </td>
+                    <td>
+                      <div className="dropdown dropdown-end">
+                        <label tabIndex={0} className="btn btn-ghost btn-xs">
+                          <Settings size={14} />
+                        </label>
+                        <ul tabIndex={0} className="menu dropdown-content z-20 w-28 p-2 shadow bg-base-100 rounded-box">
+                          <li>
+                            <UpdateGameModal game={game}>
+                              <span>Edit</span>
+                            </UpdateGameModal>
+                          </li>
+                          <li>
+                            <button className="text-left">Delete</button>
+                          </li>
+                          <li>
+                            <button className="text-left">Archive</button>
+                          </li>
+                        </ul>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
-            <p className="mt-4 text-center text-sm text-gray-500">No games found. Start by creating a new game!</p>
+            <p className="mt-4 text-center text-sm text-base-content/70">No games found. Start by creating a new game!</p>
           )}
         </div>
       </div>

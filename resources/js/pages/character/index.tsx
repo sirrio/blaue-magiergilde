@@ -4,7 +4,6 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import AppLayout from '@/layouts/app-layout'
-import { cn } from '@/lib/utils'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
@@ -155,7 +154,7 @@ export default function Index({ characters }: { characters: Character[] }) {
             </div>
           </div>
         ) : (
-          <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
+          <div className="grid grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-6">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (

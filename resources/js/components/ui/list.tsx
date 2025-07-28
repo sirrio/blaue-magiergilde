@@ -8,4 +8,8 @@ export const List = ({ children }: PropsWithChildren) => {
   )
 }
 
-export const ListRow = ({ children }: PropsWithChildren) => <li className="list-row items-center">{children}</li>
+export const ListRow = ({ children }: PropsWithChildren) => (
+  <li className="list-row items-center transition-colors duration-150 hover:shadow-lg">
+    {children}
+  </li>
+)

@@ -8,10 +8,15 @@ type ProgressProps = {
   max?: number
 }
 
-export const Progress: React.FC<ProgressProps> = ({ className, children, value, max }) => {
+export const Progress: React.FC<ProgressProps> = ({ className, children, value = 0, max = 100 }) => {
+  const percent = Math.round((value / max) * 100)
   return (
-    <progress className={cn('progress', className)} value={value ?? 0} max={max ?? 100}>
+    <div className={cn('relative h-8', className)}>
+      <progress className="progress h-8 w-full" value={value} max={max}></progress>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-medium">
+        {percent}%
+      </span>
       {children}
-    </progress>
+    </div>
   )
 }

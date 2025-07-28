@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { List, ListRow } from '@/components/ui/list'
+import { EmptyState } from '@/components/ui/empty-state'
 import AppLayout from '@/layouts/app-layout'
 import { Character } from '@/types'
 import { Head, router, Link } from '@inertiajs/react'
@@ -26,7 +27,9 @@ export default function Deleted({ characters }: { characters: Character[] }) {
             <CardTitle>Restore</CardTitle>
             <CardContent>
               {characters.length === 0 ? (
-                <p className="text-center text-sm text-base-content/70">No deleted characters</p>
+                <EmptyState icon={RotateCcw}>
+                  Deleted characters will appear here—restore them with one click.
+                </EmptyState>
               ) : (
                 <List>
                   {characters.map((char) => (

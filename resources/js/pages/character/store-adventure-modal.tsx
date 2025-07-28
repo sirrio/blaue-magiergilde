@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Tooltip } from '@/components/ui/tooltip'
 import { TextArea } from '@/components/ui/text-area'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
@@ -52,9 +53,11 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button size="sm" className="w-full">
-          <Swords size={14} />
-        </Button>
+        <Tooltip text="Add Adventure">
+          <Button aria-label="Add Adventure" size="sm" className="w-full">
+            <Swords size={14} />
+          </Button>
+        </Tooltip>
       </ModalTrigger>
       <ModalTitle>Add adventure</ModalTitle>
       <ModalContent>
