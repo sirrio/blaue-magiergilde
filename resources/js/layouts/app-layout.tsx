@@ -153,6 +153,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </nav>
       <main>{children}</main>
+      <footer className="bg-base-100 py-4 text-center text-sm">
+        <Link href={route('impressum')} className="link">
+          Impressum
+        </Link>
+        <span className="mx-2">|</span>
+        <Link href={route('privacy')} className="link">
+          Privacy
+        </Link>
+      </footer>
     </div>
   )
 }
