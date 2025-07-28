@@ -17,7 +17,7 @@ export const FileInput: React.FC<InputProps> = ({
   const inputId = id ?? generatedId
   return (
     <div>
-      <label className={'fieldset-label'} htmlFor={inputId}>{children}</label>
+      <label className={'label'} htmlFor={inputId}>{children}</label>
       <input className={'file-input w-full'}
              id={inputId}
              type={'file'}

@@ -92,7 +92,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
       <ModalTitle>Select spell options</ModalTitle>
       <ModalContent>
         <div className="mb-2">
-          <p className="fieldset-label">Levels</p>
+          <p className="label">Levels</p>
           <div className="grid grid-cols-5 gap-1">
             {levels.map((lvl) => {
               const id = `lvl-${lvl}`
@@ -105,7 +105,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
                     checked={data.spell_levels.includes(lvl)}
                     onChange={() => toggleLevel(lvl)}
                   />
-                  <label htmlFor={id} className="fieldset-label cursor-pointer">
+                  <label htmlFor={id} className="label cursor-pointer">
                     {lvl === 0 ? 'Cantrip' : lvl}
                   </label>
                 </div>
@@ -114,7 +114,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
           </div>
         </div>
         <div className="mb-2">
-          <p className="fieldset-label">Schools</p>
+          <p className="label">Schools</p>
           <div className="grid grid-cols-2 gap-1">
             {schools.map((sc) => {
               const id = `sc-${sc}`
@@ -127,7 +127,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
                     checked={data.spell_schools.includes(sc)}
                     onChange={() => toggleSchool(sc)}
                   />
-                  <label htmlFor={id} className="fieldset-label cursor-pointer flex items-center gap-1">
+                  <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
                     <svg className="icon h-4 w-4 fill-current">
                       <use xlinkHref={`/images/spell-schools.svg#${sc}`}></use>
                     </svg>

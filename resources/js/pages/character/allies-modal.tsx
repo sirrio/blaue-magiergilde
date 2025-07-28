@@ -105,7 +105,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
         />
       </div>
       <div className="mb-1">
-        <label className="fieldset-label">Classes</label>
+        <label className="label">Classes</label>
         <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
           {classes.map((cc: CharacterClass) => {
             const id = createRandomString(24)
@@ -129,7 +129,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
                     handleChange('classes', updated.join(', '))
                   }}
                 />
-                <label htmlFor={id} className="fieldset-label cursor-pointer">
+                <label htmlFor={id} className="label cursor-pointer">
                   {cc.name}
                 </label>
               </div>
@@ -137,7 +137,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
           })}
         </div>
       </div>
-      <label className="fieldset-label">Species</label>
+      <label className="label">Species</label>
       <input
         type="text"
         value={editData.species}
@@ -154,7 +154,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
-      <label className="fieldset-label">Standing</label>
+      <label className="label">Standing</label>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
@@ -221,7 +221,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
         onChange={(e) => handleChange('name', e.target.value)}
       />
       <div className="mb-1">
-        <label className="fieldset-label">Classes</label>
+        <label className="label">Classes</label>
         <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
           {classes.map((cc: CharacterClass) => {
             const id = createRandomString(24)
@@ -245,7 +245,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
                     handleChange('classes', updated.join(', '))
                   }}
                 />
-                <label htmlFor={id} className="fieldset-label cursor-pointer">
+                <label htmlFor={id} className="label cursor-pointer">
                   {cc.name}
                 </label>
               </div>
@@ -253,7 +253,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
           })}
         </div>
       </div>
-      <label className="fieldset-label">Species</label>
+      <label className="label">Species</label>
       <input
         type="text"
         value={editData.species}
@@ -270,7 +270,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
-      <label className="fieldset-label">Standing</label>
+      <label className="label">Standing</label>
       <select
         value={editData.standing}
         onChange={(e) => handleChange('standing', e.target.value)}
