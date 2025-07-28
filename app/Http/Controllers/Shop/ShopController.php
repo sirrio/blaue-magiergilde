@@ -58,10 +58,17 @@ class ShopController extends Controller
         $shops = Shop::query()
             ->with([
                 'items' => function ($query) {
-                    $query
-                        ->select(['items.id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count'])
-                        ->with('pivot.spell');
+                    $query->select([
+                        'items.id',
+                        'name',
+                        'url',
+                        'cost',
+                        'rarity',
+                        'type',
+                        'pick_count',
+                    ]);
                 },
+                'items.pivot.spell',
             ])
             ->orderByDesc('created_at')
             ->select(['shops.id', 'created_at'])
