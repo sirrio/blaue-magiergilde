@@ -1,15 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
 import { ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem } from '@/types'
-import { useForm, usePage } from '@inertiajs/react'
+import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Sword, XCircle } from 'lucide-react'
-import { JSX } from 'react'
+import React, { useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
   common: 'text-gray-700',
@@ -53,6 +52,8 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
 
   const { data, setData, post } = useForm({ spell_levels: [] as number[], spell_schools: [] as string[] })
 
+  const [isOpen, setIsOpen] = useState(false)
+
   const toggleLevel = (level: number) => {
     setData(
       'spell_levels',
@@ -74,13 +75,17 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   const handleSubmit = () => {
     post(route('shop-items.add-spell', { shopItem: shopItemId }), {
       preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        router.reload({ preserveScroll: true })
+      },
     })
   }
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square">
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
           +
         </Button>
       </ModalTrigger>
@@ -89,21 +94,45 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
         <div className="mb-2">
           <p className="fieldset-label">Levels</p>
           <div className="grid grid-cols-5 gap-1">
-            {levels.map((lvl) => (
-              <Checkbox key={lvl} size="xs" checked={data.spell_levels.includes(lvl)} onChange={() => toggleLevel(lvl)}>
-                {lvl === 0 ? '0' : lvl}
-              </Checkbox>
-            ))}
+            {levels.map((lvl) => {
+              const id = `lvl-${lvl}`
+              return (
+                <div className="flex items-center gap-1" key={lvl}>
+                  <input
+                    type="checkbox"
+                    id={id}
+                    className="checkbox checkbox-xs"
+                    checked={data.spell_levels.includes(lvl)}
+                    onChange={() => toggleLevel(lvl)}
+                  />
+                  <label htmlFor={id} className="fieldset-label cursor-pointer">
+                    {lvl}
+                  </label>
+                </div>
+              )
+            })}
           </div>
         </div>
         <div className="mb-2">
           <p className="fieldset-label">Schools</p>
           <div className="grid grid-cols-2 gap-1">
-            {schools.map((sc) => (
-              <Checkbox key={sc} size="xs" checked={data.spell_schools.includes(sc)} onChange={() => toggleSchool(sc)}>
-                {sc}
-              </Checkbox>
-            ))}
+            {schools.map((sc) => {
+              const id = `sc-${sc}`
+              return (
+                <div className="flex items-center gap-1" key={sc}>
+                  <input
+                    type="checkbox"
+                    id={id}
+                    className="checkbox checkbox-xs"
+                    checked={data.spell_schools.includes(sc)}
+                    onChange={() => toggleSchool(sc)}
+                  />
+                  <label htmlFor={id} className="fieldset-label cursor-pointer">
+                    {sc}
+                  </label>
+                </div>
+              )
+            })}
           </div>
         </div>
       </ModalContent>
