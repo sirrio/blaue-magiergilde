@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Input } from '@/components/ui/input'
+import { TextArea } from '@/components/ui/text-area'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
@@ -96,13 +98,15 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
             <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
           )}
         </div>
-        <input
+        <Input
           type="text"
           value={editData.name}
           placeholder="Name"
-          className="input input-bordered input-xs flex-1"
           onChange={(e) => handleChange('name', e.target.value)}
-        />
+          className="flex-1"
+        >
+          Name
+        </Input>
       </div>
       <div className="mb-1">
         <label className="fieldset-label">Classes</label>
@@ -137,20 +141,24 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
           })}
         </div>
       </div>
-      <label className="fieldset-label">Species</label>
-      <input
+      <Input
         type="text"
         value={editData.species}
         placeholder="Species"
-        className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
-      />
-      <textarea
-        value={editData.notes}
-        placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+        className="mb-1"
+      >
+        Species
+      </Input>
+      <div className="mb-1">
+        <TextArea
+          value={editData.notes}
+          placeholder="Notes"
+          onChange={(e) => handleChange('notes', e.target.value)}
+        >
+          Notes
+        </TextArea>
+      </div>
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
@@ -213,13 +221,15 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
   }
   return (
     <div className="card bg-base-200 border p-2 shadow">
-      <input
+      <Input
         type="text"
         value={editData.name}
         placeholder="Name"
-        className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('name', e.target.value)}
-      />
+        className="mb-1"
+      >
+        Name
+      </Input>
       <div className="mb-1">
         <label className="fieldset-label">Classes</label>
         <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
@@ -253,20 +263,24 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
           })}
         </div>
       </div>
-      <label className="fieldset-label">Species</label>
-      <input
+      <Input
         type="text"
         value={editData.species}
         placeholder="Species"
-        className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
-      />
-      <textarea
-        value={editData.notes}
-        placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+        className="mb-1"
+      >
+        Species
+      </Input>
+      <div className="mb-1">
+        <TextArea
+          value={editData.notes}
+          placeholder="Notes"
+          onChange={(e) => handleChange('notes', e.target.value)}
+        >
+          Notes
+        </TextArea>
+      </div>
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
