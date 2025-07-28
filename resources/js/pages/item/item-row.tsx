@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
@@ -38,7 +39,37 @@ const copyToClipboard = (text: string) => {
 }
 
 const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
-  const { data, setData, post } = useForm({ spell_level: 0 })
+  const levels = Array.from({ length: 10 }, (_, i) => i)
+  const schools = [
+    'abjuration',
+    'conjuration',
+    'divination',
+    'enchantment',
+    'evocation',
+    'illusion',
+    'necromancy',
+    'transmutation',
+  ] as const
+
+  const { data, setData, post } = useForm({ spell_levels: [] as number[], spell_schools: [] as string[] })
+
+  const toggleLevel = (level: number) => {
+    setData(
+      'spell_levels',
+      data.spell_levels.includes(level)
+        ? data.spell_levels.filter((l) => l !== level)
+        : [...data.spell_levels, level],
+    )
+  }
+
+  const toggleSchool = (school: string) => {
+    setData(
+      'spell_schools',
+      data.spell_schools.includes(school)
+        ? data.spell_schools.filter((s) => s !== school)
+        : [...data.spell_schools, school],
+    )
+  }
 
   const handleSubmit = () => {
     post(route('shop-items.add-spell', { shopItem: shopItemId }), {
@@ -53,15 +84,28 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
           +
         </Button>
       </ModalTrigger>
-      <ModalTitle>Select spell level</ModalTitle>
+      <ModalTitle>Select spell options</ModalTitle>
       <ModalContent>
-        <Input
-          type="number"
-          value={data.spell_level}
-          onChange={(e) => setData('spell_level', Number(e.target.value))}
-        >
-          Level
-        </Input>
+        <div className="mb-2">
+          <p className="fieldset-label">Levels</p>
+          <div className="grid grid-cols-5 gap-1">
+            {levels.map((lvl) => (
+              <Checkbox key={lvl} size="xs" checked={data.spell_levels.includes(lvl)} onChange={() => toggleLevel(lvl)}>
+                {lvl === 0 ? '0' : lvl}
+              </Checkbox>
+            ))}
+          </div>
+        </div>
+        <div className="mb-2">
+          <p className="fieldset-label">Schools</p>
+          <div className="grid grid-cols-2 gap-1">
+            {schools.map((sc) => (
+              <Checkbox key={sc} size="xs" checked={data.spell_schools.includes(sc)} onChange={() => toggleSchool(sc)}>
+                {sc}
+              </Checkbox>
+            ))}
+          </div>
+        </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit}>Roll</ModalAction>
     </Modal>
@@ -159,9 +203,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       >
         <Copy size={14} />
       </Button>
-      {shopItem && !spell && item.type === 'spellscroll' && (
-        <AddSpellModal shopItemId={shopItem.id} />
-      )}
+      {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
       {item.url ? (
         <Button as="a" href={item.url} target="_blank" size="xs" variant="ghost" modifier="square">
           <ExternalLink size={14} />

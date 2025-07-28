@@ -16,7 +16,10 @@ class AddSpellRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'spell_level' => 'required|integer|min:0|max:9',
+            'spell_levels' => 'required|array',
+            'spell_levels.*' => 'integer|min:0|max:9',
+            'spell_schools' => 'sometimes|array',
+            'spell_schools.*' => 'string|in:abjuration,conjuration,divination,enchantment,evocation,illusion,necromancy,transmutation',
         ];
     }
 }
