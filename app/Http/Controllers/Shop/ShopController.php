@@ -7,6 +7,7 @@ use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Item;
 use App\Models\Shop;
+use App\Models\Spell;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -56,8 +57,11 @@ class ShopController extends Controller
     {
         $shops = Shop::query()
             ->with([
-                'items' => fn ($query) => $query->select(['items.id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
-                'items.pivot.spell',
+                'items' => function ($query) {
+                    $query
+                        ->select(['items.id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count'])
+                        ->with('pivot.spell');
+                },
             ])
             ->orderByDesc('created_at')
             ->select(['shops.id', 'created_at'])
@@ -130,7 +134,10 @@ class ShopController extends Controller
         }
 
         DB::transaction(function () use ($itemData) {
-            Item::query()->whereIn(array_keys($itemData))->increment('pick_count');
+            Item::query()
+                ->whereIn('id', array_keys($itemData))
+                ->increment('pick_count');
+
             $shop = Shop::query()->create();
             $shop->items()->attach($itemData);
         });
