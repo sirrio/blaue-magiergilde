@@ -133,6 +133,20 @@ export interface Downtime {
   character_id: number
 }
 
+export interface RegisteredCharacter {
+  id: number
+  registered_player_id: number
+  name: string
+  tier: 'bt' | 'lt' | 'ht' | 'et'
+  url: string
+}
+
+export interface RegisteredPlayer {
+  id: number
+  name: string
+  registered_characters: RegisteredCharacter[]
+}
+
 export interface Game {
   id: number
   title: string
