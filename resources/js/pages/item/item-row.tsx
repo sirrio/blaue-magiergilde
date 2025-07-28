@@ -63,7 +63,11 @@ export default function ItemRow({ item }: { item: Item }) {
     <ListRow>
       <div className={cn(textColor)}>{renderIcon(item.type)}</div>
       <div className={cn(textColor, 'text-xs sm:text-sm')}>
-        {item.name} <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+        {item.name}
+        {item.pivot?.spell && (
+          <span className={'ml-1'}>- {item.pivot.spell.name}</span>
+        )}{' '}
+        <span className={'text-xs font-light italic'}>({item.pick_count})</span>
       </div>
       <div className="max-w-20 font-mono text-xs">{item.cost ? item.cost : <span className="text-error">No cost available</span>}</div>
       <Modal>

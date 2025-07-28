@@ -6,6 +6,7 @@ use Database\Factories\ShopFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\ItemShop;
 
 class Shop extends Model
 {
@@ -14,6 +15,8 @@ class Shop extends Model
 
     public function items(): BelongsToMany
     {
-        return $this->belongsToMany(Item::class);
+        return $this->belongsToMany(Item::class)
+            ->using(ItemShop::class)
+            ->withPivot('spell_id');
     }
 }

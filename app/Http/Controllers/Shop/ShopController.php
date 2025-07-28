@@ -55,7 +55,10 @@ class ShopController extends Controller
     public function index(): Response
     {
         $shops = Shop::query()
-            ->with(['items' => fn ($query) => $query->select(['items.id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count'])])
+            ->with([
+                'items' => fn ($query) => $query->select(['items.id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
+                'items.pivot.spell',
+            ])
             ->orderByDesc('created_at')
             ->select(['shops.id', 'created_at'])
             ->get();
@@ -78,42 +81,59 @@ class ShopController extends Controller
      */
     public function store(StoreShopRequest $request): RedirectResponse
     {
-        for ($i = 0; $i < 200; $i++) {
-
-            $items = Item::all()->groupBy(['rarity', function ($item) {
+        $items = Item::all()->groupBy([
+            'rarity',
+            function ($item) {
                 return ($item->rarity === 'very_rare' || $item->rarity === 'rare') && in_array($item->type, ['consumable', 'spellscroll']) ? 'consumable' : $item->type;
-            }]);
+            },
+        ]);
 
-            $selectionRules = [
-                'common' => ['item' => 5, 'consumable' => 1, 'spellscroll' => 1],
-                'uncommon' => ['item' => 3, 'consumable' => 1, 'spellscroll' => 1],
-                'rare' => ['item' => 2, 'consumable' => 1, 'spellscroll' => 0],
-                'very_rare' => ['item' => 1, 'consumable' => 1, 'spellscroll' => 0],
-            ];
+        $selectionRules = [
+            'common' => ['item' => 5, 'consumable' => 1, 'spellscroll' => 1],
+            'uncommon' => ['item' => 3, 'consumable' => 1, 'spellscroll' => 1],
+            'rare' => ['item' => 2, 'consumable' => 1, 'spellscroll' => 0],
+            'very_rare' => ['item' => 1, 'consumable' => 1, 'spellscroll' => 0],
+        ];
 
-            $pickedItems = [];
+        $pickedItems = [];
+        foreach ($selectionRules as $rarity => $typeRules) {
+            foreach ($typeRules as $type => $count) {
+                if (isset($items[$rarity][$type])) {
+                    $itemsArray = $items[$rarity][$type]->toArray();
 
-            foreach ($selectionRules as $rarity => $typeRules) {
-                foreach ($typeRules as $type => $count) {
-                    if (isset($items[$rarity][$type])) {
-                        $itemsArray = $items[$rarity][$type]->toArray();
-
-                        // Pick weighted random items
-                        $picked = $this->weightedRandomSelection($itemsArray, $count);
-                        $pickedItems = array_merge($pickedItems, $picked);
-                    }
+                    // Pick weighted random items
+                    $picked = $this->weightedRandomSelection($itemsArray, $count);
+                    $pickedItems = array_merge($pickedItems, $picked);
                 }
             }
-
-            $pickedItemIds = array_column($pickedItems, 'id');
-
-            DB::transaction(function () use ($pickedItemIds) {
-                Item::query()->whereIn('id', $pickedItemIds)->increment('pick_count');
-                $shop = Shop::query()->create();
-                $shop->items()->attach($pickedItemIds);
-            });
-
         }
+
+        $itemData = [];
+        foreach ($pickedItems as $item) {
+            $pivotData = [];
+            if ($item['type'] === 'spellscroll') {
+                $level = 0;
+                if (str_contains(strtolower($item['name']), 'cantrip')) {
+                    $level = 0;
+                } elseif (preg_match('/(\d+)/', $item['name'], $m)) {
+                    $level = (int) $m[1];
+                }
+                $spell = Spell::query()
+                    ->where('spell_level', $level)
+                    ->inRandomOrder()
+                    ->first();
+                if ($spell) {
+                    $pivotData['spell_id'] = $spell->id;
+                }
+            }
+            $itemData[$item['id']] = $pivotData;
+        }
+
+        DB::transaction(function () use ($itemData) {
+            Item::query()->whereIn(array_keys($itemData))->increment('pick_count');
+            $shop = Shop::query()->create();
+            $shop->items()->attach($itemData);
+        });
 
         return redirect()->back();
     }

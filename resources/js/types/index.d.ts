@@ -44,6 +44,10 @@ export interface Item {
   type: 'item' | 'consumable' | 'spellscroll'
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare'
   pick_count: number
+  pivot?: {
+    spell_id: number
+    spell: Spell
+  }
 }
 
 export interface Spell {
