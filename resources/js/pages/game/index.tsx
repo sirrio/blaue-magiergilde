@@ -12,29 +12,37 @@ import { calculateCoinsSpend } from '@/helper/calculateCoinsSpend'
 import AppLayout from '@/layouts/app-layout'
 import StoreGameModal from '@/pages/game/store-game-modal'
 import UpdateGameModal from '@/pages/game/update-game-modal'
+import UpdateBreakdownModal from '@/pages/game/update-breakdown-modal'
+import type { Character, Game, User } from '@/types'
 import { Head } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { AlertCircle, Coins, Droplets, PartyPopper, Plus, Settings, Swords } from 'lucide-react'
 
-export default function MasteredGames({ games, user, characters }) {
+interface Props {
+  games: Game[]
+  user: User
+  characters: Character[]
+}
+
+export default function MasteredGames({ games, user, characters }: Props) {
   const totalBubbles =
     calculateBubbleByGames(games) +
     calculateBubbleByFillerCharacters(characters) +
-    (user.event_bubbles || 0) +
-    (user.bt_bubbles || 0) +
-    (user.lt_bubbles || 0) +
-    (user.ht_bubbles || 0) +
-    (user.et_bubbles || 0) +
-    (user.other_bubbles || 0)
+    Number(user.event_bubbles ?? 0) +
+    Number(user.bt_bubbles ?? 0) +
+    Number(user.lt_bubbles ?? 0) +
+    Number(user.ht_bubbles ?? 0) +
+    Number(user.et_bubbles ?? 0) +
+    Number(user.other_bubbles ?? 0)
 
   const totalCoins =
     calculateCoins(games) +
-    (user.event_coins || 0) +
-    (user.bt_coins || 0) +
-    (user.lt_coins || 0) +
-    (user.ht_coins || 0) +
-    (user.et_coins || 0) +
-    (user.other_coins || 0)
+    Number(user.event_coins ?? 0) +
+    Number(user.bt_coins ?? 0) +
+    Number(user.lt_coins ?? 0) +
+    Number(user.ht_coins ?? 0) +
+    Number(user.et_coins ?? 0) +
+    Number(user.other_coins ?? 0)
 
   const spentBubbles = calculateBubbleSpend(characters)
   const spentCoins = calculateCoinsSpend(characters)
@@ -110,7 +118,10 @@ export default function MasteredGames({ games, user, characters }) {
 
         <Card>
           <CardBody>
-            <CardTitle>Breakdown</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              Breakdown
+              <UpdateBreakdownModal user={user} />
+            </CardTitle>
             <CardContent>
               <div className="grid grid-cols-1 gap-6 text-sm md:grid-cols-2">
                 <div className="space-y-4 md:border-r md:pr-4">
@@ -149,10 +160,10 @@ export default function MasteredGames({ games, user, characters }) {
                     </div>
                     <div className="flex items-center space-x-4 text-right">
                       <span className="w-20">
-                        {user.event_bubbles || 0} <Droplets size={16} className="inline" />
+                        {Number(user.event_bubbles ?? 0)} <Droplets size={16} className="inline" />
                       </span>
                       <span className="w-20">
-                        {user.event_coins || 0} <Coins size={16} className="inline" />
+                        {Number(user.event_coins ?? 0)} <Coins size={16} className="inline" />
                       </span>
                     </div>
                   </div>
@@ -162,10 +173,10 @@ export default function MasteredGames({ games, user, characters }) {
                     </div>
                     <div className="flex items-center space-x-4 text-right">
                       <span className="w-20">
-                        {user.other_bubbles || 0} <Droplets size={16} className="inline" />
+                        {Number(user.other_bubbles ?? 0)} <Droplets size={16} className="inline" />
                       </span>
                       <span className="w-20">
-                        {user.other_coins || 0} <Coins size={16} className="inline" />
+                        {Number(user.other_coins ?? 0)} <Coins size={16} className="inline" />
                       </span>
                     </div>
                   </div>
@@ -182,10 +193,10 @@ export default function MasteredGames({ games, user, characters }) {
                       </div>
                       <div className="flex items-center space-x-4 text-right">
                         <span className="w-20">
-                          {user[`${type}_bubbles`] || 0} <Droplets size={16} className="inline" />
+                          {Number(user[`${type}_bubbles`] ?? 0)} <Droplets size={16} className="inline" />
                         </span>
                         <span className="w-20">
-                          {user[`${type}_coins`] || 0} <Coins size={16} className="inline" />
+                          {Number(user[`${type}_coins`] ?? 0)} <Coins size={16} className="inline" />
                         </span>
                       </div>
                     </div>
