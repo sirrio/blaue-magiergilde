@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
-import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
 import createRandomString from '@/helper/createRandomString'
@@ -23,9 +23,10 @@ interface AllyCardProps {
   onSave: (ally: Ally) => void
   onCancel: () => void
   onRemove: (ally: Ally) => void
+  large?: boolean
 }
 
-const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, onCancel, onRemove }) => {
+const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, onCancel, onRemove, large = false }) => {
   const [editData, setEditData] = useState<Ally>({ ...ally })
   const [avatarSrc, setAvatarSrc] = useState('')
   const [editAvatarSrc, setEditAvatarSrc] = useState('')
@@ -70,7 +71,9 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
         onClick={onEdit}
       >
         <div className="flex items-center gap-2">
-          <div className="bg-base-200 h-10 w-10 flex-shrink-0 overflow-hidden rounded-full">
+          <div
+            className={`bg-base-200 flex-shrink-0 overflow-hidden rounded-full ${large ? 'h-20 w-20' : 'h-10 w-10'}`}
+          >
           {avatarSrc ? (
               <img src={avatarSrc} alt={`${ally.name}'s avatar`} className="h-full w-full object-cover" />
             ) : (
@@ -91,7 +94,9 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
   return (
     <div className="card bg-base-200 border p-2 shadow">
       <div className="mb-2 flex items-center gap-2">
-        <div className="bg-base-200 h-10 w-10 flex-shrink-0 overflow-hidden rounded-full">
+        <div
+          className={`bg-base-200 flex-shrink-0 overflow-hidden rounded-full ${large ? 'h-20 w-20' : 'h-10 w-10'}`}
+        >
           {editAvatarSrc ? (
             <img src={editAvatarSrc} alt={`${editData.name}'s avatar`} className="h-full w-full object-cover" />
           ) : (
@@ -363,45 +368,59 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
       </ModalTrigger>
       <ModalTitle>Manage Allies</ModalTitle>
       <ModalContent>
-        <div className="mb-4">
-          <Button size="xs" onClick={() => setEditingId('new')}>
-            <PlusCircle size={16} className="mr-1" /> Add Ally
-          </Button>
-        </div>
-        {editingId === 'new' && (
-          <div className="mb-4">
-            <h3 className="text-sm font-bold">New Ally</h3>
-            <NewAllyCard isEditing={true} onSave={handleSave} onCancel={handleCancel} />
-          </div>
-        )}
-        <div className="space-y-8">
-          {grouped.map(({ standing, allies: group }) => (
-            <div key={standing}>
-              <h3 className="text-sm font-bold capitalize">
-                {standing} {group.length === 0 && <span className="text-base-content text-xs">(No allies)</span>}
-              </h3>
-              {group.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                  {group.map((ally) => (
-                    <AllyCard
-                      key={ally.id}
-                      ally={ally}
-                      isEditing={editingId === ally.id}
-                      onEdit={() => setEditingId(ally.id)}
-                      onSave={handleSave}
-                      onCancel={handleCancel}
-                      onRemove={handleRemove}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-base-content text-xs">No allies in this category.</p>
-              )}
+        <div className="flex flex-col gap-4 md:flex-row">
+          <div className="space-y-4 md:w-1/2">
+            <div>
+              <Button size="xs" onClick={() => setEditingId('new')}>
+                <PlusCircle size={16} className="mr-1" /> Add Ally
+              </Button>
             </div>
-          ))}
+            <div className="space-y-8">
+              {grouped.map(({ standing, allies: group }) => (
+                <div key={standing}>
+                  <h3 className="text-sm font-bold capitalize">
+                    {standing} {group.length === 0 && <span className="text-base-content text-xs">(No allies)</span>}
+                  </h3>
+                  {group.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-2">
+                      {group.map((ally) => (
+                        <AllyCard
+                          key={ally.id}
+                          ally={ally}
+                          isEditing={false}
+                          onEdit={() => setEditingId(ally.id)}
+                          onSave={handleSave}
+                          onCancel={handleCancel}
+                          onRemove={handleRemove}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-base-content text-xs">No allies in this category.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="md:w-1/2">
+            {editingId && (
+              editingId === 'new' ? (
+                <NewAllyCard isEditing={true} onSave={handleSave} onCancel={handleCancel} />
+              ) : (
+                <AllyCard
+                  ally={allies.find((a) => a.id === editingId)!}
+                  isEditing={true}
+                  large
+                  onEdit={() => setEditingId(editingId)}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                  onRemove={handleRemove}
+                />
+              )
+            )}
+          </div>
         </div>
       </ModalContent>
-      <ModalAction onClick={() => setEditingId(null)}>Close</ModalAction>
     </Modal>
   )
 }
