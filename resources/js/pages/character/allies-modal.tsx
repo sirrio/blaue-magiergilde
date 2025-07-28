@@ -36,7 +36,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       return
     }
     if (typeof ally.avatar === 'string') {
-      setAvatarSrc(ally.avatar)
+      setAvatarSrc(`/storage/${ally.avatar}`)
       return
     }
     const url = URL.createObjectURL(ally.avatar)
@@ -49,7 +49,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       return
     }
     if (typeof editData.avatar === 'string') {
-      setEditAvatarSrc(editData.avatar)
+      setEditAvatarSrc(`/storage/${editData.avatar}`)
       return
     }
     const url = URL.createObjectURL(editData.avatar)
