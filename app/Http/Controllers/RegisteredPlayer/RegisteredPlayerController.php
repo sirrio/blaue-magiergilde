@@ -17,7 +17,7 @@ class RegisteredPlayerController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return Inertia::render('registered-character/index', [
+        return Inertia::render('registered-player/index', [
             'players' => $players,
         ]);
     }
