@@ -1,4 +1,3 @@
-import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { List, ListRow } from '@/components/ui/list'
 import { Button } from '@/components/ui/button'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
@@ -22,12 +21,10 @@ export default function Show({ character }: { character: Character }) {
           </Link>
         </div>
 
-        <Card>
-          <CardBody>
-            <CardTitle>Adventures</CardTitle>
-            <CardContent>
-              {character.adventures.length > 0 ? (
-                <List>
+        <div>
+          <h2 className="mb-4 text-xl font-semibold">Adventures</h2>
+            {character.adventures.length > 0 ? (
+              <List>
                   {character.adventures.map((adv) => (
                     <ListRow key={adv.id}>
                       <h3>{adv.title || 'Adventure'}</h3>
@@ -51,16 +48,12 @@ export default function Show({ character }: { character: Character }) {
               ) : (
                 <p className="text-center text-sm text-base-content/70">No adventures</p>
               )}
-            </CardContent>
-          </CardBody>
-        </Card>
+        </div>
 
-        <Card>
-          <CardBody>
-            <CardTitle>Downtimes</CardTitle>
-            <CardContent>
-              {character.downtimes.length > 0 ? (
-                <List>
+        <div>
+          <h2 className="mb-4 text-xl font-semibold">Downtimes</h2>
+            {character.downtimes.length > 0 ? (
+              <List>
                   {character.downtimes.map((dt) => (
                     <ListRow key={dt.id}>
                       <h3 className="capitalize">{dt.type}</h3>
@@ -82,16 +75,12 @@ export default function Show({ character }: { character: Character }) {
               ) : (
                 <p className="text-center text-sm text-base-content/70">No downtimes</p>
               )}
-            </CardContent>
-          </CardBody>
-        </Card>
+        </div>
 
-        <Card>
-          <CardBody>
-            <CardTitle>Allies</CardTitle>
-            <CardContent>
-              {character.allies.length > 0 ? (
-                <List>
+        <div>
+          <h2 className="mb-4 text-xl font-semibold">Allies</h2>
+            {character.allies.length > 0 ? (
+              <List>
                   {character.allies.map((ally) => (
                     <ListRow key={ally.id}>
                       <div className="grid grid-cols-3 gap-2 text-sm w-full">
@@ -105,9 +94,7 @@ export default function Show({ character }: { character: Character }) {
               ) : (
                 <p className="text-center text-sm text-base-content/70">No allies</p>
               )}
-            </CardContent>
-          </CardBody>
-        </Card>
+        </div>
       </div>
     </AppLayout>
   )
