@@ -13,6 +13,11 @@ class DeletedCharacterController extends Controller
     public function __invoke(): Response
     {
         $characters = Character::onlyTrashed()
+            ->with([
+                'adventures' => fn ($q) => $q->withTrashed(),
+                'downtimes' => fn ($q) => $q->withTrashed(),
+                'characterClasses',
+            ])
             ->where('user_id', Auth::id())
             ->orderBy('deleted_at', 'desc')
             ->get();
