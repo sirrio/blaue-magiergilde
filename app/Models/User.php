@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\RegisteredCharacter;
 
 /**
  * @property mixed $is_admin
@@ -65,8 +64,4 @@ class User extends Authenticatable
         ];
     }
 
-    public function registeredCharacters(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(RegisteredCharacter::class);
-    }
 }

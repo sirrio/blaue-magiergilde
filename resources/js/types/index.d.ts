@@ -135,10 +135,16 @@ export interface Downtime {
 
 export interface RegisteredCharacter {
   id: number
-  user_id: number
+  registered_player_id: number
   name: string
   tier: 'bt' | 'lt' | 'ht' | 'et'
   url: string
+}
+
+export interface RegisteredPlayer {
+  id: number
+  name: string
+  registered_characters: RegisteredCharacter[]
 }
 
 export interface Game {
