@@ -8,6 +8,9 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
+Route::get('/impressum', fn () => Inertia::render('impressum'))->name('impressum');
+Route::get('/privacy', fn () => Inertia::render('privacy'))->name('privacy');
+
 Route::post('appearance', [AppearanceController::class, 'update'])->name('appearance.update');
 
 require __DIR__.'/auth.php';

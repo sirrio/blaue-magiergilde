@@ -17,6 +17,8 @@ const menuLinks = [
 
 const profileLinks = [
   { name: 'Profile', route: 'profile.edit', method: 'get' as const },
+  { name: 'Impressum', route: 'impressum', method: 'get' as const },
+  { name: 'Privacy', route: 'privacy', method: 'get' as const },
   { name: 'Logout', route: 'logout', method: 'post' as const },
 ]
 
@@ -154,6 +156,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </nav>
       <main>{children}</main>
+      
     </div>
   )
 }

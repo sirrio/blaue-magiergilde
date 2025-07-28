@@ -3,6 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/react'
 import type { ElementType } from 'react'
 import { PageProps } from '@/types'
 import { Button } from '@/components/ui/button'
+import LegalLinks from '@/components/legal-links'
 import { format } from 'date-fns'
 import { z } from 'zod'
 
@@ -47,6 +48,7 @@ export default function Welcome() {
           </div>
         </div>
       </div>
+      <LegalLinks />
     </>
   )
 }
