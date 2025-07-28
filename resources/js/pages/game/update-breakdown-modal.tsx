@@ -65,8 +65,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
         <form className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Input
             type="number"
+            min={0}
             value={data.event_bubbles}
-            onChange={(e) => setData('event_bubbles', Number(e.target.value))}
+            onChange={(e) => setData('event_bubbles', Math.max(0, Number(e.target.value)))}
             errors={errors.event_bubbles}
           >
             <span className="flex items-center">
@@ -87,8 +88,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
           </Input>
           <Input
             type="number"
+            min={0}
             value={data.other_bubbles}
-            onChange={(e) => setData('other_bubbles', Number(e.target.value))}
+            onChange={(e) => setData('other_bubbles', Math.max(0, Number(e.target.value)))}
             errors={errors.other_bubbles}
           >
             <span className="flex items-center">
@@ -109,8 +111,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             <React.Fragment key={type}>
               <Input
                 type="number"
+                min={0}
                 value={data[`${type}_bubbles`]}
-                onChange={(e) => setData(`${type}_bubbles`, Number(e.target.value))}
+                onChange={(e) => setData(`${type}_bubbles`, Math.max(0, Number(e.target.value)))}
                 errors={errors[`${type}_bubbles`]}
               >
                 <span className="flex items-center">
