@@ -20,7 +20,7 @@ export default function Welcome() {
       <Head title="Welcome"></Head>
       <div className={cn('hero bg-base-200 min-h-screen')}>
         <div className={cn('hero-content flex-col lg:flex-row-reverse')}>
-          <img src="/images/icon_magiergilde.svg" className={cn('max-w-sm rounded-lg')} />
+          <img src="/images/icon_magiergilde.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
           <div>
             <h1 className={cn('text-5xl font-bold')}>Blaue Magiergilde</h1>
             <p className={cn('py-6')}>
