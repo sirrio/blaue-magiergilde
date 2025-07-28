@@ -5,7 +5,7 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import React from 'react'
 
-interface BreakdownForm {
+interface BreakdownForm extends Record<string, number> {
   event_bubbles: number
   event_coins: number
   bt_bubbles: number
@@ -22,7 +22,7 @@ interface BreakdownForm {
 }
 
 const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React.ReactNode }) => {
-  const initialFormData = {
+  const initialFormData: BreakdownForm = {
     event_bubbles: Number(user.event_bubbles ?? 0),
     event_coins: Number(user.event_coins ?? 0),
     bt_bubbles: Number(user.bt_bubbles ?? 0),
@@ -37,11 +37,11 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
     other_coins: Number(user.other_coins ?? 0),
   }
 
-  const { data, setData, put } = useForm(initialFormData)
+  const { data, setData, put } = useForm<BreakdownForm>(initialFormData)
   const { errors } = usePage().props as { errors: Record<string, string> }
 
   const handleFormSubmit = () => {
-    put(route('breakdowns.update', { breakdown: user.id }), {
+    put(route('breakdowns.update', { user: user.id }), {
       preserveState: 'errors',
       preserveScroll: true,
     })

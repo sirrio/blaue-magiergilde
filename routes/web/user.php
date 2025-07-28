@@ -8,6 +8,9 @@ Route::resource('user', UserController::class)->only([
     'destroy',
 ])->middleware(['auth']);
 
-Route::resource('breakdowns', BreakdownController::class)->only([
-    'update',
-])->middleware(['auth']);
+Route::resource('breakdowns', BreakdownController::class)
+    ->parameters(['breakdowns' => 'user'])
+    ->only([
+        'update',
+    ])
+    ->middleware(['auth']);
