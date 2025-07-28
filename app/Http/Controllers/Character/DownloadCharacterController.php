@@ -4,15 +4,16 @@ namespace App\Http\Controllers\Character;
 
 use App\Http\Controllers\Controller;
 use App\Models\Character;
+use App\Http\Resources\CharacterDownloadResource;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DownloadCharacterController extends Controller
 {
     public function __invoke(Character $character): StreamedResponse
     {
-        $character->load(['adventures', 'downtimes', 'allies']);
+        $character->loadMissing(['adventures', 'downtimes', 'allies', 'characterClasses']);
 
-        $data = $character->toArray();
+        $data = CharacterDownloadResource::make($character)->resolve();
         $fileName = 'character_'.$character->id.'.json';
 
         return response()->streamDownload(
