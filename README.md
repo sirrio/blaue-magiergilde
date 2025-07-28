@@ -47,3 +47,7 @@ Type-check the frontend:
 ```bash
 npm run types
 ```
+
+## Character Sign-up
+
+Visit `/signup` to submit a character sheet link and tier. Admins can review submissions at `/registrations`.

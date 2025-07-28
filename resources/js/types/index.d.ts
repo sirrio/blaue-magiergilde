@@ -146,6 +146,13 @@ export interface Game {
   user_id: number
 }
 
+export interface Registration {
+  id: number
+  link: string
+  tier: string
+  approved_at?: string | null
+}
+
 export interface SharedData {
   name: string
   quote: { message: string; author: string }
