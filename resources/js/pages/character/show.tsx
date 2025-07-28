@@ -4,10 +4,26 @@ import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
-import { Character } from '@/types'
+import { Character, Ally } from '@/types'
 import { Head, Link } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Settings } from 'lucide-react'
+import { useImage } from 'react-image'
+import { cn } from '@/lib/utils'
+
+function CharacterPortrait({ character, className }: { character: Character; className?: string }) {
+  const { src } = useImage({
+    srcList: ['storage/' + character.avatar, '/images/no-avatar.svg'],
+  })
+  return <img className={cn('aspect-square rounded-full object-cover', className)} src={src} alt={character.name} />
+}
+
+function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
+  const { src } = useImage({
+    srcList: ally.avatar ? ['storage/' + ally.avatar, '/images/no-avatar.svg'] : ['/images/no-avatar.svg'],
+  })
+  return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={ally.name} />
+}
 
 export default function Show({ character }: { character: Character }) {
   return (
@@ -19,6 +35,9 @@ export default function Show({ character }: { character: Character }) {
           <Link href={route('characters.index')} className="btn btn-sm">
             Back
           </Link>
+        </div>
+        <div className="flex justify-center">
+          <CharacterPortrait character={character} className="h-32 w-32" />
         </div>
 
         <div>
@@ -83,10 +102,13 @@ export default function Show({ character }: { character: Character }) {
               <List>
                   {character.allies.map((ally) => (
                     <ListRow key={ally.id}>
-                      <div className="grid grid-cols-3 gap-2 text-sm w-full">
-                        <div>{ally.name}</div>
-                        <div className="capitalize">{ally.standing}</div>
-                        <div className="text-base-content/70">{ally.classes || '-'}</div>
+                      <div className="flex items-center gap-2 w-full">
+                        <AllyPortrait ally={ally} />
+                        <div className="grid flex-1 grid-cols-3 gap-2 text-sm">
+                          <div>{ally.name}</div>
+                          <div className="capitalize">{ally.standing}</div>
+                          <div className="text-base-content/70">{ally.classes || '-'}</div>
+                        </div>
                       </div>
                     </ListRow>
                   ))}
