@@ -147,6 +147,22 @@ export interface RegisteredPlayer {
   registered_characters: RegisteredCharacter[]
 }
 
+export interface Registration {
+  id: number
+  player_name: string
+  player_contact: string
+  external_link: string
+  tier: string
+  notes?: string
+  user_id?: number | null
+  character_id?: number | null
+  status: string
+  reviewed_by?: number | null
+  reviewed_at?: string | null
+  created_by?: number | null
+  updated_by?: number | null
+}
+
 export interface Game {
   id: number
   title: string

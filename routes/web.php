@@ -25,3 +25,4 @@ require __DIR__.'/web/shop.php';
 require __DIR__.'/web/registered-player.php';
 require __DIR__.'/web/user.php';
 require __DIR__.'/web/settings.php';
+require __DIR__.'/web/registration.php';
