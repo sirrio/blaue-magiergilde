@@ -58,7 +58,7 @@ const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; child
             </Input>
           </div>
           {errors.duration && <p className={'fieldset-label text-error'}>{errors.duration}</p>}
-          <Select value={data.type} onChange={(e) => setData('type', e.target.value)}>
+          <Select value={data.type} onChange={(e) => setData('type', e.target.value as Downtime['type'])}>
             <SelectLabel>Type</SelectLabel>
             <SelectOptions>
               <option value="faction">Faction</option>

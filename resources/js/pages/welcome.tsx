@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { Head, Link, usePage } from '@inertiajs/react'
+import type { ElementType } from 'react'
 import { PageProps } from '@/types'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
@@ -29,15 +30,15 @@ export default function Welcome() {
             </p>
             <div className={cn('space-x-2')}>
               {auth.user ? (
-                <Button as={Link} href={route('characters.index')} color="primary">
+                <Button as={Link as ElementType} href={route('characters.index')} color="primary">
                   Zur Characterverwaltung
                 </Button>
               ) : (
                 <div className={cn('flex gap-2')}>
-                  <Button as={Link} href={route('login')} color="accent">
+                  <Button as={Link as ElementType} href={route('login')} color="accent">
                     Login
                   </Button>
-                  <Button as={Link} href={route('register')} variant="outline">
+                  <Button as={Link as ElementType} href={route('register')} variant="outline">
                     Register
                   </Button>
                 </div>

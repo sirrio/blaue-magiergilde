@@ -44,7 +44,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {menuLinks.map((menuLink) => (
                 <li key={menuLink.route} role="none">
-                  <Link role="menuitem" className={cn(route().current(menuLink.route) ? 'menu-active' : '')} href={route(menuLink.route)}>
+                    <Link role="menuitem" className={cn(route().current(menuLink.route) ? 'menu-active' : '')} href={route(menuLink.route)}>
                     {menuLink.name}
                   </Link>
                 </li>
@@ -59,7 +59,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           role="menuitem"
                           method={adminLink.method}
                           href={route(adminLink.route)}
-                          className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
+                            className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
                         >
                           {adminLink.name}
                         </Link>
@@ -84,7 +84,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   role="menuitem"
                   method={menuLink.method}
                   href={route(menuLink.route)}
-                  className={cn(route().current(menuLink.route) ? 'menu-active' : '')}
+                    className={cn(route().current(menuLink.route) ? 'menu-active' : '')}
                 >
                   {menuLink.name}
                 </Link>
@@ -101,7 +101,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           role="menuitem"
                           method={adminLink.method}
                           href={route(adminLink.route)}
-                          className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
+                            className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
                         >
                           {adminLink.name}
                         </Link>

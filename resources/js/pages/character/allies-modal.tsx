@@ -8,6 +8,7 @@ import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
+import type { RequestPayload } from '@inertiajs/core'
 
 interface AlliesModalProps {
   character: Character
@@ -58,8 +59,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
     setEditAvatarSrc(url)
     return () => URL.revokeObjectURL(url)
   }, [editData.avatar])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleChange = (key: keyof Ally, value: any) => {
+  const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
     setEditData({ ...editData, [key]: value })
   }
   if (!isEditing) {
@@ -165,7 +165,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       <label className="label">Standing</label>
       <select
         value={editData.standing}
-        onChange={(e) => handleChange('standing', e.target.value)}
+        onChange={(e) => handleChange('standing', e.target.value as Ally['standing'])}
         className="input input-bordered input-xs mb-2 w-full"
       >
         {standingOrder.map((stand) => (
@@ -207,14 +207,13 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
     id: 0,
     name: '',
     notes: '',
-    avatar: undefined,
+      avatar: '',
     classes: '',
     species: '',
     standing: 'normal',
   })
   const { classes } = usePage<PageProps>().props
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleChange = (key: keyof Ally, value: any) => {
+  const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
     setEditData({ ...editData, [key]: value })
   }
   if (!isEditing) {
@@ -296,7 +295,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       <label className="label">Standing</label>
       <select
         value={editData.standing}
-        onChange={(e) => handleChange('standing', e.target.value)}
+        onChange={(e) => handleChange('standing', e.target.value as Ally['standing'])}
         className="input input-bordered input-xs mb-2 w-full"
       >
         {standingOrder.map((stand) => (
@@ -321,7 +320,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const handleSave = (ally: Ally) => {
-    const payload: Record<string, unknown> = { ...ally }
+    const payload: RequestPayload = { ...ally }
     if (ally.id === 0) {
       payload.character_id = character.id
     } else {
@@ -336,7 +335,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
     } else {
-      router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
+        router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
     }
     setEditingId(null)

@@ -33,7 +33,7 @@ export default function Index({ spells }: { spells: Spell[] }) {
     })),
   ]
 
-  const currentQueryParams = route().params
+  const currentQueryParams = route().params as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
 
   const navigateTo = (href: string) => {
