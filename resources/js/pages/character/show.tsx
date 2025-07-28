@@ -13,14 +13,14 @@ import { cn } from '@/lib/utils'
 
 function CharacterPortrait({ character, className }: { character: Character; className?: string }) {
   const { src } = useImage({
-    srcList: ['storage/' + character.avatar, '/images/no-avatar.svg'],
+    srcList: ['/storage/' + character.avatar, '/images/no-avatar.svg'],
   })
   return <img className={cn('aspect-square rounded-full object-cover', className)} src={src} alt={character.name} />
 }
 
 function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
   const { src } = useImage({
-    srcList: ally.avatar ? ['storage/' + ally.avatar, '/images/no-avatar.svg'] : ['/images/no-avatar.svg'],
+    srcList: ally.avatar ? ['/storage/' + ally.avatar, '/images/no-avatar.svg'] : ['/images/no-avatar.svg'],
   })
   return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={ally.name} />
 }
