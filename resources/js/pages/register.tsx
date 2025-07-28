@@ -1,8 +1,10 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Head, useForm } from '@inertiajs/react'
+import { Head, Link, useForm, usePage } from '@inertiajs/react'
+import type { PageProps } from '@/types'
 
 export default function Register() {
+  const { features } = usePage<PageProps>().props
   const { data, setData, post, processing, errors } = useForm({
     name: '',
     email: '',
@@ -19,8 +21,14 @@ export default function Register() {
     <>
       <Head title="Register" />
       <div className="hero bg-base-200 min-h-screen">
-        <form onSubmit={submit} className="hero-content card w-full max-w-sm flex-col space-y-4 p-6">
-          <h1 className="text-2xl font-bold">Register</h1>
+        <form onSubmit={submit} className="hero-content card w-full max-w-sm flex-col space-y-4 p-6 shadow">
+          <img className="mx-auto w-24" src="/images/icon_magiergilde.svg" alt="Blaue Magiergilde" />
+          <h1 className="text-2xl font-bold text-center">Register</h1>
+          {features.discord && (
+            <Button as="a" href={route('discord.login')} color="primary" modifier="block">
+              Register with Discord
+            </Button>
+          )}
           <Input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name}>
             Name
           </Input>
@@ -41,6 +49,9 @@ export default function Register() {
           <Button type="submit" disabled={processing} className="btn-primary w-full">
             Register
           </Button>
+          <p className="text-center text-sm">
+            Already registered? <Link href={route('login')} className="link">Login</Link>
+          </p>
         </form>
       </div>
     </>
