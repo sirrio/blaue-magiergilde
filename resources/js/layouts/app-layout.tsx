@@ -33,7 +33,6 @@ const adminLinks = [
   { name: 'Items', route: 'items.index', method: 'get' as const },
   { name: 'Spells', route: 'spells.index', method: 'get' as const },
   { name: 'Shop', route: 'shops.index', method: 'get' as const },
-  { name: 'Players', route: 'registered-players.index', method: 'get' as const },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
