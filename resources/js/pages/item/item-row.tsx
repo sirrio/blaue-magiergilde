@@ -77,7 +77,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload({ preserveScroll: true })
+        router.reload()
       },
     })
   }

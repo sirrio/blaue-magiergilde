@@ -8,6 +8,7 @@ import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
+import type { RequestPayload } from '@inertiajs/core'
 
 interface AlliesModalProps {
   character: Character
@@ -207,7 +208,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
     id: 0,
     name: '',
     notes: '',
-    avatar: undefined,
+      avatar: '',
     classes: '',
     species: '',
     standing: 'normal',
@@ -321,7 +322,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const handleSave = (ally: Ally) => {
-    const payload: Record<string, unknown> = { ...ally }
+    const payload: RequestPayload = { ...ally }
     if (ally.id === 0) {
       payload.character_id = character.id
     } else {
@@ -336,7 +337,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
     } else {
-      router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
+        router.put(route('allies.update', ally.id as any), payload, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
     }
     setEditingId(null)
@@ -346,7 +347,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   }
   const handleRemove = (ally: Ally) => {
     if (window.confirm(`Are you sure you want to remove ${ally.name}?`)) {
-      router.delete(route('allies.destroy', ally.id), { preserveScroll: true })
+      router.delete(route('allies.destroy', ally.id as any), { preserveScroll: true })
       setAllies(allies.filter((a) => a.id !== ally.id))
       setEditingId(null)
     }

@@ -6,7 +6,7 @@ import { Trash } from 'lucide-react'
 
 const DestroyCharacterModal = ({ character }: { character: Character }) => {
   const handleFormSubmit = () => {
-    router.delete(route('characters.destroy', character.id), { preserveState: 'errors' })
+  router.delete(route('characters.destroy', character.id as any), { preserveState: 'errors' })
   }
 
   return (

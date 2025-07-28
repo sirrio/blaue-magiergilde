@@ -36,7 +36,7 @@ const UpdateGameModal = ({ game, children }: { game: Game; children: React.React
           <Input placeholder="Game Title" errors={errors.title} type="text" value={data.title} onChange={(e) => setData('title', e.target.value)}>
             Title
           </Input>
-          <Input placeholder="Game Tier" errors={errors.tier} type="text" value={data.tier} onChange={(e) => setData('tier', e.target.value)}>
+          <Input placeholder="Game Tier" errors={errors.tier} type="text" value={data.tier} onChange={(e) => setData('tier', e.target.value as Game['tier'])}>
             Tier
           </Input>
           <Input

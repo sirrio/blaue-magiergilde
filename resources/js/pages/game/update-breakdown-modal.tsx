@@ -67,7 +67,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             type="number"
             min={0}
             value={data.event_bubbles}
-            onChange={(e) => setData('event_bubbles', Math.max(0, Number(e.target.value)))}
+            onChange={(e) =>
+              (setData as any)('event_bubbles', Math.max(0, Number(e.target.value)))
+            }
             errors={errors.event_bubbles}
           >
             <span className="flex items-center">
@@ -78,7 +80,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
           <Input
             type="number"
             value={data.event_coins}
-            onChange={(e) => setData('event_coins', Number(e.target.value))}
+            onChange={(e) =>
+              (setData as any)('event_coins', Number(e.target.value))
+            }
             errors={errors.event_coins}
           >
             <span className="flex items-center">
@@ -90,7 +94,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             type="number"
             min={0}
             value={data.other_bubbles}
-            onChange={(e) => setData('other_bubbles', Math.max(0, Number(e.target.value)))}
+            onChange={(e) =>
+              (setData as any)('other_bubbles', Math.max(0, Number(e.target.value)))
+            }
             errors={errors.other_bubbles}
           >
             <span className="flex items-center">
@@ -100,7 +106,9 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
           <Input
             type="number"
             value={data.other_coins}
-            onChange={(e) => setData('other_coins', Number(e.target.value))}
+            onChange={(e) =>
+              (setData as any)('other_coins', Number(e.target.value))
+            }
             errors={errors.other_coins}
           >
             <span className="flex items-center">
@@ -113,7 +121,12 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
                 type="number"
                 min={0}
                 value={data[`${type}_bubbles`]}
-                onChange={(e) => setData(`${type}_bubbles`, Math.max(0, Number(e.target.value)))}
+                onChange={(e) =>
+                  (setData as any)(
+                    `${type}_bubbles`,
+                    Math.max(0, Number(e.target.value)),
+                  )
+                }
                 errors={errors[`${type}_bubbles`]}
               >
                 <span className="flex items-center">
@@ -128,7 +141,12 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
               <Input
                 type="number"
                 value={data[`${type}_coins`]}
-                onChange={(e) => setData(`${type}_coins`, Number(e.target.value))}
+                onChange={(e) =>
+                  (setData as any)(
+                    `${type}_coins`,
+                    Number(e.target.value),
+                  )
+                }
                 errors={errors[`${type}_coins`]}
               >
                 <span className="flex items-center">
