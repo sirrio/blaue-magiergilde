@@ -10,11 +10,13 @@ import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { Head, router } from '@inertiajs/react'
+import { Head, router, usePage } from '@inertiajs/react'
+import type { PageProps } from '@/types'
 import { BookUser, Copy, Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Index({ characters }: { characters: Character[] }) {
+  const { features } = usePage<PageProps>().props
   const visibleCharacters = characters.filter((char) => !char.deleted_at)
   const [chars, setChars] = useState([...visibleCharacters])
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
@@ -80,6 +82,7 @@ export default function Index({ characters }: { characters: Character[] }) {
   const [password, setPassword] = useState('')
 
   const test = () => {
+    if (!features.discord) return
     return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
   }
 
@@ -125,30 +128,32 @@ export default function Index({ characters }: { characters: Character[] }) {
                   <span>Create Character</span>
                 </Button>
               </StoreCharacterModal>
-              <Modal>
-                <ModalTrigger>
-                  <Button variant={'outline'} className="flex items-center space-x-2">
-                    <RefreshCw size={16} />
-                    <span>Sync Characters</span>
-                  </Button>
-                </ModalTrigger>
-                <ModalTitle>Sync characters</ModalTitle>
-                <ModalContent>
-                  <Input type="email" placeholder="Enter your email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)}>
-                    Email
-                  </Input>
-                  <Input
-                    type="password"
-                    placeholder="Enter your password"
-                    className="w-full"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  >
-                    Password
-                  </Input>
-                </ModalContent>
-                <ModalAction onClick={() => test()}>Sync now</ModalAction>
-              </Modal>
+              {features.discord && (
+                <Modal>
+                  <ModalTrigger>
+                    <Button variant={'outline'} className="flex items-center space-x-2">
+                      <RefreshCw size={16} />
+                      <span>Sync Characters</span>
+                    </Button>
+                  </ModalTrigger>
+                  <ModalTitle>Sync characters</ModalTitle>
+                  <ModalContent>
+                    <Input type="email" placeholder="Enter your email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)}>
+                      Email
+                    </Input>
+                    <Input
+                      type="password"
+                      placeholder="Enter your password"
+                      className="w-full"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    >
+                      Password
+                    </Input>
+                  </ModalContent>
+                  <ModalAction onClick={() => test()}>Sync now</ModalAction>
+                </Modal>
+              )}
               <Button as="a" href={route('characters.deleted')} variant="outline" modifier="square">
                 <RotateCcw size={16} />
               </Button>

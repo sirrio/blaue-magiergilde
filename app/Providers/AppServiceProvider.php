@@ -26,8 +26,10 @@ class AppServiceProvider extends ServiceProvider
     {
         RedirectIfAuthenticated::redirectUsing(fn () => route('characters.index'));
 
-        Event::listen(function (SocialiteWasCalled $event) {
-            $event->extendSocialite('discord', Provider::class);
-        });
+        if (config('features.discord')) {
+            Event::listen(function (SocialiteWasCalled $event) {
+                $event->extendSocialite('discord', Provider::class);
+            });
+        }
     }
 }
