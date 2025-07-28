@@ -30,10 +30,16 @@ export interface User {
   [key: string]: unknown // This allows for additional properties...
 }
 
+export interface ShopItem {
+  id: number
+  item: Item
+  spell?: Spell | null
+}
+
 export interface Shop {
   id: number
   created_at: string
-  items: Item[]
+  shop_items: ShopItem[]
 }
 
 export interface Item {
