@@ -298,12 +298,22 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const handleSave = (ally: Ally) => {
+    const payload: Record<string, unknown> = { ...ally }
     if (ally.id === 0) {
-      router.post(route('allies.store'), { ...ally, character_id: character.id }, { preserveScroll: true })
+      payload.character_id = character.id
+    } else {
+      payload._method = 'put'
+    }
+    if (!payload.avatar || typeof payload.avatar === 'string') {
+      delete payload.avatar
+    }
+
+    if (ally.id === 0) {
+      router.post(route('allies.store'), payload, { preserveScroll: true })
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
     } else {
-      router.put(route('allies.update', ally.id), { ...ally, _method: 'put' }, { preserveScroll: true })
+      router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
     }
     setEditingId(null)
