@@ -106,7 +106,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
                     onChange={() => toggleLevel(lvl)}
                   />
                   <label htmlFor={id} className="fieldset-label cursor-pointer">
-                    {lvl}
+                    {lvl === 0 ? 'Cantrip' : lvl}
                   </label>
                 </div>
               )
@@ -127,8 +127,11 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
                     checked={data.spell_schools.includes(sc)}
                     onChange={() => toggleSchool(sc)}
                   />
-                  <label htmlFor={id} className="fieldset-label cursor-pointer">
-                    {sc}
+                  <label htmlFor={id} className="fieldset-label cursor-pointer flex items-center gap-1">
+                    <svg className="icon h-4 w-4 fill-current">
+                      <use xlinkHref={`/images/spell-schools.svg#${sc}`}></use>
+                    </svg>
+                    {sc.toUpperCase()}
                   </label>
                 </div>
               )

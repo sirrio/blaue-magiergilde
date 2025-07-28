@@ -7,10 +7,20 @@ import { Shop } from '@/types'
 import { Head, router } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Store } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 export default function Index({ shops }: { shops: Shop[] }) {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(shops[0] ?? null)
+
+   
+  useEffect(() => {
+    setSelectedShop((prev) => {
+      if (prev) {
+        return shops.find((s) => s.id === prev.id) || null
+      }
+      return shops[0] ?? null
+    })
+  }, [shops, selectedShop?.id])
 
   const formatShopCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
 
