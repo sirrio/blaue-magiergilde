@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Input } from '@/components/ui/input'
+import { TextArea } from '@/components/ui/text-area'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
@@ -36,7 +38,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       return
     }
     if (typeof ally.avatar === 'string') {
-      setAvatarSrc(ally.avatar)
+      setAvatarSrc(`/storage/${ally.avatar}`)
       return
     }
     const url = URL.createObjectURL(ally.avatar)
@@ -49,7 +51,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       return
     }
     if (typeof editData.avatar === 'string') {
-      setEditAvatarSrc(editData.avatar)
+      setEditAvatarSrc(`/storage/${editData.avatar}`)
       return
     }
     const url = URL.createObjectURL(editData.avatar)
@@ -96,13 +98,15 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
             <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
           )}
         </div>
-        <input
+        <Input
           type="text"
           value={editData.name}
           placeholder="Name"
-          className="input input-bordered input-xs flex-1"
           onChange={(e) => handleChange('name', e.target.value)}
-        />
+          className="flex-1"
+        >
+          Name
+        </Input>
       </div>
       <div className="mb-1">
         <label className="label">Classes</label>
@@ -137,20 +141,24 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
           })}
         </div>
       </div>
-      <label className="label">Species</label>
-      <input
+      <Input
         type="text"
         value={editData.species}
         placeholder="Species"
-        className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
-      />
-      <textarea
-        value={editData.notes}
-        placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+        className="mb-1"
+      >
+        Species
+      </Input>
+      <div className="mb-1">
+        <TextArea
+          value={editData.notes}
+          placeholder="Notes"
+          onChange={(e) => handleChange('notes', e.target.value)}
+        >
+          Notes
+        </TextArea>
+      </div>
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
@@ -185,15 +193,21 @@ interface NewAllyCardProps {
   isEditing: boolean
   onSave: (ally: Ally) => void
   onCancel: () => void
+  onEdit?: () => void
 }
 
-const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }) => {
+const NewAllyCard: React.FC<NewAllyCardProps> = ({
+  isEditing,
+  onSave,
+  onCancel,
+  onEdit,
+}) => {
   const [editData, setEditData] = useState<Ally>({
     character_id: 0,
     id: 0,
     name: '',
     notes: '',
-    avatar: '',
+    avatar: undefined,
     classes: '',
     species: '',
     standing: 'normal',
@@ -205,7 +219,10 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
   }
   if (!isEditing) {
     return (
-      <div className="card bg-base-100 hover:bg-base-200 cursor-pointer border-2 border-dashed p-4 text-center shadow-sm" onClick={onCancel}>
+      <div
+        className="card bg-base-100 hover:bg-base-200 cursor-pointer border-2 border-dashed p-4 text-center shadow-sm"
+        onClick={onEdit}
+      >
         <PlusCircle size={24} className="mx-auto" />
         <p className="mt-2 text-sm">Add Ally</p>
       </div>
@@ -213,13 +230,15 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
   }
   return (
     <div className="card bg-base-200 border p-2 shadow">
-      <input
+      <Input
         type="text"
         value={editData.name}
         placeholder="Name"
-        className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('name', e.target.value)}
-      />
+        className="mb-1"
+      >
+        Name
+      </Input>
       <div className="mb-1">
         <label className="label">Classes</label>
         <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
@@ -253,20 +272,24 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({ isEditing, onSave, onCancel }
           })}
         </div>
       </div>
-      <label className="label">Species</label>
-      <input
+      <Input
         type="text"
         value={editData.species}
         placeholder="Species"
-        className="input input-bordered input-xs mb-1 w-full"
         onChange={(e) => handleChange('species', e.target.value)}
-      />
-      <textarea
-        value={editData.notes}
-        placeholder="Notes"
-        className="textarea textarea-bordered textarea-xs mb-1 w-full"
-        onChange={(e) => handleChange('notes', e.target.value)}
-      />
+        className="mb-1"
+      >
+        Species
+      </Input>
+      <div className="mb-1">
+        <TextArea
+          value={editData.notes}
+          placeholder="Notes"
+          onChange={(e) => handleChange('notes', e.target.value)}
+        >
+          Notes
+        </TextArea>
+      </div>
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
@@ -298,12 +321,22 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const handleSave = (ally: Ally) => {
+    const payload: Record<string, unknown> = { ...ally }
     if (ally.id === 0) {
-      router.post(route('allies.store'), { ...ally, character_id: character.id }, { preserveScroll: true })
+      payload.character_id = character.id
+    } else {
+      payload._method = 'put'
+    }
+    if (!payload.avatar || typeof payload.avatar === 'string') {
+      delete payload.avatar
+    }
+
+    if (ally.id === 0) {
+      router.post(route('allies.store'), payload, { preserveScroll: true })
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
     } else {
-      router.put(route('allies.update', ally.id), { ...ally, _method: 'put' }, { preserveScroll: true })
+      router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
     }
     setEditingId(null)
