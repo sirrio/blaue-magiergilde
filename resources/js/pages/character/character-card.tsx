@@ -137,7 +137,7 @@ export function CharacterCard({ character }: { character: Character }) {
               </div>
             )}
             <div className={cn('mt-4 grid grid-cols-4 gap-1')}>
-              <Button as="a" href={route('characters.show', character.id as any)} size="sm" className={cn('col-span-4')}>
+              <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-4')}>
                 <BookOpen size={14} />
                 Details
               </Button>

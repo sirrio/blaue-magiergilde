@@ -9,7 +9,7 @@ import { RotateCcw } from 'lucide-react'
 
 export default function Deleted({ characters }: { characters: Character[] }) {
   const restore = (id: number) => {
-    router.post(route('characters.restore-deleted', id as any))
+    router.post(route('characters.restore-deleted', id))
   }
 
   return (

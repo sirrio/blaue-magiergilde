@@ -59,8 +59,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
     setEditAvatarSrc(url)
     return () => URL.revokeObjectURL(url)
   }, [editData.avatar])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleChange = (key: keyof Ally, value: any) => {
+  const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
     setEditData({ ...editData, [key]: value })
   }
   if (!isEditing) {
@@ -166,7 +165,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       <label className="label">Standing</label>
       <select
         value={editData.standing}
-        onChange={(e) => handleChange('standing', e.target.value)}
+        onChange={(e) => handleChange('standing', e.target.value as Ally['standing'])}
         className="input input-bordered input-xs mb-2 w-full"
       >
         {standingOrder.map((stand) => (
@@ -214,8 +213,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
     standing: 'normal',
   })
   const { classes } = usePage<PageProps>().props
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleChange = (key: keyof Ally, value: any) => {
+  const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
     setEditData({ ...editData, [key]: value })
   }
   if (!isEditing) {
@@ -297,7 +295,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       <label className="label">Standing</label>
       <select
         value={editData.standing}
-        onChange={(e) => handleChange('standing', e.target.value)}
+        onChange={(e) => handleChange('standing', e.target.value as Ally['standing'])}
         className="input input-bordered input-xs mb-2 w-full"
       >
         {standingOrder.map((stand) => (
@@ -337,7 +335,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
     } else {
-        router.put(route('allies.update', ally.id as any), payload, { preserveScroll: true })
+        router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
     }
     setEditingId(null)
@@ -347,7 +345,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   }
   const handleRemove = (ally: Ally) => {
     if (window.confirm(`Are you sure you want to remove ${ally.name}?`)) {
-      router.delete(route('allies.destroy', ally.id as any), { preserveScroll: true })
+      router.delete(route('allies.destroy', ally.id), { preserveScroll: true })
       setAllies(allies.filter((a) => a.id !== ally.id))
       setEditingId(null)
     }

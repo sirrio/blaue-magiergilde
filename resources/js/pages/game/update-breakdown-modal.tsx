@@ -9,7 +9,7 @@ import LogoHt from '@/components/logo-ht'
 import LogoEt from '@/components/logo-et'
 import React from 'react'
 
-interface BreakdownForm extends Record<string, number> {
+interface BreakdownForm {
   event_bubbles: number
   event_coins: number
   bt_bubbles: number
@@ -68,7 +68,10 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             min={0}
             value={data.event_bubbles}
             onChange={(e) =>
-              (setData as any)('event_bubbles', Math.max(0, Number(e.target.value)))
+              setData((prev) => ({
+                ...prev,
+                event_bubbles: Math.max(0, Number(e.target.value)),
+              }))
             }
             errors={errors.event_bubbles}
           >
@@ -81,7 +84,10 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             type="number"
             value={data.event_coins}
             onChange={(e) =>
-              (setData as any)('event_coins', Number(e.target.value))
+              setData((prev) => ({
+                ...prev,
+                event_coins: Number(e.target.value),
+              }))
             }
             errors={errors.event_coins}
           >
@@ -95,7 +101,10 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             min={0}
             value={data.other_bubbles}
             onChange={(e) =>
-              (setData as any)('other_bubbles', Math.max(0, Number(e.target.value)))
+              setData((prev) => ({
+                ...prev,
+                other_bubbles: Math.max(0, Number(e.target.value)),
+              }))
             }
             errors={errors.other_bubbles}
           >
@@ -107,7 +116,10 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
             type="number"
             value={data.other_coins}
             onChange={(e) =>
-              (setData as any)('other_coins', Number(e.target.value))
+              setData((prev) => ({
+                ...prev,
+                other_coins: Number(e.target.value),
+              }))
             }
             errors={errors.other_coins}
           >
@@ -122,10 +134,10 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
                 min={0}
                 value={data[`${type}_bubbles`]}
                 onChange={(e) =>
-                  (setData as any)(
-                    `${type}_bubbles`,
-                    Math.max(0, Number(e.target.value)),
-                  )
+                  setData((prev) => ({
+                    ...prev,
+                    [`${type}_bubbles`]: Math.max(0, Number(e.target.value)),
+                  }))
                 }
                 errors={errors[`${type}_bubbles`]}
               >
@@ -142,10 +154,10 @@ const UpdateBreakdownModal = ({ user, children }: { user: User; children?: React
                 type="number"
                 value={data[`${type}_coins`]}
                 onChange={(e) =>
-                  (setData as any)(
-                    `${type}_coins`,
-                    Number(e.target.value),
-                  )
+                  setData((prev) => ({
+                    ...prev,
+                    [`${type}_coins`]: Number(e.target.value),
+                  }))
                 }
                 errors={errors[`${type}_coins`]}
               >

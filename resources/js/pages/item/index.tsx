@@ -27,7 +27,7 @@ export default function Index({ items }: { items: Item[] }) {
     { label: 'Spell Scroll', value: 'spellscroll' },
   ]
 
-  const currentQueryParams = (route() as any).params
+  const currentQueryParams = route().params as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
 
   const navigateTo = (href: string) => {
