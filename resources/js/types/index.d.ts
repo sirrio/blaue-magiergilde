@@ -146,6 +146,15 @@ export interface Game {
   user_id: number
 }
 
+export interface Registration {
+  id: number
+  character_name: string
+  character_url: string
+  tier: string
+  discord_name: string
+  status: 'pending' | 'approved' | 'declined'
+}
+
 export interface SharedData {
   name: string
   quote: { message: string; author: string }

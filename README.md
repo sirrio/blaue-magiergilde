@@ -47,3 +47,7 @@ Type-check the frontend:
 ```bash
 npm run types
 ```
+
+## Character Sign-up
+
+Players register their characters via the Discord bot. Admins can review and approve these registrations at `/registrations`.
