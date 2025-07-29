@@ -39,6 +39,7 @@ class RegistrationController extends Controller
             'character_url' => ['required', 'string'],
             'tier' => ['required', 'string'],
             'discord_name' => ['required', 'string'],
+            'notes' => ['nullable', 'string'],
         ]);
 
         Registration::create($data);

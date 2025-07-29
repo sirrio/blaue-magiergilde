@@ -14,6 +14,7 @@ class Registration extends Model
         'character_url',
         'tier',
         'discord_name',
+        'notes',
         'status',
     ];
 }

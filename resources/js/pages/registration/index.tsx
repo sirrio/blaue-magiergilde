@@ -1,11 +1,13 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TextArea } from '@/components/ui/text-area'
 import { Head, useForm } from '@inertiajs/react'
 
 export default function RegistrationForm() {
   const { data, setData, post, processing, errors } = useForm({
     link: '',
     tier: '',
+    notes: '',
   })
 
   const submit = (e: React.FormEvent) => {
@@ -25,6 +27,14 @@ export default function RegistrationForm() {
           <Input value={data.tier} onChange={e => setData('tier', e.target.value)} errors={errors.tier}>
             Tier
           </Input>
+          <TextArea
+            value={data.notes}
+            onChange={(e) => setData('notes', e.target.value)}
+            errors={errors.notes}
+            placeholder="Additional notes"
+          >
+            Notes
+          </TextArea>
           <Button type="submit" disabled={processing} className="btn-primary w-full">
             Submit
           </Button>

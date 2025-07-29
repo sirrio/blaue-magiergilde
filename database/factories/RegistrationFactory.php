@@ -19,6 +19,7 @@ class RegistrationFactory extends Factory
             'character_url' => $this->faker->url(),
             'tier' => $this->faker->randomElement(['bt', 'lt', 'ht', 'et']),
             'discord_name' => $this->faker->userName(),
+            'notes' => $this->faker->sentence(),
             'status' => 'pending',
         ];
     }

@@ -11,10 +11,12 @@ it('allows guests to submit registrations', function () {
         'character_url' => 'https://example.com/sheet',
         'tier' => 'bt',
         'discord_name' => 'Tester#1234',
+        'notes' => 'First session',
     ]);
 
     $response->assertRedirect();
     expect(Registration::count())->toBe(1);
+    expect(Registration::first()->notes)->toBe('First session');
 });
 
 it('admins can view the registration list', function () {

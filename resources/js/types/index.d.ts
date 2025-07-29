@@ -152,6 +152,7 @@ export interface Registration {
   character_url: string
   tier: string
   discord_name: string
+  notes: string
   status: 'pending' | 'approved' | 'declined'
 }
 
