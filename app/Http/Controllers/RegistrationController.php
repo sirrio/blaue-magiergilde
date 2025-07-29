@@ -12,7 +12,18 @@ class RegistrationController extends Controller
 {
     public function index(): Response
     {
-        $registrations = Registration::query()
+        $search = request('search');
+
+        $registrationQuery = Registration::query();
+
+        if (! empty($search)) {
+            $registrationQuery->where(function ($query) use ($search) {
+                $query->where('character_name', 'LIKE', "%{$search}%")
+                    ->orWhere('discord_name', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $registrations = $registrationQuery
             ->orderByDesc('created_at')
             ->get();
 
