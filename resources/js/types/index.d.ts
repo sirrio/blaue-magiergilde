@@ -153,6 +153,7 @@ export interface Registration {
   start_tier: string
   tier: string
   discord_name: string
+  discord_id: number
   notes: string
   status: 'pending' | 'approved' | 'declined'
 }

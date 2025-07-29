@@ -15,6 +15,7 @@ export default function UpdateRegistrationModal({ registration }: { registration
     start_tier: registration.start_tier,
     tier: registration.tier,
     discord_name: registration.discord_name,
+    discord_id: registration.discord_id,
     notes: registration.notes ?? '',
   })
 
@@ -49,6 +50,9 @@ export default function UpdateRegistrationModal({ registration }: { registration
           </Input>
           <Input errors={errors.discord_name} value={data.discord_name} onChange={(e) => setData('discord_name', e.target.value)}>
             Discord Name
+          </Input>
+          <Input errors={errors.discord_id} value={data.discord_id} onChange={(e) => setData('discord_id', Number(e.target.value))}>
+            Discord ID
           </Input>
           <TextArea errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes

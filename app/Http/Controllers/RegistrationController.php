@@ -40,6 +40,7 @@ class RegistrationController extends Controller
             'start_tier' => ['required', 'string'],
             'tier' => ['required', 'string'],
             'discord_name' => ['required', 'string'],
+            'discord_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -56,6 +57,7 @@ class RegistrationController extends Controller
             'start_tier' => ['sometimes', 'required', 'string'],
             'tier' => ['sometimes', 'required', 'string'],
             'discord_name' => ['sometimes', 'required', 'string'],
+            'discord_id' => ['sometimes', 'integer'],
             'notes' => ['nullable', 'string'],
             'status' => ['sometimes', 'required', 'in:pending,approved,declined'],
         ]);

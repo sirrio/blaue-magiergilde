@@ -56,6 +56,7 @@ export default function RegistrationList({ registrations }: { registrations: Reg
                 <LogoTier tier={r.tier} width={16} />
               </div>
               <div className="text-xs">{r.discord_name}</div>
+              <div className="text-xs">{r.discord_id}</div>
               <div className="text-xs">{r.notes}</div>
               <div
                 className={cn(
