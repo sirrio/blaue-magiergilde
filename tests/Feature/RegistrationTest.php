@@ -12,6 +12,7 @@ it('allows guests to submit registrations', function () {
         'start_tier' => 'bt',
         'tier' => 'bt',
         'discord_name' => 'Tester#1234',
+        'discord_id' => 12345,
         'notes' => 'First session',
     ]);
 

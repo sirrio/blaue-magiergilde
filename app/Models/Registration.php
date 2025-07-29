@@ -15,6 +15,7 @@ class Registration extends Model
         'start_tier',
         'tier',
         'discord_name',
+        'discord_id',
         'notes',
         'status',
     ];

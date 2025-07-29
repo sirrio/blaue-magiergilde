@@ -20,6 +20,7 @@ class RegistrationFactory extends Factory
             'start_tier' => $this->faker->randomElement(['bt', 'lt', 'ht', 'et']),
             'tier' => $this->faker->randomElement(['bt', 'lt', 'ht', 'et']),
             'discord_name' => $this->faker->userName(),
+            'discord_id' => $this->faker->numberBetween(100000, 999999),
             'notes' => $this->faker->sentence(),
             'status' => 'pending',
         ];
