@@ -20,8 +20,15 @@ export default function Welcome() {
   return (
     <>
       <Head title="Welcome"></Head>
-      <div className={cn('hero bg-base-200 min-h-screen')}>
-        <div className={cn('hero-content flex-col lg:flex-row-reverse')}>
+      <div className={cn('hero bg-base-200 min-h-screen relative overflow-hidden')}>
+        <div className="absolute inset-0">
+          <img
+            src="/images/bg-dragon.webp"
+            className="h-full w-full object-cover torn-mask"
+            alt=""
+          />
+        </div>
+        <div className={cn('hero-content relative z-10 flex-col lg:flex-row-reverse')}>
           <img src="/images/icon_magiergilde.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
           <div>
             <h1 className={cn('text-5xl font-bold')}>Blaue Magiergilde</h1>
