@@ -9,6 +9,7 @@ it('allows guests to submit registrations', function () {
     $response = $this->post('/registrations', [
         'character_name' => 'Hero',
         'character_url' => 'https://example.com/sheet',
+        'start_tier' => 'bt',
         'tier' => 'bt',
         'discord_name' => 'Tester#1234',
         'notes' => 'First session',
@@ -16,7 +17,9 @@ it('allows guests to submit registrations', function () {
 
     $response->assertRedirect();
     expect(Registration::count())->toBe(1);
-    expect(Registration::first()->notes)->toBe('First session');
+    $stored = Registration::first();
+    expect($stored->notes)->toBe('First session');
+    expect($stored->start_tier)->toBe('bt');
 });
 
 it('admins can view the registration list', function () {

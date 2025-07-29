@@ -6,6 +6,7 @@ import { Head, useForm } from '@inertiajs/react'
 export default function RegistrationForm() {
   const { data, setData, post, processing, errors } = useForm({
     link: '',
+    start_tier: '',
     tier: '',
     notes: '',
   })
@@ -23,6 +24,9 @@ export default function RegistrationForm() {
           <h1 className="text-2xl font-bold text-center">Character Registration</h1>
           <Input value={data.link} onChange={e => setData('link', e.target.value)} errors={errors.link}>
             Character Sheet Link
+          </Input>
+          <Input value={data.start_tier} onChange={e => setData('start_tier', e.target.value)} errors={errors.start_tier}>
+            Start Tier
           </Input>
           <Input value={data.tier} onChange={e => setData('tier', e.target.value)} errors={errors.tier}>
             Tier

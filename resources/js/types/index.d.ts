@@ -150,6 +150,7 @@ export interface Registration {
   id: number
   character_name: string
   character_url: string
+  start_tier: string
   tier: string
   discord_name: string
   notes: string
