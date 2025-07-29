@@ -15,8 +15,11 @@ class RegistrationFactory extends Factory
     public function definition(): array
     {
         return [
-            'link' => $this->faker->url(),
+            'character_name' => $this->faker->name(),
+            'character_url' => $this->faker->url(),
             'tier' => $this->faker->randomElement(['bt', 'lt', 'ht', 'et']),
+            'discord_name' => $this->faker->userName(),
+            'status' => 'pending',
         ];
     }
 }

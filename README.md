@@ -50,4 +50,4 @@ npm run types
 
 ## Character Sign-up
 
-Visit `/signup` to submit a character sheet link and tier. Admins can review submissions at `/registrations`.
+Players register their characters via the Discord bot. Admins can review and approve these registrations at `/registrations`.

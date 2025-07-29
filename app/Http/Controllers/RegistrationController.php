@@ -24,8 +24,10 @@ class RegistrationController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'link' => ['required', 'string'],
+            'character_name' => ['required', 'string'],
+            'character_url' => ['required', 'string'],
             'tier' => ['required', 'string'],
+            'discord_name' => ['required', 'string'],
         ]);
 
         Registration::create($data);
@@ -36,9 +38,7 @@ class RegistrationController extends Controller
     public function update(Request $request, Registration $registration): RedirectResponse
     {
         $data = $request->validate([
-            'user_id' => ['nullable', 'exists:users,id'],
-            'character_id' => ['nullable', 'exists:characters,id'],
-            'approved_at' => ['nullable', 'date'],
+            'status' => ['required', 'in:pending,approved,declined'],
         ]);
 
         $registration->update($data);

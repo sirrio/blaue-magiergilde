@@ -4,31 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Registration extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'link',
+        'character_name',
+        'character_url',
         'tier',
-        'user_id',
-        'character_id',
-        'approved_at',
+        'discord_name',
+        'status',
     ];
-
-    protected $casts = [
-        'approved_at' => 'datetime',
-    ];
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function character(): BelongsTo
-    {
-        return $this->belongsTo(Character::class);
-    }
 }

@@ -148,9 +148,11 @@ export interface Game {
 
 export interface Registration {
   id: number
-  link: string
+  character_name: string
+  character_url: string
   tier: string
-  approved_at?: string | null
+  discord_name: string
+  status: 'pending' | 'approved' | 'declined'
 }
 
 export interface SharedData {

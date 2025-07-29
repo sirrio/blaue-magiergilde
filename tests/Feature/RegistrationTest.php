@@ -7,8 +7,10 @@ uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 it('allows guests to submit registrations', function () {
     $response = $this->post('/registrations', [
-        'link' => 'https://example.com/sheet',
+        'character_name' => 'Hero',
+        'character_url' => 'https://example.com/sheet',
         'tier' => 'bt',
+        'discord_name' => 'Tester#1234',
     ]);
 
     $response->assertRedirect();
@@ -29,10 +31,10 @@ it('admins can approve a registration', function () {
 
     $this->actingAs($admin)
         ->put('/registrations/' . $registration->id, [
-            'approved_at' => now()->toDateTimeString(),
+            'status' => 'approved',
         ])
         ->assertRedirect();
 
     $registration->refresh();
-    expect($registration->approved_at)->not->toBeNull();
+    expect($registration->status)->toBe('approved');
 });

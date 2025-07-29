@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('registrations', function (Blueprint $table) {
             $table->id();
-            $table->string('link');
+            $table->string('character_name');
+            $table->string('character_url');
             $table->string('tier');
-            $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->foreignId('character_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->timestamp('approved_at')->nullable();
+            $table->string('discord_name');
+            $table->enum('status', ['pending', 'approved', 'declined'])->default('pending');
             $table->timestamps();
         });
     }
