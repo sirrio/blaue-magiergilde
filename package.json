@@ -9,7 +9,7 @@
     "format:check": "prettier --check resources/",
     "lint": "eslint . --fix",
     "types": "tsc --noEmit",
-    "share": "ngrok http --domain=sirrio.ngrok.app --host-header=sirrio.ngrok.app 8000"
+    "share": "herd share https://blaue-magiergilde.test/"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
