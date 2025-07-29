@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import LogoTier from '@/components/logo-tier'
 import { CheckCircle2, Clock, XCircle } from 'lucide-react'
+import UpdateRegistrationModal from './update-registration-modal'
 import { cn } from '@/lib/utils'
 import React, { useState } from 'react'
 
@@ -50,7 +51,8 @@ export default function RegistrationList({ registrations }: { registrations: Reg
               <a href={r.character_url} className="link text-xs" target="_blank" rel="noopener noreferrer">
                 Sheet
               </a>
-              <div className="text-xs">
+              <div className="text-xs flex items-center gap-1">
+                <LogoTier tier={r.start_tier} width={16} />
                 <LogoTier tier={r.tier} width={16} />
               </div>
               <div className="text-xs">{r.discord_name}</div>
@@ -69,6 +71,7 @@ export default function RegistrationList({ registrations }: { registrations: Reg
                 <span className="ml-1 capitalize">{r.status}</span>
               </div>
               <div className="flex justify-end gap-2">
+                <UpdateRegistrationModal registration={r} />
                 <Button
                   size="xs"
                   modifier="square"

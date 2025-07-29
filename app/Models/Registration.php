@@ -12,6 +12,7 @@ class Registration extends Model
     protected $fillable = [
         'character_name',
         'character_url',
+        'start_tier',
         'tier',
         'discord_name',
         'notes',

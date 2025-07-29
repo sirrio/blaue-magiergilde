@@ -17,6 +17,7 @@ class RegistrationFactory extends Factory
         return [
             'character_name' => $this->faker->name(),
             'character_url' => $this->faker->url(),
+            'start_tier' => $this->faker->randomElement(['bt', 'lt', 'ht', 'et']),
             'tier' => $this->faker->randomElement(['bt', 'lt', 'ht', 'et']),
             'discord_name' => $this->faker->userName(),
             'notes' => $this->faker->sentence(),

@@ -37,6 +37,7 @@ class RegistrationController extends Controller
         $data = $request->validate([
             'character_name' => ['required', 'string'],
             'character_url' => ['required', 'string'],
+            'start_tier' => ['required', 'string'],
             'tier' => ['required', 'string'],
             'discord_name' => ['required', 'string'],
             'notes' => ['nullable', 'string'],
@@ -50,7 +51,13 @@ class RegistrationController extends Controller
     public function update(Request $request, Registration $registration): RedirectResponse
     {
         $data = $request->validate([
-            'status' => ['required', 'in:pending,approved,declined'],
+            'character_name' => ['sometimes', 'required', 'string'],
+            'character_url' => ['sometimes', 'required', 'string'],
+            'start_tier' => ['sometimes', 'required', 'string'],
+            'tier' => ['sometimes', 'required', 'string'],
+            'discord_name' => ['sometimes', 'required', 'string'],
+            'notes' => ['nullable', 'string'],
+            'status' => ['sometimes', 'required', 'in:pending,approved,declined'],
         ]);
 
         $registration->update($data);
