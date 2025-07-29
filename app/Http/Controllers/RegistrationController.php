@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Registration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,8 +38,8 @@ class RegistrationController extends Controller
         $data = $request->validate([
             'character_name' => ['required', 'string'],
             'character_url' => ['required', 'string'],
-            'start_tier' => ['required', 'string'],
-            'tier' => ['required', 'string'],
+            'start_tier' => ['required', Rule::in(['bt', 'lt', 'ht'])],
+            'tier' => ['required', Rule::in(['bt', 'lt', 'ht', 'et'])],
             'discord_name' => ['required', 'string'],
             'discord_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string'],
@@ -54,10 +55,7 @@ class RegistrationController extends Controller
         $data = $request->validate([
             'character_name' => ['sometimes', 'required', 'string'],
             'character_url' => ['sometimes', 'required', 'string'],
-            'start_tier' => ['sometimes', 'required', 'string'],
-            'tier' => ['sometimes', 'required', 'string'],
-            'discord_name' => ['sometimes', 'required', 'string'],
-            'discord_id' => ['sometimes', 'integer'],
+            'tier' => ['sometimes', 'required', Rule::in(['bt', 'lt', 'ht', 'et'])],
             'notes' => ['nullable', 'string'],
             'status' => ['sometimes', 'required', 'in:pending,approved,declined'],
         ]);
