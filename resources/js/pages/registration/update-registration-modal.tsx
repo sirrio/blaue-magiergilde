@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { TextArea } from '@/components/ui/text-area'
 import { PageProps, Registration } from '@/types'
@@ -8,14 +9,12 @@ import { Edit } from 'lucide-react'
 import React from 'react'
 
 export default function UpdateRegistrationModal({ registration }: { registration: Registration }) {
-  const { errors } = usePage<PageProps>().props
+  const { tiers, errors } = usePage<PageProps>().props
   const { data, setData, post } = useForm({
     character_name: registration.character_name,
     character_url: registration.character_url,
     start_tier: registration.start_tier,
     tier: registration.tier,
-    discord_name: registration.discord_name,
-    discord_id: registration.discord_id,
     notes: registration.notes ?? '',
   })
 
@@ -42,18 +41,28 @@ export default function UpdateRegistrationModal({ registration }: { registration
           <Input errors={errors.character_url} value={data.character_url} onChange={(e) => setData('character_url', e.target.value)}>
             Sheet URL
           </Input>
-          <Input errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
-            Start Tier
-          </Input>
-          <Input errors={errors.tier} value={data.tier} onChange={(e) => setData('tier', e.target.value)}>
-            Current Tier
-          </Input>
-          <Input errors={errors.discord_name} value={data.discord_name} onChange={(e) => setData('discord_name', e.target.value)}>
-            Discord Name
-          </Input>
-          <Input errors={errors.discord_id} value={data.discord_id} onChange={(e) => setData('discord_id', Number(e.target.value))}>
-            Discord ID
-          </Input>
+          <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value as Registration['start_tier'])}>
+            <SelectLabel>Start Tier</SelectLabel>
+            <SelectOptions>
+              {Object.entries(tiers)
+                .filter(([key]) => key !== 'et')
+                .map(([key, value]) => (
+                  <option key={key} value={key}>
+                    {value}
+                  </option>
+                ))}
+            </SelectOptions>
+          </Select>
+          <Select errors={errors.tier} value={data.tier} onChange={(e) => setData('tier', e.target.value as Registration['tier'])}>
+            <SelectLabel>Current Tier</SelectLabel>
+            <SelectOptions>
+              {Object.entries(tiers).map(([key, value]) => (
+                <option key={key} value={key}>
+                  {value}
+                </option>
+              ))}
+            </SelectOptions>
+          </Select>
           <TextArea errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
