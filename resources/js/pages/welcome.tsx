@@ -1,10 +1,10 @@
-import { cn } from '@/lib/utils'
-import { Head, Link, usePage } from '@inertiajs/react'
-import type { ElementType } from 'react'
-import { PageProps } from '@/types'
-import { Button } from '@/components/ui/button'
 import LegalLinks from '@/components/legal-links'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { PageProps } from '@/types'
+import { Head, Link, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
+import type { ElementType } from 'react'
 import { z } from 'zod'
 
 const mySchema = z.string()
@@ -20,16 +20,12 @@ export default function Welcome() {
   return (
     <>
       <Head title="Welcome"></Head>
-      <div className={cn('hero bg-base-200 min-h-screen relative overflow-hidden')}>
-        <div className="absolute inset-0">
-          <img
-            src="/images/bg-dragon.webp"
-            className="h-full w-full object-cover torn-mask"
-            alt=""
-          />
+      <div className={cn('hero bg-base-300 relative min-h-screen overflow-hidden')} data-theme={'light'}>
+        <div className="absolute inset-0 grayscale-[60%] hue-rotate-[3.5rad] ">
+          <img src="/images/bg-dragon-torn.webp" className="h-full w-full object-none md:object-cover" alt="" />
         </div>
-        <div className={cn('hero-content relative z-10 flex-col lg:flex-row-reverse')}>
-          <img src="/images/icon_magiergilde.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
+        <div className={cn('hero-content relative z-10 flex-col bg-transparent lg:flex-row-reverse')} data-theme={'dark'}>
+          <img src="/images/icon_magiergilde_white.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
           <div>
             <h1 className={cn('text-5xl font-bold')}>Blaue Magiergilde</h1>
             <p className={cn('py-6')}>
@@ -43,7 +39,7 @@ export default function Welcome() {
                 </Button>
               ) : (
                 <div className={cn('flex gap-2')}>
-                  <Button as={Link as ElementType} href={route('login')} color="accent">
+                  <Button as={Link as ElementType} href={route('login')} color="info">
                     Login
                   </Button>
                   <Button as={Link as ElementType} href={route('register')} variant="outline">
@@ -55,7 +51,9 @@ export default function Welcome() {
           </div>
         </div>
       </div>
-      <LegalLinks />
+      <div className="bg-base-300 h-fit w-fit" data-theme={'light'}>
+        <LegalLinks />
+      </div>
     </>
   )
 }
