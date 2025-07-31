@@ -9,8 +9,18 @@ export default function Privacy() {
         <div className="prose mx-auto">
           <h1>Privacy Policy</h1>
           <p>
-            We do not collect personal data beyond what is necessary for the
-            operation of this site.
+            This site uses cookies solely for technical functions such as
+            maintaining sessions. We do not employ tracking or advertising
+            cookies.
+          </p>
+          <p>
+            Any personal data you provide is processed only as required to
+            operate the site and to deliver the services you request. We do not
+            monetize, sell, or otherwise use your data for marketing purposes.
+          </p>
+          <p>
+            Data is retained only as long as necessary for these technical
+            reasons.
           </p>
         </div>
       </div>
