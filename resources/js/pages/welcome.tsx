@@ -1,8 +1,8 @@
 import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
+import DiscordIcon from '@/components/discord-icon'
 import { cn } from '@/lib/utils'
-import { PageProps } from '@/types'
-import { Head, Link, usePage } from '@inertiajs/react'
+import { Head, Link } from '@inertiajs/react'
 import { format } from 'date-fns'
 import type { ElementType } from 'react'
 import { z } from 'zod'
@@ -16,7 +16,6 @@ mySchema.safeParse(12) // => { success: false; error: ZodError }
 format(new Date(), "'Today is a' eeee")
 
 export default function Welcome() {
-  const { auth } = usePage<PageProps>().props
   return (
     <>
       <Head title="Welcome"></Head>
@@ -32,21 +31,27 @@ export default function Welcome() {
               Hier kannst du deine Charaktere und gespielten Runden speichern. Deine Ressourcen und Level werden automatisch berechnet – so hast du
               alles im Blick und kannst dich voll und ganz auf dein Spiele konzentrieren!
             </p>
-            <div className={cn('space-x-2')}>
-              {auth.user ? (
-                <Button as={Link as ElementType} href={route('characters.index')} color="primary">
-                  Zur Characterverwaltung
+            <div className={cn('flex gap-2')}>
+              <Button
+                as={Link as ElementType}
+                href="https://discord.com"
+                size="lg"
+                color="primary"
+                className="gap-2"
+              >
+                <DiscordIcon width={24} />
+                Start playing
+              </Button>
+              <div className="tooltip" data-tip="comming soon">
+                <Button
+                  as={Link as ElementType}
+                  href={route('login')}
+                  color="secondary"
+                  disabled={import.meta.env.PROD}
+                >
+                  Charactermanger
                 </Button>
-              ) : (
-                <div className={cn('flex gap-2')}>
-                  <Button as={Link as ElementType} href={route('login')} color="info">
-                    Login
-                  </Button>
-                  <Button as={Link as ElementType} href={route('register')} variant="outline">
-                    Register
-                  </Button>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
