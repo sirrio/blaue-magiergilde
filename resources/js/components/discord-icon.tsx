@@ -9,7 +9,7 @@ export default function DiscordIcon({ width = 24, className }: { width?: number;
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      fill={`#${siDiscord.hex}`}
+      fill="currentColor"
     >
       <title>Discord</title>
       <path d={siDiscord.path} />

@@ -35,11 +35,11 @@ export default function Welcome() {
               <Button
                 as="a"
                 href="https://discord.gg/dd5c"
-                color="primary"
+                color="info"
                 className="gap-2"
                 target="_blank"
               >
-                <DiscordIcon className={'fill-white'} width={24} />
+                <DiscordIcon width={24} />
                 Mitmachen im DD5C-Discord
               </Button>
               <div className="tooltip" data-tip="comming soon">
@@ -47,7 +47,7 @@ export default function Welcome() {
                   as={Link as ElementType}
                   href={route('login')}
                   variant={'outline'}
-                  disabled={!import.meta.env.PROD}
+                  disabled={import.meta.env.VITE_CHARACTER_MANAGER_ENABLED !== 'true'}
                 >
                   Charactermanger
                 </Button>
