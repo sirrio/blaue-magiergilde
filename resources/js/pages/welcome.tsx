@@ -33,21 +33,21 @@ export default function Welcome() {
             </p>
             <div className={cn('flex gap-2')}>
               <Button
-                as={Link as ElementType}
-                href="https://discord.com"
-                size="lg"
+                as="a"
+                href="https://discord.gg/dd5c"
                 color="primary"
                 className="gap-2"
+                target="_blank"
               >
-                <DiscordIcon width={24} />
-                Start playing
+                <DiscordIcon className={'fill-white'} width={24} />
+                Mitmachen im DD5C-Discord
               </Button>
               <div className="tooltip" data-tip="comming soon">
                 <Button
                   as={Link as ElementType}
                   href={route('login')}
-                  color="secondary"
-                  disabled={import.meta.env.PROD}
+                  variant={'outline'}
+                  disabled={!import.meta.env.PROD}
                 >
                   Charactermanger
                 </Button>
