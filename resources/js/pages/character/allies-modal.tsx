@@ -340,7 +340,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
       const newAlly = { ...ally, id: Date.now() }
       setAllies([...allies, newAlly])
     } else {
-        router.put(route('allies.update', ally.id), payload, { preserveScroll: true })
+      router.post(route('allies.update', ally.id), payload, { preserveScroll: true })
       setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
     }
     setEditingId(null)
