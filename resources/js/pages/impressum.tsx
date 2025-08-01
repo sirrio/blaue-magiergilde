@@ -80,6 +80,18 @@ export default function Impressum() {
                 Urheberrechtsverletzung aufmerksam werden, bitten wir um einen entsprechenden Hinweis. Bei Bekanntwerden
                 von Rechtsverletzungen werden wir derartige Inhalte umgehend entfernen.
               </p>
+              <h2 className="font-bold">Attribution</h2>
+              <p>
+                Logo-Design von{' '}
+                <a className="link" href="https://linktr.ee/lizzylizarts" target="_blank" rel="noopener noreferrer">
+                  lizzylizarts
+                </a>
+                .
+              </p>
+              <p>
+                Diese Webseite nutzt Open-Source-Software wie Laravel, React, InertiaJS, Tailwind&nbsp;CSS und Vite.
+                Vielen Dank an alle Mitwirkenden dieser Projekte.
+              </p>
               <Button as={Link as ElementType} href={route('home')} color="primary" className="mt-4">
                 Zurück zur Startseite
               </Button>
