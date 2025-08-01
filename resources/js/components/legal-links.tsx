@@ -6,8 +6,8 @@ export default function LegalLinks() {
       <Link href={route('impressum')} className="link">
         Impressum
       </Link>
-      <Link href={route('privacy')} className="link">
-        Privacy
+      <Link href={route('datenschutz')} className="link">
+        Datenschutz
       </Link>
     </div>
   )
