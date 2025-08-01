@@ -61,6 +61,7 @@
     "react-dom": "^19.1.0",
     "react-hotkeys-hook": "^5.1.0",
     "react-image": "^4.1.0",
+    "simple-icons": "^9.21.0",
     "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.1.7",
     "tailwindcss-animate": "^1.0.7",
