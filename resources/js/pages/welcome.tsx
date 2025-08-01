@@ -2,7 +2,8 @@ import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
 import DiscordIcon from '@/components/discord-icon'
 import { cn } from '@/lib/utils'
-import { Head, Link } from '@inertiajs/react'
+import { Head, Link, usePage } from '@inertiajs/react'
+import type { PageProps } from '@/types'
 import { format } from 'date-fns'
 import type { ElementType } from 'react'
 import { z } from 'zod'
@@ -16,6 +17,8 @@ mySchema.safeParse(12) // => { success: false; error: ZodError }
 format(new Date(), "'Today is a' eeee")
 
 export default function Welcome() {
+  const { features } = usePage<PageProps>().props
+
   return (
     <>
       <Head title="Welcome"></Head>
@@ -47,7 +50,7 @@ export default function Welcome() {
                   as={Link as ElementType}
                   href={route('login')}
                   variant={'outline'}
-                  disabled={import.meta.env.VITE_CHARACTER_MANAGER_ENABLED !== 'true'}
+                  disabled={!features.character_manager}
                 >
                   Charactermanger
                 </Button>

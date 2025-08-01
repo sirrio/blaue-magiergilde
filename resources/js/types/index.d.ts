@@ -9,7 +9,7 @@ export interface PageProps {
   tiers: object
   versions: string[]
   factions: object
-  features: { discord: boolean }
+  features: { discord: boolean; character_manager: boolean }
   ziggy: Config & { location: string }
 
   [key: string]: unknown
