@@ -24,7 +24,8 @@ export default function Welcome() {
       <Head title="Welcome"></Head>
       <div className={cn('hero bg-base-300 relative min-h-screen overflow-hidden')} data-theme={'light'}>
         <div className="absolute inset-0 grayscale-[60%] hue-rotate-[3.5rad] ">
-          <img src="/images/bg-dragon-torn.webp" className="h-full w-full object-none md:object-cover" alt="" />
+          <img src="/images/bg-dragon.webp" className="h-full md:hidden object-cover" alt="" />
+          <img src="/images/bg-dragon-torn.webp" className="h-full w-full object-cover hidden md:block" alt="" />
         </div>
         <div className={cn('hero-content relative z-10 flex-col bg-transparent lg:flex-row-reverse')} data-theme={'dark'}>
           <img src="/images/icon_magiergilde_white.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
@@ -34,7 +35,7 @@ export default function Welcome() {
               Hier kannst du deine Charaktere und gespielten Runden speichern. Deine Ressourcen und Level werden automatisch berechnet – so hast du
               alles im Blick und kannst dich voll und ganz auf dein Spiele konzentrieren!
             </p>
-            <div className={cn('flex gap-2')}>
+            <div className={cn('flex gap-2 flex-wrap')}>
               <Button
                 as="a"
                 href="https://discord.gg/dd5c"
@@ -69,7 +70,7 @@ export default function Welcome() {
           </div>
         </div>
       </div>
-      <div className="bg-base-300 h-fit w-fit" data-theme={'light'}>
+      <div className="bg-base-300 h-fit w-fit md:text-base-content text-info" data-theme={'light'}>
         <LegalLinks />
       </div>
     </>
