@@ -22,7 +22,7 @@ const accountLinks = [
 
 const legalLinks = [
   { name: 'Impressum', route: 'impressum', method: 'get' as const },
-  { name: 'Privacy', route: 'privacy', method: 'get' as const },
+  { name: 'Datenschutz', route: 'datenschutz', method: 'get' as const },
 ]
 
 const authLinks = [

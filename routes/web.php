@@ -9,7 +9,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/impressum', fn () => Inertia::render('impressum'))->name('impressum');
-Route::get('/privacy', fn () => Inertia::render('privacy'))->name('privacy');
+Route::get('/datenschutz', fn () => Inertia::render('datenschutz'))->name('datenschutz');
 
 Route::post('appearance', [AppearanceController::class, 'update'])->name('appearance.update');
 
