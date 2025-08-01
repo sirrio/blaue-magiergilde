@@ -45,16 +45,26 @@ export default function Welcome() {
                 <DiscordIcon width={24} />
                 Mitmachen im DD5C-Discord
               </Button>
-              <div className="tooltip" data-tip="comming soon">
+              {!features.character_manager ? (
+                <div className="tooltip" data-tip="comming soon">
+                  <Button
+                    as={Link as ElementType}
+                    href={route('login')}
+                    variant={'outline'}
+                    disabled
+                  >
+                    Charactermanger
+                  </Button>
+                </div>
+              ) : (
                 <Button
                   as={Link as ElementType}
                   href={route('login')}
                   variant={'outline'}
-                  disabled={!features.character_manager}
                 >
                   Charactermanger
                 </Button>
-              </div>
+              )}
             </div>
           </div>
         </div>
