@@ -2,7 +2,8 @@ import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
 import DiscordIcon from '@/components/discord-icon'
 import { cn } from '@/lib/utils'
-import { Head, Link } from '@inertiajs/react'
+import { Head, Link, usePage } from '@inertiajs/react'
+import type { PageProps } from '@/types'
 import { format } from 'date-fns'
 import type { ElementType } from 'react'
 import { z } from 'zod'
@@ -16,6 +17,8 @@ mySchema.safeParse(12) // => { success: false; error: ZodError }
 format(new Date(), "'Today is a' eeee")
 
 export default function Welcome() {
+  const { features } = usePage<PageProps>().props
+
   return (
     <>
       <Head title="Welcome"></Head>
@@ -35,23 +38,33 @@ export default function Welcome() {
               <Button
                 as="a"
                 href="https://discord.gg/dd5c"
-                color="primary"
+                color="info"
                 className="gap-2"
                 target="_blank"
               >
-                <DiscordIcon className={'fill-white'} width={24} />
+                <DiscordIcon width={24} />
                 Mitmachen im DD5C-Discord
               </Button>
-              <div className="tooltip" data-tip="comming soon">
+              {!features.character_manager ? (
+                <div className="tooltip" data-tip="comming soon">
+                  <Button
+                    as={Link as ElementType}
+                    href={route('login')}
+                    variant={'outline'}
+                    disabled
+                  >
+                    Charactermanger
+                  </Button>
+                </div>
+              ) : (
                 <Button
                   as={Link as ElementType}
                   href={route('login')}
                   variant={'outline'}
-                  disabled={!import.meta.env.PROD}
                 >
                   Charactermanger
                 </Button>
-              </div>
+              )}
             </div>
           </div>
         </div>
