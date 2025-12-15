@@ -51,67 +51,27 @@ function tierRequirementForRarity(rarity) {
 }
 
 function formatLink(name, url) {
-    if (!url) return name;
+    if (!url) return String(name ?? '');
     return `[${name}](<${url}>)`;
 }
 
 function formatItemLine(row) {
-    const name = formatLink(row.name, row.url);
-    const cost = row.cost ? `: ${row.cost}` : '';
+    const itemLink = formatLink(row.name, row.url);
+    const parts = [itemLink];
 
-    if (!row.spell_id) return `${name}${cost}`;
+    if (row.spell_id) {
+        const spellPrimaryUrl = row.spell_url || row.spell_legacy_url;
+        const spellLink = formatLink(row.spell_name, spellPrimaryUrl);
+        parts.push(spellLink);
 
-    const spellUrl = row.spell_url || row.spell_legacy_url;
-    const spellName = formatLink(row.spell_name, spellUrl);
-    const spellLevel = Number(row.spell_level);
-    const spellLevelText = Number.isFinite(spellLevel) ? ` (L${spellLevel})` : '';
-    return `${name}${cost} — Spell: ${spellName}${spellLevelText}`;
-}
-
-function buildSectionMessages(header, lines, maxMessageLength = 2000) {
-    const sanitizedLines = lines.filter(Boolean);
-    if (sanitizedLines.length === 0) return [];
-
-    const messages = [];
-    let currentLines = [];
-    let currentHeader = header;
-
-    const flush = () => {
-        if (currentLines.length === 0) return;
-        messages.push(`${currentHeader}\n${currentLines.join('\n')}`);
-        currentLines = [];
-        currentHeader = `${header} (cont.)`;
-    };
-
-    for (const line of sanitizedLines) {
-        const candidateLines = [...currentLines, line];
-        const candidate = `${currentHeader}\n${candidateLines.join('\n')}`;
-
-        if (candidate.length > maxMessageLength) {
-            flush();
-            const single = `${currentHeader}\n${line}`;
-            if (single.length > maxMessageLength) {
-                messages.push(single.slice(0, maxMessageLength));
-                currentHeader = `${header} (cont.)`;
-                continue;
-            }
-            currentLines.push(line);
-            continue;
+        if (row.spell_legacy_url && row.spell_legacy_url !== spellPrimaryUrl) {
+            parts.push(formatLink('Legacy', row.spell_legacy_url));
         }
-
-        currentLines.push(line);
     }
 
-    flush();
-    return messages;
-}
-
-async function sendSection(destination, header, lines) {
-    const messages = buildSectionMessages(header, lines);
-    for (const message of messages) {
-        // eslint-disable-next-line no-await-in-loop
-        await destination.send(message);
-    }
+    const prefix = parts.join(' - ');
+    const cost = row.cost ? `: ${row.cost}` : '';
+    return `${prefix}${cost}`;
 }
 
 async function fetchShop(shopId) {
@@ -212,6 +172,18 @@ async function resolveDestination({ botMember, interaction, target, shop, thread
     return target;
 }
 
+async function sendOneLine(destination, line) {
+    if (!line) return;
+    await destination.send(String(line));
+}
+
+async function sendLines(destination, lines) {
+    for (const line of lines) {
+        // eslint-disable-next-line no-await-in-loop
+        await sendOneLine(destination, line);
+    }
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('post-shop'))
@@ -284,7 +256,7 @@ module.exports = {
 
             const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
             const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
-            await destination.send(`**Shop #${String(shop.id).padStart(3, '0')}** — Rolled: ${createdAtText}`);
+            await sendOneLine(destination, `**Shop #${String(shop.id).padStart(3, '0')}** — Rolled: ${createdAtText}`);
 
             const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
             const typeOrder = ['item', 'consumable', 'spellscroll'];
@@ -311,17 +283,21 @@ module.exports = {
                     if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
                 }
 
-                const magicItemLines = (byType.get('item') ?? []).map(formatItemLine);
-                await sendSection(destination, `## ***⚔️ ${rarityLabel} Magic Items (${tierText}):***`, magicItemLines);
+                await sendOneLine(destination, `## ***⚔️ ${rarityLabel} Magic Items (${tierText}):***`);
+                await sendLines(destination, (byType.get('item') ?? []).map(formatItemLine));
 
                 const consumableLines = (byType.get('consumable') ?? []).map(formatItemLine);
                 const scrollLines = (byType.get('spellscroll') ?? []).map(formatItemLine);
 
                 if (rarity === 'common' || rarity === 'uncommon') {
-                    await sendSection(destination, `### ${rarityLabel} Consumable`, consumableLines);
-                    await sendSection(destination, `### ${rarityLabel} Spell Scroll`, scrollLines);
+                    await sendOneLine(destination, `### ${rarityLabel} Consumable`);
+                    await sendLines(destination, consumableLines);
+
+                    await sendOneLine(destination, `### ${rarityLabel} Spell Scroll`);
+                    await sendLines(destination, scrollLines);
                 } else {
-                    await sendSection(destination, `### ${rarityLabel} Consumable/Spell Scroll`, [...consumableLines, ...scrollLines]);
+                    await sendOneLine(destination, `### ${rarityLabel} Consumable/Spell Scroll`);
+                    await sendLines(destination, [...consumableLines, ...scrollLines]);
                 }
             }
 
