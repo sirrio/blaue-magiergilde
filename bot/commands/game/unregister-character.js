@@ -1,13 +1,14 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const db = require('../../db');
+const { commandName } = require('../../commandConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('wwt-unregister-character')
+        .setName(commandName('unregister-character'))
         .setDescription('Entferne eine Charakter-Registrierung.')
         .addIntegerOption(option =>
             option.setName('id')
-                .setDescription('ID aus /wwt-list-characters')
+                .setDescription(`ID aus /${commandName('list-characters')}`)
                 .setRequired(true),
         ),
     async execute(interaction) {

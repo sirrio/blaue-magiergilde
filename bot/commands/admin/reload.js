@@ -1,10 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Collection, SlashCommandBuilder } = require('discord.js');
+const { commandName } = require('../../commandConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('wwt-reload')
+        .setName(commandName('reload'))
         .setDescription('Reloads all commands.'),
     async execute(interaction) {
         const foldersPath = path.join(__dirname, '..');

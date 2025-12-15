@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const { pendingGames } = require('../state');
 const db = require('../db');
+const { isOwner } = require('../commandConfig');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -251,6 +252,14 @@ module.exports = {
         }
 
         if (!interaction.isChatInputCommand()) return;
+
+        if (!isOwner(interaction.user.id)) {
+            await interaction.reply({
+                content: 'Dieser Bot ist auf Owner-only Befehle konfiguriert.',
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
+        }
 
         const command = interaction.client.commands.get(interaction.commandName);
 

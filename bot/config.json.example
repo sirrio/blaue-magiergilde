@@ -1,0 +1,14 @@
+{
+  "clientId": "YOUR_APPLICATION_ID",
+  "guildId": "OPTIONAL_DEV_GUILD_ID_FOR_INSTANT_COMMANDS",
+  "commandPrefix": "wwt",
+  "ownerIds": ["OPTIONAL_OWNER_USER_ID"],
+  "db": {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "default",
+    "port": 3306
+  },
+  "token": "YOUR_BOT_TOKEN"
+}

@@ -27,11 +27,14 @@ const rest = new REST().setToken(token);
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-        const data = await rest.put(
-            Routes.applicationCommands(clientId), { body: commands },
-        );
+        const route = guildId
+            ? Routes.applicationGuildCommands(clientId, guildId)
+            : Routes.applicationCommands(clientId);
+
+        const data = await rest.put(route, { body: commands });
 
         console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+        console.log(guildId ? `Deployed as GUILD commands for guildId=${guildId}.` : 'Deployed as GLOBAL commands (can take up to ~1h to appear).');
     } catch (error) {
         console.error(error);
     }

@@ -1,8 +1,9 @@
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { commandName } = require('../../commandConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('wwt-register-character')
+        .setName(commandName('register-character'))
         .setDescription('Registriere einen Charakter.'),
     async execute(interaction) {
         const modal = new ModalBuilder()

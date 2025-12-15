@@ -6,10 +6,11 @@ const {
     MessageFlags,
 } = require('discord.js');
 const { pendingGames } = require('../../state');
+const { commandName } = require('../../commandConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('wwt-new-game')
+        .setName(commandName('new-game'))
         .setDescription('Erstellt eine neue Spielankuendigung.'),
     async execute(interaction) {
         const id = interaction.id;

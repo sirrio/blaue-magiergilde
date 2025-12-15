@@ -1,9 +1,10 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const db = require('../../db');
+const { commandName } = require('../../commandConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('wwt-list-characters')
+        .setName(commandName('list-characters'))
         .setDescription('Liste deiner registrierten Charaktere.'),
     async execute(interaction) {
         const [rows] = await db.execute(
