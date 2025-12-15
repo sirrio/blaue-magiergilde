@@ -7,6 +7,21 @@ const {
 const db = require('../../db');
 const { commandName, isOwner } = require('../../commandConfig');
 
+function missingPermissions(permissions, required) {
+    return required.filter(perm => !permissions?.has(perm));
+}
+
+function formatPermissionList(perms) {
+    const names = {
+        ViewChannel: 'View Channel',
+        SendMessages: 'Send Messages',
+        SendMessagesInThreads: 'Send Messages in Threads',
+        CreatePublicThreads: 'Create Public Threads',
+        ManageThreads: 'Manage Threads',
+    };
+    return perms.map(p => `- ${names[p] || p}`).join('\n');
+}
+
 function rarityDisplayName(rarity) {
     switch (rarity) {
         case 'very_rare':
@@ -91,6 +106,14 @@ function buildSectionMessages(header, lines, maxMessageLength = 2000) {
     return messages;
 }
 
+async function sendSection(destination, header, lines) {
+    const messages = buildSectionMessages(header, lines);
+    for (const message of messages) {
+        // eslint-disable-next-line no-await-in-loop
+        await destination.send(message);
+    }
+}
+
 async function fetchShop(shopId) {
     if (shopId) {
         const [rows] = await db.execute('SELECT id, created_at FROM shops WHERE id = ? LIMIT 1', [shopId]);
@@ -130,24 +153,86 @@ async function fetchShopItems(shopId) {
     return rows;
 }
 
-async function sendSection(targetChannel, header, lines) {
-    const messages = buildSectionMessages(header, lines);
-    for (const message of messages) {
-        // eslint-disable-next-line no-await-in-loop
-        await targetChannel.send(message);
+async function resolveDestination({ botMember, interaction, target, shop, threadNameOption }) {
+    if (target.type === ChannelType.GuildText) {
+        const perms = target.permissionsFor(botMember);
+        const missing = missingPermissions(perms, [
+            'ViewChannel',
+            'SendMessages',
+            'CreatePublicThreads',
+            'SendMessagesInThreads',
+        ]);
+        if (missing.length > 0) {
+            await interaction.editReply(
+                `Fehlende Bot-Rechte im Channel ${target}:\n${formatPermissionList(missing)}`,
+            );
+            return null;
+        }
+
+        const dateForName = new Date(shop.created_at).toISOString().slice(0, 10);
+        const defaultThreadName = `Shop #${String(shop.id).padStart(3, '0')} — ${dateForName}`;
+        const threadName = (threadNameOption || defaultThreadName).slice(0, 100);
+
+        return target.threads.create({
+            name: threadName,
+            autoArchiveDuration: 1440,
+            type: ChannelType.PublicThread,
+        });
     }
+
+    const perms = target.permissionsFor(botMember);
+    const missing = missingPermissions(perms, ['ViewChannel', 'SendMessagesInThreads']);
+    if (missing.length > 0) {
+        await interaction.editReply(
+            `Fehlende Bot-Rechte im Thread ${target}:\n${formatPermissionList(missing)}` +
+            '\nHinweis: Bei privaten Threads muss der Bot außerdem Mitglied des Threads sein.',
+        );
+        return null;
+    }
+
+    if (target.type === ChannelType.PrivateThread) {
+        try {
+            await target.members.fetch(botMember.id);
+        } catch {
+            await interaction.editReply(
+                `Der Thread ${target} ist privat und der Bot ist kein Mitglied. ` +
+                `Füge den Bot zum Thread hinzu oder wähle einen Text-Channel, damit der Bot den Thread selbst erstellt.`,
+            );
+            return null;
+        }
+    }
+
+    if (target.locked) {
+        await interaction.editReply(
+            `Der Thread ${target} ist gesperrt (locked). Entsperre ihn oder gib dem Bot "Manage Threads".`,
+        );
+        return null;
+    }
+
+    return target;
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('post-shop'))
-        .setDescription('Postet einen Shop (Items) in einen Channel.')
+        .setDescription('Postet einen Shop (Items) in einen Thread (oder erstellt einen Thread in einem Channel).')
         .addChannelOption(option =>
             option
-                .setName('channel')
-                .setDescription('Der Channel, in den der Shop gepostet werden soll.')
-                .addChannelTypes(ChannelType.GuildText)
+                .setName('target')
+                .setDescription('Text-Channel (Thread wird erstellt) oder ein existierender Thread.')
+                .addChannelTypes(
+                    ChannelType.GuildText,
+                    ChannelType.PublicThread,
+                    ChannelType.PrivateThread,
+                    ChannelType.AnnouncementThread,
+                )
                 .setRequired(true),
+        )
+        .addStringOption(option =>
+            option
+                .setName('thread_name')
+                .setDescription('Optional: Thread-Name (wenn target ein Text-Channel ist).')
+                .setRequired(false),
         )
         .addIntegerOption(option =>
             option
@@ -175,10 +260,13 @@ module.exports = {
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const targetChannel = interaction.options.getChannel('channel', true);
+        const target = interaction.options.getChannel('target', true);
         const shopIdOption = interaction.options.getInteger('shop_id');
+        const threadNameOption = interaction.options.getString('thread_name');
 
         try {
+            const botMember = interaction.guild.members.me ?? await interaction.guild.members.fetchMe();
+
             const shop = await fetchShop(shopIdOption);
             if (!shop) {
                 await interaction.editReply(shopIdOption ? `Shop #${shopIdOption} nicht gefunden.` : 'Kein Shop gefunden.');
@@ -191,11 +279,15 @@ module.exports = {
                 return;
             }
 
+            const destination = await resolveDestination({ botMember, interaction, target, shop, threadNameOption });
+            if (!destination) return;
+
             const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
             const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
-            await targetChannel.send(`**Shop #${String(shop.id).padStart(3, '0')}** — Rolled: ${createdAtText}`);
+            await destination.send(`**Shop #${String(shop.id).padStart(3, '0')}** — Rolled: ${createdAtText}`);
 
             const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
+            const typeOrder = ['item', 'consumable', 'spellscroll'];
             const grouped = new Map();
 
             for (const row of items) {
@@ -213,26 +305,42 @@ module.exports = {
 
                 const rarityLabel = rarityDisplayName(rarity);
                 const tierText = tierRequirementForRarity(rarity);
-                const heading = `## ***⚔️ ${rarityLabel} Magic Items (${tierText}):***`;
+
+                for (const type of typeOrder) {
+                    const rows = byType.get(type);
+                    if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+                }
 
                 const magicItemLines = (byType.get('item') ?? []).map(formatItemLine);
-                await sendSection(targetChannel, heading, magicItemLines);
+                await sendSection(destination, `## ***⚔️ ${rarityLabel} Magic Items (${tierText}):***`, magicItemLines);
 
                 const consumableLines = (byType.get('consumable') ?? []).map(formatItemLine);
                 const scrollLines = (byType.get('spellscroll') ?? []).map(formatItemLine);
 
                 if (rarity === 'common' || rarity === 'uncommon') {
-                    await sendSection(targetChannel, `### ${rarityLabel} Consumable`, consumableLines);
-                    await sendSection(targetChannel, `### ${rarityLabel} Spell Scroll`, scrollLines);
+                    await sendSection(destination, `### ${rarityLabel} Consumable`, consumableLines);
+                    await sendSection(destination, `### ${rarityLabel} Spell Scroll`, scrollLines);
                 } else {
-                    await sendSection(targetChannel, `### ${rarityLabel} Consumable/Spell Scroll`, [...consumableLines, ...scrollLines]);
+                    await sendSection(destination, `### ${rarityLabel} Consumable/Spell Scroll`, [...consumableLines, ...scrollLines]);
                 }
             }
 
-            await interaction.editReply(`Shop #${shop.id} wurde in ${targetChannel} gepostet.`);
+            await interaction.editReply(
+                destination.id === target.id
+                    ? `Shop #${shop.id} wurde in ${destination} gepostet.`
+                    : `Shop #${shop.id} wurde in Thread ${destination} (in ${target}) gepostet.`,
+            );
         } catch (error) {
             console.error(error);
+            const code = error?.code ?? error?.rawError?.code;
+            if (code === 50001) {
+                await interaction.editReply(
+                    'Missing Access (50001): dem Bot fehlen Rechte im Channel/Thread oder er ist nicht im privaten Thread.',
+                );
+                return;
+            }
             await interaction.editReply(`Fehler beim Posten des Shops: ${error.message}`);
         }
     },
 };
+

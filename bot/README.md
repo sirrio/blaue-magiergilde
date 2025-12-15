@@ -8,7 +8,7 @@ Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`). Du kannst es per `COMMA
 - `/[prefix]-list-characters` - Schickt dir eine private Nachricht mit allen von dir registrierten Charakteren inklusive Start-Tier, aktuellem Tier, URL und Notizen.
 - `/[prefix]-unregister-character` - Entfernt einen Charakter anhand der ID aus `/[prefix]-list-characters`.
 - `/[prefix]-update-character` - Öffnet ein Formular, um einen bestehenden Charakter zu aktualisieren. Benötigt die ID aus `/[prefix]-list-characters`.
-- `/[prefix]-post-shop` - Postet den neuesten (oder eine angegebene) Shop in einen auswählbaren Text-Channel (benötigt **Manage Server** Berechtigung).
+- `/[prefix]-post-shop` - Postet den neuesten (oder eine angegebene) Shop in einen Thread (oder erstellt einen Thread in einem Text-Channel).
 
 ## Umgebungsvariablen
 
