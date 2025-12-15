@@ -1,6 +1,5 @@
 const {
     ChannelType,
-    EmbedBuilder,
     MessageFlags,
     PermissionFlagsBits,
     SlashCommandBuilder,
@@ -8,56 +7,88 @@ const {
 const db = require('../../db');
 const { commandName } = require('../../commandConfig');
 
-function splitLinesIntoChunks(lines, maxLength) {
-    const chunks = [];
-    let currentChunk = '';
-
-    for (const line of lines) {
-        const candidate = currentChunk.length === 0 ? line : `${currentChunk}\n${line}`;
-        if (candidate.length > maxLength) {
-            if (currentChunk.length > 0) {
-                chunks.push(currentChunk);
-                currentChunk = line;
-                continue;
-            }
-
-            chunks.push(line.slice(0, maxLength));
-            currentChunk = '';
-            continue;
-        }
-
-        currentChunk = candidate;
+function rarityDisplayName(rarity) {
+    switch (rarity) {
+        case 'very_rare':
+            return 'Very Rare';
+        case 'rare':
+            return 'Rare';
+        case 'uncommon':
+            return 'Uncommon';
+        case 'common':
+        default:
+            return 'Common';
     }
-
-    if (currentChunk.length > 0) {
-        chunks.push(currentChunk);
-    }
-
-    return chunks;
 }
 
-function titleCase(snakeCase) {
-    return snakeCase
-        .split('_')
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
+function tierRequirementForRarity(rarity) {
+    switch (rarity) {
+        case 'common':
+        case 'uncommon':
+            return 'Ab Low Tier';
+        case 'rare':
+            return 'Ab High Tier';
+        case 'very_rare':
+            return 'Ab Epic Tier';
+        default:
+            return '';
+    }
+}
+
+function formatLink(name, url) {
+    if (!url) return name;
+    return `[${name}](<${url}>)`;
 }
 
 function formatItemLine(row) {
-    const name = row.url ? `[${row.name}](${row.url})` : `**${row.name}**`;
-    const cost = row.cost ? ` — ${row.cost}` : '';
-    const type = row.type ? ` (${row.type})` : '';
+    const name = formatLink(row.name, row.url);
+    const cost = row.cost ? `: ${row.cost}` : '';
 
-    let spell = '';
-    if (row.spell_id) {
-        const spellUrl = row.spell_url || row.spell_legacy_url;
-        const spellName = spellUrl ? `[${row.spell_name}](${spellUrl})` : row.spell_name;
-        const spellLevel = Number(row.spell_level);
-        const spellLevelText = Number.isFinite(spellLevel) ? ` (L${spellLevel})` : '';
-        spell = ` — Spell: ${spellName}${spellLevelText}`;
+    if (!row.spell_id) return `${name}${cost}`;
+
+    const spellUrl = row.spell_url || row.spell_legacy_url;
+    const spellName = formatLink(row.spell_name, spellUrl);
+    const spellLevel = Number(row.spell_level);
+    const spellLevelText = Number.isFinite(spellLevel) ? ` (L${spellLevel})` : '';
+    return `${name}${cost} — Spell: ${spellName}${spellLevelText}`;
+}
+
+function buildSectionMessages(header, lines, maxMessageLength = 2000) {
+    const sanitizedLines = lines.filter(Boolean);
+    if (sanitizedLines.length === 0) return [];
+
+    const messages = [];
+    let currentLines = [];
+    let currentHeader = header;
+
+    const flush = () => {
+        if (currentLines.length === 0) return;
+        messages.push(`${currentHeader}\n${currentLines.join('\n')}`);
+        currentLines = [];
+        currentHeader = `${header} (cont.)`;
+    };
+
+    for (const line of sanitizedLines) {
+        const candidateLines = [...currentLines, line];
+        const candidate = `${currentHeader}\n${candidateLines.join('\n')}`;
+
+        if (candidate.length > maxMessageLength) {
+            flush();
+            const single = `${currentHeader}\n${line}`;
+            if (single.length > maxMessageLength) {
+                messages.push(single.slice(0, maxMessageLength));
+                currentHeader = `${header} (cont.)`;
+                continue;
+            }
+            currentLines.push(line);
+            continue;
+        }
+
+        currentLines.push(line);
     }
 
-    return `• ${name}${cost}${type}${spell}`;
+    flush();
+    return messages;
 }
 
 async function fetchShop(shopId) {
@@ -91,15 +122,20 @@ async function fetchShopItems(shopId) {
             LEFT JOIN spells s ON s.id = si.spell_id
             WHERE si.shop_id = ?
               AND i.deleted_at IS NULL
-            ORDER BY
-                FIELD(i.rarity, 'very_rare', 'rare', 'uncommon', 'common'),
-                FIELD(i.type, 'item', 'consumable', 'spellscroll'),
-                i.name ASC
+            ORDER BY i.name ASC
         `,
         [shopId],
     );
 
     return rows;
+}
+
+async function sendSection(targetChannel, header, lines) {
+    const messages = buildSectionMessages(header, lines);
+    for (const message of messages) {
+        // eslint-disable-next-line no-await-in-loop
+        await targetChannel.send(message);
+    }
 }
 
 module.exports = {
@@ -156,40 +192,43 @@ module.exports = {
                 return;
             }
 
-            const rarityOrder = ['very_rare', 'rare', 'uncommon', 'common'];
-            const byRarity = new Map(rarityOrder.map(r => [r, []]));
+            const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
+            const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
+            await targetChannel.send(`**Shop #${String(shop.id).padStart(3, '0')}** — Rolled: ${createdAtText}`);
+
+            const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
+            const grouped = new Map();
 
             for (const row of items) {
                 const rarity = row.rarity ?? 'common';
-                if (!byRarity.has(rarity)) {
-                    byRarity.set(rarity, []);
-                }
-                byRarity.get(rarity).push(formatItemLine(row));
+                const type = row.type ?? 'item';
+                if (!grouped.has(rarity)) grouped.set(rarity, new Map());
+                const byType = grouped.get(rarity);
+                if (!byType.has(type)) byType.set(type, []);
+                byType.get(type).push(row);
             }
 
-            const fields = [];
             for (const rarity of rarityOrder) {
-                const lines = byRarity.get(rarity) ?? [];
-                if (lines.length === 0) continue;
+                const byType = grouped.get(rarity);
+                if (!byType) continue;
 
-                const chunks = splitLinesIntoChunks(lines, 1024);
-                for (let i = 0; i < chunks.length; i++) {
-                    fields.push({
-                        name: i === 0 ? titleCase(rarity) : `${titleCase(rarity)} (cont.)`,
-                        value: chunks[i],
-                    });
+                const rarityLabel = rarityDisplayName(rarity);
+                const tierText = tierRequirementForRarity(rarity);
+                const heading = `## ***⚔️ ${rarityLabel} Magic Items (${tierText}):***`;
+
+                const magicItemLines = (byType.get('item') ?? []).map(formatItemLine);
+                await sendSection(targetChannel, heading, magicItemLines);
+
+                const consumableLines = (byType.get('consumable') ?? []).map(formatItemLine);
+                const scrollLines = (byType.get('spellscroll') ?? []).map(formatItemLine);
+
+                if (rarity === 'common' || rarity === 'uncommon') {
+                    await sendSection(targetChannel, `### ${rarityLabel} Consumable`, consumableLines);
+                    await sendSection(targetChannel, `### ${rarityLabel} Spell Scroll`, scrollLines);
+                } else {
+                    await sendSection(targetChannel, `### ${rarityLabel} Consumable/Spell Scroll`, [...consumableLines, ...scrollLines]);
                 }
             }
-
-            const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
-            const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
-
-            const embed = new EmbedBuilder()
-                .setTitle(`Shop #${String(shop.id).padStart(3, '0')}`)
-                .setDescription(`Rolled: ${createdAtText}`)
-                .addFields(fields);
-
-            await targetChannel.send({ embeds: [embed] });
 
             await interaction.editReply(`Shop #${shop.id} wurde in ${targetChannel} gepostet.`);
         } catch (error) {
@@ -198,3 +237,4 @@ module.exports = {
         }
     },
 };
+
