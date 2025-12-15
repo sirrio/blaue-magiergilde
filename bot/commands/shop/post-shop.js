@@ -5,7 +5,7 @@ const {
     SlashCommandBuilder,
 } = require('discord.js');
 const db = require('../../db');
-const { commandName } = require('../../commandConfig');
+const { commandName, isOwner } = require('../../commandConfig');
 
 function rarityDisplayName(rarity) {
     switch (rarity) {
@@ -142,7 +142,6 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('post-shop'))
         .setDescription('Postet einen Shop (Items) in einen Channel.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .addChannelOption(option =>
             option
                 .setName('channel')
@@ -166,7 +165,7 @@ module.exports = {
             return;
         }
 
-        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        if (!isOwner(interaction.user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
             await interaction.reply({
                 content: 'Du hast keine Berechtigung, diesen Befehl zu verwenden (benötigt: Manage Server).',
                 flags: MessageFlags.Ephemeral,
@@ -237,4 +236,3 @@ module.exports = {
         }
     },
 };
-
