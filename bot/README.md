@@ -45,5 +45,12 @@ Wenn du `OWNER_DISCORD_IDS` setzt (z.B. `OWNER_DISCORD_IDS=123456789012345678`),
 
 Registriere/aktualisiere Slash-Commands mit `node deploy-commands.js` und starte danach den Bot neu.
 
-- Wenn du in `config.json` eine `guildId` setzt, werden Commands als **Guild Commands** deployed (meist sofort sichtbar).
-- Ohne `guildId` werden **Global Commands** deployed (kann bis zu ~1h dauern, bis sie in Discord auftauchen).
+- Wenn du in `config.json` eine `guildId` (oder `guildIds`) setzt, werden Commands als **Guild Commands** deployed (meist sofort sichtbar).
+- Ohne `guildId`/`guildIds` werden **Global Commands** deployed (kann bis zu ~1h dauern, bis sie in Discord auftauchen).
+
+## Security / Sharing
+
+- Poste niemals `token` (oder DB-Passwörter) in Chat/Issues/Screenshots.
+- Wenn du `config.json` teilen musst, nutze den Redaction-Helper:
+  - `node redact-config.js > config.redacted.json`
+  - Teile dann `config.redacted.json` statt `config.json`.
