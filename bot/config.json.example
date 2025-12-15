@@ -1,6 +1,7 @@
 {
   "clientId": "YOUR_APPLICATION_ID",
-  "guildId": "OPTIONAL_DEV_GUILD_ID_FOR_INSTANT_COMMANDS",
+  "guildId": "OPTIONAL_SINGLE_GUILD_ID_FOR_INSTANT_COMMANDS",
+  "guildIds": ["OPTIONAL_GUILD_ID_1", "OPTIONAL_GUILD_ID_2"],
   "commandPrefix": "wwt",
   "ownerIds": ["OPTIONAL_OWNER_USER_ID"],
   "db": {

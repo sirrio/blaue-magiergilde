@@ -1,5 +1,5 @@
 const { REST, Routes } = require('discord.js');
-const { clientId, guildId, token } = require('./config.json');
+const { clientId, guildId, guildIds, token } = require('./config.json');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -27,14 +27,23 @@ const rest = new REST().setToken(token);
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-        const route = guildId
-            ? Routes.applicationGuildCommands(clientId, guildId)
-            : Routes.applicationCommands(clientId);
+        const guildIdList = Array.isArray(guildIds) ? guildIds.filter(Boolean) : [];
+        const targetGuildIds = guildIdList.length > 0 ? guildIdList : (guildId ? [guildId] : []);
 
-        const data = await rest.put(route, { body: commands });
+        if (targetGuildIds.length === 0) {
+            const data = await rest.put(Routes.applicationCommands(clientId), { body: commands });
+            console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+            console.log('Deployed as GLOBAL commands (can take up to ~1h to appear).');
+            return;
+        }
 
-        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
-        console.log(guildId ? `Deployed as GUILD commands for guildId=${guildId}.` : 'Deployed as GLOBAL commands (can take up to ~1h to appear).');
+        for (const gid of targetGuildIds) {
+            // eslint-disable-next-line no-await-in-loop
+            const data = await rest.put(Routes.applicationGuildCommands(clientId, gid), { body: commands });
+            console.log(`Successfully reloaded ${data.length} application (/) commands for guildId=${gid}.`);
+        }
+
+        console.log(`Deployed as GUILD commands for ${targetGuildIds.length} guild(s) (usually visible immediately).`);
     } catch (error) {
         console.error(error);
     }
