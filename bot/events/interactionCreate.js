@@ -4,6 +4,7 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    EmbedBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
@@ -14,6 +15,7 @@ const {
     DiscordNotLinkedError,
     createUserForDiscord,
     createCharacterForDiscord,
+    findCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
 } = require('../appDb');
@@ -26,6 +28,39 @@ function isHttpUrl(urlString) {
     } catch {
         return false;
     }
+}
+
+function safeModalValue(value, max = 4000) {
+    const text = String(value ?? '');
+    if (text.length <= max) return text;
+    return text.slice(0, max);
+}
+
+function buildCharacterEmbed(character, title) {
+    const tier = String(character.start_tier || '').toUpperCase() || '—';
+    const name = String(character.name || '').trim() || `Charakter ${character.id}`;
+    const link = String(character.external_link || '').trim();
+    const notes = String(character.notes || '').trim();
+
+    const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setColor(0x4f46e5)
+        .addFields(
+            { name: 'Name', value: name.slice(0, 1024) || '—', inline: true },
+            { name: 'Tier', value: tier.slice(0, 1024) || '—', inline: true },
+            { name: 'ID', value: String(character.id), inline: true },
+        );
+
+    if (link) {
+        const formattedLink = isHttpUrl(link) ? `[Sheet öffnen](${link})` : link;
+        embed.addFields({ name: 'Link', value: formattedLink, inline: false });
+    }
+
+    if (notes) {
+        embed.addFields({ name: 'Notizen', value: notes.slice(0, 1024), inline: false });
+    }
+
+    return embed;
 }
 
 module.exports = {
@@ -90,12 +125,136 @@ module.exports = {
             }
         }
 
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpdateSelect_')) {
+            const [, ownerDiscordId] = interaction.customId.split('_');
+
+            if (String(interaction.user.id) !== String(ownerDiscordId)) {
+                await interaction.reply({ content: 'Du kannst diese Aktion nicht ausführen.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            const selectedId = Number(interaction.values?.[0]);
+            if (!Number.isFinite(selectedId) || selectedId < 1) {
+                await interaction.reply({ content: 'Ungültige Charakter-ID.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            let character;
+            try {
+                character = await findCharacterForDiscord(interaction.user, selectedId);
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.update({ content: notLinkedContent(), components: [], embeds: [] });
+                    return;
+                }
+                throw error;
+            }
+
+            if (!character) {
+                await interaction.update({ content: 'Charakter nicht gefunden.', components: [], embeds: [] });
+                return;
+            }
+
+            const modal = new ModalBuilder()
+                .setCustomId(`updateCharacterModal_${character.id}`)
+                .setTitle('Charakter aktualisieren');
+
+            const nameInput = new TextInputBuilder()
+                .setCustomId('updName')
+                .setLabel('Charaktername')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(character.name));
+
+            const tierInput = new TextInputBuilder()
+                .setCustomId('updTier')
+                .setLabel('Start-Tier')
+                .setPlaceholder('bt | lt | ht')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.start_tier || '').toLowerCase()));
+
+            const urlInput = new TextInputBuilder()
+                .setCustomId('updUrl')
+                .setLabel('External Link (URL)')
+                .setPlaceholder('https://...')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(character.external_link));
+
+            const notesInput = new TextInputBuilder()
+                .setCustomId('updNotes')
+                .setLabel('Notizen')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(false)
+                .setValue(safeModalValue(character.notes));
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(nameInput),
+                new ActionRowBuilder().addComponents(tierInput),
+                new ActionRowBuilder().addComponents(urlInput),
+                new ActionRowBuilder().addComponents(notesInput),
+            );
+
+            await interaction.showModal(modal);
+            return;
+        }
+
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterDeleteSelect_')) {
+            const [, ownerDiscordId] = interaction.customId.split('_');
+
+            if (String(interaction.user.id) !== String(ownerDiscordId)) {
+                await interaction.reply({ content: 'Du kannst diese Aktion nicht ausführen.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            const selectedId = Number(interaction.values?.[0]);
+            if (!Number.isFinite(selectedId) || selectedId < 1) {
+                await interaction.reply({ content: 'Ungültige Charakter-ID.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            let character;
+            try {
+                character = await findCharacterForDiscord(interaction.user, selectedId);
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.update({ content: notLinkedContent(), components: [], embeds: [] });
+                    return;
+                }
+                throw error;
+            }
+
+            if (!character) {
+                await interaction.update({ content: 'Charakter nicht gefunden.', components: [], embeds: [] });
+                return;
+            }
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`deleteCharacterConfirm_${character.id}_${interaction.user.id}`)
+                    .setLabel('Löschen')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`deleteCharacterCancel_${character.id}_${interaction.user.id}`)
+                    .setLabel('Abbrechen')
+                    .setStyle(ButtonStyle.Secondary),
+            );
+
+            await interaction.update({
+                content: 'Charakter wirklich löschen?',
+                embeds: [buildCharacterEmbed(character, 'Charakter löschen')],
+                components: [row],
+            });
+            return;
+        }
+
         if (interaction.isButton() && interaction.customId.startsWith('deleteCharacter')) {
             const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
             const characterId = Number(idRaw);
 
             if (!Number.isFinite(characterId) || characterId < 1) {
-                await interaction.reply({ content: 'Ungültige Character-ID.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Ungültige Charakter-ID.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -115,19 +274,31 @@ module.exports = {
             }
 
             try {
+                let snapshot = null;
+                try {
+                    snapshot = await findCharacterForDiscord(interaction.user, characterId);
+                } catch {
+                    snapshot = null;
+                }
+
                 const result = await softDeleteCharacterForDiscord(interaction.user, characterId);
                 if (!result.ok) {
-                    await interaction.update({ content: 'Charakter nicht gefunden oder bereits gelöscht.', components: [] });
+                    await interaction.update({ content: 'Charakter nicht gefunden oder bereits gelöscht.', components: [], embeds: [] });
                     return;
                 }
 
-                await interaction.update({ content: 'Charakter wurde gelöscht.', components: [] });
+                await interaction.update({
+                    content: 'Charakter wurde gelöscht.',
+                    components: [],
+                    embeds: snapshot ? [buildCharacterEmbed(snapshot, 'Charakter gelöscht')] : [],
+                });
             } catch (error) {
                 console.error(error);
                 if (error instanceof DiscordNotLinkedError) {
                     await interaction.update({
                         content: notLinkedContent(),
                         components: [],
+                        embeds: [],
                     });
                     return;
                 }
@@ -319,12 +490,24 @@ module.exports = {
                     notes,
                 });
 
-                await interaction.reply({ content: `Charakter erstellt! ID: ${characterId}`, flags: MessageFlags.Ephemeral });
+                let character = null;
+                try {
+                    character = await findCharacterForDiscord(interaction.user, characterId);
+                } catch {
+                    character = null;
+                }
+
+                await interaction.reply({
+                    content: character ? 'Charakter erstellt.' : `Charakter erstellt! ID: ${characterId}`,
+                    embeds: character ? [buildCharacterEmbed(character, 'Charakter erstellt')] : [],
+                    flags: MessageFlags.Ephemeral,
+                });
             } catch (error) {
                 console.error(error);
                 if (error instanceof DiscordNotLinkedError) {
                     await interaction.reply({
                         content: notLinkedContent(),
+                        embeds: [],
                         flags: MessageFlags.Ephemeral,
                     });
                     return;
@@ -347,7 +530,7 @@ module.exports = {
             const notes = interaction.fields.getTextInputValue('updNotes') || '';
 
             if (!Number.isFinite(id) || id < 1) {
-                await interaction.reply({ content: 'Ungültige Character-ID.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Ungültige Charakter-ID.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -370,8 +553,25 @@ module.exports = {
                     notes,
                 });
 
+                if (!result.ok) {
+                    await interaction.reply({
+                        content: 'Charakter nicht gefunden.',
+                        embeds: [],
+                        flags: MessageFlags.Ephemeral,
+                    });
+                    return;
+                }
+
+                let character = null;
+                try {
+                    character = await findCharacterForDiscord(interaction.user, id);
+                } catch {
+                    character = null;
+                }
+
                 await interaction.reply({
-                    content: result.ok ? 'Charakter aktualisiert.' : 'Charakter nicht gefunden.',
+                    content: 'Charakter aktualisiert.',
+                    embeds: character ? [buildCharacterEmbed(character, 'Charakter aktualisiert')] : [],
                     flags: MessageFlags.Ephemeral,
                 });
             } catch (error) {
@@ -379,6 +579,7 @@ module.exports = {
                 if (error instanceof DiscordNotLinkedError) {
                     await interaction.reply({
                         content: notLinkedContent(),
+                        embeds: [],
                         flags: MessageFlags.Ephemeral,
                     });
                     return;

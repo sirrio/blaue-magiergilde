@@ -1,27 +1,27 @@
-const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
+const {
+    SlashCommandBuilder,
+    ActionRowBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    MessageFlags,
+} = require('discord.js');
 const { commandName } = require('../../commandConfig');
-const { DiscordNotLinkedError, findCharacterForDiscord } = require('../../appDb');
+const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('update-character'))
-        .setDescription('Aktualisiere einen Charakter (aus der App).')
-        .addIntegerOption(option =>
-            option.setName('id')
-                .setDescription(`ID aus /${commandName('list-characters')}`)
-                .setRequired(true),
-        ),
+        .setDescription('Aktualisiere einen Charakter (aus der App).'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
             await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
             return;
         }
 
-        const id = interaction.options.getInteger('id');
-        let character;
+        let characters;
         try {
-            character = await findCharacterForDiscord(interaction.user, id);
+            characters = await listCharactersForDiscord(interaction.user);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -29,52 +29,30 @@ module.exports = {
             }
             throw error;
         }
-        if (!character) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+
+        if (characters.length === 0) {
+            await interaction.reply({ content: 'Keine Charaktere gefunden.', flags: MessageFlags.Ephemeral });
             return;
         }
 
-        const modal = new ModalBuilder()
-            .setCustomId(`updateCharacterModal_${id}`)
-            .setTitle('Charakter aktualisieren');
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`characterUpdateSelect_${interaction.user.id}`)
+            .setPlaceholder('Charakter auswählen…')
+            .addOptions(
+                characters.slice(0, 25).map(c =>
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(String(c.name).slice(0, 100) || `Charakter ${c.id}`)
+                        .setDescription(`ID ${c.id} · ${(String(c.start_tier || '').toUpperCase() || '—')}`)
+                        .setValue(String(c.id)),
+                ),
+            );
 
-        const nameInput = new TextInputBuilder()
-            .setCustomId('updName')
-            .setLabel('Charaktername')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(character.name);
+        const row = new ActionRowBuilder().addComponents(select);
 
-        const tierInput = new TextInputBuilder()
-            .setCustomId('updTier')
-            .setLabel('Start-Tier')
-            .setPlaceholder('bt | lt | ht')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(character.start_tier);
-
-        const urlInput = new TextInputBuilder()
-            .setCustomId('updUrl')
-            .setLabel('External Link (URL)')
-            .setPlaceholder('https://...')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(character.external_link);
-
-        const notesInput = new TextInputBuilder()
-            .setCustomId('updNotes')
-            .setLabel('Notizen')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false)
-            .setValue(character.notes || '');
-
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(nameInput),
-            new ActionRowBuilder().addComponents(tierInput),
-            new ActionRowBuilder().addComponents(urlInput),
-            new ActionRowBuilder().addComponents(notesInput),
-        );
-
-        await interaction.showModal(modal);
+        await interaction.reply({
+            content: 'Welchen Charakter möchtest du aktualisieren?',
+            components: [row],
+            flags: MessageFlags.Ephemeral,
+        });
     },
 };

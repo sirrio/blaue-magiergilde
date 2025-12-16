@@ -1,24 +1,35 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags, EmbedBuilder } = require('discord.js');
 const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 
-function splitIntoMessages(lines, maxLength = 1900) {
-    const messages = [];
-    let current = '';
+function formatTier(tier) {
+    const normalized = String(tier || '').toUpperCase();
+    if (!normalized) return '—';
+    return normalized;
+}
 
-    for (const line of lines) {
-        const candidate = current.length === 0 ? line : `${current}\n${line}`;
-        if (candidate.length > maxLength) {
-            if (current.length > 0) messages.push(current);
-            current = line;
-            continue;
-        }
-        current = candidate;
-    }
+function truncate(text, max = 240) {
+    const value = String(text || '').trim();
+    if (value.length <= max) return value;
+    return `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
 
-    if (current.length > 0) messages.push(current);
-    return messages;
+function buildCharacterField(character) {
+    const tier = formatTier(character.start_tier);
+    const name = String(character.name || '').trim() || `Charakter ${character.id}`;
+    const id = String(character.id);
+    const link = String(character.external_link || '').trim();
+    const notes = truncate(character.notes, 240);
+
+    const linkPart = link ? `[Sheet öffnen](${link})` : 'Kein Link hinterlegt.';
+    const notesPart = notes ? `\nNotizen: ${notes}` : '';
+
+    return {
+        name: `${name} · ${tier}`,
+        value: `${linkPart}\nID: ${id}${notesPart}`,
+        inline: false,
+    };
 }
 
 module.exports = {
@@ -47,13 +58,18 @@ module.exports = {
             return;
         }
 
-        const lines = characters.map(c => `${c.id}: ${c.name} [${c.start_tier}] - ${c.external_link}`);
-        const messages = splitIntoMessages(lines);
+        const embed = new EmbedBuilder()
+            .setTitle('Deine Charaktere')
+            .setColor(0x4f46e5)
+            .setDescription(
+                [
+                    `Anzahl: **${characters.length}**`,
+                    '',
+                    `Bearbeiten: \`/${commandName('update-character')}\` · Löschen: \`/${commandName('unregister-character')}\` · Neu: \`/${commandName('register-character')}\``,
+                ].join('\n'),
+            )
+            .addFields(characters.slice(0, 25).map(buildCharacterField));
 
-        await interaction.reply({ content: `Deine Charaktere:\n${messages[0]}`, flags: MessageFlags.Ephemeral });
-        for (let i = 1; i < messages.length; i++) {
-            // eslint-disable-next-line no-await-in-loop
-            await interaction.followUp({ content: messages[i], flags: MessageFlags.Ephemeral });
-        }
+        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     },
 };

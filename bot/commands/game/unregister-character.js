@@ -1,27 +1,27 @@
-const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+    SlashCommandBuilder,
+    MessageFlags,
+    ActionRowBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+} = require('discord.js');
 const { commandName } = require('../../commandConfig');
-const { DiscordNotLinkedError, findCharacterForDiscord } = require('../../appDb');
+const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('unregister-character'))
-        .setDescription('Löscht einen Charakter (soft delete).')
-        .addIntegerOption(option =>
-            option.setName('id')
-                .setDescription(`ID aus /${commandName('list-characters')}`)
-                .setRequired(true),
-        ),
+        .setDescription('Löscht einen Charakter (soft delete).'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
             await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
             return;
         }
 
-        const id = interaction.options.getInteger('id');
-        let character;
+        let characters;
         try {
-            character = await findCharacterForDiscord(interaction.user, id);
+            characters = await listCharactersForDiscord(interaction.user);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -29,24 +29,28 @@ module.exports = {
             }
             throw error;
         }
-        if (!character) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+
+        if (characters.length === 0) {
+            await interaction.reply({ content: 'Keine Charaktere gefunden.', flags: MessageFlags.Ephemeral });
             return;
         }
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`deleteCharacterConfirm_${id}_${interaction.user.id}`)
-                .setLabel('Löschen')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId(`deleteCharacterCancel_${id}_${interaction.user.id}`)
-                .setLabel('Abbrechen')
-                .setStyle(ButtonStyle.Secondary),
-        );
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`characterDeleteSelect_${interaction.user.id}`)
+            .setPlaceholder('Charakter auswählen…')
+            .addOptions(
+                characters.slice(0, 25).map(c =>
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(String(c.name).slice(0, 100) || `Charakter ${c.id}`)
+                        .setDescription(`ID ${c.id} · ${(String(c.start_tier || '').toUpperCase() || '—')}`)
+                        .setValue(String(c.id)),
+                ),
+            );
+
+        const row = new ActionRowBuilder().addComponents(select);
 
         await interaction.reply({
-            content: `Charakter wirklich löschen?\n${character.id}: ${character.name} [${character.start_tier}]`,
+            content: 'Welchen Charakter möchtest du löschen?',
             components: [row],
             flags: MessageFlags.Ephemeral,
         });
