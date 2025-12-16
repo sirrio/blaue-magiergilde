@@ -11,6 +11,7 @@ const {
 const { pendingGames } = require('../state');
 const { isOwner } = require('../commandConfig');
 const {
+    DiscordNotLinkedError,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
@@ -62,6 +63,13 @@ module.exports = {
                 await interaction.update({ content: 'Charakter wurde gelöscht.', components: [] });
             } catch (error) {
                 console.error(error);
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.update({
+                        content: 'Dein Account ist nicht mit Discord verbunden. Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile',
+                        components: [],
+                    });
+                    return;
+                }
                 await interaction.update({ content: `Fehler beim Löschen: ${error.message}`, components: [] });
             }
             return;
@@ -221,6 +229,11 @@ module.exports = {
         }
 
         if (interaction.isModalSubmit() && interaction.customId === 'registerCharacterModal') {
+            if (!interaction.inGuild()) {
+                await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             const url = interaction.fields.getTextInputValue('regUrl');
             const tier = interaction.fields.getTextInputValue('regTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('regName');
@@ -248,12 +261,24 @@ module.exports = {
                 await interaction.reply({ content: `Charakter erstellt! ID: ${characterId}`, flags: MessageFlags.Ephemeral });
             } catch (error) {
                 console.error(error);
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.reply({
+                        content: 'Dein Account ist nicht mit Discord verbunden. Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile',
+                        flags: MessageFlags.Ephemeral,
+                    });
+                    return;
+                }
                 await interaction.reply({ content: 'Fehler beim Speichern des Charakters.', flags: MessageFlags.Ephemeral });
             }
             return;
         }
 
         if (interaction.isModalSubmit() && interaction.customId.startsWith('updateCharacterModal_')) {
+            if (!interaction.inGuild()) {
+                await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             const id = Number(interaction.customId.replace('updateCharacterModal_', ''));
             const url = interaction.fields.getTextInputValue('updUrl');
             const tier = interaction.fields.getTextInputValue('updTier').toLowerCase();
@@ -290,6 +315,13 @@ module.exports = {
                 });
             } catch (error) {
                 console.error(error);
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.reply({
+                        content: 'Dein Account ist nicht mit Discord verbunden. Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile',
+                        flags: MessageFlags.Ephemeral,
+                    });
+                    return;
+                }
                 await interaction.reply({ content: 'Fehler beim Speichern des Charakters.', flags: MessageFlags.Ephemeral });
             }
             return;
@@ -320,4 +352,3 @@ module.exports = {
         }
     },
 };
-

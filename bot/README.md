@@ -6,7 +6,7 @@ Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`). Du kannst es per `COMMA
 
 ### Charaktere (App)
 
-Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt über Discord. Du musst dafür nicht die Website öffnen; der Bot legt bei Bedarf automatisch einen `users`-Eintrag anhand deiner Discord-ID an.
+Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt über Discord. Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist). Der Bot erstellt **keinen** User automatisch.
 
 - `/[prefix]-register-character` – erstellt einen Charakter (Modal: Name, Start-Tier, External Link, Notizen).
 - `/[prefix]-list-characters` – listet deine Charaktere inkl. ID.

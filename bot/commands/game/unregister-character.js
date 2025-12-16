@@ -1,6 +1,11 @@
 const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { commandName } = require('../../commandConfig');
-const { findCharacterForDiscord } = require('../../appDb');
+const { DiscordNotLinkedError, findCharacterForDiscord } = require('../../appDb');
+
+function linkNotConnectedMessage() {
+    return 'Dein Account ist nicht mit Discord verbunden.\n' +
+        'Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile';
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,8 +17,22 @@ module.exports = {
                 .setRequired(true),
         ),
     async execute(interaction) {
+        if (!interaction.inGuild()) {
+            await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+            return;
+        }
+
         const id = interaction.options.getInteger('id');
-        const character = await findCharacterForDiscord(interaction.user, id);
+        let character;
+        try {
+            character = await findCharacterForDiscord(interaction.user, id);
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await interaction.reply({ content: linkNotConnectedMessage(), flags: MessageFlags.Ephemeral });
+                return;
+            }
+            throw error;
+        }
         if (!character) {
             await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
             return;

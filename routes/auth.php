@@ -12,17 +12,15 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('/register', [RegisteredUserController::class, 'store']);
-
-    if (config('features.discord')) {
-        Route::get('/auth/redirect', [SocialAuthController::class, 'redirectToProvider'])
-            ->name('discord.login');
-
-        Route::get('/auth/callback', [SocialAuthController::class, 'handleProviderCallback'])
-            ->name('discord.callback');
-    }
 });
 
 if (config('features.discord')) {
+    Route::get('/auth/redirect', [SocialAuthController::class, 'redirectToProvider'])
+        ->name('discord.login');
+
+    Route::get('/auth/callback', [SocialAuthController::class, 'handleProviderCallback'])
+        ->name('discord.callback');
+
     Route::post('/auth/sync', SyncAccountController::class)
         ->middleware(['auth'])
         ->name('auth.sync');

@@ -15,7 +15,14 @@ function pickDiscordAvatarUrl(discordUser) {
     return null;
 }
 
-async function ensureUserForDiscord(discordUser) {
+class DiscordNotLinkedError extends Error {
+    constructor() {
+        super('DISCORD_NOT_LINKED');
+        this.name = 'DiscordNotLinkedError';
+    }
+}
+
+async function getLinkedUserIdForDiscord(discordUser) {
     const discordId = String(discordUser.id);
     const name = pickDiscordDisplayName(discordUser);
     const avatar = pickDiscordAvatarUrl(discordUser);
@@ -27,11 +34,7 @@ async function ensureUserForDiscord(discordUser) {
         return userId;
     }
 
-    const [result] = await db.execute(
-        'INSERT INTO users (discord_id, name, avatar, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [discordId, name, avatar, nowSql(), nowSql()],
-    );
-    return result.insertId;
+    return null;
 }
 
 async function getDefaultCharacterClassId(connection) {
@@ -41,7 +44,8 @@ async function getDefaultCharacterClassId(connection) {
 }
 
 async function listCharactersForDiscord(discordUser) {
-    const userId = await ensureUserForDiscord(discordUser);
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
     const [rows] = await db.execute(
         `
             SELECT id, name, start_tier, version, faction, external_link
@@ -56,7 +60,8 @@ async function listCharactersForDiscord(discordUser) {
 }
 
 async function findCharacterForDiscord(discordUser, characterId) {
-    const userId = await ensureUserForDiscord(discordUser);
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
     const [rows] = await db.execute(
         `
             SELECT id, name, start_tier, version, faction, external_link, notes
@@ -71,7 +76,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
 }
 
 async function createCharacterForDiscord(discordUser, { name, startTier, externalLink, notes }) {
-    const userId = await ensureUserForDiscord(discordUser);
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
     const createdAt = nowSql();
 
     const connection = await db.getConnection();
@@ -115,7 +121,8 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
 }
 
 async function updateCharacterForDiscord(discordUser, characterId, { name, startTier, externalLink, notes }) {
-    const userId = await ensureUserForDiscord(discordUser);
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
     const existing = await findCharacterForDiscord(discordUser, characterId);
     if (!existing) return { ok: false, reason: 'not_found' };
 
@@ -138,7 +145,8 @@ async function updateCharacterForDiscord(discordUser, characterId, { name, start
 }
 
 async function softDeleteCharacterForDiscord(discordUser, characterId) {
-    const userId = await ensureUserForDiscord(discordUser);
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
     const updatedAt = nowSql();
 
     const [rows] = await db.execute(
@@ -185,10 +193,11 @@ async function softDeleteCharacterForDiscord(discordUser, characterId) {
 }
 
 module.exports = {
+    DiscordNotLinkedError,
+    getLinkedUserIdForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
 };
-

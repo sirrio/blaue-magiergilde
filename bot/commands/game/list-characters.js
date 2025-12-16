@@ -1,6 +1,11 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { commandName } = require('../../commandConfig');
-const { listCharactersForDiscord } = require('../../appDb');
+const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
+
+function linkNotConnectedMessage() {
+    return 'Dein Account ist nicht mit Discord verbunden.\n' +
+        'Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile';
+}
 
 function splitIntoMessages(lines, maxLength = 1900) {
     const messages = [];
@@ -25,7 +30,21 @@ module.exports = {
         .setName(commandName('list-characters'))
         .setDescription('Liste deiner Charaktere (aus der App).'),
     async execute(interaction) {
-        const characters = await listCharactersForDiscord(interaction.user);
+        if (!interaction.inGuild()) {
+            await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+            return;
+        }
+
+        let characters;
+        try {
+            characters = await listCharactersForDiscord(interaction.user);
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await interaction.reply({ content: linkNotConnectedMessage(), flags: MessageFlags.Ephemeral });
+                return;
+            }
+            throw error;
+        }
 
         if (characters.length === 0) {
             await interaction.reply({ content: 'Keine Charaktere gefunden.', flags: MessageFlags.Ephemeral });
