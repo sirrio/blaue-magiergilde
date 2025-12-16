@@ -1,11 +1,11 @@
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
-const db = require('../../db');
 const { commandName } = require('../../commandConfig');
+const { findCharacterForDiscord } = require('../../appDb');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('update-character'))
-        .setDescription('Aktualisiere einen registrierten Charakter.')
+        .setDescription('Aktualisiere einen Charakter (aus der App).')
         .addIntegerOption(option =>
             option.setName('id')
                 .setDescription(`ID aus /${commandName('list-characters')}`)
@@ -13,17 +13,12 @@ module.exports = {
         ),
     async execute(interaction) {
         const id = interaction.options.getInteger('id');
-        const [rows] = await db.execute(
-            'SELECT character_name, tier, character_url, notes FROM registrations WHERE id = ? AND discord_id = ?',
-            [id, interaction.user.id],
-        );
-
-        if (rows.length === 0) {
+        const character = await findCharacterForDiscord(interaction.user, id);
+        if (!character) {
             await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
             return;
         }
 
-        const character = rows[0];
         const modal = new ModalBuilder()
             .setCustomId(`updateCharacterModal_${id}`)
             .setTitle('Charakter aktualisieren');
@@ -33,23 +28,23 @@ module.exports = {
             .setLabel('Charaktername')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
-            .setValue(character.character_name);
+            .setValue(character.name);
 
         const tierInput = new TextInputBuilder()
             .setCustomId('updTier')
-            .setLabel('Tier')
+            .setLabel('Start-Tier')
             .setPlaceholder('bt | lt | ht')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
-            .setValue(character.tier);
+            .setValue(character.start_tier);
 
         const urlInput = new TextInputBuilder()
             .setCustomId('updUrl')
-            .setLabel('URL')
-            .setPlaceholder('https://www.dndbeyond.com/profile/.../characters/...')
+            .setLabel('External Link (URL)')
+            .setPlaceholder('https://...')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
-            .setValue(character.character_url);
+            .setValue(character.external_link);
 
         const notesInput = new TextInputBuilder()
             .setCustomId('updNotes')

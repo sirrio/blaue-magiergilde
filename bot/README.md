@@ -2,15 +2,22 @@
 
 ## Befehle
 
-Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`). Du kannst es per `COMMAND_PREFIX` ändern.
+Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`). Du kannst es per `COMMAND_PREFIX` oder `config.json.commandPrefix` ändern.
 
-- `/[prefix]-register-character` - Öffnet ein Formular mit den Feldern **Name**, **Tier**, **URL** und **Notizen** (in dieser Reihenfolge). Das Tier muss `bt`, `lt` oder `ht` sein und die URL muss auf `dndbeyond.com` oder einer seiner Subdomains liegen. Bei der Registrierung werden sowohl `start_tier` als auch `tier` mit dem angegebenen Wert gefüllt sowie optionale Notizen gespeichert. Zusätzlich werden dein Discord-Name und deine Discord-ID gesichert.
-- `/[prefix]-list-characters` - Schickt dir eine private Nachricht mit allen von dir registrierten Charakteren inklusive Start-Tier, aktuellem Tier, URL und Notizen.
-- `/[prefix]-unregister-character` - Entfernt einen Charakter anhand der ID aus `/[prefix]-list-characters`.
-- `/[prefix]-update-character` - Öffnet ein Formular, um einen bestehenden Charakter zu aktualisieren. Benötigt die ID aus `/[prefix]-list-characters`.
-- `/[prefix]-post-shop` - Postet den neuesten (oder eine angegebene) Shop in einen Thread (oder erstellt einen Thread in einem Text-Channel).
+### Charaktere (App)
 
-## Umgebungsvariablen
+Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt über Discord. Du musst dafür nicht die Website öffnen; der Bot legt bei Bedarf automatisch einen `users`-Eintrag anhand deiner Discord-ID an.
+
+- `/[prefix]-register-character` – erstellt einen Charakter (Modal: Name, Start-Tier, External Link, Notizen).
+- `/[prefix]-list-characters` – listet deine Charaktere inkl. ID.
+- `/[prefix]-update-character` – aktualisiert einen Charakter per ID (Modal).
+- `/[prefix]-unregister-character` – löscht einen Charakter per ID (mit Bestätigung, soft delete).
+
+### Shop
+
+- `/[prefix]-post-shop` – postet den neuesten (oder eine angegebene) Shop in einen Thread (oder erstellt einen Thread in einem Text-Channel).
+
+## Konfiguration
 
 Der Bot kann entweder per `config.json` (empfohlen) oder optional per `.env` konfiguriert werden (Env-Variablen überschreiben `config.json`).
 
@@ -20,26 +27,17 @@ Kopiere `config.json.example` nach `config.json` und setze mindestens `clientId`
 
 Optional:
 - `commandPrefix` (z.B. `wwt` → `/wwt-list-characters`)
-- `ownerIds` (Array von Discord User IDs; wenn gesetzt, sind Commands owner-only)
-- `db` (DB-Zugriff für die Character-Commands und Shop-Posting)
+- `ownerIds` (Array von Discord User IDs; wirkt nur für Commands mit `ownerOnly`, z.B. `reload`)
+- `db` (DB-Zugriff für Character- und Shop-Commands)
+- `guildId` oder `guildIds` (Guild Commands für sofortige Updates)
 
 ### .env (optional)
 
-Für den Datenbankzugriff werden folgende Variablen unterstützt. Kopiere die Datei `.env.example` nach `.env` und passe die Werte an:
+Kopiere `.env.example` nach `.env` und passe die Werte an:
 
-- `DB_HOST`
-- `DB_USER` (oder `DB_USERNAME`)
-- `DB_PASSWORD`
-- `DB_NAME` (oder `DB_DATABASE`)
-- optional: `DB_PORT`
 - `COMMAND_PREFIX` (optional, überschreibt `config.json.commandPrefix`)
-- `OWNER_DISCORD_IDS` (optional, Komma-separiert, überschreibt `config.json.ownerIds`)
-
-Installiere Abhängigkeiten mit `npm install`. Beim Start des Bots werden die Werte aus `.env` automatisch geladen.
-
-## Owner-only
-
-Wenn du `OWNER_DISCORD_IDS` setzt (z.B. `OWNER_DISCORD_IDS=123456789012345678`), kann **nur** diese Discord-User-ID Commands ausführen.
+- `OWNER_DISCORD_IDS` (optional, überschreibt `config.json.ownerIds`)
+- `DB_HOST`, `DB_USER`/`DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`/`DB_DATABASE`, optional `DB_PORT`
 
 ## Commands deployen
 

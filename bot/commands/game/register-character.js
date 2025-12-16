@@ -4,11 +4,11 @@ const { commandName } = require('../../commandConfig');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('register-character'))
-        .setDescription('Registriere einen Charakter.'),
+        .setDescription('Erstellt einen Charakter in der App.'),
     async execute(interaction) {
         const modal = new ModalBuilder()
             .setCustomId('registerCharacterModal')
-            .setTitle('Charakter registrieren');
+            .setTitle('Charakter erstellen');
 
         const nameInput = new TextInputBuilder()
             .setCustomId('regName')
@@ -18,15 +18,15 @@ module.exports = {
 
         const tierInput = new TextInputBuilder()
             .setCustomId('regTier')
-            .setLabel('Tier')
+            .setLabel('Start-Tier')
             .setPlaceholder('bt | lt | ht')
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
             const urlInput = new TextInputBuilder()
                 .setCustomId('regUrl')
-                .setLabel('URL')
-                .setPlaceholder('https://www.dndbeyond.com/profile/.../characters/...')
+                .setLabel('External Link (URL)')
+                .setPlaceholder('https://...')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 

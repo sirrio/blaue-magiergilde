@@ -9,12 +9,64 @@ const {
     TextInputStyle,
 } = require('discord.js');
 const { pendingGames } = require('../state');
-const db = require('../db');
 const { isOwner } = require('../commandConfig');
+const {
+    createCharacterForDiscord,
+    updateCharacterForDiscord,
+    softDeleteCharacterForDiscord,
+} = require('../appDb');
+
+function isHttpUrl(urlString) {
+    try {
+        const parsed = new URL(urlString);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
+        if (interaction.isButton() && interaction.customId.startsWith('deleteCharacter')) {
+            const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
+            const characterId = Number(idRaw);
+
+            if (!Number.isFinite(characterId) || characterId < 1) {
+                await interaction.reply({ content: 'Ungültige Character-ID.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (String(interaction.user.id) !== String(ownerDiscordId)) {
+                await interaction.reply({ content: 'Du kannst diese Aktion nicht ausführen.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (action === 'deleteCharacterCancel') {
+                await interaction.update({ content: 'Abgebrochen.', components: [] });
+                return;
+            }
+
+            if (action !== 'deleteCharacterConfirm') {
+                await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            try {
+                const result = await softDeleteCharacterForDiscord(interaction.user, characterId);
+                if (!result.ok) {
+                    await interaction.update({ content: 'Charakter nicht gefunden oder bereits gelöscht.', components: [] });
+                    return;
+                }
+
+                await interaction.update({ content: 'Charakter wurde gelöscht.', components: [] });
+            } catch (error) {
+                console.error(error);
+                await interaction.update({ content: `Fehler beim Löschen: ${error.message}`, components: [] });
+            }
+            return;
+        }
+
         if (interaction.isButton() && interaction.customId.startsWith('tier_')) {
             const [, id, tier] = interaction.customId.split('_');
             const data = pendingGames.get(id);
@@ -139,9 +191,9 @@ module.exports = {
             };
 
             const tiers = Array.from(data.tiers).map(t => {
-                const emId = emojiMap[t];
-                const e = emId ? interaction.client.emojis.cache.get(emId) : null;
-                return e ? e.toString() : t;
+                const emojiId = emojiMap[t];
+                const emoji = emojiId ? interaction.client.emojis.cache.get(emojiId) : null;
+                return emoji ? emoji.toString() : t;
             }).join(' ');
 
             const date = new Date(time);
@@ -163,7 +215,7 @@ module.exports = {
                 await data.commandInteraction.deleteReply().catch(() => {});
             }
 
-            await interaction.reply({ content: 'Ankündigung erstellt', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Ankündigung erstellt.', flags: MessageFlags.Ephemeral });
             setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
             return;
         }
@@ -173,98 +225,86 @@ module.exports = {
             const tier = interaction.fields.getTextInputValue('regTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('regName');
             const notes = interaction.fields.getTextInputValue('regNotes') || '';
-            const discordName = interaction.user.tag;
-            const discordId = interaction.user.id;
 
             const allowedTiers = ['bt', 'lt', 'ht'];
-            let parsedUrl;
-            try {
-                parsedUrl = new URL(url);
-            } catch {
-                await interaction.reply({ content: 'Ungültige URL.', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
-            if (parsedUrl.hostname !== 'dndbeyond.com' && !parsedUrl.hostname.endsWith('.dndbeyond.com')) {
-                await interaction.reply({ content: 'URL muss von dndbeyond.com stammen.', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
             if (!allowedTiers.includes(tier)) {
                 await interaction.reply({ content: 'Tier muss bt, lt oder ht sein.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
+            if (!isHttpUrl(url)) {
+                await interaction.reply({ content: 'Ungültige URL (nur http/https).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             try {
-                await db.execute(
-                    'INSERT INTO registrations (character_name, character_url, start_tier, tier, notes, discord_name, discord_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
-                    [characterName, parsedUrl.toString(), tier, tier, notes, discordName, discordId],
-                );
-                await interaction.reply({ content: 'Registrierung gespeichert!', flags: MessageFlags.Ephemeral });
+                const characterId = await createCharacterForDiscord(interaction.user, {
+                    name: characterName,
+                    startTier: tier,
+                    externalLink: url,
+                    notes,
+                });
+
+                await interaction.reply({ content: `Charakter erstellt! ID: ${characterId}`, flags: MessageFlags.Ephemeral });
             } catch (error) {
                 console.error(error);
-                await interaction.reply({ content: 'Fehler beim Speichern.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Fehler beim Speichern des Charakters.', flags: MessageFlags.Ephemeral });
             }
             return;
         }
 
         if (interaction.isModalSubmit() && interaction.customId.startsWith('updateCharacterModal_')) {
-            const id = interaction.customId.replace('updateCharacterModal_', '');
+            const id = Number(interaction.customId.replace('updateCharacterModal_', ''));
             const url = interaction.fields.getTextInputValue('updUrl');
             const tier = interaction.fields.getTextInputValue('updTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('updName');
             const notes = interaction.fields.getTextInputValue('updNotes') || '';
 
+            if (!Number.isFinite(id) || id < 1) {
+                await interaction.reply({ content: 'Ungültige Character-ID.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             const allowedTiers = ['bt', 'lt', 'ht'];
-            let parsedUrl;
-            try {
-                parsedUrl = new URL(url);
-            } catch {
-                await interaction.reply({ content: 'Ungültige URL.', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
-            if (parsedUrl.hostname !== 'dndbeyond.com' && !parsedUrl.hostname.endsWith('.dndbeyond.com')) {
-                await interaction.reply({ content: 'URL muss von dndbeyond.com stammen.', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
             if (!allowedTiers.includes(tier)) {
                 await interaction.reply({ content: 'Tier muss bt, lt oder ht sein.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
+            if (!isHttpUrl(url)) {
+                await interaction.reply({ content: 'Ungültige URL (nur http/https).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             try {
-                const [result] = await db.execute(
-                    'UPDATE registrations SET character_name = ?, tier = ?, character_url = ?, notes = ?, updated_at = NOW() WHERE id = ? AND discord_id = ?',
-                    [characterName, tier, parsedUrl.toString(), notes, id, interaction.user.id],
-                );
-                if (result.affectedRows === 0) {
-                    await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
-                } else {
-                    await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
-                }
+                const result = await updateCharacterForDiscord(interaction.user, id, {
+                    name: characterName,
+                    startTier: tier,
+                    externalLink: url,
+                    notes,
+                });
+
+                await interaction.reply({
+                    content: result.ok ? 'Charakter aktualisiert.' : 'Charakter nicht gefunden.',
+                    flags: MessageFlags.Ephemeral,
+                });
             } catch (error) {
                 console.error(error);
-                await interaction.reply({ content: 'Fehler beim Speichern.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Fehler beim Speichern des Charakters.', flags: MessageFlags.Ephemeral });
             }
             return;
         }
 
         if (!interaction.isChatInputCommand()) return;
 
-        if (!isOwner(interaction.user.id)) {
+        const command = interaction.client.commands.get(interaction.commandName);
+        if (!command) return;
+
+        if (command.ownerOnly && !isOwner(interaction.user.id)) {
             await interaction.reply({
-                content: 'Dieser Bot ist auf Owner-only Befehle konfiguriert.',
+                content: 'Dieser Befehl ist Owner-only konfiguriert.',
                 flags: MessageFlags.Ephemeral,
             });
-            return;
-        }
-
-        const command = interaction.client.commands.get(interaction.commandName);
-
-        if (!command) {
-            console.error(`No command matching ${interaction.commandName} was found.`);
             return;
         }
 
@@ -280,3 +320,4 @@ module.exports = {
         }
     },
 };
+
