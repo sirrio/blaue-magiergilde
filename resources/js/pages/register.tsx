@@ -95,7 +95,7 @@ export default function Register() {
                 >
                   Confirm Password
                 </Input>
-                <Button type="submit" disabled={processing} color="primary" modifier="block">
+                <Button type="submit" disabled={processing} variant="outline" modifier="block" className={buttonOutlineWhite}>
                   Register
                 </Button>
               </form>
@@ -108,7 +108,7 @@ export default function Register() {
                   </Link>
                 </p>
                 <Button as={Link as ElementType} href={route('home')} variant="outline" className={cn('btn-sm', buttonOutlineWhite)}>
-                  Zurueck zur Startseite
+                  Zurück zur Startseite
                 </Button>
               </div>
             </CardBody>

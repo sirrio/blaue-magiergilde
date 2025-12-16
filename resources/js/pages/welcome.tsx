@@ -143,7 +143,7 @@ export default function Welcome() {
 
                 <a href={FAQ_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
                   <BookOpen size={16} />
-                  FAQ oeffnen
+                  FAQ öffnen
                 </a>
 
                 <div className="flex flex-wrap gap-2 text-xs text-white/75">
@@ -173,7 +173,7 @@ export default function Welcome() {
                     </div>
                     <p className="mt-2 text-sm text-white/80">
                       Eine offene Gemeinschaft von Spieler:innen und DMs. Wir setzen auf ein freundliches, respektvolles Miteinander
-                      und darauf, dass jede:r sich in der Runde wohl fuehlt.
+                      und darauf, dass jede:r sich in der Runde wohl fühlt.
                     </p>
                     <p className="mt-3 text-xs text-white/65">
                       Bildvorschlag: Gruppenfoto/Session-Szene oder Artwork der Gilde (z.B. Wappen/Blau-Magie-Motiv).
@@ -194,13 +194,13 @@ export default function Welcome() {
             />
             <FeatureCard
               icon={Users}
-              title="Fuer alle Erfahrungsstufen"
-              body="Ob du gerade erst startest oder schon lange spielst: Bei uns findest du passende Runden und Unterstuetzung."
+              title="Für alle Erfahrungsstufen"
+              body="Ob du gerade erst startest oder schon lange spielst: Bei uns findest du passende Runden und Unterstützung."
             />
             <FeatureCard
               icon={Compass}
               title="Leiten willkommen"
-              body="Du willst leiten? Sehr gern. Es gibt einen gemeinsamen Rahmen und Support, damit der Einstieg leicht faellt."
+              body="Du willst leiten? Sehr gern. Es gibt einen gemeinsamen Rahmen und Support, damit der Einstieg leicht fällt."
             />
           </div>
         </section>
@@ -244,9 +244,9 @@ export default function Welcome() {
                 <CardBody className="space-y-3">
                   <CardTitle className="text-lg">Was dich erwartet</CardTitle>
                   <ul className="list-disc space-y-1 pl-5 text-sm text-white/80">
-                    <li>Offenes Spielsystem im gemeinsamen Setting (Faerun und darueber hinaus).</li>
-                    <li>Community, die Newcomer unterstuetzt und kreativen Ideen Raum gibt.</li>
-                    <li>Ein klarer Rahmen - aber genug Freiheit fuer magische Geschichten.</li>
+                    <li>Offenes Spielsystem im gemeinsamen Setting (Faerûn und darüber hinaus).</li>
+                    <li>Community, die Newcomer unterstützt und kreativen Ideen Raum gibt.</li>
+                    <li>Ein klarer Rahmen - aber genug Freiheit für magische Geschichten.</li>
                   </ul>
                 </CardBody>
               </Card>

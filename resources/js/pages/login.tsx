@@ -75,7 +75,7 @@ export default function Login() {
                 >
                   Password
                 </Input>
-                <Button type="submit" disabled={processing} color="primary" modifier="block">
+                <Button type="submit" disabled={processing} variant="outline" modifier="block" className={buttonOutlineWhite}>
                   Login
                 </Button>
               </form>
@@ -88,7 +88,7 @@ export default function Login() {
                   </Link>
                 </p>
                 <Button as={Link as ElementType} href={route('home')} variant="outline" className={cn('btn-sm', buttonOutlineWhite)}>
-                  Zurueck zur Startseite
+                  Zurück zur Startseite
                 </Button>
               </div>
             </CardBody>
