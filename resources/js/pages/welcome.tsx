@@ -3,8 +3,7 @@ import DiscordIcon from '@/components/discord-icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import type { PageProps } from '@/types'
-import { Head, Link, usePage } from '@inertiajs/react'
+import { Head, Link } from '@inertiajs/react'
 import { BookOpen, CalendarCheck2, Compass, Crown, ScrollText, Sparkles, Users } from 'lucide-react'
 import type { ElementType, ReactNode } from 'react'
 
@@ -49,8 +48,9 @@ function FeatureCard({
 }
 
 export default function Welcome() {
-  usePage<PageProps>().props
   const appLabel = 'App Login'
+  const buttonOutlineWhite = 'border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white'
+  const buttonOutlineDiscord = 'border-sky-400/35 bg-white/0 text-sky-200 hover:bg-sky-400/10 hover:text-sky-100'
 
   return (
     <>
@@ -75,11 +75,23 @@ export default function Welcome() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button as={Link as ElementType} href={route('login')} color="primary" variant="outline" className="gap-2">
+                <Button
+                  as={Link as ElementType}
+                  href={route('login')}
+                  variant="outline"
+                  className={cn('gap-2', buttonOutlineWhite)}
+                >
                   <ScrollText size={18} />
                   {appLabel}
                 </Button>
-                <Button as="a" href={DISCORD_INVITE_URL} color="info" variant="outline" className="gap-2" target="_blank" rel="noreferrer">
+                <Button
+                  as="a"
+                  href={DISCORD_INVITE_URL}
+                  variant="outline"
+                  className={cn('gap-2', buttonOutlineDiscord)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <DiscordIcon width={20} />
                   Discord beitreten
                 </Button>
@@ -107,11 +119,23 @@ export default function Welcome() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button as="a" href={DISCORD_INVITE_URL} color="info" variant="outline" className="gap-2" target="_blank" rel="noreferrer">
+                  <Button
+                    as="a"
+                    href={DISCORD_INVITE_URL}
+                    variant="outline"
+                    className={cn('gap-2', buttonOutlineDiscord)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     <DiscordIcon width={20} />
                     Discord beitreten
                   </Button>
-                  <Button as={Link as ElementType} href={route('login')} color="primary" variant="outline" className="gap-2">
+                  <Button
+                    as={Link as ElementType}
+                    href={route('login')}
+                    variant="outline"
+                    className={cn('gap-2', buttonOutlineWhite)}
+                  >
                     <ScrollText size={18} />
                     {appLabel}
                   </Button>
@@ -192,11 +216,23 @@ export default function Welcome() {
                     logge dich mit deinem Account ein.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Button as="a" href={DISCORD_INVITE_URL} color="info" variant="outline" className="gap-2" target="_blank" rel="noreferrer">
+                    <Button
+                      as="a"
+                      href={DISCORD_INVITE_URL}
+                      variant="outline"
+                      className={cn('gap-2', buttonOutlineDiscord)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       <DiscordIcon width={20} />
                       Discord beitreten
                     </Button>
-                    <Button as={Link as ElementType} href={route('login')} color="primary" variant="outline" className="gap-2">
+                    <Button
+                      as={Link as ElementType}
+                      href={route('login')}
+                      variant="outline"
+                      className={cn('gap-2', buttonOutlineWhite)}
+                    >
                       <ScrollText size={18} />
                       {appLabel}
                     </Button>
@@ -230,4 +266,3 @@ export default function Welcome() {
     </>
   )
 }
-

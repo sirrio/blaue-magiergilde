@@ -15,29 +15,31 @@ export default function Datenschutz() {
 
   return (
     <>
-      <Head title="Datenschutzerklärung" />
-      <div className={cn('hero bg-base-300 relative min-h-screen overflow-hidden')} data-theme={'light'}>
-        <div className="absolute inset-0 grayscale-[60%] hue-rotate-[3.5rad]">
-          <img src="/images/bg-dragon.webp" className="h-full md:hidden object-cover" alt="" />
-          <img src="/images/bg-dragon-torn.webp" className="h-full w-full object-cover hidden md:block" alt="" />
+      <Head title="Datenschutzerklõrung" />
+      <div className={cn('relative min-h-screen overflow-hidden bg-[#070A12] text-white')} data-theme="dark">
+        <div className="pointer-events-none absolute inset-0">
+          <img src="/images/bg-dragon.webp" className="h-full w-full object-cover opacity-30" alt="" />
         </div>
-        <div className="hero-content relative z-10 flex-col" data-theme={'dark'}>
-          <Card className="w-full max-w-2xl prose text-center">
-            <CardBody>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-[#070A12]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_80%_75%,rgba(14,165,233,0.14),transparent_55%)]" />
+
+        <div className="relative mx-auto max-w-4xl px-4 py-10 md:py-14">
+          <Card className="w-full border border-white/10 bg-white/5 shadow-xl backdrop-blur">
+            <CardBody className="prose prose-invert max-w-none">
               <CardTitle className="justify-center">
-                <h1>Datenschutzerklärung</h1>
+                <h1>Datenschutzerklõrung</h1>
               </CardTitle>
               <h2 className="font-bold">Allgemeine Hinweise</h2>
               <p>
-                Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst. Diese Datenschutzerklärung informiert Sie
-                über die Art, den Umfang und Zweck der Erhebung und Verwendung personenbezogener Daten auf unserer
+                Wir nehmen den Schutz Ihrer pers÷nlichen Daten sehr ernst. Diese Datenschutzerklõrung informiert Sie
+                ³ber die Art, den Umfang und Zweck der Erhebung und Verwendung personenbezogener Daten auf unserer
                 Website. Wir behandeln Ihre personenbezogenen Daten vertraulich und entsprechend der gesetzlichen
-                Datenschutzvorschriften (insbesondere DSGVO) sowie dieser Datenschutzerklärung.
+                Datenschutzvorschriften (insbesondere DSGVO) sowie dieser Datenschutzerklõrung.
               </p>
               <p>
-                Bitte beachten Sie, dass Datenübertragung im Internet (z.B. bei der Kommunikation per E-Mail)
-                Sicherheitslücken aufweisen kann. Ein vollumfänglicher Schutz der Daten vor dem Zugriff durch Dritte
-                ist nicht möglich.
+                Bitte beachten Sie, dass Daten³bertragung im Internet (z.B. bei der Kommunikation per E-Mail)
+                Sicherheitsl³cken aufweisen kann. Ein vollumfõnglicher Schutz der Daten vor dem Zugriff durch Dritte
+                ist nicht m÷glich.
               </p>
               <h2 className="font-bold">Verantwortliche Stelle</h2>
               <p>{VITE_IMPRESSUM_NAME}</p>
@@ -46,7 +48,7 @@ export default function Datenschutz() {
               <p>E-Mail: {VITE_IMPRESSUM_EMAIL}</p>
               <p>
                 Als privater Websitebetreiber sind wir nicht verpflichtet, einen Datenschutzbeauftragten zu benennen.
-                Bei Fragen zum Datenschutz können Sie sich jedoch jederzeit an die obige Kontaktadresse wenden.
+                Bei Fragen zum Datenschutz k÷nnen Sie sich jedoch jederzeit an die obige Kontaktadresse wenden.
               </p>
               <h2 className="font-bold">Hosting und Server-Log-Dateien</h2>
               <p>
@@ -54,30 +56,30 @@ export default function Datenschutz() {
                 LLC</strong>, Region Frankfurt (Datacenter FR1 in Deutschland). Personenbezogene Daten, die auf dieser
                 Website erfasst werden, werden auf den Servern von DigitalOcean gespeichert. DigitalOcean handelt bei der
                 Datenverarbeitung in unserem Auftrag (Auftragsverarbeitung). Wir haben mit dem Hoster einen Vertrag zur
-                Auftragsverarbeitung gemäß Art. 28 DSGVO geschlossen. Dieser Vertrag stellt sicher, dass DigitalOcean die
+                Auftragsverarbeitung gemõ▀ Art. 28 DSGVO geschlossen. Dieser Vertrag stellt sicher, dass DigitalOcean die
                 Daten unserer Websitebesucher nur nach unseren Weisungen und in Einklang mit den geltenden
                 Datenschutzgesetzen verarbeitet. DigitalOcean ist ein US-amerikanisches Unternehmen; wir haben durch
-                geeignete Garantien (insbesondere EU-Standardvertragsklauseln) dafür gesorgt, dass ein dem europäischen
-                Datenschutzniveau entsprechendes Schutzniveau gewährleistet ist.
+                geeignete Garantien (insbesondere EU-Standardvertragsklauseln) daf³r gesorgt, dass ein dem europõischen
+                Datenschutzniveau entsprechendes Schutzniveau gewõhrleistet ist.
               </p>
               <p>
-                Beim Aufruf unserer Website übermittelt Ihr Browser automatisch Informationen an den Server unseres
-                Hosters. Diese Informationen werden in sogenannten Server-Log-Dateien temporär gespeichert. Die Logfiles
+                Beim Aufruf unserer Website ³bermittelt Ihr Browser automatisch Informationen an den Server unseres
+                Hosters. Diese Informationen werden in sogenannten Server-Log-Dateien temporõr gespeichert. Die Logfiles
                 enthalten z.B. folgende Daten:
               </p>
               <ul>
-                <li>Ihre IP-Adresse (in anonymisierter Form, sofern möglich)</li>
+                <li>Ihre IP-Adresse (in anonymisierter Form, sofern m÷glich)</li>
                 <li>Datum und Uhrzeit des Zugriffs</li>
                 <li>Name und URL der abgerufenen Datei (angeforderte Seite)</li>
                 <li>Referrer-URL (die zuvor besuchte Seite)</li>
-                <li>Verwendeter Browser und ggf. Betriebssystem Ihres Geräts</li>
+                <li>Verwendeter Browser und ggf. Betriebssystem Ihres Gerõts</li>
               </ul>
               <p>
-                Diese Daten sind nicht direkt bestimmten Personen zuordenbar und dienen ausschließlich der
-                Sicherstellung eines reibungslosen Verbindungsaufbaus der Website, der Systemsicherheit und -stabilität
-                sowie administrativen Zwecken (z.B. Auswertung von technischen Fehlern). Eine Zusammenführung dieser
+                Diese Daten sind nicht direkt bestimmten Personen zuordenbar und dienen ausschlie▀lich der
+                Sicherstellung eines reibungslosen Verbindungsaufbaus der Website, der Systemsicherheit und -stabilitõt
+                sowie administrativen Zwecken (z.B. Auswertung von technischen Fehlern). Eine Zusammenf³hrung dieser
                 Daten mit anderen Datenquellen wird nicht vorgenommen. Die Log-Daten werden in der Regel nach kurzer Zeit
-                automatisiert gelöscht (spätestens nach 7 bis 14 Tagen), sofern keine weitere Aufbewahrung zu
+                automatisiert gel÷scht (spõtestens nach 7 bis 14 Tagen), sofern keine weitere Aufbewahrung zu
                 Beweiszwecken erforderlich ist.
               </p>
               <p>
@@ -87,90 +89,90 @@ export default function Datenschutz() {
               </p>
               <h2 className="font-bold">Einsatz von Cookies</h2>
               <p>
-                Unsere Website verwendet ausschließlich technisch notwendige Cookies, die für den Betrieb und die
-                grundlegende Funktionalität der Seite erforderlich sind. Wir setzen keine Cookies zu Analyse-, Tracking-
+                Unsere Website verwendet ausschlie▀lich technisch notwendige Cookies, die f³r den Betrieb und die
+                grundlegende Funktionalitõt der Seite erforderlich sind. Wir setzen keine Cookies zu Analyse-, Tracking-
                 oder Werbezwecken ein.
               </p>
               <p>
                 Bei den von uns eingesetzten Cookies handelt es sich z.B. um Session-Cookies, die eine eindeutige Kennung
-                (Session-ID) enthalten. Ggf. nutzt unsere Seite zudem ein Cookie zur Gewährleistung der Sicherheit (z.B.
-                ein CSRF-Token-Cookie), um Formular-Eingaben vor missbräuchlichen Angriffen zu schützen. Auch dieses
-                Cookie ist technisch notwendig und enthält keine personenbezogenen Profile.
+                (Session-ID) enthalten. Ggf. nutzt unsere Seite zudem ein Cookie zur Gewõhrleistung der Sicherheit (z.B.
+                ein CSRF-Token-Cookie), um Formular-Eingaben vor missbrõuchlichen Angriffen zu sch³tzen. Auch dieses
+                Cookie ist technisch notwendig und enthõlt keine personenbezogenen Profile.
               </p>
               <p>
                 Diese Session-Cookies sind notwendig, um Ihnen bestimmte Funktionen bereitzustellen (z.B. Login und
-                Navigation) und werden nach Ende Ihres Besuchs automatisch gelöscht (Sitzungsende).
+                Navigation) und werden nach Ende Ihres Besuchs automatisch gel÷scht (Sitzungsende).
               </p>
               <p>
-                Sie können Ihren Browser so einstellen, dass er Sie über das Setzen von Cookies informiert, Cookies nur
-                im Einzelfall erlaubt oder die Annahme von Cookies für bestimmte Fälle oder generell ausschließt. Bitte
-                beachten Sie jedoch, dass die Funktionalität dieser Website eingeschränkt sein kann, wenn Sie keine
+                Sie k÷nnen Ihren Browser so einstellen, dass er Sie ³ber das Setzen von Cookies informiert, Cookies nur
+                im Einzelfall erlaubt oder die Annahme von Cookies f³r bestimmte Fõlle oder generell ausschlie▀t. Bitte
+                beachten Sie jedoch, dass die Funktionalitõt dieser Website eingeschrõnkt sein kann, wenn Sie keine
                 Cookies zulassen.
               </p>
               <p>
-                Für den Einsatz technisch notwendiger Cookies ist nach § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.
-                Die Verarbeitung erfolgt insoweit auf Basis unseres berechtigten Interesses gemäß Art. 6 Abs. 1 lit. f
-                DSGVO, da die Cookies für die Bereitstellung der von Ihnen angeforderten Dienste unbedingt erforderlich
+                F³r den Einsatz technisch notwendiger Cookies ist nach º 25 Abs. 2 TTDSG keine Einwilligung erforderlich.
+                Die Verarbeitung erfolgt insoweit auf Basis unseres berechtigten Interesses gemõ▀ Art. 6 Abs. 1 lit. f
+                DSGVO, da die Cookies f³r die Bereitstellung der von Ihnen angeforderten Dienste unbedingt erforderlich
                 sind.
               </p>
               <h2 className="font-bold">Kontaktaufnahme per E-Mail</h2>
               <p>
-                Auf dieser Website gibt es kein Kontaktformular. Wenn Sie uns kontaktieren möchten, nutzen Sie bitte die
+                Auf dieser Website gibt es kein Kontaktformular. Wenn Sie uns kontaktieren m÷chten, nutzen Sie bitte die
                 bereitgestellte E-Mail-Adresse.
               </p>
               <p>
-                Wenn Sie uns über die bereitgestellte E-Mail-Adresse ( {VITE_IMPRESSUM_EMAIL} ) kontaktieren, werden die
+                Wenn Sie uns ³ber die bereitgestellte E-Mail-Adresse ( {VITE_IMPRESSUM_EMAIL} ) kontaktieren, werden die
                 von Ihnen mitgeteilten Daten (z.B. Ihre E-Mail-Adresse und der Inhalt Ihrer Nachricht sowie evtl. weitere
-                von Ihnen übermittelte Kontaktinformationen) zum Zweck der Bearbeitung Ihrer Anfrage und für eventuelle
+                von Ihnen ³bermittelte Kontaktinformationen) zum Zweck der Bearbeitung Ihrer Anfrage und f³r eventuelle
                 Anschlussfragen bei uns gespeichert und verarbeitet. Diese Daten geben wir nicht ohne Ihre Einwilligung
-                weiter und verwenden sie ausschließlich zur Kommunikation mit Ihnen.
+                weiter und verwenden sie ausschlie▀lich zur Kommunikation mit Ihnen.
               </p>
               <p>
-                Die Verarbeitung dieser Daten erfolgt auf Basis von Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse –
-                nämlich die Bearbeitung Ihrer Anfrage). Wenn Sie mit uns Kontakt aufnehmen, können Sie davon ausgehen,
-                dass die Verarbeitung der übermittelten Daten in Ihrem Interesse liegt, um Ihr Anliegen zu beantworten.
-                Ihre Daten aus der E-Mail-Anfrage werden von uns gelöscht, sobald die jeweilige Konversation mit Ihnen
-                beendet ist und der Zweck der Speicherung entfällt. Gesetzliche Aufbewahrungspflichten bleiben
-                unberührt.
+                Die Verarbeitung dieser Daten erfolgt auf Basis von Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse û
+                nõmlich die Bearbeitung Ihrer Anfrage). Wenn Sie mit uns Kontakt aufnehmen, k÷nnen Sie davon ausgehen,
+                dass die Verarbeitung der ³bermittelten Daten in Ihrem Interesse liegt, um Ihr Anliegen zu beantworten.
+                Ihre Daten aus der E-Mail-Anfrage werden von uns gel÷scht, sobald die jeweilige Konversation mit Ihnen
+                beendet ist und der Zweck der Speicherung entfõllt. Gesetzliche Aufbewahrungspflichten bleiben
+                unber³hrt.
               </p>
-              <h2 className="font-bold">Registrierung und Login über Discord</h2>
+              <h2 className="font-bold">Registrierung und Login ³ber Discord</h2>
               <p>
-                Unsere Website bietet Ihnen ggf. die Möglichkeit, sich für bestimmte Bereiche anzumelden. Dies erfolgt
-                als privates, nicht öffentliches Angebot vorrangig über einen Login mit Ihrem Discord-Account
+                Unsere Website bietet Ihnen ggf. die M÷glichkeit, sich f³r bestimmte Bereiche anzumelden. Dies erfolgt
+                als privates, nicht ÷ffentliches Angebot vorrangig ³ber einen Login mit Ihrem Discord-Account
                 (Single-Sign-On). Wenn Sie den "Login mit Discord" nutzen, werden Sie auf die Plattform Discord
                 (betrieben durch Discord Inc., 444 De Haro Street, San Francisco, CA 94107, USA) weitergeleitet. Dort
-                können Sie sich mit Ihren Discord-Zugangsdaten authentifizieren. Bei diesem Vorgang erhalten wir von
+                k÷nnen Sie sich mit Ihren Discord-Zugangsdaten authentifizieren. Bei diesem Vorgang erhalten wir von
                 Discord bestimmte Informationen aus Ihrem Discord-Profil, insbesondere Ihren Discord-Benutzernamen, Ihre
-                einmalige Discord-ID-Nummer und ggf. Ihre mit Discord verknüpfte E-Mail-Adresse (abhängig von den
-                Berechtigungen, die Sie beim Login bestätigen). Wir nutzen diese Daten, um ein Benutzerkonto für Sie auf
-                unserer Website einzurichten bzw. Ihr Login zu verifizieren. Ohne diese Daten ist eine Anmeldung über
-                Discord nicht möglich.
+                einmalige Discord-ID-Nummer und ggf. Ihre mit Discord verkn³pfte E-Mail-Adresse (abhõngig von den
+                Berechtigungen, die Sie beim Login bestõtigen). Wir nutzen diese Daten, um ein Benutzerkonto f³r Sie auf
+                unserer Website einzurichten bzw. Ihr Login zu verifizieren. Ohne diese Daten ist eine Anmeldung ³ber
+                Discord nicht m÷glich.
               </p>
               <p>
-                Die Kommunikation zwischen unserer Website und Discord erfolgt über eine verschlüsselte Verbindung. Bitte
-                beachten Sie, dass bei Nutzung der Discord-Anmeldung zunächst eine Verbindung zu den Servern von Discord
+                Die Kommunikation zwischen unserer Website und Discord erfolgt ³ber eine verschl³sselte Verbindung. Bitte
+                beachten Sie, dass bei Nutzung der Discord-Anmeldung zunõchst eine Verbindung zu den Servern von Discord
                 hergestellt wird. Dabei gelten die Datenschutzbestimmungen von Discord. Weitere Informationen dazu finden
-                Sie in der <a className="link" href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Datenschutzerklärung von Discord</a>.
+                Sie in der <a className="link" href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Datenschutzerklõrung von Discord</a>.
               </p>
               <p>
                 Die Verarbeitung Ihrer Daten im Rahmen des Discord-Logins erfolgt auf Grundlage Ihrer Einwilligung (Art.
                 6 Abs. 1 lit. a DSGVO), die Sie durch das freiwillige Nutzen der "Login mit Discord"-Funktion erteilen.
-                Sie können diese Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie uns z.B. eine
-                Nachricht senden und die Löschung Ihres Benutzerkontos verlangen. In diesem Fall werden wir Ihre im
-                Zusammenhang mit dem Discord-Login gespeicherten personenbezogenen Daten umgehend löschen, sofern keine
+                Sie k÷nnen diese Einwilligung jederzeit mit Wirkung f³r die Zukunft widerrufen, indem Sie uns z.B. eine
+                Nachricht senden und die L÷schung Ihres Benutzerkontos verlangen. In diesem Fall werden wir Ihre im
+                Zusammenhang mit dem Discord-Login gespeicherten personenbezogenen Daten umgehend l÷schen, sofern keine
                 gesetzlichen Aufbewahrungspflichten dem entgegenstehen.
               </p>
               <p>
-                Alle über das Benutzerkonto ausgetauschten oder von Ihnen eingegebenen Inhalte unterliegen ebenfalls den
-                Bestimmungen dieser Datenschutzerklärung. Bitte stellen Sie keine sensiblen personenbezogenen Daten über
+                Alle ³ber das Benutzerkonto ausgetauschten oder von Ihnen eingegebenen Inhalte unterliegen ebenfalls den
+                Bestimmungen dieser Datenschutzerklõrung. Bitte stellen Sie keine sensiblen personenbezogenen Daten ³ber
                 Ihr Benutzerkonto ein, die nicht unbedingt notwendig sind.
               </p>
               <h2 className="font-bold">Keine weiteren Drittanbieterdienste</h2>
               <p>
-                Wir verwenden keine Analysetools wie Google Analytics oder ähnliche Tracking-Dienste. Es werden keine
-                Social-Media-Plugins (Facebook-Like-Button o.Ä.) und keine extern eingebetteten Inhalte von Drittanbietern
+                Wir verwenden keine Analysetools wie Google Analytics oder õhnliche Tracking-Dienste. Es werden keine
+                Social-Media-Plugins (Facebook-Like-Button o.─.) und keine extern eingebetteten Inhalte von Drittanbietern
                 (z.B. Videos von YouTube, Karten von Google Maps oder Webfonts von Google Fonts) auf unserer Website
-                eingesetzt. Dadurch werden beim Besuch unserer Website keine Daten ungewollt an Dritte übermittelt.
+                eingesetzt. Dadurch werden beim Besuch unserer Website keine Daten ungewollt an Dritte ³bermittelt.
               </p>
               <p>
                 Auch Content Delivery Networks (CDN) kommen bei uns nicht zum Einsatz. Alle Ressourcen (z.B. CSS- und
@@ -183,53 +185,54 @@ export default function Datenschutz() {
               </p>
               <h2 className="font-bold">Sicherheit Ihrer Daten</h2>
               <p>
-                Diese Website nutzt aus Gründen der Sicherheit und zum Schutz der Übertragung vertraulicher Inhalte eine
-                SSL- bzw. TLS-Verschlüsselung. Das erkennen Sie an der "https://"-Adresszeile Ihres Browsers und dem
-                Schloss-Symbol in der Browserzeile. Wenn die SSL- bzw. TLS-Verschlüsselung aktiv ist, können die Daten,
-                die Sie an uns übermitteln, nicht von Dritten mitgelesen werden.
+                Diese Website nutzt aus Gr³nden der Sicherheit und zum Schutz der ▄bertragung vertraulicher Inhalte eine
+                SSL- bzw. TLS-Verschl³sselung. Das erkennen Sie an der "https://"-Adresszeile Ihres Browsers und dem
+                Schloss-Symbol in der Browserzeile. Wenn die SSL- bzw. TLS-Verschl³sselung aktiv ist, k÷nnen die Daten,
+                die Sie an uns ³bermitteln, nicht von Dritten mitgelesen werden.
               </p>
               <p>
-                Wir treffen außerdem angemessene technische und organisatorische Maßnahmen, um Ihre Daten vor Verlust,
-                Missbrauch oder unbefugtem Zugriff zu schützen. Bitte beachten Sie jedoch, dass kein elektronisches
-                Übertragungssystem vollkommen sicher ist. Wir werden unsere Sicherheitsmaßnahmen entsprechend der
+                Wir treffen au▀erdem angemessene technische und organisatorische Ma▀nahmen, um Ihre Daten vor Verlust,
+                Missbrauch oder unbefugtem Zugriff zu sch³tzen. Bitte beachten Sie jedoch, dass kein elektronisches
+                ▄bertragungssystem vollkommen sicher ist. Wir werden unsere Sicherheitsma▀nahmen entsprechend der
                 technologischen Entwicklung fortlaufend verbessern.
               </p>
               <h2 className="font-bold">Ihre Rechte als betroffene Person</h2>
               <ul>
-                <li>Recht auf Auskunft über gespeicherte personenbezogene Daten (Art. 15 DSGVO)</li>
-                <li>Recht auf Berichtigung unrichtiger oder unvollständiger Daten (Art. 16 DSGVO)</li>
-                <li>Recht auf Löschung, sofern keine gesetzlichen Aufbewahrungspflichten entgegenstehen (Art. 17 DSGVO)</li>
-                <li>Recht auf Einschränkung der Verarbeitung unter den Voraussetzungen des Art. 18 DSGVO</li>
+                <li>Recht auf Auskunft ³ber gespeicherte personenbezogene Daten (Art. 15 DSGVO)</li>
+                <li>Recht auf Berichtigung unrichtiger oder unvollstõndiger Daten (Art. 16 DSGVO)</li>
+                <li>Recht auf L÷schung, sofern keine gesetzlichen Aufbewahrungspflichten entgegenstehen (Art. 17 DSGVO)</li>
+                <li>Recht auf Einschrõnkung der Verarbeitung unter den Voraussetzungen des Art. 18 DSGVO</li>
                 <li>Recht auf Widerspruch gegen die Verarbeitung aufgrund besonderer Situation (Art. 21 DSGVO)</li>
-                <li>Recht auf Datenübertragbarkeit bei automatisierter Verarbeitung (Art. 20 DSGVO)</li>
+                <li>Recht auf Daten³bertragbarkeit bei automatisierter Verarbeitung (Art. 20 DSGVO)</li>
                 <li>Recht auf Widerruf erteilter Einwilligungen (Art. 7 Abs. 3 DSGVO)</li>
               </ul>
               <p>
-                Zur Ausübung Ihrer Rechte können Sie uns jederzeit unter den oben angegebenen Kontaktdaten kontaktieren.
+                Zur Aus³bung Ihrer Rechte k÷nnen Sie uns jederzeit unter den oben angegebenen Kontaktdaten kontaktieren.
                 Bitte stellen Sie dabei ausreichende Informationen zu Ihrer Person bereit, die uns eine eindeutige
-                Identifizierung ermöglichen.
+                Identifizierung erm÷glichen.
               </p>
               <p>
-                Beschwerderecht: Sie haben zudem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde über die
-                Verarbeitung Ihrer personenbezogenen Daten durch uns zu beschweren (Art. 77 DSGVO). Dies können Sie
-                beispielsweise bei der Aufsichtsbehörde Ihres Aufenthaltsortes oder unseres Firmensitzes tun. Für Hessen
-                ist dies der Hessische Beauftragte für Datenschutz und Informationsfreiheit (HBDI).
+                Beschwerderecht: Sie haben zudem das Recht, sich bei einer Datenschutz-Aufsichtsbeh÷rde ³ber die
+                Verarbeitung Ihrer personenbezogenen Daten durch uns zu beschweren (Art. 77 DSGVO). Dies k÷nnen Sie
+                beispielsweise bei der Aufsichtsbeh÷rde Ihres Aufenthaltsortes oder unseres Firmensitzes tun. F³r Hessen
+                ist dies der Hessische Beauftragte f³r Datenschutz und Informationsfreiheit (HBDI).
               </p>
-              <h2 className="font-bold">Aktualität und Änderungen dieser Erklärung</h2>
+              <h2 className="font-bold">Aktualitõt und ─nderungen dieser Erklõrung</h2>
               <p>
-                Diese Datenschutzerklärung ist aktuell gültig (Stand: August 2025). Wir behalten uns vor, den Inhalt
-                dieser Erklärung bei Bedarf anzupassen, um sie an geänderte Rechtslagen oder technische Änderungen
-                unseres Angebots anzupassen. Die jeweils aktuelle Fassung der Datenschutzerklärung finden Sie auf dieser
-                Website. Auf wesentliche Änderungen weisen wir gegebenenfalls zusätzlich auf der Website hin.
+                Diese Datenschutzerklõrung ist aktuell g³ltig (Stand: August 2025). Wir behalten uns vor, den Inhalt
+                dieser Erklõrung bei Bedarf anzupassen, um sie an geõnderte Rechtslagen oder technische ─nderungen
+                unseres Angebots anzupassen. Die jeweils aktuelle Fassung der Datenschutzerklõrung finden Sie auf dieser
+                Website. Auf wesentliche ─nderungen weisen wir gegebenenfalls zusõtzlich auf der Website hin.
               </p>
-              <Button as={Link as ElementType} href={route('home')} color="primary" className="mt-4">
-                Zurück zur Startseite
+              <Button as={Link as ElementType} href={route('home')} variant="outline" className="mt-6 border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white">
+                Zur³ck zur Startseite
               </Button>
             </CardBody>
           </Card>
+          <LegalLinks variant="inline" className="mt-10 text-white/70" />
         </div>
       </div>
-      <LegalLinks />
     </>
   )
 }
+
