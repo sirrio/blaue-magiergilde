@@ -6,14 +6,14 @@ Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`).
 
 ### Charaktere (App)
 
-Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt über Discord.
-Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist).
+Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt über Discord.  
+Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist).  
 Der Bot erstellt **keinen** User automatisch.
 
 - `/[prefix]-register-character` - erstellt einen Charakter (Modal: Name, Start-Tier, External Link, Notizen).
-- `/[prefix]-list-characters` - listet deine Charaktere inkl. ID.
-- `/[prefix]-update-character` - aktualisiert einen Charakter per ID (Modal).
-- `/[prefix]-unregister-character` - löscht einen Charakter per ID (mit Bestätigung, soft delete).
+- `/[prefix]-list-characters` - listet deine Charaktere (schön formatiert).
+- `/[prefix]-update-character` - wähle einen Charakter per Dropdown → Modal zum Aktualisieren.
+- `/[prefix]-unregister-character` - wähle einen Charakter per Dropdown → Bestätigung (soft delete).
 
 Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
 
@@ -23,7 +23,7 @@ Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button**
 
 ## Konfiguration (ein einziges Env)
 
-Der Bot nutzt die **gleiche** Root-`.env` wie die Laravel-App (ein einziges Env-File im Projekt-Hauptordner).
+Der Bot nutzt die **gleiche** Root-`.env` wie die Laravel-App (ein einziges Env-File im Projekt-Hauptordner).  
 `bot/config.json` wird nicht mehr unterstützt.
 
 ### Root `.env` (empfohlen)
