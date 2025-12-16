@@ -129,18 +129,18 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
 function buildCharacterCardRow({ characterId, ownerDiscordId, isFiller }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
             .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
             .setLabel('Abenteuer')
-            .setStyle(ButtonStyle.Secondary),
+            .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
             .setLabel('Downtime')
-            .setStyle(ButtonStyle.Secondary)
+            .setStyle(ButtonStyle.Success)
             .setDisabled(Boolean(isFiller)),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
+            .setLabel('Bearbeiten')
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
             .setLabel('L\u00f6schen')
@@ -436,12 +436,8 @@ async function handle(interaction) {
         if (action === 'adv') {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`advAdd0_${character.id}_${ownerDiscordId}`)
+                    .setCustomId(`advAdd_${character.id}_${ownerDiscordId}`)
                     .setLabel('Neues Abenteuer')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`advAdd1_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Neues Abenteuer (+1)')
                     .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId(`advList_${character.id}_${ownerDiscordId}`)
@@ -459,13 +455,8 @@ async function handle(interaction) {
         if (action === 'dt') {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`dtAdd_faction_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Downtime: Faction')
-                    .setStyle(ButtonStyle.Primary)
-                    .setDisabled(Boolean(character.is_filler)),
-                new ButtonBuilder()
-                    .setCustomId(`dtAdd_other_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Downtime: Other')
+                    .setCustomId(`dtAdd_${character.id}_${ownerDiscordId}`)
+                    .setLabel('Downtime hinzuf\u00fcgen')
                     .setStyle(ButtonStyle.Primary)
                     .setDisabled(Boolean(character.is_filler)),
                 new ButtonBuilder()
@@ -530,12 +521,11 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('advAdd')) {
-        const match = interaction.customId.match(/^advAdd([01])_(\d+)_(\d+)$/);
+    if (interaction.isButton() && interaction.customId.startsWith('advAdd_')) {
+        const match = interaction.customId.match(/^advAdd_(\d+)_(\d+)$/);
         if (!match) return false;
-        const extra = match[1] === '1';
-        const characterId = Number(match[2]);
-        const ownerDiscordId = match[3];
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
@@ -543,7 +533,7 @@ async function handle(interaction) {
         }
 
         const modal = new ModalBuilder()
-            .setCustomId(`advCreateModal_${characterId}_${ownerDiscordId}_${extra ? 1 : 0}`)
+            .setCustomId(`advCreateModal_${characterId}_${ownerDiscordId}`)
             .setTitle('Abenteuer hinzuf\u00fcgen');
 
         const durationInput = new TextInputBuilder()
@@ -566,11 +556,13 @@ async function handle(interaction) {
             .setStyle(TextInputStyle.Short)
             .setRequired(false);
 
-        const gmInput = new TextInputBuilder()
-            .setCustomId('advGm')
-            .setLabel('Game Master (optional)')
+        const bonusInput = new TextInputBuilder()
+            .setCustomId('advBonus')
+            .setLabel('Bonus Bubble (+1)?')
+            .setPlaceholder('nein | ja')
             .setStyle(TextInputStyle.Short)
-            .setRequired(false);
+            .setRequired(true)
+            .setValue('nein');
 
         const notesInput = new TextInputBuilder()
             .setCustomId('advNotes')
@@ -582,7 +574,7 @@ async function handle(interaction) {
             new ActionRowBuilder().addComponents(durationInput),
             new ActionRowBuilder().addComponents(dateInput),
             new ActionRowBuilder().addComponents(titleInput),
-            new ActionRowBuilder().addComponents(gmInput),
+            new ActionRowBuilder().addComponents(bonusInput),
             new ActionRowBuilder().addComponents(notesInput),
         );
 
@@ -591,9 +583,8 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreateModal_')) {
-        const [, characterIdRaw, ownerDiscordId, extraRaw] = interaction.customId.split('_');
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
-        const hasAdditionalBubble = String(extraRaw) === '1';
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -604,8 +595,10 @@ async function handle(interaction) {
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('advDuration'));
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('advDate'));
         const title = (interaction.fields.getTextInputValue('advTitle') || '').trim();
-        const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
+        const bonusRaw = String(interaction.fields.getTextInputValue('advBonus') || '').trim().toLowerCase();
         const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
+
+        const hasAdditionalBubble = ['1', 'true', 'ja', 'j', 'yes', 'y', '+1'].includes(bonusRaw);
 
         if (duration === null) {
             await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
@@ -624,7 +617,7 @@ async function handle(interaction) {
                 hasAdditionalBubble,
                 notes,
                 title,
-                gameMaster,
+                gameMaster: null,
             });
 
             if (!result.ok) {
@@ -704,8 +697,10 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dtAdd_')) {
-        const [, type, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
+        const match = interaction.customId.match(/^dtAdd_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -713,15 +708,17 @@ async function handle(interaction) {
             return true;
         }
 
-        const safeType = String(type || '').toLowerCase();
-        if (safeType !== 'faction' && safeType !== 'other') {
-            await interaction.reply({ content: 'Ung\u00fcltiger Downtime-Typ.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         const modal = new ModalBuilder()
-            .setCustomId(`dtCreateModal_${characterId}_${ownerDiscordId}_${safeType}`)
+            .setCustomId(`dtCreateModal_${characterId}_${ownerDiscordId}`)
             .setTitle('Downtime hinzuf\u00fcgen');
+
+        const typeInput = new TextInputBuilder()
+            .setCustomId('dtType')
+            .setLabel('Typ')
+            .setPlaceholder('faction | other')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setValue('other');
 
         const hoursInput = new TextInputBuilder()
             .setCustomId('dtHours')
@@ -751,6 +748,7 @@ async function handle(interaction) {
             .setRequired(false);
 
         modal.addComponents(
+            new ActionRowBuilder().addComponents(typeInput),
             new ActionRowBuilder().addComponents(hoursInput),
             new ActionRowBuilder().addComponents(minutesInput),
             new ActionRowBuilder().addComponents(dateInput),
@@ -762,9 +760,8 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreateModal_')) {
-        const [, characterIdRaw, ownerDiscordId, typeRaw] = interaction.customId.split('_');
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
-        const type = String(typeRaw || '').toLowerCase();
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -772,8 +769,14 @@ async function handle(interaction) {
             return true;
         }
 
-        if (type !== 'faction' && type !== 'other') {
-            await interaction.reply({ content: 'Ung\u00fcltiger Downtime-Typ.', flags: MessageFlags.Ephemeral });
+        const typeRaw = String(interaction.fields.getTextInputValue('dtType') || '').trim().toLowerCase();
+        const normalizedType = (() => {
+            if (['faction', 'f', '1'].includes(typeRaw)) return 'faction';
+            if (['other', 'o', '2'].includes(typeRaw)) return 'other';
+            return null;
+        })();
+        if (!normalizedType) {
+            await interaction.reply({ content: 'Ung\u00fcltiger Typ. Nutze `faction` oder `other`.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -802,7 +805,7 @@ async function handle(interaction) {
                 characterId,
                 duration,
                 startDate,
-                type,
+                type: normalizedType,
                 notes,
             });
 
@@ -1230,6 +1233,14 @@ async function handle(interaction) {
             .setCustomId(`dtUpdateModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
             .setTitle('Downtime bearbeiten');
 
+        const typeInput = new TextInputBuilder()
+            .setCustomId('dtType')
+            .setLabel('Typ')
+            .setPlaceholder('faction | other')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setValue(String(downtime.type || 'other'));
+
         const hoursInput = new TextInputBuilder()
             .setCustomId('dtHours')
             .setLabel('Stunden')
@@ -1259,6 +1270,7 @@ async function handle(interaction) {
             .setValue(safeModalValue(downtime.notes));
 
         modal.addComponents(
+            new ActionRowBuilder().addComponents(typeInput),
             new ActionRowBuilder().addComponents(hoursInput),
             new ActionRowBuilder().addComponents(minutesInput),
             new ActionRowBuilder().addComponents(dateInput),
@@ -1282,9 +1294,19 @@ async function handle(interaction) {
 
         const hours = Number(String(interaction.fields.getTextInputValue('dtHours') || '').trim());
         const minutes = Number(String(interaction.fields.getTextInputValue('dtMinutes') || '').trim());
+        const typeRaw = String(interaction.fields.getTextInputValue('dtType') || '').trim().toLowerCase();
+        const normalizedType = (() => {
+            if (['faction', 'f', '1'].includes(typeRaw)) return 'faction';
+            if (['other', 'o', '2'].includes(typeRaw)) return 'other';
+            return null;
+        })();
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('dtDate'));
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
+        if (!normalizedType) {
+            await interaction.reply({ content: 'Ung\u00fcltiger Typ. Nutze `faction` oder `other`.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
         if (!Number.isFinite(hours) || hours < 0 || !Number.isInteger(hours)) {
             await interaction.reply({ content: 'Ung\u00fcltige Stunden.', flags: MessageFlags.Ephemeral });
             return true;
@@ -1301,7 +1323,12 @@ async function handle(interaction) {
         const duration = hours * 3600 + minutes * 60;
 
         try {
-            const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { duration, startDate, notes });
+            const result = await updateDowntimeForDiscord(interaction.user, downtimeId, {
+                duration,
+                startDate,
+                type: normalizedType,
+                notes,
+            });
             if (!result.ok) {
                 await interaction.reply({ content: 'Downtime nicht gefunden.', flags: MessageFlags.Ephemeral });
                 return true;

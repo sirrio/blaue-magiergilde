@@ -230,18 +230,18 @@ function buildSummaryRow(ownerDiscordId) {
 function buildCharacterCardRow({ ownerDiscordId, characterId, isFiller }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
             .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
             .setLabel('Abenteuer')
-            .setStyle(ButtonStyle.Secondary),
+            .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
             .setLabel('Downtime')
-            .setStyle(ButtonStyle.Secondary)
+            .setStyle(ButtonStyle.Success)
             .setDisabled(Boolean(isFiller)),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
+            .setLabel('Bearbeiten')
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
             .setLabel('L\u00f6schen')
@@ -306,4 +306,3 @@ module.exports = {
         }
     },
 };
-
