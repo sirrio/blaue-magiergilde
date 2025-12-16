@@ -1,4 +1,11 @@
-const { SlashCommandBuilder, MessageFlags, EmbedBuilder } = require('discord.js');
+const {
+    SlashCommandBuilder,
+    MessageFlags,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+} = require('discord.js');
 const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
@@ -61,15 +68,24 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setTitle('Deine Charaktere')
             .setColor(0x4f46e5)
-            .setDescription(
-                [
-                    `Anzahl: **${characters.length}**`,
-                    '',
-                    `Bearbeiten: \`/${commandName('update-character')}\` · Löschen: \`/${commandName('unregister-character')}\` · Neu: \`/${commandName('register-character')}\``,
-                ].join('\n'),
-            )
+            .setDescription(`Anzahl: **${characters.length}**`)
             .addFields(characters.slice(0, 25).map(buildCharacterField));
 
-        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        const actions = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_update_${interaction.user.id}`)
+                .setLabel('Bearbeiten')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_delete_${interaction.user.id}`)
+                .setLabel('Löschen')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_new_${interaction.user.id}`)
+                .setLabel('Neu')
+                .setStyle(ButtonStyle.Primary),
+        );
+
+        await interaction.reply({ embeds: [embed], components: [actions], flags: MessageFlags.Ephemeral });
     },
 };

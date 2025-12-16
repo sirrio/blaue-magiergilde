@@ -5,6 +5,8 @@ const {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
@@ -16,6 +18,7 @@ const {
     createUserForDiscord,
     createCharacterForDiscord,
     findCharacterForDiscord,
+    listCharactersForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
 } = require('../appDb');
@@ -123,6 +126,104 @@ module.exports = {
                 }
                 return;
             }
+        }
+
+        if (interaction.isButton() && interaction.customId.startsWith('charactersAction_')) {
+            const [, action, ownerDiscordId] = interaction.customId.split('_');
+
+            if (String(interaction.user.id) !== String(ownerDiscordId)) {
+                await interaction.reply({ content: 'Du kannst diese Aktion nicht ausführen.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (!interaction.inGuild()) {
+                await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (action === 'new') {
+                const modal = new ModalBuilder()
+                    .setCustomId('registerCharacterModal')
+                    .setTitle('Charakter erstellen');
+
+                const nameInput = new TextInputBuilder()
+                    .setCustomId('regName')
+                    .setLabel('Charaktername')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const tierInput = new TextInputBuilder()
+                    .setCustomId('regTier')
+                    .setLabel('Start-Tier')
+                    .setPlaceholder('bt | lt | ht')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const urlInput = new TextInputBuilder()
+                    .setCustomId('regUrl')
+                    .setLabel('External Link (URL)')
+                    .setPlaceholder('https://...')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const notesInput = new TextInputBuilder()
+                    .setCustomId('regNotes')
+                    .setLabel('Notizen')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(false);
+
+                modal.addComponents(
+                    new ActionRowBuilder().addComponents(nameInput),
+                    new ActionRowBuilder().addComponents(tierInput),
+                    new ActionRowBuilder().addComponents(urlInput),
+                    new ActionRowBuilder().addComponents(notesInput),
+                );
+
+                await interaction.showModal(modal);
+                return;
+            }
+
+            let characters;
+            try {
+                characters = await listCharactersForDiscord(interaction.user);
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.reply({ content: notLinkedContent(), flags: MessageFlags.Ephemeral });
+                    return;
+                }
+                throw error;
+            }
+
+            if (characters.length === 0) {
+                await interaction.reply({ content: 'Keine Charaktere gefunden.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (action !== 'update' && action !== 'delete') {
+                await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            const select = new StringSelectMenuBuilder()
+                .setCustomId(`${action === 'update' ? 'characterUpdateSelect' : 'characterDeleteSelect'}_${interaction.user.id}`)
+                .setPlaceholder('Charakter auswählen…')
+                .addOptions(
+                    characters.slice(0, 25).map(c =>
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(String(c.name).slice(0, 100) || `Charakter ${c.id}`)
+                            .setDescription(`ID ${c.id} · ${(String(c.start_tier || '').toUpperCase() || '—')}`)
+                            .setValue(String(c.id)),
+                    ),
+                );
+
+            const row = new ActionRowBuilder().addComponents(select);
+
+            await interaction.reply({
+                content: action === 'update' ? 'Welchen Charakter möchtest du bearbeiten?' : 'Welchen Charakter möchtest du löschen?',
+                components: [row],
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
         }
 
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpdateSelect_')) {
