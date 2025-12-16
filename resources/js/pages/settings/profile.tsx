@@ -61,9 +61,9 @@ export default function Profile() {
               <p className="text-sm opacity-80">
                 Um den Discord Bot zu nutzen, musst du deinen Account einmalig mit Discord verbinden.
               </p>
-              <Link href={route('discord.login')} className="btn btn-primary btn-sm w-fit">
+              <Button as="a" href={route('discord.login')} color="primary" size="sm" className="w-fit">
                 Connect Discord
-              </Link>
+              </Button>
             </>
           )}
           {status === 'discord-connected' && <p className="text-sm text-success mt-2">Discord verbunden.</p>}
