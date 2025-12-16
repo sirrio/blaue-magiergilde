@@ -39,10 +39,29 @@ function buildCharacterField(character) {
     };
 }
 
+function buildActionsRow({ ownerDiscordId, hasCharacters }) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersAction_update_${ownerDiscordId}`)
+            .setLabel('Bearbeiten')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!hasCharacters),
+        new ButtonBuilder()
+            .setCustomId(`charactersAction_delete_${ownerDiscordId}`)
+            .setLabel('Löschen')
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(!hasCharacters),
+        new ButtonBuilder()
+            .setCustomId(`charactersAction_new_${ownerDiscordId}`)
+            .setLabel('Neu')
+            .setStyle(ButtonStyle.Primary),
+    );
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName(commandName('list-characters'))
-        .setDescription('Liste deiner Charaktere (aus der App).'),
+        .setName(commandName('characters'))
+        .setDescription('Verwalte deine Charaktere (Liste, Bearbeiten, Löschen, Neu).'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
             await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
@@ -60,32 +79,22 @@ module.exports = {
             throw error;
         }
 
-        if (characters.length === 0) {
-            await interaction.reply({ content: 'Keine Charaktere gefunden.', flags: MessageFlags.Ephemeral });
-            return;
-        }
+        const hasCharacters = characters.length > 0;
 
         const embed = new EmbedBuilder()
             .setTitle('Deine Charaktere')
             .setColor(0x4f46e5)
-            .setDescription(`Anzahl: **${characters.length}**`)
-            .addFields(characters.slice(0, 25).map(buildCharacterField));
+            .setDescription(hasCharacters ? `Anzahl: **${characters.length}**` : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.');
 
-        const actions = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`charactersAction_update_${interaction.user.id}`)
-                .setLabel('Bearbeiten')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`charactersAction_delete_${interaction.user.id}`)
-                .setLabel('Löschen')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId(`charactersAction_new_${interaction.user.id}`)
-                .setLabel('Neu')
-                .setStyle(ButtonStyle.Primary),
-        );
+        if (hasCharacters) {
+            embed.addFields(characters.slice(0, 25).map(buildCharacterField));
+        }
 
-        await interaction.reply({ embeds: [embed], components: [actions], flags: MessageFlags.Ephemeral });
+        await interaction.reply({
+            embeds: [embed],
+            components: [buildActionsRow({ ownerDiscordId: interaction.user.id, hasCharacters })],
+            flags: MessageFlags.Ephemeral,
+        });
     },
 };
+

@@ -2,7 +2,7 @@
 
 ## Befehle
 
-Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`).
+Standard-Prefix ist `wwt` (z.B. `/wwt-characters`).
 
 ### Charaktere (App)
 
@@ -10,10 +10,7 @@ Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt 
 Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist).  
 Der Bot erstellt **keinen** User automatisch.
 
-- `/[prefix]-register-character` - erstellt einen Charakter (Modal: Name, Start-Tier, External Link, Notizen).
-- `/[prefix]-list-characters` - listet deine Charaktere (schön formatiert).
-- `/[prefix]-update-character` - wähle einen Charakter per Dropdown → Modal zum Aktualisieren.
-- `/[prefix]-unregister-character` - wähle einen Charakter per Dropdown → Bestätigung (soft delete).
+- `/[prefix]-characters` - zeigt deine Charaktere und Buttons für **Bearbeiten**, **Löschen** und **Neu**.
 
 Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
 
