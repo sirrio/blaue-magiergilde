@@ -10,9 +10,9 @@ Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt 
 Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist).  
 Der Bot erstellt **keinen** User automatisch.
 
-- `/[prefix]-characters` - zeigt deine Charaktere und Buttons für **Bearbeiten**, **Löschen** und **Neu**.
-  - Wenn der Charakter in der App einen Avatar hat (z.B. `avatars/foo.webp`), baut der Bot daraus automatisch `${APP_URL}/storage/avatars/foo.webp` und zeigt ihn als Thumbnail.
-  - Alternativ kannst du im Discord-Modal auch einen externen Avatar-Link (https) setzen.
+- `/[prefix]-characters` - zeigt deine Charaktere im Dashboard-Stil und Buttons für **Bearbeiten**, **Löschen** und **Neu**.
+  - Wenn der Charakter in der App einen Avatar hat (z.B. `avatars/foo.webp`), zeigt der Bot ihn als Thumbnail.
+  - Avatar und Start-Tier können im Bot **nicht** geändert werden (Start-Tier nur bei Erstellung).
 
 Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
 

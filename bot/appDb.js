@@ -65,11 +65,56 @@ async function listCharactersForDiscord(discordUser) {
     if (!userId) throw new DiscordNotLinkedError();
     const [rows] = await db.execute(
         `
-            SELECT id, name, start_tier, version, faction, external_link, avatar, notes
-            FROM characters
-            WHERE user_id = ?
-              AND deleted_at IS NULL
-            ORDER BY position ASC, id ASC
+            SELECT
+                c.id,
+                c.name,
+                c.start_tier,
+                c.version,
+                c.faction,
+                c.external_link,
+                c.avatar,
+                c.notes,
+                c.dm_bubbles,
+                c.dm_coins,
+                c.bubble_shop_spend,
+                c.is_filler,
+                COALESCE(a.adventures_count, 0) AS adventures_count,
+                COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
+                COALESCE(dt.total_downtime, 0) AS total_downtime,
+                COALESCE(dt.faction_downtime, 0) AS faction_downtime,
+                COALESCE(dt.other_downtime, 0) AS other_downtime,
+                COALESCE(cls.class_names, '') AS class_names
+            FROM characters c
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    COUNT(*) AS adventures_count,
+                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles
+                FROM adventures
+                WHERE deleted_at IS NULL
+                GROUP BY character_id
+            ) a ON a.character_id = c.id
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    SUM(duration) AS total_downtime,
+                    SUM(CASE WHEN type = 'faction' THEN duration ELSE 0 END) AS faction_downtime,
+                    SUM(CASE WHEN type = 'other' THEN duration ELSE 0 END) AS other_downtime
+                FROM downtimes
+                WHERE deleted_at IS NULL
+                GROUP BY character_id
+            ) dt ON dt.character_id = c.id
+            LEFT JOIN (
+                SELECT
+                    ccc.character_id,
+                    GROUP_CONCAT(cc.name ORDER BY cc.id SEPARATOR '/ ') AS class_names
+                FROM character_character_class ccc
+                INNER JOIN character_classes cc ON cc.id = ccc.character_class_id
+                GROUP BY ccc.character_id
+            ) cls ON cls.character_id = c.id
+            WHERE c.user_id = ?
+              AND c.deleted_at IS NULL
+            ORDER BY c.position ASC, c.id ASC
         `,
         [userId],
     );
@@ -81,10 +126,55 @@ async function findCharacterForDiscord(discordUser, characterId) {
     if (!userId) throw new DiscordNotLinkedError();
     const [rows] = await db.execute(
         `
-            SELECT id, name, start_tier, version, faction, external_link, avatar, notes
-            FROM characters
-            WHERE id = ?
-              AND user_id = ?
+            SELECT
+                c.id,
+                c.name,
+                c.start_tier,
+                c.version,
+                c.faction,
+                c.external_link,
+                c.avatar,
+                c.notes,
+                c.dm_bubbles,
+                c.dm_coins,
+                c.bubble_shop_spend,
+                c.is_filler,
+                COALESCE(a.adventures_count, 0) AS adventures_count,
+                COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
+                COALESCE(dt.total_downtime, 0) AS total_downtime,
+                COALESCE(dt.faction_downtime, 0) AS faction_downtime,
+                COALESCE(dt.other_downtime, 0) AS other_downtime,
+                COALESCE(cls.class_names, '') AS class_names
+            FROM characters c
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    COUNT(*) AS adventures_count,
+                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles
+                FROM adventures
+                WHERE deleted_at IS NULL
+                GROUP BY character_id
+            ) a ON a.character_id = c.id
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    SUM(duration) AS total_downtime,
+                    SUM(CASE WHEN type = 'faction' THEN duration ELSE 0 END) AS faction_downtime,
+                    SUM(CASE WHEN type = 'other' THEN duration ELSE 0 END) AS other_downtime
+                FROM downtimes
+                WHERE deleted_at IS NULL
+                GROUP BY character_id
+            ) dt ON dt.character_id = c.id
+            LEFT JOIN (
+                SELECT
+                    ccc.character_id,
+                    GROUP_CONCAT(cc.name ORDER BY cc.id SEPARATOR '/ ') AS class_names
+                FROM character_character_class ccc
+                INNER JOIN character_classes cc ON cc.id = ccc.character_class_id
+                GROUP BY ccc.character_id
+            ) cls ON cls.character_id = c.id
+            WHERE c.id = ?
+              AND c.user_id = ?
             LIMIT 1
         `,
         [characterId, userId],
@@ -92,7 +182,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
     return rows[0] ?? null;
 }
 
-async function createCharacterForDiscord(discordUser, { name, startTier, externalLink, avatar, notes }) {
+async function createCharacterForDiscord(discordUser, { name, startTier, externalLink, notes }) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
     const createdAt = nowSql();
@@ -104,11 +194,11 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
         const [insertCharacter] = await connection.execute(
             `
                 INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, user_id, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, user_id, created_at, updated_at)
                 VALUES
-                    (?, ?, 0, 0, 0, ?, ?, ?, ?, ?)
+                    (?, ?, 0, 0, 0, ?, ?, ?, ?)
             `,
-            [name, startTier, externalLink, avatar ?? null, userId, createdAt, createdAt],
+            [name, startTier, externalLink, userId, createdAt, createdAt],
         );
 
         const characterId = insertCharacter.insertId;
@@ -137,7 +227,7 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
     }
 }
 
-async function updateCharacterForDiscord(discordUser, characterId, { name, startTier, externalLink, avatar, notes }) {
+async function updateCharacterForDiscord(discordUser, characterId, { name, startTier, externalLink, notes }) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
     const existing = await findCharacterForDiscord(discordUser, characterId);
@@ -147,16 +237,15 @@ async function updateCharacterForDiscord(discordUser, characterId, { name, start
     const newName = typeof name === 'string' ? name : existing.name;
     const newStartTier = typeof startTier === 'string' ? startTier : existing.start_tier;
     const newExternalLink = typeof externalLink === 'string' ? externalLink : existing.external_link;
-    const newAvatar = typeof avatar === 'string' ? avatar : existing.avatar;
     const newNotes = typeof notes === 'string' ? notes : existing.notes;
 
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, avatar = ?, notes = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
-        [newName, newStartTier, newExternalLink, newAvatar, newNotes, updatedAt, characterId, userId],
+        [newName, newStartTier, newExternalLink, newNotes, updatedAt, characterId, userId],
     );
 
     return { ok: true };

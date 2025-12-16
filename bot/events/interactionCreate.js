@@ -218,13 +218,6 @@ module.exports = {
                     .setStyle(TextInputStyle.Short)
                     .setRequired(true);
 
-                const avatarInput = new TextInputBuilder()
-                    .setCustomId('regAvatar')
-                    .setLabel('Avatar (optional, URL)')
-                    .setPlaceholder('https://... oder /storage/... (öffentlich)')
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(false);
-
                 const notesInput = new TextInputBuilder()
                     .setCustomId('regNotes')
                     .setLabel('Notizen')
@@ -235,7 +228,6 @@ module.exports = {
                     new ActionRowBuilder().addComponents(nameInput),
                     new ActionRowBuilder().addComponents(tierInput),
                     new ActionRowBuilder().addComponents(urlInput),
-                    new ActionRowBuilder().addComponents(avatarInput),
                     new ActionRowBuilder().addComponents(notesInput),
                 );
 
@@ -319,14 +311,6 @@ module.exports = {
                 .setRequired(true)
                 .setValue(safeModalValue(character.name));
 
-            const tierInput = new TextInputBuilder()
-                .setCustomId('updTier')
-                .setLabel('Start-Tier')
-                .setPlaceholder('bt | lt | ht')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.start_tier || '').toLowerCase()));
-
             const urlInput = new TextInputBuilder()
                 .setCustomId('updUrl')
                 .setLabel('External Link (URL)')
@@ -334,14 +318,6 @@ module.exports = {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setValue(safeModalValue(character.external_link));
-
-            const avatarInput = new TextInputBuilder()
-                .setCustomId('updAvatar')
-                .setLabel('Avatar (optional, URL)')
-                .setPlaceholder('https://... oder /storage/... (öffentlich)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(false)
-                .setValue(safeModalValue(character.avatar));
 
             const notesInput = new TextInputBuilder()
                 .setCustomId('updNotes')
@@ -352,9 +328,7 @@ module.exports = {
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(nameInput),
-                new ActionRowBuilder().addComponents(tierInput),
                 new ActionRowBuilder().addComponents(urlInput),
-                new ActionRowBuilder().addComponents(avatarInput),
                 new ActionRowBuilder().addComponents(notesInput),
             );
 
@@ -623,7 +597,6 @@ module.exports = {
             const url = interaction.fields.getTextInputValue('regUrl');
             const tier = interaction.fields.getTextInputValue('regTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('regName');
-            const avatarRaw = interaction.fields.getTextInputValue('regAvatar') || '';
             const notes = interaction.fields.getTextInputValue('regNotes') || '';
 
             const allowedTiers = ['bt', 'lt', 'ht'];
@@ -637,18 +610,11 @@ module.exports = {
                 return;
             }
 
-            const avatar = normalizeOptionalAvatarInput(avatarRaw);
-            if (avatarRaw.trim() && !avatar) {
-                await interaction.reply({ content: 'Ungültiger Avatar (nur http/https oder ein Pfad wie /storage/... ).', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
             try {
                 const characterId = await createCharacterForDiscord(interaction.user, {
                     name: characterName,
                     startTier: tier,
                     externalLink: url,
-                    avatar,
                     notes,
                 });
 
@@ -687,19 +653,11 @@ module.exports = {
 
             const id = Number(interaction.customId.replace('updateCharacterModal_', ''));
             const url = interaction.fields.getTextInputValue('updUrl');
-            const tier = interaction.fields.getTextInputValue('updTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('updName');
-            const avatarRaw = interaction.fields.getTextInputValue('updAvatar') || '';
             const notes = interaction.fields.getTextInputValue('updNotes') || '';
 
             if (!Number.isFinite(id) || id < 1) {
                 await interaction.reply({ content: 'Ungültige Charakter-ID.', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
-            const allowedTiers = ['bt', 'lt', 'ht'];
-            if (!allowedTiers.includes(tier)) {
-                await interaction.reply({ content: 'Tier muss bt, lt oder ht sein.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -708,18 +666,10 @@ module.exports = {
                 return;
             }
 
-            const avatar = normalizeOptionalAvatarInput(avatarRaw);
-            if (avatarRaw.trim() && !avatar) {
-                await interaction.reply({ content: 'Ungültiger Avatar (nur http/https oder ein Pfad wie /storage/... ).', flags: MessageFlags.Ephemeral });
-                return;
-            }
-
             try {
                 const result = await updateCharacterForDiscord(interaction.user, id, {
                     name: characterName,
-                    startTier: tier,
                     externalLink: url,
-                    avatar,
                     notes,
                 });
 
