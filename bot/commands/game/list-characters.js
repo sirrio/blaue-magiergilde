@@ -1,11 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
-
-function linkNotConnectedMessage() {
-    return 'Dein Account ist nicht mit Discord verbunden.\n' +
-        'Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile';
-}
+const { replyNotLinked } = require('../../linkingUi');
 
 function splitIntoMessages(lines, maxLength = 1900) {
     const messages = [];
@@ -40,7 +36,7 @@ module.exports = {
             characters = await listCharactersForDiscord(interaction.user);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
-                await interaction.reply({ content: linkNotConnectedMessage(), flags: MessageFlags.Ephemeral });
+                await replyNotLinked(interaction);
                 return;
             }
             throw error;

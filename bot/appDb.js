@@ -37,6 +37,23 @@ async function getLinkedUserIdForDiscord(discordUser) {
     return null;
 }
 
+async function createUserForDiscord(discordUser) {
+    const discordId = String(discordUser.id);
+    const name = pickDiscordDisplayName(discordUser);
+    const avatar = pickDiscordAvatarUrl(discordUser);
+
+    const existingUserId = await getLinkedUserIdForDiscord(discordUser);
+    if (existingUserId) return { created: false, userId: existingUserId };
+
+    const createdAt = nowSql();
+    const [result] = await db.execute(
+        'INSERT INTO users (discord_id, name, avatar, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        [discordId, name, avatar, createdAt, createdAt],
+    );
+
+    return { created: true, userId: result.insertId };
+}
+
 async function getDefaultCharacterClassId(connection) {
     const executor = connection ?? db;
     const [rows] = await executor.execute('SELECT id FROM character_classes ORDER BY id ASC LIMIT 1');
@@ -195,6 +212,7 @@ async function softDeleteCharacterForDiscord(discordUser, characterId) {
 module.exports = {
     DiscordNotLinkedError,
     getLinkedUserIdForDiscord,
+    createUserForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
     createCharacterForDiscord,

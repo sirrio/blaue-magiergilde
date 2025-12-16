@@ -13,6 +13,8 @@ Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt 
 - `/[prefix]-update-character` – aktualisiert einen Charakter per ID (Modal).
 - `/[prefix]-unregister-character` – löscht einen Charakter per ID (mit Bestätigung, soft delete).
 
+Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
+
 ### Shop
 
 - `/[prefix]-post-shop` – postet den neuesten (oder eine angegebene) Shop in einen Thread (oder erstellt einen Thread in einem Text-Channel).

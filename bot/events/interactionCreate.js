@@ -12,10 +12,12 @@ const { pendingGames } = require('../state');
 const { isOwner } = require('../commandConfig');
 const {
     DiscordNotLinkedError,
+    createUserForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
 } = require('../appDb');
+const { buildJoinConfirmButtons, notLinkedContent } = require('../linkingUi');
 
 function isHttpUrl(urlString) {
     try {
@@ -29,6 +31,65 @@ function isHttpUrl(urlString) {
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
+        if (interaction.isButton() && interaction.customId.startsWith('app')) {
+            const [action, ownerDiscordId] = interaction.customId.split('_');
+
+            if (String(interaction.user.id) !== String(ownerDiscordId)) {
+                await interaction.reply({ content: 'Du kannst diese Aktion nicht ausführen.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (action === 'appLinkInfo') {
+                await interaction.update({
+                    content: [
+                        notLinkedContent(),
+                        '',
+                        'Wenn du die App bereits nutzt: bitte verbinde Discord in deinem Profil (Connect Discord).',
+                    ].join('\n'),
+                    components: [],
+                });
+                return;
+            }
+
+            if (action === 'appJoinStart') {
+                await interaction.update({
+                    content: [
+                        '**Neuen App-Account erstellen?**',
+                        '',
+                        'Das erstellt einen neuen Benutzer-Account, der an deine Discord-ID gebunden ist.',
+                        '',
+                        '**Nicht machen**, wenn du bereits einen App-Account hast (sonst hast du danach zwei Accounts).',
+                    ].join('\n'),
+                    components: [buildJoinConfirmButtons(ownerDiscordId)],
+                });
+                return;
+            }
+
+            if (action === 'appJoinCancel') {
+                await interaction.update({
+                    content: 'Abgebrochen.',
+                    components: [],
+                });
+                return;
+            }
+
+            if (action === 'appJoinConfirm') {
+                try {
+                    const result = await createUserForDiscord(interaction.user);
+                    await interaction.update({
+                        content: result.created
+                            ? 'Account erstellt und mit Discord verbunden. Du kannst den Command jetzt erneut ausführen.'
+                            : 'Dein Discord ist bereits mit einem Account verbunden. Du kannst den Command jetzt erneut ausführen.',
+                        components: [],
+                    });
+                } catch (error) {
+                    console.error(error);
+                    await interaction.update({ content: `Fehler beim Erstellen: ${error.message}`, components: [] });
+                }
+                return;
+            }
+        }
+
         if (interaction.isButton() && interaction.customId.startsWith('deleteCharacter')) {
             const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
             const characterId = Number(idRaw);
@@ -65,7 +126,7 @@ module.exports = {
                 console.error(error);
                 if (error instanceof DiscordNotLinkedError) {
                     await interaction.update({
-                        content: 'Dein Account ist nicht mit Discord verbunden. Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile',
+                        content: notLinkedContent(),
                         components: [],
                     });
                     return;
@@ -263,7 +324,7 @@ module.exports = {
                 console.error(error);
                 if (error instanceof DiscordNotLinkedError) {
                     await interaction.reply({
-                        content: 'Dein Account ist nicht mit Discord verbunden. Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile',
+                        content: notLinkedContent(),
                         flags: MessageFlags.Ephemeral,
                     });
                     return;
@@ -317,7 +378,7 @@ module.exports = {
                 console.error(error);
                 if (error instanceof DiscordNotLinkedError) {
                     await interaction.reply({
-                        content: 'Dein Account ist nicht mit Discord verbunden. Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile',
+                        content: notLinkedContent(),
                         flags: MessageFlags.Ephemeral,
                     });
                     return;

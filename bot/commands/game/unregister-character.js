@@ -1,11 +1,7 @@
 const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, findCharacterForDiscord } = require('../../appDb');
-
-function linkNotConnectedMessage() {
-    return 'Dein Account ist nicht mit Discord verbunden.\n' +
-        'Bitte verbinde Discord in deinem Profil: https://blaue-magiergilde.de/settings/profile';
-}
+const { replyNotLinked } = require('../../linkingUi');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -28,7 +24,7 @@ module.exports = {
             character = await findCharacterForDiscord(interaction.user, id);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
-                await interaction.reply({ content: linkNotConnectedMessage(), flags: MessageFlags.Ephemeral });
+                await replyNotLinked(interaction);
                 return;
             }
             throw error;
