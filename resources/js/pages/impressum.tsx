@@ -16,14 +16,16 @@ export default function Impressum() {
   return (
     <>
       <Head title="Impressum" />
-      <div className={cn('hero bg-base-300 relative min-h-screen overflow-hidden')} data-theme={'light'}>
-        <div className="absolute inset-0 grayscale-[60%] hue-rotate-[3.5rad]">
-          <img src="/images/bg-dragon.webp" className="h-full md:hidden object-cover" alt="" />
-          <img src="/images/bg-dragon-torn.webp" className="h-full w-full object-cover hidden md:block" alt="" />
+      <div className={cn('relative min-h-screen overflow-hidden bg-[#070A12] text-white')} data-theme="dark">
+        <div className="pointer-events-none absolute inset-0">
+          <img src="/images/bg-dragon.webp" className="h-full w-full object-cover opacity-30" alt="" />
         </div>
-        <div className="hero-content relative z-10 flex-col" data-theme={'dark'}>
-          <Card className="w-full max-w-2xl prose text-center">
-            <CardBody>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-[#070A12]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_80%_75%,rgba(14,165,233,0.14),transparent_55%)]" />
+
+        <div className="relative mx-auto max-w-4xl px-4 py-10 md:py-14">
+          <Card className="w-full border border-white/10 bg-white/5 shadow-xl backdrop-blur">
+            <CardBody className="prose prose-invert max-w-none">
               <CardTitle className="justify-center">
                 <h1>Impressum</h1>
               </CardTitle>
@@ -92,14 +94,15 @@ export default function Impressum() {
                 Diese Webseite nutzt Open-Source-Software wie Laravel, React, InertiaJS, Tailwind&nbsp;CSS und Vite.
                 Vielen Dank an alle Mitwirkenden dieser Projekte.
               </p>
-              <Button as={Link as ElementType} href={route('home')} color="primary" className="mt-4">
+              <Button as={Link as ElementType} href={route('home')} variant="outline" className="mt-6 border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white">
                 Zurück zur Startseite
               </Button>
             </CardBody>
           </Card>
+          <LegalLinks variant="inline" className="mt-10 text-white/70" />
         </div>
       </div>
-      <LegalLinks />
     </>
   )
 }
+

@@ -4,6 +4,7 @@ const { Collection, SlashCommandBuilder } = require('discord.js');
 const { commandName } = require('../../commandConfig');
 
 module.exports = {
+    ownerOnly: true,
     data: new SlashCommandBuilder()
         .setName(commandName('reload'))
         .setDescription('Reloads all commands.'),

@@ -25,15 +25,40 @@ class SocialAuthController extends Controller
     public function handleProviderCallback(): RedirectResponse
     {
         $discordUser = Socialite::driver('discord')->user();
+        $discordId = $discordUser->getId();
+
+        if (Auth::check()) {
+            /** @var User $user */
+            $user = Auth::user();
+
+            $discordAlreadyLinked = User::query()
+                ->where('discord_id', $discordId)
+                ->whereKeyNot($user->getKey())
+                ->exists();
+
+            if ($discordAlreadyLinked) {
+                return redirect()
+                    ->route('profile.edit')
+                    ->with('error', 'This Discord account is already linked to another user.');
+            }
+
+            $user->discord_id = $discordId;
+            $user->avatar = $discordUser->getAvatar();
+            $user->save();
+
+            return redirect()
+                ->route('profile.edit')
+                ->with('status', 'discord-connected');
+        }
 
         $user = User::query()->updateOrCreate(
             [
-                'discord_id' => $discordUser->getId(),
+                'discord_id' => $discordId,
             ],
             [
                 'name' => $discordUser->getName(),
                 'avatar' => $discordUser->getAvatar(),
-                'password' => '',
+                'password' => null,
             ]
         );
 

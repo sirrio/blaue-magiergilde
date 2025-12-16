@@ -22,6 +22,7 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'discordConnected' => config('features.discord') && (bool) $request->user()->discord_id,
+            'error' => $request->session()->get('error'),
         ]);
     }
 
@@ -58,5 +59,14 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    public function disconnectDiscord(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $user->discord_id = null;
+        $user->save();
+
+        return to_route('profile.edit')->with('status', 'discord-disconnected');
     }
 }

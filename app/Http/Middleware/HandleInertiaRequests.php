@@ -48,6 +48,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'features' => config('features'),
+            'discordConnected' => config('features.discord') && (bool) $request->user()?->discord_id,
             'appearance' => $request->cookie('appearance', 'system'),
             'ziggy' => fn (): array => [
                 ...(new Ziggy)->toArray(),

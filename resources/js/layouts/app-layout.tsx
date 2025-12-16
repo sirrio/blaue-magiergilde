@@ -37,7 +37,7 @@ const adminLinks = [
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth } = usePage<PageProps>().props
+  const { auth, discordConnected, features } = usePage<PageProps>().props
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   useClickOutside(adminDetailsRef, () =>
@@ -192,7 +192,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </div>
       </nav>
-      <main>{children}</main>
+      <main>
+        {features.discord && !discordConnected && (
+          <div className="container mx-auto max-w-4xl px-2 pt-4 md:px-0">
+            <div className="alert alert-warning">
+              <div>
+                <p className="font-semibold">Discord ist nicht verbunden.</p>
+                <p className="text-sm opacity-80">
+                  Verbinde Discord in deinem Profil, damit du Charaktere über den Discord Bot verwalten kannst.
+                </p>
+              </div>
+              <Link href={route('profile.edit')} className="btn btn-sm">
+                Zum Profil
+              </Link>
+            </div>
+          </div>
+        )}
+        {children}
+      </main>
       
     </div>
   )
