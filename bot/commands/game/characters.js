@@ -10,33 +10,71 @@ const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 
+function isHttpUrl(urlString) {
+    try {
+        const parsed = new URL(urlString);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function resolvePublicUrl(urlOrPath) {
+    const value = String(urlOrPath || '').trim();
+    if (!value) return null;
+    if (isHttpUrl(value)) return value;
+
+    const appUrl = String(process.env.BOT_PUBLIC_APP_URL || process.env.APP_URL || '').trim();
+    if (!appUrl) return null;
+    const baseUrl = appUrl.replace(/\/$/, '');
+
+    if (value.startsWith('/')) return `${baseUrl}${value}`;
+    if (value.startsWith('storage/')) return `${baseUrl}/${value}`;
+
+    return `${baseUrl}/storage/${value}`;
+}
+
 function formatTier(tier) {
     const normalized = String(tier || '').toUpperCase();
     if (!normalized) return '—';
     return normalized;
 }
 
-function truncate(text, max = 240) {
+function truncate(text, max = 900) {
     const value = String(text || '').trim();
     if (value.length <= max) return value;
     return `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }
 
-function buildCharacterField(character) {
+function buildCharacterEmbed(character) {
     const tier = formatTier(character.start_tier);
     const name = String(character.name || '').trim() || `Charakter ${character.id}`;
-    const id = String(character.id);
     const link = String(character.external_link || '').trim();
-    const notes = truncate(character.notes, 240);
+    const notes = truncate(character.notes, 900);
+    const avatarUrl = resolvePublicUrl(character.avatar);
 
-    const linkPart = link ? `[Sheet öffnen](${link})` : 'Kein Link hinterlegt.';
-    const notesPart = notes ? `\nNotizen: ${notes}` : '';
+    const embed = new EmbedBuilder()
+        .setColor(0x4f46e5)
+        .setTitle(`${name} · ${tier}`)
+        .addFields({ name: 'ID', value: String(character.id), inline: true });
 
-    return {
-        name: `${name} · ${tier}`,
-        value: `${linkPart}\nID: ${id}${notesPart}`,
-        inline: false,
-    };
+    if (isHttpUrl(link)) {
+        embed.setURL(link);
+        embed.setDescription('[Sheet öffnen](' + link + ')');
+    } else if (link) {
+        embed.setDescription(link);
+    }
+
+    if (avatarUrl) {
+        embed.setThumbnail(avatarUrl);
+        embed.addFields({ name: 'Avatar', value: avatarUrl.slice(0, 1024), inline: false });
+    }
+
+    if (notes) {
+        embed.addFields({ name: 'Notizen', value: notes.slice(0, 1024), inline: false });
+    }
+
+    return embed;
 }
 
 function buildActionsRow({ ownerDiscordId, hasCharacters }) {
@@ -81,20 +119,20 @@ module.exports = {
 
         const hasCharacters = characters.length > 0;
 
-        const embed = new EmbedBuilder()
+        const summary = new EmbedBuilder()
             .setTitle('Deine Charaktere')
             .setColor(0x4f46e5)
             .setDescription(hasCharacters ? `Anzahl: **${characters.length}**` : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.');
 
+        const embeds = [summary];
         if (hasCharacters) {
-            embed.addFields(characters.slice(0, 25).map(buildCharacterField));
+            embeds.push(...characters.slice(0, 9).map(buildCharacterEmbed)); // + summary = max 10 embeds
         }
 
         await interaction.reply({
-            embeds: [embed],
+            embeds,
             components: [buildActionsRow({ ownerDiscordId: interaction.user.id, hasCharacters })],
             flags: MessageFlags.Ephemeral,
         });
     },
 };
-

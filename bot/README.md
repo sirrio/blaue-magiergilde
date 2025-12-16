@@ -11,6 +11,8 @@ Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden 
 Der Bot erstellt **keinen** User automatisch.
 
 - `/[prefix]-characters` - zeigt deine Charaktere und Buttons für **Bearbeiten**, **Löschen** und **Neu**.
+  - Wenn der Charakter in der App einen Avatar hat (z.B. `avatars/foo.webp`), baut der Bot daraus automatisch `${APP_URL}/storage/avatars/foo.webp` und zeigt ihn als Thumbnail.
+  - Alternativ kannst du im Discord-Modal auch einen externen Avatar-Link (https) setzen.
 
 Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
 
@@ -32,6 +34,7 @@ Setze folgende Variablen in der Root-`.env`:
 - `DISCORD_GUILD_IDS` - kommaseparierte Liste (für Guild-Commands, meist sofort sichtbar)
 - `DISCORD_COMMAND_PREFIX` - z.B. `wwt`
 - `DISCORD_OWNER_IDS` - kommaseparierte Discord User IDs (Owner-only Commands)
+- `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
 
 DB nutzt die gleichen Laravel-Variablen:
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
