@@ -65,7 +65,7 @@ async function listCharactersForDiscord(discordUser) {
     if (!userId) throw new DiscordNotLinkedError();
     const [rows] = await db.execute(
         `
-            SELECT id, name, start_tier, version, faction, external_link
+            SELECT id, name, start_tier, version, faction, external_link, avatar, notes
             FROM characters
             WHERE user_id = ?
               AND deleted_at IS NULL
@@ -81,7 +81,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
     if (!userId) throw new DiscordNotLinkedError();
     const [rows] = await db.execute(
         `
-            SELECT id, name, start_tier, version, faction, external_link, notes
+            SELECT id, name, start_tier, version, faction, external_link, avatar, notes
             FROM characters
             WHERE id = ?
               AND user_id = ?
@@ -92,7 +92,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
     return rows[0] ?? null;
 }
 
-async function createCharacterForDiscord(discordUser, { name, startTier, externalLink, notes }) {
+async function createCharacterForDiscord(discordUser, { name, startTier, externalLink, avatar, notes }) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
     const createdAt = nowSql();
@@ -104,11 +104,11 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
         const [insertCharacter] = await connection.execute(
             `
                 INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, user_id, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, user_id, created_at, updated_at)
                 VALUES
-                    (?, ?, 0, 0, 0, ?, ?, ?, ?)
+                    (?, ?, 0, 0, 0, ?, ?, ?, ?, ?)
             `,
-            [name, startTier, externalLink, userId, createdAt, createdAt],
+            [name, startTier, externalLink, avatar ?? null, userId, createdAt, createdAt],
         );
 
         const characterId = insertCharacter.insertId;
@@ -137,7 +137,7 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
     }
 }
 
-async function updateCharacterForDiscord(discordUser, characterId, { name, startTier, externalLink, notes }) {
+async function updateCharacterForDiscord(discordUser, characterId, { name, startTier, externalLink, avatar, notes }) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
     const existing = await findCharacterForDiscord(discordUser, characterId);
@@ -147,15 +147,16 @@ async function updateCharacterForDiscord(discordUser, characterId, { name, start
     const newName = typeof name === 'string' ? name : existing.name;
     const newStartTier = typeof startTier === 'string' ? startTier : existing.start_tier;
     const newExternalLink = typeof externalLink === 'string' ? externalLink : existing.external_link;
+    const newAvatar = typeof avatar === 'string' ? avatar : existing.avatar;
     const newNotes = typeof notes === 'string' ? notes : existing.notes;
 
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, avatar = ?, notes = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
-        [newName, newStartTier, newExternalLink, newNotes, updatedAt, characterId, userId],
+        [newName, newStartTier, newExternalLink, newAvatar, newNotes, updatedAt, characterId, userId],
     );
 
     return { ok: true };

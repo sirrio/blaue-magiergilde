@@ -5,6 +5,8 @@ const {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
@@ -16,6 +18,7 @@ const {
     createUserForDiscord,
     createCharacterForDiscord,
     findCharacterForDiscord,
+    listCharactersForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
 } = require('../appDb');
@@ -30,10 +33,35 @@ function isHttpUrl(urlString) {
     }
 }
 
+function resolvePublicUrl(urlOrPath) {
+    const value = String(urlOrPath || '').trim();
+    if (!value) return null;
+    if (isHttpUrl(value)) return value;
+
+    const appUrl = String(process.env.BOT_PUBLIC_APP_URL || process.env.APP_URL || '').trim();
+    if (!appUrl) return null;
+    const baseUrl = appUrl.replace(/\/$/, '');
+
+    if (value.startsWith('/')) return `${baseUrl}${value}`;
+    if (value.startsWith('storage/')) return `${baseUrl}/${value}`;
+
+    return `${baseUrl}/storage/${value}`;
+}
+
 function safeModalValue(value, max = 4000) {
     const text = String(value ?? '');
     if (text.length <= max) return text;
     return text.slice(0, max);
+}
+
+function normalizeOptionalAvatarInput(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (isHttpUrl(raw)) return raw;
+    if (raw.startsWith('/')) return raw;
+    if (raw.startsWith('storage/')) return raw;
+    if (/^[a-z0-9][a-z0-9/_-]*\.(png|jpg|jpeg|webp|gif)$/i.test(raw)) return raw;
+    return null;
 }
 
 function buildCharacterEmbed(character, title) {
@@ -41,6 +69,7 @@ function buildCharacterEmbed(character, title) {
     const name = String(character.name || '').trim() || `Charakter ${character.id}`;
     const link = String(character.external_link || '').trim();
     const notes = String(character.notes || '').trim();
+    const avatarUrl = resolvePublicUrl(character.avatar);
 
     const embed = new EmbedBuilder()
         .setTitle(title)
@@ -51,9 +80,16 @@ function buildCharacterEmbed(character, title) {
             { name: 'ID', value: String(character.id), inline: true },
         );
 
-    if (link) {
-        const formattedLink = isHttpUrl(link) ? `[Sheet öffnen](${link})` : link;
-        embed.addFields({ name: 'Link', value: formattedLink, inline: false });
+    if (isHttpUrl(link)) {
+        embed.setURL(link);
+        embed.addFields({ name: 'Link', value: `[Sheet öffnen](${link})`, inline: false });
+    } else if (link) {
+        embed.addFields({ name: 'Link', value: link, inline: false });
+    }
+
+    if (avatarUrl) {
+        embed.setThumbnail(avatarUrl);
+        embed.addFields({ name: 'Avatar', value: avatarUrl.slice(0, 1024), inline: false });
     }
 
     if (notes) {
@@ -61,6 +97,25 @@ function buildCharacterEmbed(character, title) {
     }
 
     return embed;
+}
+
+function buildCharacterSelect({ ownerDiscordId, characters, purpose }) {
+    const customId = `${purpose === 'update' ? 'characterUpdateSelect' : 'characterDeleteSelect'}_${ownerDiscordId}`;
+    const placeholder = 'Charakter auswählen…';
+
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder(placeholder)
+        .addOptions(
+            characters.slice(0, 25).map(c =>
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(String(c.name).slice(0, 100) || `Charakter ${c.id}`)
+                    .setDescription(`ID ${c.id} · ${(String(c.start_tier || '').toUpperCase() || '—')}`)
+                    .setValue(String(c.id)),
+            ),
+        );
+
+    return new ActionRowBuilder().addComponents(select);
 }
 
 module.exports = {
@@ -125,6 +180,104 @@ module.exports = {
             }
         }
 
+        if (interaction.isButton() && interaction.customId.startsWith('charactersAction_')) {
+            const [, action, ownerDiscordId] = interaction.customId.split('_');
+
+            if (String(interaction.user.id) !== String(ownerDiscordId)) {
+                await interaction.reply({ content: 'Du kannst diese Aktion nicht ausführen.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (!interaction.inGuild()) {
+                await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            if (action === 'new') {
+                const modal = new ModalBuilder()
+                    .setCustomId('registerCharacterModal')
+                    .setTitle('Charakter erstellen');
+
+                const nameInput = new TextInputBuilder()
+                    .setCustomId('regName')
+                    .setLabel('Charaktername')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const tierInput = new TextInputBuilder()
+                    .setCustomId('regTier')
+                    .setLabel('Start-Tier')
+                    .setPlaceholder('bt | lt | ht')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const urlInput = new TextInputBuilder()
+                    .setCustomId('regUrl')
+                    .setLabel('External Link (URL)')
+                    .setPlaceholder('https://...')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                const avatarInput = new TextInputBuilder()
+                    .setCustomId('regAvatar')
+                    .setLabel('Avatar (optional, URL)')
+                    .setPlaceholder('https://... oder /storage/... (öffentlich)')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false);
+
+                const notesInput = new TextInputBuilder()
+                    .setCustomId('regNotes')
+                    .setLabel('Notizen')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(false);
+
+                modal.addComponents(
+                    new ActionRowBuilder().addComponents(nameInput),
+                    new ActionRowBuilder().addComponents(tierInput),
+                    new ActionRowBuilder().addComponents(urlInput),
+                    new ActionRowBuilder().addComponents(avatarInput),
+                    new ActionRowBuilder().addComponents(notesInput),
+                );
+
+                await interaction.showModal(modal);
+                return;
+            }
+
+            if (action !== 'update' && action !== 'delete') {
+                await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            let characters;
+            try {
+                characters = await listCharactersForDiscord(interaction.user);
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.reply({ content: notLinkedContent(), flags: MessageFlags.Ephemeral });
+                    return;
+                }
+                throw error;
+            }
+
+            if (characters.length === 0) {
+                await interaction.reply({ content: 'Keine Charaktere gefunden.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
+            const row = buildCharacterSelect({
+                ownerDiscordId: interaction.user.id,
+                characters,
+                purpose: action,
+            });
+
+            await interaction.reply({
+                content: action === 'update' ? 'Welchen Charakter möchtest du bearbeiten?' : 'Welchen Charakter möchtest du löschen?',
+                components: [row],
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
+        }
+
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpdateSelect_')) {
             const [, ownerDiscordId] = interaction.customId.split('_');
 
@@ -182,6 +335,14 @@ module.exports = {
                 .setRequired(true)
                 .setValue(safeModalValue(character.external_link));
 
+            const avatarInput = new TextInputBuilder()
+                .setCustomId('updAvatar')
+                .setLabel('Avatar (optional, URL)')
+                .setPlaceholder('https://... oder /storage/... (öffentlich)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setValue(safeModalValue(character.avatar));
+
             const notesInput = new TextInputBuilder()
                 .setCustomId('updNotes')
                 .setLabel('Notizen')
@@ -193,6 +354,7 @@ module.exports = {
                 new ActionRowBuilder().addComponents(nameInput),
                 new ActionRowBuilder().addComponents(tierInput),
                 new ActionRowBuilder().addComponents(urlInput),
+                new ActionRowBuilder().addComponents(avatarInput),
                 new ActionRowBuilder().addComponents(notesInput),
             );
 
@@ -264,7 +426,7 @@ module.exports = {
             }
 
             if (action === 'deleteCharacterCancel') {
-                await interaction.update({ content: 'Abgebrochen.', components: [] });
+                await interaction.update({ content: 'Abgebrochen.', components: [], embeds: [] });
                 return;
             }
 
@@ -302,7 +464,7 @@ module.exports = {
                     });
                     return;
                 }
-                await interaction.update({ content: `Fehler beim Löschen: ${error.message}`, components: [] });
+                await interaction.update({ content: `Fehler beim Löschen: ${error.message}`, components: [], embeds: [] });
             }
             return;
         }
@@ -437,15 +599,7 @@ module.exports = {
             }).join(' ');
 
             const date = new Date(time);
-            const formattedDate = `${date.toLocaleString('de-DE', {
-                day: '2-digit',
-            })}. ${date.toLocaleString('de-DE', { month: 'long' })} ${date.toLocaleString('de-DE', {
-                year: 'numeric',
-            })} ${date.toLocaleString('de-DE', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            })}`;
+            const formattedDate = `${date.toLocaleString('de-DE', { day: '2-digit' })}. ${date.toLocaleString('de-DE', { month: 'long' })} ${date.toLocaleString('de-DE', { year: 'numeric' })} ${date.toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
 
             const announcement = `${tiers} - ${formattedDate} - von <@${data.userId}> - ${mention} - ${text}`;
             const msg = await interaction.channel.send(announcement);
@@ -469,6 +623,7 @@ module.exports = {
             const url = interaction.fields.getTextInputValue('regUrl');
             const tier = interaction.fields.getTextInputValue('regTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('regName');
+            const avatarRaw = interaction.fields.getTextInputValue('regAvatar') || '';
             const notes = interaction.fields.getTextInputValue('regNotes') || '';
 
             const allowedTiers = ['bt', 'lt', 'ht'];
@@ -482,11 +637,18 @@ module.exports = {
                 return;
             }
 
+            const avatar = normalizeOptionalAvatarInput(avatarRaw);
+            if (avatarRaw.trim() && !avatar) {
+                await interaction.reply({ content: 'Ungültiger Avatar (nur http/https oder ein Pfad wie /storage/... ).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             try {
                 const characterId = await createCharacterForDiscord(interaction.user, {
                     name: characterName,
                     startTier: tier,
                     externalLink: url,
+                    avatar,
                     notes,
                 });
 
@@ -527,6 +689,7 @@ module.exports = {
             const url = interaction.fields.getTextInputValue('updUrl');
             const tier = interaction.fields.getTextInputValue('updTier').toLowerCase();
             const characterName = interaction.fields.getTextInputValue('updName');
+            const avatarRaw = interaction.fields.getTextInputValue('updAvatar') || '';
             const notes = interaction.fields.getTextInputValue('updNotes') || '';
 
             if (!Number.isFinite(id) || id < 1) {
@@ -545,11 +708,18 @@ module.exports = {
                 return;
             }
 
+            const avatar = normalizeOptionalAvatarInput(avatarRaw);
+            if (avatarRaw.trim() && !avatar) {
+                await interaction.reply({ content: 'Ungültiger Avatar (nur http/https oder ein Pfad wie /storage/... ).', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             try {
                 const result = await updateCharacterForDiscord(interaction.user, id, {
                     name: characterName,
                     startTier: tier,
                     externalLink: url,
+                    avatar,
                     notes,
                 });
 

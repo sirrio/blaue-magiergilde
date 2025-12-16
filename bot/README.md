@@ -2,7 +2,7 @@
 
 ## Befehle
 
-Standard-Prefix ist `wwt` (z.B. `/wwt-list-characters`).
+Standard-Prefix ist `wwt` (z.B. `/wwt-characters`).
 
 ### Charaktere (App)
 
@@ -10,10 +10,9 @@ Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt 
 Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist).  
 Der Bot erstellt **keinen** User automatisch.
 
-- `/[prefix]-register-character` - erstellt einen Charakter (Modal: Name, Start-Tier, External Link, Notizen).
-- `/[prefix]-list-characters` - listet deine Charaktere (schön formatiert).
-- `/[prefix]-update-character` - wähle einen Charakter per Dropdown → Modal zum Aktualisieren.
-- `/[prefix]-unregister-character` - wähle einen Charakter per Dropdown → Bestätigung (soft delete).
+- `/[prefix]-characters` - zeigt deine Charaktere und Buttons für **Bearbeiten**, **Löschen** und **Neu**.
+  - Wenn der Charakter in der App einen Avatar hat (z.B. `avatars/foo.webp`), baut der Bot daraus automatisch `${APP_URL}/storage/avatars/foo.webp` und zeigt ihn als Thumbnail.
+  - Alternativ kannst du im Discord-Modal auch einen externen Avatar-Link (https) setzen.
 
 Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
 
@@ -35,6 +34,7 @@ Setze folgende Variablen in der Root-`.env`:
 - `DISCORD_GUILD_IDS` - kommaseparierte Liste (für Guild-Commands, meist sofort sichtbar)
 - `DISCORD_COMMAND_PREFIX` - z.B. `wwt`
 - `DISCORD_OWNER_IDS` - kommaseparierte Discord User IDs (Owner-only Commands)
+- `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
 
 DB nutzt die gleichen Laravel-Variablen:
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
