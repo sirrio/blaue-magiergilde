@@ -299,6 +299,246 @@ async function softDeleteCharacterForDiscord(discordUser, characterId) {
     }
 }
 
+function formatSqlDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+    return raw;
+}
+
+async function listAdventuresForDiscord(discordUser, characterId, limit = 25) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const safeLimit = Math.max(1, Math.min(25, Number(limit) || 25));
+    const [rows] = await db.execute(
+        `
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id
+            FROM adventures a
+            INNER JOIN characters c ON c.id = a.character_id
+            WHERE a.character_id = ?
+              AND c.user_id = ?
+              AND a.deleted_at IS NULL
+            ORDER BY a.start_date DESC, a.id DESC
+            LIMIT ${safeLimit}
+        `,
+        [characterId, userId],
+    );
+    return rows;
+}
+
+async function findAdventureForDiscord(discordUser, adventureId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute(
+        `
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id
+            FROM adventures a
+            INNER JOIN characters c ON c.id = a.character_id
+            WHERE a.id = ?
+              AND c.user_id = ?
+            LIMIT 1
+        `,
+        [adventureId, userId],
+    );
+
+    return rows[0] ?? null;
+}
+
+async function createAdventureForDiscord(discordUser, { characterId, duration, startDate, hasAdditionalBubble, notes, title, gameMaster }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const character = await findCharacterForDiscord(discordUser, characterId);
+    if (!character) return { ok: false, reason: 'character_not_found' };
+
+    const date = formatSqlDate(startDate);
+    if (!date) return { ok: false, reason: 'invalid_date' };
+
+    const safeDuration = Number(duration);
+    if (!Number.isFinite(safeDuration) || safeDuration < 0) return { ok: false, reason: 'invalid_duration' };
+
+    const createdAt = nowSql();
+    const [result] = await db.execute(
+        `
+            INSERT INTO adventures (duration, start_date, has_additional_bubble, notes, title, game_master, character_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+            Math.floor(safeDuration),
+            date,
+            hasAdditionalBubble ? 1 : 0,
+            notes ?? null,
+            title ?? null,
+            gameMaster ?? null,
+            characterId,
+            createdAt,
+            createdAt,
+        ],
+    );
+
+    return { ok: true, id: result.insertId };
+}
+
+async function updateAdventureForDiscord(discordUser, adventureId, { duration, startDate, notes, title, gameMaster }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findAdventureForDiscord(discordUser, adventureId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    const date = formatSqlDate(startDate) || existing.start_date;
+    const safeDuration = Number.isFinite(Number(duration)) ? Math.floor(Number(duration)) : existing.duration;
+    const newNotes = typeof notes === 'string' ? notes : existing.notes;
+    const newTitle = typeof title === 'string' ? title : existing.title;
+    const newGameMaster = typeof gameMaster === 'string' ? gameMaster : existing.game_master;
+
+    await db.execute(
+        `
+            UPDATE adventures
+            SET duration = ?, start_date = ?, notes = ?, title = ?, game_master = ?, updated_at = ?
+            WHERE id = ?
+        `,
+        [safeDuration, date, newNotes ?? null, newTitle ?? null, newGameMaster ?? null, nowSql(), adventureId],
+    );
+
+    return { ok: true };
+}
+
+async function softDeleteAdventureForDiscord(discordUser, adventureId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findAdventureForDiscord(discordUser, adventureId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    await db.execute(
+        `
+            UPDATE adventures a
+            INNER JOIN characters c ON c.id = a.character_id
+            SET a.deleted_at = ?, a.updated_at = ?
+            WHERE a.id = ? AND c.user_id = ? AND a.deleted_at IS NULL
+        `,
+        [nowSql(), nowSql(), adventureId, userId],
+    );
+
+    return { ok: true };
+}
+
+async function listDowntimesForDiscord(discordUser, characterId, limit = 25) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const safeLimit = Math.max(1, Math.min(25, Number(limit) || 25));
+    const [rows] = await db.execute(
+        `
+            SELECT d.id, d.duration, d.start_date, d.type, d.notes, d.character_id
+            FROM downtimes d
+            INNER JOIN characters c ON c.id = d.character_id
+            WHERE d.character_id = ?
+              AND c.user_id = ?
+              AND d.deleted_at IS NULL
+            ORDER BY d.start_date DESC, d.id DESC
+            LIMIT ${safeLimit}
+        `,
+        [characterId, userId],
+    );
+    return rows;
+}
+
+async function findDowntimeForDiscord(discordUser, downtimeId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute(
+        `
+            SELECT d.id, d.duration, d.start_date, d.type, d.notes, d.character_id
+            FROM downtimes d
+            INNER JOIN characters c ON c.id = d.character_id
+            WHERE d.id = ?
+              AND c.user_id = ?
+            LIMIT 1
+        `,
+        [downtimeId, userId],
+    );
+
+    return rows[0] ?? null;
+}
+
+async function createDowntimeForDiscord(discordUser, { characterId, duration, startDate, type, notes }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const character = await findCharacterForDiscord(discordUser, characterId);
+    if (!character) return { ok: false, reason: 'character_not_found' };
+
+    const date = formatSqlDate(startDate);
+    if (!date) return { ok: false, reason: 'invalid_date' };
+
+    const safeDuration = Number(duration);
+    if (!Number.isFinite(safeDuration) || safeDuration < 0) return { ok: false, reason: 'invalid_duration' };
+
+    const safeType = String(type || '').trim().toLowerCase();
+    if (safeType !== 'faction' && safeType !== 'other') return { ok: false, reason: 'invalid_type' };
+
+    const createdAt = nowSql();
+    const [result] = await db.execute(
+        `
+            INSERT INTO downtimes (duration, start_date, type, notes, character_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [Math.floor(safeDuration), date, safeType, notes ?? null, characterId, createdAt, createdAt],
+    );
+
+    return { ok: true, id: result.insertId };
+}
+
+async function updateDowntimeForDiscord(discordUser, downtimeId, { duration, startDate, type, notes }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findDowntimeForDiscord(discordUser, downtimeId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    const date = formatSqlDate(startDate) || existing.start_date;
+    const safeDuration = Number.isFinite(Number(duration)) ? Math.floor(Number(duration)) : existing.duration;
+    const safeType = String(type || existing.type || '').trim().toLowerCase();
+    if (safeType !== 'faction' && safeType !== 'other') return { ok: false, reason: 'invalid_type' };
+    const newNotes = typeof notes === 'string' ? notes : existing.notes;
+
+    await db.execute(
+        `
+            UPDATE downtimes
+            SET duration = ?, start_date = ?, type = ?, notes = ?, updated_at = ?
+            WHERE id = ?
+        `,
+        [safeDuration, date, safeType, newNotes ?? null, nowSql(), downtimeId],
+    );
+
+    return { ok: true };
+}
+
+async function softDeleteDowntimeForDiscord(discordUser, downtimeId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findDowntimeForDiscord(discordUser, downtimeId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    await db.execute(
+        `
+            UPDATE downtimes d
+            INNER JOIN characters c ON c.id = d.character_id
+            SET d.deleted_at = ?, d.updated_at = ?
+            WHERE d.id = ? AND c.user_id = ? AND d.deleted_at IS NULL
+        `,
+        [nowSql(), nowSql(), downtimeId, userId],
+    );
+
+    return { ok: true };
+}
+
 module.exports = {
     DiscordNotLinkedError,
     getLinkedUserIdForDiscord,
@@ -308,4 +548,14 @@ module.exports = {
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
+    listAdventuresForDiscord,
+    findAdventureForDiscord,
+    createAdventureForDiscord,
+    updateAdventureForDiscord,
+    softDeleteAdventureForDiscord,
+    listDowntimesForDiscord,
+    findDowntimeForDiscord,
+    createDowntimeForDiscord,
+    updateDowntimeForDiscord,
+    softDeleteDowntimeForDiscord,
 };

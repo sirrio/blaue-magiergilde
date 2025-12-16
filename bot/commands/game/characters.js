@@ -46,9 +46,9 @@ function safeInt(value, fallback = 0) {
 }
 
 function secondsToHourMinuteString(seconds) {
-    const s = Math.max(0, safeInt(seconds, 0));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
+    const total = Math.max(0, safeInt(seconds, 0));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
     const parts = [];
     if (h > 0) parts.push(`${h}h`);
     if (m > 0) parts.push(`${m}m`);
@@ -104,11 +104,11 @@ function calculateBubblesInCurrentLevel(character, level) {
 }
 
 function buildProgressBar(current, total, width = 10) {
-    if (total <= 0) return '—';
+    if (total <= 0) return '\u2014';
     const ratio = Math.max(0, Math.min(1, current / total));
     const filled = Math.round(ratio * width);
     const empty = Math.max(0, width - filled);
-    return `${'█'.repeat(filled)}${'░'.repeat(empty)} ${(ratio * 100).toFixed(0)}%`;
+    return `${'\u2588'.repeat(filled)}${'\u2591'.repeat(empty)} ${(ratio * 100).toFixed(0)}%`;
 }
 
 function calculateFactionLevel(character, level, tier) {
@@ -164,7 +164,6 @@ function tryBuildLocalAvatarAttachment(character) {
 
     const ext = path.extname(filePath) || '.png';
     const safeName = `avatar_${character.id}${ext}`.slice(0, 100);
-
     return { filePath, fileName: safeName };
 }
 
@@ -172,7 +171,6 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level);
     const classNames = String(character.class_names || '').trim();
-    const titleSuffix = classNames ? ` · Level ${level} ${classNames}` : ` · Level ${level}`;
 
     const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -188,14 +186,21 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
 
+    const titleParts = [
+        String(character.name || `Charakter ${character.id}`),
+        tier,
+        `Level ${level}`,
+        classNames,
+    ].filter(Boolean);
+
     const embed = new EmbedBuilder()
         .setColor(0x4f46e5)
-        .setTitle(`${character.name} · ${tier}${titleSuffix}`)
+        .setTitle(titleParts.join(' \u00b7 '))
         .addFields(
             { name: 'Fortschritt', value: `${buildProgressBar(inCurrent, toNextTotal)}\nNoch: **${toNext}** Bubble(s)`, inline: false },
             { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
             { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },
-            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} · Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
+            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} \u00b7 Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );
@@ -203,7 +208,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const link = String(character.external_link || '').trim();
     if (isHttpUrl(link)) {
         embed.setURL(link);
-        embed.setDescription(`[Sheet öffnen](${link})`);
+        embed.setDescription(`[Sheet \u00f6ffnen](${link})`);
     }
 
     if (thumbnailUrlOrAttachment) {
@@ -213,18 +218,8 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildActionsRow({ ownerDiscordId, hasCharacters }) {
+function buildSummaryRow(ownerDiscordId) {
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersAction_update_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(!hasCharacters),
-        new ButtonBuilder()
-            .setCustomId(`charactersAction_delete_${ownerDiscordId}`)
-            .setLabel('Löschen')
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(!hasCharacters),
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
             .setLabel('Neu')
@@ -232,10 +227,32 @@ function buildActionsRow({ ownerDiscordId, hasCharacters }) {
     );
 }
 
+function buildCharacterCardRow({ ownerDiscordId, characterId, isFiller }) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
+            .setLabel('Bearbeiten')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
+            .setLabel('Abenteuer')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
+            .setLabel('Downtime')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(Boolean(isFiller)),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
+            .setLabel('L\u00f6schen')
+            .setStyle(ButtonStyle.Danger),
+    );
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription('Deine Charaktere (Dashboard) inkl. Bearbeiten/Löschen/Neu.'),
+        .setDescription('Deine Charaktere (Dashboard) inkl. Bearbeiten/L\u00f6schen/Neu.'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
             await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
@@ -253,44 +270,40 @@ module.exports = {
             throw error;
         }
 
-        const hasCharacters = characters.length > 0;
-
         const summary = new EmbedBuilder()
             .setTitle('Your Characters')
             .setColor(0x4f46e5)
-            .setDescription(hasCharacters ? `**${characters.length}** aktiv` : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.');
+            .setDescription(characters.length > 0 ? `**${characters.length}** aktiv` : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.');
 
-        if (!hasCharacters) {
-            await interaction.reply({
-                embeds: [summary],
-                components: [buildActionsRow({ ownerDiscordId: interaction.user.id, hasCharacters })],
-                flags: MessageFlags.Ephemeral,
-            });
-            return;
-        }
+        await interaction.reply({
+            embeds: [summary],
+            components: [buildSummaryRow(interaction.user.id)],
+            flags: MessageFlags.Ephemeral,
+        });
 
-        const embeds = [summary];
-        const files = [];
-
-        for (const character of characters.slice(0, 6)) {
+        for (const character of characters.slice(0, 8)) {
             const attachment = tryBuildLocalAvatarAttachment(character);
             const url = resolvePublicAvatarUrl(character.avatar);
 
+            const files = [];
+            let thumbnail = url;
             if (attachment) {
                 files.push({ attachment: attachment.filePath, name: attachment.fileName });
-                embeds.push(buildCharacterEmbed(character, { thumbnailUrlOrAttachment: `attachment://${attachment.fileName}` }));
-                continue;
+                thumbnail = `attachment://${attachment.fileName}`;
             }
 
-            embeds.push(buildCharacterEmbed(character, { thumbnailUrlOrAttachment: url }));
+            // eslint-disable-next-line no-await-in-loop
+            await interaction.followUp({
+                embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail })],
+                components: [buildCharacterCardRow({
+                    ownerDiscordId: interaction.user.id,
+                    characterId: character.id,
+                    isFiller: character.is_filler,
+                })],
+                files,
+                flags: MessageFlags.Ephemeral,
+            });
         }
-
-        await interaction.reply({
-            embeds,
-            components: [buildActionsRow({ ownerDiscordId: interaction.user.id, hasCharacters })],
-            files,
-            flags: MessageFlags.Ephemeral,
-        });
     },
 };
 
