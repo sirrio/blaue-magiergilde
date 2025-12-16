@@ -1,7 +1,19 @@
 const { REST, Routes } = require('discord.js');
-const { clientId, guildId, guildIds, token } = require('./config.json');
+const { clientId, guildIds, token } = require('./config');
 const fs = require('node:fs');
 const path = require('node:path');
+
+if (!token) {
+    // eslint-disable-next-line no-console
+    console.error('Missing bot token. Set DISCORD_BOT_TOKEN in the root .env.');
+    process.exit(1);
+}
+
+if (!clientId) {
+    // eslint-disable-next-line no-console
+    console.error('Missing clientId. Set DISCORD_CLIENT_ID in the root .env.');
+    process.exit(1);
+}
 
 const commands = [];
 const foldersPath = path.join(__dirname, 'commands');
@@ -28,7 +40,7 @@ const rest = new REST().setToken(token);
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
         const guildIdList = Array.isArray(guildIds) ? guildIds.filter(Boolean) : [];
-        const targetGuildIds = guildIdList.length > 0 ? guildIdList : (guildId ? [guildId] : []);
+        const targetGuildIds = guildIdList.length > 0 ? guildIdList : [];
 
         if (targetGuildIds.length === 0) {
             const data = await rest.put(Routes.applicationCommands(clientId), { body: commands });
