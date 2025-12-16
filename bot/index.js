@@ -1,8 +1,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
-require('dotenv').config();
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
-const { token } = require('./config.json');
+const { token } = require('./config');
+
+if (!token) {
+    // eslint-disable-next-line no-console
+    console.error('Missing bot token. Set DISCORD_BOT_TOKEN in the root .env.');
+    process.exit(1);
+}
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 

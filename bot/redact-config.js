@@ -1,5 +1,4 @@
-const fs = require('node:fs');
-const path = require('node:path');
+const config = require('./config');
 
 function redactValue(value) {
     if (value === null || value === undefined) return value;
@@ -22,13 +21,9 @@ function redactConfig(config) {
 }
 
 function main() {
-    const configPath = path.join(__dirname, 'config.json');
-    const raw = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(raw);
     const redacted = redactConfig(config);
     process.stdout.write(JSON.stringify(redacted, null, 2));
     process.stdout.write('\n');
 }
 
 main();
-

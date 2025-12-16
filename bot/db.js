@@ -1,21 +1,22 @@
 const mysql = require('mysql2/promise');
+require('./env');
 
-let config = {};
-try {
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    config = require('./config.json');
-} catch {
-    config = {};
+const host = (process.env.DB_HOST || '127.0.0.1').trim();
+const user = (process.env.DB_USERNAME || process.env.DB_USER || '').trim();
+const password = process.env.DB_PASSWORD ?? '';
+const database = (process.env.DB_DATABASE || process.env.DB_NAME || '').trim();
+const port = process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306;
+
+if (!user || !database) {
+    throw new Error('Bot DB not configured. Set DB_USERNAME and DB_DATABASE in the root .env.');
 }
 
-const dbConfig = config.db || {};
-
 const pool = mysql.createPool({
-    host: process.env.DB_HOST ?? dbConfig.host,
-    user: process.env.DB_USER ?? process.env.DB_USERNAME ?? dbConfig.user ?? dbConfig.username,
-    password: process.env.DB_PASSWORD ?? dbConfig.password,
-    database: process.env.DB_NAME ?? process.env.DB_DATABASE ?? dbConfig.database ?? dbConfig.name,
-    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : (dbConfig.port ? Number(dbConfig.port) : undefined),
+    host,
+    user,
+    password,
+    database,
+    port,
 });
 
 module.exports = pool;
