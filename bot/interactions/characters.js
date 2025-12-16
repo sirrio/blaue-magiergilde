@@ -80,13 +80,6 @@ function parseDurationToSeconds(input) {
     return null;
 }
 
-function secondsToHoursMinutes(seconds) {
-    const total = Math.max(0, Number(seconds) || 0);
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.floor((total % 3600) / 60);
-    return { hours, minutes };
-}
-
 function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -556,6 +549,12 @@ async function handle(interaction) {
             .setStyle(TextInputStyle.Short)
             .setRequired(false);
 
+        const gmInput = new TextInputBuilder()
+            .setCustomId('advGm')
+            .setLabel('Game Master (optional)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false);
+
         const bonusInput = new TextInputBuilder()
             .setCustomId('advBonus')
             .setLabel('Bonus Bubble (+1)?')
@@ -564,18 +563,12 @@ async function handle(interaction) {
             .setRequired(true)
             .setValue('nein');
 
-        const notesInput = new TextInputBuilder()
-            .setCustomId('advNotes')
-            .setLabel('Notizen (optional)')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false);
-
         modal.addComponents(
             new ActionRowBuilder().addComponents(durationInput),
             new ActionRowBuilder().addComponents(dateInput),
             new ActionRowBuilder().addComponents(titleInput),
+            new ActionRowBuilder().addComponents(gmInput),
             new ActionRowBuilder().addComponents(bonusInput),
-            new ActionRowBuilder().addComponents(notesInput),
         );
 
         await interaction.showModal(modal);
@@ -595,8 +588,8 @@ async function handle(interaction) {
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('advDuration'));
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('advDate'));
         const title = (interaction.fields.getTextInputValue('advTitle') || '').trim();
+        const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
         const bonusRaw = String(interaction.fields.getTextInputValue('advBonus') || '').trim().toLowerCase();
-        const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
 
         const hasAdditionalBubble = ['1', 'true', 'ja', 'j', 'yes', 'y', '+1'].includes(bonusRaw);
 
@@ -615,9 +608,9 @@ async function handle(interaction) {
                 duration,
                 startDate,
                 hasAdditionalBubble,
-                notes,
+                notes: '',
                 title,
-                gameMaster: null,
+                gameMaster,
             });
 
             if (!result.ok) {
@@ -720,19 +713,12 @@ async function handle(interaction) {
             .setRequired(true)
             .setValue('other');
 
-        const hoursInput = new TextInputBuilder()
-            .setCustomId('dtHours')
-            .setLabel('Stunden')
+        const durationInput = new TextInputBuilder()
+            .setCustomId('dtDuration')
+            .setLabel('Dauer (HH:MM oder Minuten)')
+            .setPlaceholder('03:00')
             .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue('0');
-
-        const minutesInput = new TextInputBuilder()
-            .setCustomId('dtMinutes')
-            .setLabel('Minuten')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue('0');
+            .setRequired(true);
 
         const dateInput = new TextInputBuilder()
             .setCustomId('dtDate')
@@ -749,8 +735,7 @@ async function handle(interaction) {
 
         modal.addComponents(
             new ActionRowBuilder().addComponents(typeInput),
-            new ActionRowBuilder().addComponents(hoursInput),
-            new ActionRowBuilder().addComponents(minutesInput),
+            new ActionRowBuilder().addComponents(durationInput),
             new ActionRowBuilder().addComponents(dateInput),
             new ActionRowBuilder().addComponents(notesInput),
         );
@@ -780,25 +765,18 @@ async function handle(interaction) {
             return true;
         }
 
-        const hours = Number(String(interaction.fields.getTextInputValue('dtHours') || '').trim());
-        const minutes = Number(String(interaction.fields.getTextInputValue('dtMinutes') || '').trim());
+        const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('dtDate'));
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
-        if (!Number.isFinite(hours) || hours < 0 || !Number.isInteger(hours)) {
-            await interaction.reply({ content: 'Ung\u00fcltige Stunden.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-        if (!Number.isFinite(minutes) || minutes < 0 || minutes > 59 || !Number.isInteger(minutes)) {
-            await interaction.reply({ content: 'Ung\u00fcltige Minuten (0\u201359).', flags: MessageFlags.Ephemeral });
+        if (duration === null) {
+            await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
             await interaction.reply({ content: 'Ung\u00fcltiges Datum. Nutze YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
-
-        const duration = hours * 3600 + minutes * 60;
 
         try {
             const result = await createDowntimeForDiscord(interaction.user, {
@@ -1006,19 +984,11 @@ async function handle(interaction) {
             .setRequired(false)
             .setValue(safeModalValue(adventure.game_master));
 
-        const notesInput = new TextInputBuilder()
-            .setCustomId('advNotes')
-            .setLabel('Notizen (optional)')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false)
-            .setValue(safeModalValue(adventure.notes));
-
         modal.addComponents(
             new ActionRowBuilder().addComponents(durationInput),
             new ActionRowBuilder().addComponents(dateInput),
             new ActionRowBuilder().addComponents(titleInput),
             new ActionRowBuilder().addComponents(gmInput),
-            new ActionRowBuilder().addComponents(notesInput),
         );
 
         await interaction.showModal(modal);
@@ -1040,7 +1010,6 @@ async function handle(interaction) {
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('advDate'));
         const title = (interaction.fields.getTextInputValue('advTitle') || '').trim();
         const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
-        const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
 
         if (duration === null) {
             await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
@@ -1055,7 +1024,7 @@ async function handle(interaction) {
             const result = await updateAdventureForDiscord(interaction.user, adventureId, {
                 duration,
                 startDate,
-                notes,
+                notes: '',
                 title,
                 gameMaster,
             });
@@ -1227,8 +1196,6 @@ async function handle(interaction) {
             return true;
         }
 
-        const parts = secondsToHoursMinutes(downtime.duration);
-
         const modal = new ModalBuilder()
             .setCustomId(`dtUpdateModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
             .setTitle('Downtime bearbeiten');
@@ -1241,19 +1208,12 @@ async function handle(interaction) {
             .setRequired(true)
             .setValue(String(downtime.type || 'other'));
 
-        const hoursInput = new TextInputBuilder()
-            .setCustomId('dtHours')
-            .setLabel('Stunden')
+        const durationInput = new TextInputBuilder()
+            .setCustomId('dtDuration')
+            .setLabel('Dauer (HH:MM oder Minuten)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
-            .setValue(String(parts.hours));
-
-        const minutesInput = new TextInputBuilder()
-            .setCustomId('dtMinutes')
-            .setLabel('Minuten')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(String(parts.minutes));
+            .setValue(formatDuration(downtime.duration));
 
         const dateInput = new TextInputBuilder()
             .setCustomId('dtDate')
@@ -1271,8 +1231,7 @@ async function handle(interaction) {
 
         modal.addComponents(
             new ActionRowBuilder().addComponents(typeInput),
-            new ActionRowBuilder().addComponents(hoursInput),
-            new ActionRowBuilder().addComponents(minutesInput),
+            new ActionRowBuilder().addComponents(durationInput),
             new ActionRowBuilder().addComponents(dateInput),
             new ActionRowBuilder().addComponents(notesInput),
         );
@@ -1292,8 +1251,7 @@ async function handle(interaction) {
             return true;
         }
 
-        const hours = Number(String(interaction.fields.getTextInputValue('dtHours') || '').trim());
-        const minutes = Number(String(interaction.fields.getTextInputValue('dtMinutes') || '').trim());
+        const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
         const typeRaw = String(interaction.fields.getTextInputValue('dtType') || '').trim().toLowerCase();
         const normalizedType = (() => {
             if (['faction', 'f', '1'].includes(typeRaw)) return 'faction';
@@ -1307,20 +1265,14 @@ async function handle(interaction) {
             await interaction.reply({ content: 'Ung\u00fcltiger Typ. Nutze `faction` oder `other`.', flags: MessageFlags.Ephemeral });
             return true;
         }
-        if (!Number.isFinite(hours) || hours < 0 || !Number.isInteger(hours)) {
-            await interaction.reply({ content: 'Ung\u00fcltige Stunden.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-        if (!Number.isFinite(minutes) || minutes < 0 || minutes > 59 || !Number.isInteger(minutes)) {
-            await interaction.reply({ content: 'Ung\u00fcltige Minuten (0\u201359).', flags: MessageFlags.Ephemeral });
+        if (duration === null) {
+            await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
             await interaction.reply({ content: 'Ung\u00fcltiges Datum. Nutze YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
-
-        const duration = hours * 3600 + minutes * 60;
 
         try {
             const result = await updateDowntimeForDiscord(interaction.user, downtimeId, {
