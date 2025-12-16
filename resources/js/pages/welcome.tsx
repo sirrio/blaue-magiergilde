@@ -1,77 +1,248 @@
 import LegalLinks from '@/components/legal-links'
-import { Button } from '@/components/ui/button'
 import DiscordIcon from '@/components/discord-icon'
+import { Button } from '@/components/ui/button'
+import { Card, CardBody, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Head, Link, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
-import { format } from 'date-fns'
-import type { ElementType } from 'react'
-import { z } from 'zod'
+import { Head, Link, usePage } from '@inertiajs/react'
+import { BookOpen, CalendarCheck2, Compass, Crown, ScrollText, Sparkles, Users } from 'lucide-react'
+import type { ElementType, ReactNode } from 'react'
 
-const mySchema = z.string()
+const DISCORD_INVITE_URL = 'https://discord.gg/dd5c'
+const FAQ_URL = 'https://docs.google.com/document/d/13J4LiV4o2RygG2j35LLQC4Dyh_-B94om7EiSAl_I15c'
 
-mySchema.parse('tuna') // => "tuna"
+function InfoChip({ children }: { children: ReactNode }) {
+  return <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-white/80">{children}</span>
+}
 
-mySchema.safeParse('tuna') // => { success: true; data: "tuna" }
-mySchema.safeParse(12) // => { success: false; error: ZodError }
-format(new Date(), "'Today is a' eeee")
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+      <div className="text-xs opacity-70">{label}</div>
+      <div className="mt-1 text-sm font-semibold">{value}</div>
+    </div>
+  )
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  body,
+}: {
+  icon: typeof Users
+  title: string
+  body: string
+}) {
+  return (
+    <Card className="border border-white/10 bg-white/5 shadow-xl backdrop-blur">
+      <CardBody className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
+            <Icon size={18} />
+          </span>
+          <CardTitle className="text-base">{title}</CardTitle>
+        </div>
+        <p className="text-sm opacity-80">{body}</p>
+      </CardBody>
+    </Card>
+  )
+}
 
 export default function Welcome() {
   const { features } = usePage<PageProps>().props
+  const appLabel = features.character_manager ? 'App Login / Charaktermanager' : 'App Login'
 
   return (
     <>
-      <Head title="Welcome"></Head>
-      <div className={cn('hero bg-base-300 relative min-h-screen overflow-hidden')} data-theme={'light'}>
-        <div className="absolute inset-0 grayscale-[60%] hue-rotate-[3.5rad] ">
-          <img src="/images/bg-dragon.webp" className="h-full md:hidden object-cover" alt="" />
-          <img src="/images/bg-dragon-torn.webp" className="h-full w-full object-cover hidden md:block" alt="" />
-        </div>
-        <div className={cn('hero-content relative z-10 flex-col bg-transparent lg:flex-row-reverse')} data-theme={'dark'}>
-          <img src="/images/icon_magiergilde_white.svg" className={cn('max-w-sm rounded-lg')} alt="Blaue Magiergilde" />
-          <div>
-            <h1 className={cn('text-5xl font-bold')}>Blaue Magiergilde</h1>
-            <p className={cn('py-6')}>
-              Hier kannst du deine Charaktere und gespielten Runden speichern. Deine Ressourcen und Level werden automatisch berechnet – so hast du
-              alles im Blick und kannst dich voll und ganz auf dein Spiele konzentrieren!
-            </p>
-            <div className={cn('flex gap-2 flex-wrap')}>
-              <Button
-                as="a"
-                href="https://discord.gg/dd5c"
-                color="info"
-                className="gap-2"
-                target="_blank"
-              >
-                <DiscordIcon width={24} />
-                Mitmachen im DD5C-Discord
-              </Button>
-              {!features.character_manager ? (
-                <div className="tooltip" data-tip="comming soon">
-                  <Button
-                    as={Link as ElementType}
-                    href={route('login')}
-                    variant={'outline'}
-                    disabled
-                  >
-                    Charactermanger
-                  </Button>
+      <Head title="Blaue Magiergilde" />
+
+      <div className="min-h-screen bg-[#070A12] text-white">
+        <section className={cn('relative overflow-hidden')}>
+          <div className="absolute inset-0">
+            <img src="/images/bg-dragon.webp" className="h-full w-full object-cover opacity-45" alt="" />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-[#070A12]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_80%_30%,rgba(14,165,233,0.16),transparent_45%)]" />
+
+          <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-6 md:pb-20 md:pt-10">
+            <header className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <img src="/images/icon_magiergilde.svg" className="h-9 w-9" alt="Blaue Magiergilde" />
+                <div className="leading-tight">
+                  <div className="text-sm font-semibold">Blaue Magiergilde</div>
+                  <div className="text-xs opacity-70">Offenes D&amp;D-Spielsystem</div>
                 </div>
-              ) : (
+              </div>
+
+              <div className="flex items-center gap-2">
                 <Button
                   as={Link as ElementType}
                   href={route('login')}
-                  variant={'outline'}
+                  className="gap-2 bg-white/10 text-white hover:bg-white/15"
+                  variant="outline"
                 >
-                  Charactermanger
+                  <ScrollText size={18} />
+                  {appLabel}
                 </Button>
-              )}
+                <Button as="a" href={DISCORD_INVITE_URL} color="info" className="gap-2" target="_blank" rel="noreferrer">
+                  <DiscordIcon width={20} />
+                  Discord
+                </Button>
+              </div>
+            </header>
+
+            <div className="mt-14 grid items-start gap-10 lg:mt-20 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
+                  <Sparkles size={14} />
+                  Community-first · Westmarch-artig · Flexibel
+                </div>
+
+                <div className="space-y-3">
+                  <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
+                    Spiele D&amp;D, wann du Zeit hast.
+                    <span className="block bg-gradient-to-r from-sky-300 via-indigo-300 to-purple-300 bg-clip-text text-transparent">
+                      In einer freundlichen Gilde.
+                    </span>
+                  </h1>
+                  <p className="max-w-2xl text-base text-white/85 md:text-lg">
+                    Die Blaue Magiergilde ist ein offenes Spielsystem, in dem Spieler:innen und Spielleiter:innen gemeinsam magische
+                    Geschichten erleben - ohne Kampagnenzwang, aber mit langfristiger Charakterentwicklung.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button as="a" href={DISCORD_INVITE_URL} color="info" className="gap-2" target="_blank" rel="noreferrer">
+                    <DiscordIcon width={20} />
+                    Discord beitreten
+                  </Button>
+                  <Button
+                    as={Link as ElementType}
+                    href={route('login')}
+                    color="primary"
+                    className="gap-2"
+                  >
+                    <ScrollText size={18} />
+                    {appLabel}
+                  </Button>
+                </div>
+                <a href={FAQ_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
+                  <BookOpen size={16} />
+                  FAQ oeffnen
+                </a>
+
+                <div className="flex flex-wrap gap-2 text-xs text-white/75">
+                  <InfoChip>Einsteiger:innen &amp; Erfahrene</InfoChip>
+                  <InfoChip>Respektvolles Miteinander</InfoChip>
+                  <InfoChip>Gemeinsames Setting</InfoChip>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Stat label="Format" value="Offenes Westmarch-System" />
+                  <Stat label="Fokus" value="Community-first & Fair Play" />
+                  <Stat label="Spielstil" value="Oneshots & Runden" />
+                  <Stat label="Progression" value="Charakterentwicklung inklusive" />
+                </div>
+
+                <div
+                  className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl"
+                  style={{ backgroundImage: "url('/images/bg-dragon-torn.webp')" }}
+                >
+                  <div className="absolute inset-0 bg-black/55" />
+                  <div className="relative p-6">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <Crown size={16} />
+                      Wer wir sind
+                    </div>
+                    <p className="mt-2 text-sm text-white/80">
+                      Eine offene Gemeinschaft von Spieler:innen und DMs. Wir setzen auf ein freundliches, respektvolles Miteinander
+                      und darauf, dass jede:r sich in der Runde wohl fuehlt.
+                    </p>
+                    <p className="mt-3 text-xs text-white/65">
+                      Platzhalter-Bildvorschlag: Gruppenfoto/Session-Szene oder Artwork der Gilde (z.B. Wappen/Blau-Magie-Motiv).
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-      <div className="bg-base-300 h-fit w-fit md:text-base-content text-info" data-theme={'light'}>
-        <LegalLinks />
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 py-14">
+          <div className="grid gap-4 md:grid-cols-3">
+            <FeatureCard
+              icon={CalendarCheck2}
+              title="Flexibel spielen"
+              body="Runden finden statt, wenn du Zeit hast. Keine langfristigen Verpflichtungen wie bei klassischen Kampagnen."
+            />
+            <FeatureCard
+              icon={Users}
+              title="Fuer alle Erfahrungsstufen"
+              body="Ob du gerade erst startest oder schon lange spielst: Bei uns findest du passende Runden und Unterstuetzung."
+            />
+            <FeatureCard
+              icon={Compass}
+              title="Leiten willkommen"
+              body="Du willst leiten? Sehr gern. Es gibt einen gemeinsamen Rahmen und Support, damit der Einstieg leicht faellt."
+            />
+          </div>
+        </section>
+
+        <section className="border-y border-white/10 bg-white/[0.03]">
+          <div className="mx-auto max-w-6xl px-4 py-14">
+            <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+              <Card className="border border-white/10 bg-white/5 shadow-xl">
+                <CardBody className="space-y-3">
+                  <CardTitle className="text-lg">Starte in 2 Klicks</CardTitle>
+                  <p className="text-sm text-white/80">
+                    Der schnellste Einstieg: Discord beitreten und direkt Teil der Community werden. Wenn du die App nutzen willst,
+                    logge dich mit deinem Account ein.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button as="a" href={DISCORD_INVITE_URL} color="info" className="gap-2" target="_blank" rel="noreferrer">
+                      <DiscordIcon width={20} />
+                      Discord
+                    </Button>
+                    <Button as={Link as ElementType} href={route('login')} color="primary" className="gap-2">
+                      <ScrollText size={18} />
+                      {appLabel}
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+
+              <Card className="border border-white/10 bg-white/5 shadow-xl">
+                <CardBody className="space-y-3">
+                  <CardTitle className="text-lg">Was dich erwartet</CardTitle>
+                  <ul className="space-y-2 text-sm text-white/80">
+                    <li className="flex gap-2">
+                      <span className="mt-0.5 text-white/60">•</span> Offenes Spielsystem im gemeinsamen Setting (Faerun und darueber
+                      hinaus).
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="mt-0.5 text-white/60">•</span> Community, die Newcomer unterstuetzt und kreativen Ideen Raum
+                      gibt.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="mt-0.5 text-white/60">•</span> Ein klarer Rahmen - aber genug Freiheit fuer magische Geschichten.
+                    </li>
+                  </ul>
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        <footer className="bg-[#070A12]">
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-4 py-10 text-center">
+            <p className="text-sm text-white/60">(c) {new Date().getFullYear()} Blaue Magiergilde</p>
+            <div className="text-white/70">
+              <LegalLinks variant="inline" />
+            </div>
+          </div>
+        </footer>
       </div>
     </>
   )
