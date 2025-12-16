@@ -49,8 +49,8 @@ function FeatureCard({
 }
 
 export default function Welcome() {
-  const { features } = usePage<PageProps>().props
-  const appLabel = features.character_manager ? 'App Login / Charaktermanager' : 'App Login'
+  usePage<PageProps>().props
+  const appLabel = 'App Login'
 
   return (
     <>
@@ -67,7 +67,7 @@ export default function Welcome() {
           <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-6 md:pb-20 md:pt-10">
             <header className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <img src="/images/icon_magiergilde.svg" className="h-9 w-9" alt="Blaue Magiergilde" />
+                <img src="/images/icon_magiergilde_white.svg" className="h-9 w-9" alt="Blaue Magiergilde" />
                 <div className="leading-tight">
                   <div className="text-sm font-semibold">Blaue Magiergilde</div>
                   <div className="text-xs opacity-70">Offenes D&amp;D-Spielsystem</div>
@@ -75,18 +75,13 @@ export default function Welcome() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  as={Link as ElementType}
-                  href={route('login')}
-                  className="gap-2 bg-white/10 text-white hover:bg-white/15"
-                  variant="outline"
-                >
+                <Button as={Link as ElementType} href={route('login')} color="primary" variant="outline" className="gap-2">
                   <ScrollText size={18} />
                   {appLabel}
                 </Button>
-                <Button as="a" href={DISCORD_INVITE_URL} color="info" className="gap-2" target="_blank" rel="noreferrer">
+                <Button as="a" href={DISCORD_INVITE_URL} color="info" variant="outline" className="gap-2" target="_blank" rel="noreferrer">
                   <DiscordIcon width={20} />
-                  Discord
+                  Discord beitreten
                 </Button>
               </div>
             </header>
@@ -95,7 +90,7 @@ export default function Welcome() {
               <div className="space-y-6">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
                   <Sparkles size={14} />
-                  Community-first · Westmarch-artig · Flexibel
+                  Community-first - Westmarch-artig - Flexibel
                 </div>
 
                 <div className="space-y-3">
@@ -112,20 +107,16 @@ export default function Welcome() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button as="a" href={DISCORD_INVITE_URL} color="info" className="gap-2" target="_blank" rel="noreferrer">
+                  <Button as="a" href={DISCORD_INVITE_URL} color="info" variant="outline" className="gap-2" target="_blank" rel="noreferrer">
                     <DiscordIcon width={20} />
                     Discord beitreten
                   </Button>
-                  <Button
-                    as={Link as ElementType}
-                    href={route('login')}
-                    color="primary"
-                    className="gap-2"
-                  >
+                  <Button as={Link as ElementType} href={route('login')} color="primary" variant="outline" className="gap-2">
                     <ScrollText size={18} />
                     {appLabel}
                   </Button>
                 </div>
+
                 <a href={FAQ_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
                   <BookOpen size={16} />
                   FAQ oeffnen
@@ -161,7 +152,7 @@ export default function Welcome() {
                       und darauf, dass jede:r sich in der Runde wohl fuehlt.
                     </p>
                     <p className="mt-3 text-xs text-white/65">
-                      Platzhalter-Bildvorschlag: Gruppenfoto/Session-Szene oder Artwork der Gilde (z.B. Wappen/Blau-Magie-Motiv).
+                      Bildvorschlag: Gruppenfoto/Session-Szene oder Artwork der Gilde (z.B. Wappen/Blau-Magie-Motiv).
                     </p>
                   </div>
                 </div>
@@ -201,11 +192,11 @@ export default function Welcome() {
                     logge dich mit deinem Account ein.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Button as="a" href={DISCORD_INVITE_URL} color="info" className="gap-2" target="_blank" rel="noreferrer">
+                    <Button as="a" href={DISCORD_INVITE_URL} color="info" variant="outline" className="gap-2" target="_blank" rel="noreferrer">
                       <DiscordIcon width={20} />
-                      Discord
+                      Discord beitreten
                     </Button>
-                    <Button as={Link as ElementType} href={route('login')} color="primary" className="gap-2">
+                    <Button as={Link as ElementType} href={route('login')} color="primary" variant="outline" className="gap-2">
                       <ScrollText size={18} />
                       {appLabel}
                     </Button>
@@ -216,18 +207,10 @@ export default function Welcome() {
               <Card className="border border-white/10 bg-white/5 shadow-xl">
                 <CardBody className="space-y-3">
                   <CardTitle className="text-lg">Was dich erwartet</CardTitle>
-                  <ul className="space-y-2 text-sm text-white/80">
-                    <li className="flex gap-2">
-                      <span className="mt-0.5 text-white/60">•</span> Offenes Spielsystem im gemeinsamen Setting (Faerun und darueber
-                      hinaus).
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="mt-0.5 text-white/60">•</span> Community, die Newcomer unterstuetzt und kreativen Ideen Raum
-                      gibt.
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="mt-0.5 text-white/60">•</span> Ein klarer Rahmen - aber genug Freiheit fuer magische Geschichten.
-                    </li>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-white/80">
+                    <li>Offenes Spielsystem im gemeinsamen Setting (Faerun und darueber hinaus).</li>
+                    <li>Community, die Newcomer unterstuetzt und kreativen Ideen Raum gibt.</li>
+                    <li>Ein klarer Rahmen - aber genug Freiheit fuer magische Geschichten.</li>
                   </ul>
                 </CardBody>
               </Card>
@@ -247,3 +230,4 @@ export default function Welcome() {
     </>
   )
 }
+
