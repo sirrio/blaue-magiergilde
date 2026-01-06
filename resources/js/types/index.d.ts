@@ -44,6 +44,42 @@ export interface Shop {
   shop_items: ShopItem[]
 }
 
+export interface AuctionBid {
+  id: number
+  bidder_name: string
+  amount: number
+  created_at: string
+}
+
+export interface AuctionItem {
+  id: number
+  item: Item
+  starting_bid: number
+  repair_current?: number | null
+  repair_max?: number | null
+  remaining_auctions: number
+  bids: AuctionBid[]
+}
+
+export interface AuctionVoiceCandidate {
+  id: string
+  name: string
+  avatar?: string | null
+}
+
+export interface Auction {
+  id: number
+  title?: string | null
+  status: 'open' | 'closed' | 'draft'
+  currency: string
+  created_at: string
+  posted_at?: string | null
+  auction_items: AuctionItem[]
+  voice_channel_id?: string | null
+  voice_candidates?: AuctionVoiceCandidate[] | null
+  voice_updated_at?: string | null
+}
+
 export interface Item {
   id: number
   name: string

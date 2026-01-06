@@ -1,11 +1,13 @@
 # AI Agent Documentation
 
 ## 1. Overview
-This project is a Laravel 12 web application paired with a React 19 front‑end using InertiaJS. It manages RPG related data such as characters, items, spells and games. No AI or ML models are integrated.
+This project is a Laravel 12 web application paired with a React 19 front-end using InertiaJS. It manages RPG related data such as characters, items, spells and games. No AI or ML models are integrated.
+The repository also contains a Discord bot under `bot/` that is part of the same product and shares configuration with the app.
 
 ## 2. Architecture
 - **Backend:** PHP 8.3 with Laravel framework.
-- **Frontend:** React and TypeScript compiled through Vite with server‑side rendering enabled via InertiaJS.
+- **Frontend:** React and TypeScript compiled through Vite with server-side rendering enabled via InertiaJS.
+- **Discord Bot:** Node.js bot located in `bot/`, using the same root `.env` and database as the app.
 - **Database:** Migrations define tables for users, characters, adventures and related entities.
 - **Queue & Cache:** Default connection is database driven.
 
@@ -17,6 +19,7 @@ Requests hit Laravel route files which map to controller classes. Controllers in
 - **Controllers:** Resource controllers for characters, items, shops and more.
 - **Routes:** REST style endpoints grouped in `routes/web/*`. Authentication routes are in `routes/auth.php`.
 - **React Components:** Located under `resources/js` for UI and forms.
+- **Bot Commands:** Located under `bot/commands`, with shared configuration from the root `.env`.
 
 ## 5. Models & Data Pipelines
 No ML models or data pipelines are defined in this repository.
@@ -55,3 +58,6 @@ Logging defaults to a stack of channels with daily file logs and optional Slack 
 - Resolve failing Pest tests to ensure application integrity.
 - Evaluate moving queue and cache to Redis for scalability.
 - Document deployment steps for SSR and queue workers.
+
+## 14. Coordination Rule
+When implementing new features, always update both the Laravel app and the Discord bot as needed so they stay in sync.

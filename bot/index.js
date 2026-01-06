@@ -9,7 +9,7 @@ if (!token) {
     process.exit(1);
 }
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 
 client.commands = new Collection();
 const foldersPath = path.join(__dirname, 'commands');

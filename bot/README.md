@@ -20,6 +20,10 @@ Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button**
 
 - `/[prefix]-post-shop` - postet den neuesten (oder eine angegebene) Shop in einen Thread (oder erstellt einen Thread in einem Text-Channel).
 
+### Voice Sync
+
+- Voice-Channel Kandidaten werden von der App aus per HTTP-Endpoint synchronisiert (kein Slash-Command).
+
 ## Konfiguration (ein einziges Env)
 
 Der Bot nutzt die **gleiche** Root-`.env` wie die Laravel-App (ein einziges Env-File im Projekt-Hauptordner).  
@@ -36,6 +40,10 @@ Setze folgende Variablen in der Root-`.env`:
 - `DISCORD_OWNER_IDS` - kommaseparierte Discord User IDs (Owner-only Commands)
 - `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
 
+- `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (app triggers voice sync).
+- `BOT_HTTP_URL` - base URL for the bot HTTP server (no path, e.g. `http://127.0.0.1:3125`).
+- `BOT_HTTP_HOST` - optional: listen host override (default: 127.0.0.1).
+- `BOT_HTTP_PORT` - optional: listen port override (default: 3125).
 DB nutzt die gleichen Laravel-Variablen:
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
 

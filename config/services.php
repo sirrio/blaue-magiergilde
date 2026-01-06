@@ -24,4 +24,9 @@ return [
         'avatar_default_extension' => env('DISCORD_EXTENSION_DEFAULT', 'png'), // only pick from jpg, png, webp
     ],
 
+    'bot' => [
+        'http_url' => env('BOT_HTTP_URL'),
+        'http_token' => env('BOT_HTTP_TOKEN'),
+    ],
+
 ];
