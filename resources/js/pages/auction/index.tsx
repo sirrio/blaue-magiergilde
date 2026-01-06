@@ -107,7 +107,13 @@ const buildDiscordText = (auction: Auction) => {
   const lines: string[] = []
 
   rarityOrder.forEach((rarity) => {
-    const groupItems = auction.auction_items.filter((auctionItem) => auctionItem.item.rarity === rarity)
+    const groupItems = auction.auction_items
+      .filter((auctionItem) => auctionItem.item.rarity === rarity)
+      .sort((a, b) => {
+        const typeCompare = typeOrder[a.item.type] - typeOrder[b.item.type]
+        if (typeCompare !== 0) return typeCompare
+        return a.item.name.localeCompare(b.item.name)
+      })
     if (groupItems.length === 0) return
 
     lines.push(`## ${rarityLabels[rarity]}`)
