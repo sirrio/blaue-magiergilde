@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Sword, XCircle } from 'lucide-react'
-import React, { useState, JSX } from 'react'
+import React, { useEffect, useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
   common: 'text-gray-700',
@@ -53,6 +53,12 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   const { data, setData, post } = useForm({ spell_levels: [] as number[], spell_schools: [] as string[] })
 
   const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setData('spell_levels', [0])
+    setData('spell_schools', [...schools])
+  }, [isOpen, setData])
 
   const toggleLevel = (level: number) => {
     setData(

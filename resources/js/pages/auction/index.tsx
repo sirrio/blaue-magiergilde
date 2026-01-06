@@ -181,19 +181,23 @@ const AvatarCircle = ({
   avatar,
   sizeClass = 'h-8 w-8',
   title,
+  noPadding = false,
 }: {
   name: string
   avatar?: string | null
   sizeClass?: string
   title?: string
+  noPadding?: boolean
 }) => {
   const getInitials = useInitials()
   const label = name?.trim() || 'User'
+  const paddingClass = noPadding ? 'p-0' : 'p-1'
 
   return (
     <div
       className={cn(
-        'flex items-center justify-center overflow-hidden rounded-full border border-base-100 bg-base-200 p-1 text-[10px] font-semibold',
+        'flex items-center justify-center overflow-hidden rounded-full border border-base-100 bg-base-200 text-[10px] font-semibold',
+        paddingClass,
         sizeClass,
       )}
       title={title ?? label}
@@ -267,6 +271,7 @@ const AuctionItemBidControls = ({
             const disableReason = hiddenBid
               ? `Max ${hiddenBid.max_amount} ${currency}`
               : ''
+            const displayName = candidate.name.length > 8 ? `${candidate.name.slice(0, 8)}…` : candidate.name
             return (
               <Button
                 key={candidate.id}
@@ -282,8 +287,8 @@ const AuctionItemBidControls = ({
                   isOverMax && 'opacity-60',
                 )}
               >
-                <AvatarCircle name={candidate.name} avatar={candidate.avatar} sizeClass="h-5 w-5" />
-                <span>{candidate.name}</span>
+                <AvatarCircle name={candidate.name} avatar={candidate.avatar} sizeClass="h-5 w-5" noPadding />
+                <span>{displayName}</span>
                 {isLeader ? <span className="rounded-full bg-success/10 px-2 py-0.5 text-[9px] uppercase">Lead</span> : null}
               </Button>
             )
