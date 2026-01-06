@@ -105,11 +105,14 @@ const buildDiscordText = (auction: Auction) => {
     const groupItems = auction.auction_items.filter((auctionItem) => auctionItem.item.rarity === rarity)
     if (groupItems.length === 0) return
 
-    lines.push(`${rarityLabels[rarity]}`)
+    lines.push(`## ${rarityLabels[rarity]}`)
     groupItems.forEach((auctionItem) => {
       const missing = getRepairMissing(auctionItem)
+      const itemLabel = auctionItem.item.url
+        ? `[${auctionItem.item.name}](${auctionItem.item.url})`
+        : auctionItem.item.name
       lines.push(
-        `(${auctionItem.remaining_auctions}) - ${auctionItem.starting_bid} ${auction.currency} - ${auctionItem.item.name} (${missing})`,
+        `**(${auctionItem.remaining_auctions})** - ${auctionItem.starting_bid} ${auction.currency} - ${itemLabel} (${missing})`,
       )
     })
     lines.push('')
