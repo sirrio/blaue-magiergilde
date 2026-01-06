@@ -156,7 +156,7 @@ const getDiscordItemLabel = (auctionItem: AuctionItem) => {
   const itemLabel = auctionItem.item.url
     ? `[${displayName}](${auctionItem.item.url})`
     : displayName
-  return `${itemLabel} (${rarityLabels[auctionItem.item.rarity]}) (${getRepairMissing(auctionItem)})`
+  return `${itemLabel} (${getRepairMissing(auctionItem)})`
 }
 
 const getHighestBid = (auctionItem: AuctionItem) => {
