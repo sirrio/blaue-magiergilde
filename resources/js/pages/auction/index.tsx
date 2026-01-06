@@ -369,6 +369,7 @@ export default function Index({
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
+  const voiceChannelIdRef = useRef<string | null>(initialVoiceSettings?.voice_channel_id ?? null)
   const getInitials = useInitials()
 
   useEffect(() => {
@@ -381,8 +382,15 @@ export default function Index({
   }, [auctions, selectedAuction?.id])
 
   useEffect(() => {
+    const nextChannelId = initialVoiceSettings?.voice_channel_id ?? null
+    const prevChannelId = voiceChannelIdRef.current
+
     setVoiceSettings(initialVoiceSettings)
-    setVoiceCandidates([])
+
+    if (nextChannelId !== prevChannelId) {
+      setVoiceCandidates([])
+      voiceChannelIdRef.current = nextChannelId
+    }
   }, [initialVoiceSettings])
 
   useEffect(() => {
@@ -496,7 +504,7 @@ export default function Index({
   }, [candidates])
 
   const resolveBidderLabel = useCallback(
-    (discordId: string) => candidateNameById[discordId] ?? discordId,
+    (discordId: string) => candidateNameById[discordId] ?? `ID ${discordId}`,
     [candidateNameById],
   )
 
