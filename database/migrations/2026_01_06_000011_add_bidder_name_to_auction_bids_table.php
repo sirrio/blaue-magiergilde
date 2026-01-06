@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,16 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (! Schema::hasColumn('auction_bids', 'bidder_discord_id')) {
+        if (! Schema::hasColumn('auction_bids', 'bidder_name')) {
             Schema::table('auction_bids', function (Blueprint $table) {
-                $table->string('bidder_discord_id')->after('auction_item_id');
+                $table->string('bidder_name')->after('auction_item_id');
             });
-        }
-
-        if (Schema::hasColumn('auction_bids', 'bidder_name')) {
-            DB::table('auction_bids')->whereNull('bidder_discord_id')->update([
-                'bidder_discord_id' => DB::raw('bidder_name'),
-            ]);
         }
     }
 
@@ -30,9 +23,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasColumn('auction_bids', 'bidder_discord_id')) {
+        if (Schema::hasColumn('auction_bids', 'bidder_name')) {
             Schema::table('auction_bids', function (Blueprint $table) {
-                $table->dropColumn('bidder_discord_id');
+                $table->dropColumn('bidder_name');
             });
         }
     }

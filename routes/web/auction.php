@@ -18,3 +18,7 @@ Route::post('auctions/{auction}/items', [AuctionItemController::class, 'store'])
 Route::post('auction-items/{auctionItem}/bids', [AuctionBidController::class, 'store'])
     ->middleware(['auth'])
     ->name('auction-items.bids.store');
+
+Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
+    ->middleware(['auth'])
+    ->name('auction-bids.destroy');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auction;
 
+use App\Models\Item;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +19,21 @@ class StoreAuctionItemRequest extends FormRequest
         return $user->is_admin;
     }
 
+    private function parseCostValue(?string $cost): ?int
+    {
+        if ($cost === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/[^0-9]/', '', $cost);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        return (int) $digits;
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -27,10 +43,36 @@ class StoreAuctionItemRequest extends FormRequest
     {
         return [
             'item_id' => ['required', 'integer', 'exists:items,id'],
-            'starting_bid' => ['required', 'integer', 'min:0'],
             'remaining_auctions' => ['required', 'integer', 'min:1'],
-            'repair_current' => ['nullable', 'integer', 'min:0', 'required_with:repair_max'],
-            'repair_max' => ['nullable', 'integer', 'min:0', 'required_with:repair_current', 'gte:repair_current'],
+            'repair_current' => [
+                'nullable',
+                'integer',
+                'min:0',
+                function (string $attribute, mixed $value, callable $fail): void {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+
+                    $itemId = $this->input('item_id');
+                    if (!$itemId) {
+                        return;
+                    }
+
+                    $item = Item::query()->select('cost')->find($itemId);
+                    if (!$item) {
+                        return;
+                    }
+
+                    $costValue = $this->parseCostValue($item->cost);
+                    if ($costValue === null) {
+                        return;
+                    }
+
+                    if ((int) $value > $costValue) {
+                        $fail('Repariert darf nicht hoeher als die Kosten sein.');
+                    }
+                },
+            ],
         ];
     }
 }

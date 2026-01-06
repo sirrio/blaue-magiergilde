@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\StoreAuctionBidRequest;
+use App\Models\AuctionBid;
 use App\Models\AuctionItem;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class AuctionBidController extends Controller
 {
@@ -54,10 +56,24 @@ class AuctionBidController extends Controller
         }
 
         $auctionItem->bids()->create([
+            'bidder_name' => $request->bidder_name,
             'bidder_discord_id' => $request->bidder_discord_id,
             'amount' => $request->amount,
             'created_by' => $request->user()->id,
         ]);
+
+        return redirect()->back();
+    }
+
+    /**
+     * Remove the specified bid.
+     */
+    public function destroy(Request $request, AuctionBid $auctionBid): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $auctionBid->delete();
 
         return redirect()->back();
     }

@@ -24,6 +24,12 @@ Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button**
 
 - Voice-Channel Kandidaten werden von der App aus per HTTP-Endpoint synchronisiert (kein Slash-Command).
 
+### Auktionen (App)
+
+- Auktionen werden in der App verwaltet; beim Schliessen wird automatisch eine neue Auktion erstellt.
+- Wenn keine Auktion existiert, erstellt die App beim ersten Aufruf automatisch eine neue Auktion.
+- Der Bot hat keine Auction-Commands, bleibt hier nur passiv.
+
 ## Konfiguration (ein einziges Env)
 
 Der Bot nutzt die **gleiche** Root-`.env` wie die Laravel-App (ein einziges Env-File im Projekt-Hauptordner).  

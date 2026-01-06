@@ -46,6 +46,7 @@ export interface Shop {
 
 export interface AuctionBid {
   id: number
+  bidder_name: string
   bidder_discord_id: string
   amount: number
   created_at: string

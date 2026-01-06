@@ -26,9 +26,7 @@ class UpdateAuctionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['nullable', 'string', 'max:255'],
             'status' => ['required', 'string', 'in:open,closed,draft'],
-            'currency' => ['required', 'string', 'max:16'],
         ];
     }
 }
