@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auction\AuctionBidController;
 use App\Http\Controllers\Auction\AuctionController;
+use App\Http\Controllers\Auction\AuctionHiddenBidController;
 use App\Http\Controllers\Auction\AuctionItemController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,14 @@ Route::post('auction-items/{auctionItem}/bids', [AuctionBidController::class, 's
     ->middleware(['auth'])
     ->name('auction-items.bids.store');
 
+Route::post('auction-items/{auctionItem}/hidden-bids', [AuctionHiddenBidController::class, 'store'])
+    ->middleware(['auth'])
+    ->name('auction-items.hidden-bids.store');
+
 Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
     ->middleware(['auth'])
     ->name('auction-bids.destroy');
+
+Route::delete('auction-hidden-bids/{auctionHiddenBid}', [AuctionHiddenBidController::class, 'destroy'])
+    ->middleware(['auth'])
+    ->name('auction-hidden-bids.destroy');

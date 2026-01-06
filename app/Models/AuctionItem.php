@@ -34,4 +34,9 @@ class AuctionItem extends Model
     {
         return $this->hasMany(AuctionBid::class);
     }
+
+    public function hiddenBids(): HasMany
+    {
+        return $this->hasMany(AuctionHiddenBid::class);
+    }
 }

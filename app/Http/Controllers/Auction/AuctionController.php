@@ -38,6 +38,9 @@ class AuctionController extends Controller
                     ->select(['id', 'auction_item_id', 'bidder_name', 'bidder_discord_id', 'amount', 'created_at'])
                     ->orderByDesc('amount')
                     ->orderByDesc('created_at'),
+                'auctionItems.hiddenBids' => fn ($query) => $query
+                    ->select(['id', 'auction_item_id', 'bidder_name', 'bidder_discord_id', 'max_amount', 'created_at'])
+                    ->orderByDesc('created_at'),
             ])
             ->orderByDesc('created_at')
             ->select(['id', 'title', 'status', 'currency', 'created_at', 'posted_at'])

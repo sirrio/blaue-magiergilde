@@ -7,10 +7,10 @@ import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import { Auction, AuctionBid, AuctionItem, AuctionVoiceCandidate, Item, VoiceSettings } from '@/types'
+import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionVoiceCandidate, Item, VoiceSettings } from '@/types'
 import { Head, Link, router, useForm } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Copy, FlaskRound, History, Plus, ScrollText, Sword, Trash2 } from 'lucide-react'
+import { Copy, EyeOff, FlaskRound, History, Plus, ScrollText, Sword, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -140,6 +140,11 @@ const getHighestBid = (auctionItem: AuctionItem) => {
   }, null as AuctionBid | null)
 }
 
+const getHiddenBidForCandidate = (auctionItem: AuctionItem, bidderId: string) => {
+  if (!auctionItem.hidden_bids || auctionItem.hidden_bids.length === 0) return null
+  return auctionItem.hidden_bids.find((hiddenBid) => hiddenBid.bidder_discord_id === bidderId) ?? null
+}
+
 const AvatarCircle = ({
   name,
   avatar,
@@ -193,6 +198,12 @@ const AuctionItemBidControls = ({
       return
     }
 
+    const hiddenBid = getHiddenBidForCandidate(auctionItem, candidateId)
+    if (hiddenBid && minBid > hiddenBid.max_amount) {
+      toast.show(`Max Gebot fuer ${candidateName} ist ${hiddenBid.max_amount} ${currency}.`, 'error')
+      return
+    }
+
     router.post(
       route('auction-items.bids.store', { auctionItem: auctionItem.id }),
       { bidder_discord_id: candidateId, bidder_name: candidateName, amount: minBid },
@@ -219,6 +230,12 @@ const AuctionItemBidControls = ({
         <div className="flex flex-wrap gap-2">
           {candidates.map((candidate) => {
             const isLeader = candidate.id === highestBidderId
+            const hiddenBid = getHiddenBidForCandidate(auctionItem, candidate.id)
+            const isOverMax = hiddenBid ? minBid > hiddenBid.max_amount : false
+            const hasHiddenRoom = !!hiddenBid && !isOverMax && !isLeader
+            const disableReason = hiddenBid
+              ? `Max ${hiddenBid.max_amount} ${currency}`
+              : ''
             return (
               <Button
                 key={candidate.id}
@@ -226,7 +243,13 @@ const AuctionItemBidControls = ({
                 variant="outline"
                 disabled={!isAmountValid}
                 onClick={() => handleBid(candidate.id, candidate.name)}
-                className={cn('gap-2', isLeader && 'border-success text-success')}
+                title={isOverMax ? disableReason : undefined}
+                className={cn(
+                  'gap-2',
+                  isLeader && 'border-success text-success',
+                  hasHiddenRoom && 'border-warning text-warning',
+                  isOverMax && 'opacity-60',
+                )}
               >
                 <AvatarCircle name={candidate.name} avatar={candidate.avatar} sizeClass="h-5 w-5" />
                 <span>{candidate.name}</span>
@@ -245,6 +268,13 @@ const AuctionItemBidControls = ({
 
 const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; currency: string }) => {
   const [isOpen, setIsOpen] = useState(false)
+  const hiddenBids = useMemo(
+    () =>
+      [...(auctionItem.hidden_bids ?? [])].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    [auctionItem.hidden_bids],
+  )
   const bids = useMemo(
     () =>
       [...(auctionItem.bids ?? [])].sort(
@@ -275,6 +305,31 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
       <ModalTitle>Bietverlauf</ModalTitle>
       <ModalContent>
         <p className="mb-2 text-xs text-base-content/60">{auctionItem.item.name}</p>
+        {hiddenBids.length > 0 ? (
+          <div className="mb-3">
+            <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Geheime Gebote</p>
+            <div className="space-y-2">
+              {hiddenBids.map((hiddenBid) => (
+                <div
+                  key={hiddenBid.id}
+                  className="flex items-center justify-between gap-3 rounded-box bg-base-200/60 px-2 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono">
+                      Max {hiddenBid.max_amount} {currency}
+                    </p>
+                    <p className="truncate text-xs">{hiddenBid.bidder_name}</p>
+                    <p className="text-[10px] text-base-content/60">ID: {hiddenBid.bidder_discord_id}</p>
+                  </div>
+                  <div className="text-[10px] text-base-content/50">
+                    {format(new Date(hiddenBid.created_at), "dd.MM.yyyy ' - ' HH:mm")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Gebote</p>
         {bids.length === 0 ? (
           <p className="text-xs text-base-content/70">Keine Gebote vorhanden.</p>
         ) : (
@@ -314,6 +369,160 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
   )
 }
 
+const HiddenBidModal = ({
+  auctionItem,
+  currency,
+  candidates,
+}: {
+  auctionItem: AuctionItem
+  currency: string
+  candidates: AuctionVoiceCandidate[]
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const defaultMaxAmount = Math.max(auctionItem.starting_bid, 1)
+  const { data, setData, post, reset } = useForm({
+    bidder_discord_id: '',
+    bidder_name: '',
+    max_amount: defaultMaxAmount,
+  })
+  const hiddenBids = useMemo<AuctionHiddenBid[]>(
+    () =>
+      [...(auctionItem.hidden_bids ?? [])].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    [auctionItem.hidden_bids],
+  )
+  const selectedCandidateId = candidates.some((candidate) => candidate.id === data.bidder_discord_id)
+    ? data.bidder_discord_id
+    : ''
+
+  useEffect(() => {
+    if (!isOpen) return
+    setData('max_amount', defaultMaxAmount)
+  }, [isOpen, defaultMaxAmount, setData])
+
+  const handleCandidateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const candidateId = event.target.value
+    if (!candidateId) return
+    const candidate = candidates.find((entry) => entry.id === candidateId)
+    if (!candidate) return
+
+    const existingHiddenBid = hiddenBids.find((entry) => entry.bidder_discord_id === candidate.id)
+    setData('bidder_discord_id', candidate.id)
+    setData('bidder_name', candidate.name)
+    setData('max_amount', existingHiddenBid?.max_amount ?? defaultMaxAmount)
+  }
+
+  const handleSubmit = () => {
+    if (!data.bidder_discord_id || !data.bidder_name) {
+      toast.show('Discord ID und Name angeben.', 'error')
+      return
+    }
+
+    post(route('auction-items.hidden-bids.store', { auctionItem: auctionItem.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        reset('bidder_discord_id', 'bidder_name')
+        setData('max_amount', defaultMaxAmount)
+        router.reload({ preserveScroll: true, preserveState: true })
+      },
+      onError: (errors) => {
+        const message = errors.max_amount || errors.bidder_discord_id || errors.bidder_name
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+    })
+  }
+
+  const handleDelete = (hiddenBidId: number) => {
+    if (!window.confirm('Geheimes Gebot wirklich loeschen?')) return
+
+    router.delete(route('auction-hidden-bids.destroy', { auctionHiddenBid: hiddenBidId }), {
+      preserveScroll: true,
+      preserveState: true,
+      onError: () => {
+        toast.show('Geheimes Gebot konnte nicht geloescht werden.', 'error')
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
+          <EyeOff size={16} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Geheime Gebote</ModalTitle>
+      <ModalContent>
+        <p className="mb-3 text-xs text-base-content/60">Maximalgebote vor der Auktion, pro Spieler eines.</p>
+        {candidates.length > 0 ? (
+          <Select value={selectedCandidateId} onChange={handleCandidateChange}>
+            <SelectLabel>Live Kandidat auswaehlen</SelectLabel>
+            <SelectOptions>
+              <option value="">Manuell</option>
+              {candidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </SelectOptions>
+          </Select>
+        ) : null}
+        <Input value={data.bidder_discord_id} onChange={(e) => setData('bidder_discord_id', e.target.value)}>
+          Discord ID
+        </Input>
+        <Input value={data.bidder_name} onChange={(e) => setData('bidder_name', e.target.value)}>
+          Name
+        </Input>
+        <Input
+          type="number"
+          min={1}
+          value={data.max_amount}
+          onChange={(e) => setData('max_amount', Number(e.target.value))}
+        >
+          Max Gebot ({currency})
+        </Input>
+
+        <div className="mt-4">
+          <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Aktive geheime Gebote</p>
+          {hiddenBids.length === 0 ? (
+            <p className="text-xs text-base-content/70">Keine geheimen Gebote vorhanden.</p>
+          ) : (
+            <div className="space-y-2">
+              {hiddenBids.map((hiddenBid) => (
+                <div
+                  key={hiddenBid.id}
+                  className="flex items-center justify-between gap-3 rounded-box bg-base-200/60 px-2 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono">
+                      Max {hiddenBid.max_amount} {currency}
+                    </p>
+                    <p className="truncate text-xs">{hiddenBid.bidder_name}</p>
+                    <p className="text-[10px] text-base-content/60">ID: {hiddenBid.bidder_discord_id}</p>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    modifier="square"
+                    color="error"
+                    onClick={() => handleDelete(hiddenBid.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit}>Speichern</ModalAction>
+    </Modal>
+  )
+}
+
 const AuctionItemRow = ({
   auctionItem,
   currency,
@@ -325,8 +534,26 @@ const AuctionItemRow = ({
 }) => {
   const textColor = getRarityTextColor(auctionItem.item.rarity)
   const highestBid = getHighestBid(auctionItem)
+  const bidCandidates = useMemo(() => {
+    const merged = new Map<string, AuctionVoiceCandidate>()
+
+    candidates.forEach((candidate) => {
+      merged.set(candidate.id, candidate)
+    })
+
+    ;(auctionItem.hidden_bids ?? []).forEach((hiddenBid) => {
+      if (merged.has(hiddenBid.bidder_discord_id)) return
+      merged.set(hiddenBid.bidder_discord_id, {
+        id: hiddenBid.bidder_discord_id,
+        name: hiddenBid.bidder_name,
+        avatar: null,
+      })
+    })
+
+    return Array.from(merged.values())
+  }, [auctionItem.hidden_bids, candidates])
   const highestBidder = highestBid
-    ? candidates.find((candidate) => candidate.id === highestBid.bidder_discord_id)
+    ? bidCandidates.find((candidate) => candidate.id === highestBid.bidder_discord_id)
     : null
   const highestBidderName = highestBid?.bidder_name ?? ''
 
@@ -347,7 +574,8 @@ const AuctionItemRow = ({
               </span>
             </div>
           </div>
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
+            <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} />
             <BidHistoryModal auctionItem={auctionItem} currency={currency} />
           </div>
         </div>
@@ -377,7 +605,7 @@ const AuctionItemRow = ({
             <AuctionItemBidControls
               auctionItem={auctionItem}
               currency={currency}
-              candidates={candidates}
+              candidates={bidCandidates}
               highestBidderId={highestBid?.bidder_discord_id}
             />
           </div>

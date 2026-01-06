@@ -33,7 +33,7 @@ class AuctionBidController extends Controller
      */
     public function store(StoreAuctionBidRequest $request, AuctionItem $auctionItem): RedirectResponse
     {
-        $auctionItem->loadMissing(['item', 'auction']);
+        $auctionItem->loadMissing(['item', 'auction', 'hiddenBids']);
 
         $step = $this->getBidStep($auctionItem->item);
         $highestBid = (int) $auctionItem->bids()->max('amount');
@@ -42,6 +42,14 @@ class AuctionBidController extends Controller
             : $auctionItem->starting_bid;
 
         $amount = (int) $request->amount;
+        $hiddenBid = $auctionItem->hiddenBids
+            ->firstWhere('bidder_discord_id', $request->bidder_discord_id);
+
+        if ($hiddenBid && $amount > $hiddenBid->max_amount) {
+            return redirect()->back()->withErrors([
+                'amount' => "Max Gebot fuer {$hiddenBid->bidder_name} ist {$hiddenBid->max_amount}.",
+            ])->withInput();
+        }
 
         if ($amount < $minBid) {
             return redirect()->back()->withErrors([

@@ -52,6 +52,14 @@ export interface AuctionBid {
   created_at: string
 }
 
+export interface AuctionHiddenBid {
+  id: number
+  bidder_name: string
+  bidder_discord_id: string
+  max_amount: number
+  created_at: string
+}
+
 export interface AuctionItem {
   id: number
   item: Item
@@ -60,6 +68,7 @@ export interface AuctionItem {
   repair_max?: number | null
   remaining_auctions: number
   bids: AuctionBid[]
+  hidden_bids: AuctionHiddenBid[]
 }
 
 export interface AuctionVoiceCandidate {

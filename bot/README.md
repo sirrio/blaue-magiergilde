@@ -28,6 +28,7 @@ Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button**
 
 - Auktionen werden in der App verwaltet; beim Schliessen wird automatisch eine neue Auktion erstellt.
 - Wenn keine Auktion existiert, erstellt die App beim ersten Aufruf automatisch eine neue Auktion.
+- Geheime Gebote werden in der App gepflegt; der Bot hat hier keine Funktion.
 - Der Bot hat keine Auction-Commands, bleibt hier nur passiv.
 
 ## Konfiguration (ein einziges Env)
