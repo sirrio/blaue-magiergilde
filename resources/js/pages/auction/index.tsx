@@ -40,6 +40,11 @@ const typeIcons: Record<string, JSX.Element> = {
 }
 
 const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'] as const
+const typeOrder: Record<Item['type'], number> = {
+  item: 0,
+  consumable: 1,
+  spellscroll: 2,
+}
 const isLocalDev = import.meta.env.DEV
 const mockVoiceCandidates: AuctionVoiceCandidate[] = [
   { id: '111111111111111111', name: 'Ari', avatar: '/images/no-avatar.svg' },
@@ -861,7 +866,13 @@ export default function Index({
     return rarityOrder
       .map((rarity) => ({
         rarity,
-        items: selectedAuction.auction_items.filter((auctionItem) => auctionItem.item.rarity === rarity),
+        items: selectedAuction.auction_items
+          .filter((auctionItem) => auctionItem.item.rarity === rarity)
+          .sort((a, b) => {
+            const typeCompare = typeOrder[a.item.type] - typeOrder[b.item.type]
+            if (typeCompare !== 0) return typeCompare
+            return a.item.name.localeCompare(b.item.name)
+          }),
       }))
       .filter((group) => group.items.length > 0)
   }, [selectedAuction])
