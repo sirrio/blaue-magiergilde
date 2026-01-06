@@ -118,12 +118,9 @@ const buildDiscordText = (auction: Auction) => {
 
     lines.push(`## ${rarityLabels[rarity]}`)
     groupItems.forEach((auctionItem) => {
-      const missing = getRepairMissing(auctionItem)
-      const itemLabel = auctionItem.item.url
-        ? `[${auctionItem.item.name}](${auctionItem.item.url})`
-        : auctionItem.item.name
+      const lineLabel = getDiscordItemLabel(auctionItem)
       lines.push(
-        `**(${auctionItem.remaining_auctions})** - ${auctionItem.starting_bid} ${auction.currency} - ${itemLabel} (${missing})`,
+        `**(${auctionItem.remaining_auctions})** - ${auctionItem.starting_bid} ${auction.currency} - ${lineLabel}`,
       )
     })
     lines.push('')
@@ -140,6 +137,26 @@ const getRepairMissing = (auctionItem: AuctionItem) => {
 const getRepairLabel = (auctionItem: AuctionItem) => {
   if (auctionItem.repair_max == null || auctionItem.repair_current == null) return '-'
   return `${auctionItem.repair_current}/${auctionItem.repair_max}`
+}
+
+const getAuctionItemLabel = (name: string, auctionItem: AuctionItem) => {
+  const parts: string[] = [name]
+  const notes = auctionItem.notes?.trim()
+  if (notes) {
+    parts.push(`(${notes})`)
+  }
+  parts.push(`(${rarityLabels[auctionItem.item.rarity]})`)
+  parts.push(`(${getRepairMissing(auctionItem)})`)
+  return parts.join(' ')
+}
+
+const getDiscordItemLabel = (auctionItem: AuctionItem) => {
+  const notes = auctionItem.notes?.trim()
+  const displayName = notes ? `${auctionItem.item.name} - ${notes}` : auctionItem.item.name
+  const itemLabel = auctionItem.item.url
+    ? `[${displayName}](${auctionItem.item.url})`
+    : displayName
+  return `${itemLabel} (${rarityLabels[auctionItem.item.rarity]}) (${getRepairMissing(auctionItem)})`
 }
 
 const getHighestBid = (auctionItem: AuctionItem) => {
@@ -581,7 +598,7 @@ const AuctionItemRow = ({
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <span className={cn(textColor, 'text-sm font-semibold leading-none')}>
-                {auctionItem.item.name} ({rarityLabels[auctionItem.item.rarity]})({getRepairMissing(auctionItem)})
+                {getAuctionItemLabel(auctionItem.item.name, auctionItem)}
               </span>
               <span className="text-xs font-normal leading-none text-base-content/70">
                 Versteigerungen: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
@@ -636,6 +653,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   const defaultRepairCurrent = getDefaultRepairCurrent(initialItemId, items)
   const { data, setData, post } = useForm({
     item_id: initialItemId,
+    notes: '',
     remaining_auctions: 3,
     repair_current: defaultRepairCurrent,
   })
@@ -649,6 +667,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
     if (!isOpen) return
     const repairCurrent = getDefaultRepairCurrent(data.item_id, items)
     setData('repair_current', repairCurrent)
+    setData('notes', '')
     setData('remaining_auctions', 3)
   }, [isOpen])
 
@@ -661,7 +680,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
         router.reload({ preserveScroll: true, preserveState: true })
       },
       onError: (errors) => {
-        const message = errors.repair_current || errors.remaining_auctions || errors.item_id
+        const message = errors.notes || errors.repair_current || errors.remaining_auctions || errors.item_id
         if (message) {
           toast.show(String(message), 'error')
         }
@@ -686,6 +705,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
             const repairCurrent = getDefaultRepairCurrent(nextId, items)
             setData('item_id', nextId)
             setData('repair_current', repairCurrent)
+            setData('notes', '')
           }}
         >
           <SelectLabel>Item</SelectLabel>
@@ -701,6 +721,12 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
             )}
           </SelectOptions>
         </Select>
+        <Input
+          value={data.notes}
+          onChange={(e) => setData('notes', e.target.value)}
+        >
+          Notizen
+        </Input>
         <Input
           type="number"
           min={1}

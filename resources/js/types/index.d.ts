@@ -63,6 +63,7 @@ export interface AuctionHiddenBid {
 export interface AuctionItem {
   id: number
   item: Item
+  notes?: string | null
   starting_bid: number
   repair_current?: number | null
   repair_max?: number | null

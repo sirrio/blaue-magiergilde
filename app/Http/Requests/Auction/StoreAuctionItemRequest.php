@@ -44,6 +44,7 @@ class StoreAuctionItemRequest extends FormRequest
         return [
             'item_id' => ['required', 'integer', 'exists:items,id'],
             'remaining_auctions' => ['required', 'integer', 'min:1'],
+            'notes' => ['nullable', 'string', 'max:255'],
             'repair_current' => [
                 'nullable',
                 'integer',

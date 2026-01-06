@@ -47,9 +47,18 @@ class AuctionItemController extends Controller
     public function store(StoreAuctionItemRequest $request, Auction $auction): RedirectResponse
     {
         $repairCurrent = $request->input('repair_current');
+        $notes = $request->input('notes');
 
         if ($repairCurrent === '') {
             $repairCurrent = null;
+        }
+
+        if (is_string($notes)) {
+            $notes = trim($notes);
+        }
+
+        if ($notes === '') {
+            $notes = null;
         }
 
         $item = Item::query()->select(['id', 'cost', 'rarity', 'type'])->find($request->item_id);
@@ -66,6 +75,7 @@ class AuctionItemController extends Controller
 
         $auction->auctionItems()->create([
             'item_id' => $request->item_id,
+            'notes' => $notes,
             'starting_bid' => $startingBid,
             'remaining_auctions' => $request->remaining_auctions,
             'repair_current' => $repairCurrent,
