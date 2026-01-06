@@ -1,4 +1,5 @@
 const http = require('node:http');
+const { getSnapshot } = require('./voiceStateCache');
 
 function resolveListenConfig() {
     const rawUrl = String(process.env.BOT_HTTP_URL || '').trim();
@@ -45,22 +46,6 @@ function respondJson(res, status, payload) {
     res.end(JSON.stringify(payload));
 }
 
-function buildCandidate(member) {
-    const name = String(member.displayName || member.user?.username || '').trim();
-    if (!name) return null;
-    if (member.user?.bot) return null;
-
-    const avatar = typeof member.displayAvatarURL === 'function'
-        ? member.displayAvatarURL({ extension: 'png', size: 128 })
-        : null;
-
-    return {
-        id: String(member.id),
-        name,
-        avatar: avatar || null,
-    };
-}
-
 function startHttpServer(client) {
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!token) {
@@ -96,21 +81,13 @@ function startHttpServer(client) {
             return;
         }
 
-        try {
-            const channel = await client.channels.fetch(channelId);
-            if (!channel || typeof channel.isVoiceBased !== 'function' || !channel.isVoiceBased()) {
-                respondJson(res, 422, { error: 'Channel is not voice-based.' });
-                return;
-            }
-
-            const members = Array.from(channel.members?.values() || [])
-                .map(buildCandidate)
-                .filter(Boolean);
-
-            respondJson(res, 200, { channel_id: channelId, members });
-        } catch (error) {
-            respondJson(res, 500, { error: error.message });
+        const { snapshot, error } = await getSnapshot(channelId, client);
+        if (error) {
+            respondJson(res, 422, { error });
+            return;
         }
+
+        respondJson(res, 200, snapshot);
     });
 
     server.listen(port, host, () => {

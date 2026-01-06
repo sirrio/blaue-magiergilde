@@ -15,13 +15,10 @@ class Auction extends Model
         'status',
         'currency',
         'posted_at',
-        'voice_channel_id',
     ];
 
     protected $casts = [
         'posted_at' => 'datetime',
-        'voice_updated_at' => 'datetime',
-        'voice_candidates' => 'array',
     ];
 
     public function auctionItems(): HasMany

@@ -3,7 +3,6 @@
 use App\Http\Controllers\Auction\AuctionBidController;
 use App\Http\Controllers\Auction\AuctionController;
 use App\Http\Controllers\Auction\AuctionItemController;
-use App\Http\Controllers\Auction\AuctionVoiceSyncController;
 use Illuminate\Support\Facades\Route;
 
 Route::resource('auctions', AuctionController::class)->only([
@@ -19,7 +18,3 @@ Route::post('auctions/{auction}/items', [AuctionItemController::class, 'store'])
 Route::post('auction-items/{auctionItem}/bids', [AuctionBidController::class, 'store'])
     ->middleware(['auth'])
     ->name('auction-items.bids.store');
-
-Route::post('auctions/{auction}/voice-sync', AuctionVoiceSyncController::class)
-    ->middleware(['auth'])
-    ->name('auctions.voice-sync');

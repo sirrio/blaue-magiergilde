@@ -7,6 +7,7 @@ use App\Http\Requests\Auction\StoreAuctionRequest;
 use App\Http\Requests\Auction\UpdateAuctionRequest;
 use App\Models\Auction;
 use App\Models\Item;
+use App\Models\VoiceSetting;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,7 +31,7 @@ class AuctionController extends Controller
                     ->orderByDesc('created_at'),
             ])
             ->orderByDesc('created_at')
-            ->select(['id', 'title', 'status', 'currency', 'voice_channel_id', 'voice_candidates', 'voice_updated_at', 'created_at', 'posted_at'])
+            ->select(['id', 'title', 'status', 'currency', 'created_at', 'posted_at'])
             ->get();
 
         $items = Item::query()
@@ -38,9 +39,12 @@ class AuctionController extends Controller
             ->select(['id', 'name', 'rarity', 'type', 'cost', 'url'])
             ->get();
 
+        $voiceSettings = VoiceSetting::current();
+
         return Inertia::render('auction/index', [
             'auctions' => $auctions,
             'items' => $items,
+            'voiceSettings' => $voiceSettings,
         ]);
     }
 
@@ -66,11 +70,6 @@ class AuctionController extends Controller
         $auction->title = $request->title;
         $auction->status = $request->status;
         $auction->currency = $request->currency;
-        $auction->voice_channel_id = $request->voice_channel_id;
-        if (! $auction->voice_channel_id) {
-            $auction->voice_candidates = null;
-            $auction->voice_updated_at = null;
-        }
         $auction->save();
 
         return redirect()->back();

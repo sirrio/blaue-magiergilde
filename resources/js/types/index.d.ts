@@ -67,6 +67,10 @@ export interface AuctionVoiceCandidate {
   avatar?: string | null
 }
 
+export interface VoiceSettings {
+  voice_channel_id?: string | null
+}
+
 export interface Auction {
   id: number
   title?: string | null
@@ -75,9 +79,6 @@ export interface Auction {
   created_at: string
   posted_at?: string | null
   auction_items: AuctionItem[]
-  voice_channel_id?: string | null
-  voice_candidates?: AuctionVoiceCandidate[] | null
-  voice_updated_at?: string | null
 }
 
 export interface Item {

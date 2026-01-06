@@ -6,11 +6,11 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
-import { Auction, AuctionItem, AuctionVoiceCandidate, Item } from '@/types'
-import { Head, router, useForm } from '@inertiajs/react'
+import { Auction, AuctionItem, AuctionVoiceCandidate, Item, VoiceSettings } from '@/types'
+import { Head, Link, router, useForm } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Copy, Edit, FlaskRound, Plus, ScrollText, Sword } from 'lucide-react'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
   common: 'Common',
@@ -63,6 +63,12 @@ const getBidStep = (item: Item): number => {
 }
 
 const formatAuctionCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
+
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return ''
+  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
+  return meta?.content ?? ''
+}
 
 const parseCostValue = (cost?: string | null) => {
   if (!cost) return null
@@ -135,7 +141,7 @@ const AuctionItemRow = ({
       </div>
       <div className="max-w-24 font-mono text-xs">{auctionItem.starting_bid} {currency}</div>
       <div className="text-xs">
-        {highestBid ? `${highestBid.amount} ${currency} · ${highestBid.bidder_name}` : 'No bids yet'}
+        {highestBid ? `${highestBid.amount} ${currency} - ${highestBid.bidder_name}` : 'No bids yet'}
       </div>
       <div className="text-xs text-base-content/70">Repair {getRepairLabel(auctionItem)}</div>
       <AddBidModal auctionItem={auctionItem} currency={currency} defaultBidderName={defaultBidderName} />
@@ -199,7 +205,7 @@ const AddBidModal = ({
           Betrag
         </Input>
         <p className="mt-2 text-xs text-base-content/70">
-          Mindestgebot: {minBid} {currency} · Schritt: {step} {currency}
+          Mindestgebot: {minBid} {currency} - Schritt: {step} {currency}
         </p>
       </ModalContent>
       <ModalAction onClick={handleSubmit}>Speichern</ModalAction>
@@ -302,7 +308,6 @@ const EditAuctionModal = ({ auction }: { auction: Auction }) => {
     title: auction.title ?? '',
     status: auction.status,
     currency: auction.currency,
-    voice_channel_id: auction.voice_channel_id ?? '',
   })
 
   const handleSubmit = () => {
@@ -337,10 +342,7 @@ const EditAuctionModal = ({ auction }: { auction: Auction }) => {
           </SelectOptions>
         </Select>
         <Input value={data.currency} onChange={(e) => setData('currency', e.target.value)}>
-          Währung
-        </Input>
-        <Input value={data.voice_channel_id} onChange={(e) => setData('voice_channel_id', e.target.value)}>
-          Voice Channel ID
+          Waehrung
         </Input>
       </ModalContent>
       <ModalAction onClick={handleSubmit}>Speichern</ModalAction>
@@ -348,9 +350,21 @@ const EditAuctionModal = ({ auction }: { auction: Auction }) => {
   )
 }
 
-export default function Index({ auctions, items }: { auctions: Auction[]; items: Item[] }) {
+export default function Index({
+  auctions,
+  items,
+  voiceSettings: initialVoiceSettings,
+}: {
+  auctions: Auction[]
+  items: Item[]
+  voiceSettings: VoiceSettings
+}) {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(auctions[0] ?? null)
   const [preferredBidderName, setPreferredBidderName] = useState<string>('')
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(initialVoiceSettings)
+  const [voiceCandidates, setVoiceCandidates] = useState<AuctionVoiceCandidate[]>([])
+  const [voiceUpdatedAt, setVoiceUpdatedAt] = useState<string | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   useEffect(() => {
     setSelectedAuction((prev) => {
@@ -360,6 +374,16 @@ export default function Index({ auctions, items }: { auctions: Auction[]; items:
       return auctions[0] ?? null
     })
   }, [auctions, selectedAuction?.id])
+
+  useEffect(() => {
+    setVoiceSettings(initialVoiceSettings)
+    setVoiceCandidates([])
+    setVoiceUpdatedAt(null)
+  }, [initialVoiceSettings])
+
+  useEffect(() => {
+    setPreferredBidderName('')
+  }, [voiceSettings.voice_channel_id])
 
   const onAuctionSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const auctionId = Number(event.target.value)
@@ -379,22 +403,50 @@ export default function Index({ auctions, items }: { auctions: Auction[]; items:
     })
   }
 
+  const syncVoiceCandidates = useCallback(async (showToast: boolean) => {
+    if (!voiceSettings.voice_channel_id || isSyncing) return
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      if (showToast) toast.show('CSRF Token fehlt.', 'error')
+      return
+    }
+
+    setIsSyncing(true)
+    try {
+      const response = await fetch(route('voice-settings.sync'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        if (showToast) toast.show(String(payload?.error ?? 'Fehler beim Sync.'), 'error')
+        return
+      }
+
+      const candidates = Array.isArray(payload?.voice_candidates) ? payload.voice_candidates : []
+      setVoiceCandidates(candidates)
+      setVoiceUpdatedAt(payload?.voice_updated_at ?? null)
+
+      if (showToast) {
+        toast.show('Voice Kandidaten aktualisiert', 'info')
+      }
+    } catch (error) {
+      if (showToast) toast.show('Fehler beim Sync.', 'error')
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [isSyncing, voiceSettings.voice_channel_id])
+
   const handleRefreshCandidates = () => {
-    if (!selectedAuction) return
-    router.post(
-      route('auctions.voice-sync', { auction: selectedAuction.id }),
-      {},
-      {
-        preserveScroll: true,
-        onSuccess: () => {
-          toast.show('Voice Kandidaten aktualisiert', 'info')
-        },
-        onError: (errors) => {
-          const message = errors.voice_sync ?? 'Fehler beim Sync.'
-          toast.show(String(message), 'error')
-        },
-      },
-    )
+    void syncVoiceCandidates(true)
   }
 
   const groupedItems = useMemo(() => {
@@ -407,14 +459,35 @@ export default function Index({ auctions, items }: { auctions: Auction[]; items:
       .filter((group) => group.items.length > 0)
   }, [selectedAuction])
 
-  const candidates = useMemo<AuctionVoiceCandidate[]>(() => {
-    if (!selectedAuction?.voice_candidates || !Array.isArray(selectedAuction.voice_candidates)) return []
-    return selectedAuction.voice_candidates
-  }, [selectedAuction])
+  const candidates = useMemo<AuctionVoiceCandidate[]>(() => voiceCandidates, [voiceCandidates])
 
-  const voiceUpdatedLabel = selectedAuction?.voice_updated_at
-    ? format(new Date(selectedAuction.voice_updated_at), "iiii dd MMM'.' yyyy ' - ' HH:mm")
+  const voiceUpdatedLabel = voiceUpdatedAt
+    ? format(new Date(voiceUpdatedAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
     : 'unbekannt'
+
+  useEffect(() => {
+    if (!voiceSettings.voice_channel_id) return
+
+    void syncVoiceCandidates(false)
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void syncVoiceCandidates(false)
+    }, 20000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void syncVoiceCandidates(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [syncVoiceCandidates, voiceSettings.voice_channel_id])
 
   return (
     <AppLayout>
@@ -458,19 +531,19 @@ export default function Index({ auctions, items }: { auctions: Auction[]; items:
                 <div>
                   <p className="text-sm font-semibold">Voice Kandidaten</p>
                   <p className="text-xs text-base-content/70">
-                    Channel ID: {selectedAuction.voice_channel_id ?? '-'} · Letztes Update: {voiceUpdatedLabel}
+                    Channel ID: {voiceSettings.voice_channel_id ?? '-'} - Letztes Update: {voiceUpdatedLabel}
                   </p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleRefreshCandidates}
-                  disabled={!selectedAuction.voice_channel_id}
+                  disabled={!voiceSettings.voice_channel_id || isSyncing}
                 >
                   Aktualisieren
                 </Button>
               </div>
-              {selectedAuction.voice_channel_id ? (
+              {voiceSettings.voice_channel_id ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {candidates.length === 0 ? (
                     <p className="text-xs text-base-content/70">Keine aktiven Nutzer gemeldet.</p>
@@ -492,7 +565,12 @@ export default function Index({ auctions, items }: { auctions: Auction[]; items:
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-base-content/70">
-                  Keine Channel ID gesetzt. Nutze "Auktion bearbeiten", um sie zu hinterlegen.
+                  Keine Channel ID gesetzt. Bitte in den Administration Settings konfigurieren.
+                  <span className="ml-1">
+                    <Link href={route('admin.settings')} className="link">
+                      Zu den Settings
+                    </Link>
+                  </span>
                 </p>
               )}
             </div>
