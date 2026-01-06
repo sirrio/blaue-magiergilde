@@ -54,7 +54,7 @@ class AuctionBidController extends Controller
         }
 
         $auctionItem->bids()->create([
-            'bidder_name' => $request->bidder_name,
+            'bidder_discord_id' => $request->bidder_discord_id,
             'amount' => $request->amount,
             'created_by' => $request->user()->id,
         ]);

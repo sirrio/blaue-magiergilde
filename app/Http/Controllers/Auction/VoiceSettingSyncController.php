@@ -45,8 +45,6 @@ class VoiceSettingSyncController extends Controller
 
         $payload = $response->json();
         $members = is_array($payload['members'] ?? null) ? $payload['members'] : null;
-        $updatedAt = is_string($payload['updated_at'] ?? null) ? $payload['updated_at'] : null;
-
         if (! is_array($members)) {
             return response()->json(['error' => 'Ungueltige Bot-Antwort.'], 502);
         }
@@ -54,7 +52,6 @@ class VoiceSettingSyncController extends Controller
         return response()->json([
             'voice_channel_id' => $settings->voice_channel_id,
             'voice_candidates' => $members,
-            'voice_updated_at' => $updatedAt ?: now()->toISOString(),
         ]);
     }
 }

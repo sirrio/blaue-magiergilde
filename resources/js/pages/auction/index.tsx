@@ -5,6 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
+import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
 import { Auction, AuctionItem, AuctionVoiceCandidate, Item, VoiceSettings } from '@/types'
 import { Head, Link, router, useForm } from '@inertiajs/react'
@@ -120,14 +121,80 @@ const getHighestBid = (auctionItem: AuctionItem) => {
   return auctionItem.bids?.[0]
 }
 
-const AuctionItemRow = ({
+const AuctionItemBidControls = ({
   auctionItem,
   currency,
-  defaultBidderName,
+  candidates,
 }: {
   auctionItem: AuctionItem
   currency: string
-  defaultBidderName?: string
+  candidates: AuctionVoiceCandidate[]
+}) => {
+  const step = getBidStep(auctionItem.item)
+  const highestBid = getHighestBid(auctionItem)
+  const minBid = highestBid ? Math.max(auctionItem.starting_bid, highestBid.amount + step) : auctionItem.starting_bid
+  const isAmountValid = (minBid - auctionItem.starting_bid) % step === 0
+
+  const handleBid = (candidateId: string) => {
+    if (!isAmountValid) {
+      toast.show(`Min ${minBid} ${currency} in Schritten von ${step}.`, 'error')
+      return
+    }
+
+    router.post(
+      route('auction-items.bids.store', { auctionItem: auctionItem.id }),
+      { bidder_discord_id: candidateId, amount: minBid },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          router.reload({ preserveScroll: true })
+        },
+        onError: (errors) => {
+          const message = errors.amount || errors.bidder_discord_id
+          if (message) {
+            toast.show(String(message), 'error')
+          }
+        },
+      },
+    )
+  }
+
+  return (
+    <div className="flex w-full flex-col items-start gap-2">
+      {candidates.length === 0 ? (
+        <p className="text-xs text-base-content/70">Keine Live Nutzer.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {candidates.map((candidate) => (
+            <Button
+              key={candidate.id}
+              size="xs"
+              variant="outline"
+              disabled={!isAmountValid}
+              onClick={() => handleBid(candidate.id)}
+            >
+              {candidate.name}
+            </Button>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-base-content/60">
+        Naechstes Gebot: {minBid} {currency} - Schritt {step}
+      </p>
+    </div>
+  )
+}
+
+const AuctionItemRow = ({
+  auctionItem,
+  currency,
+  candidates,
+  resolveBidderLabel,
+}: {
+  auctionItem: AuctionItem
+  currency: string
+  candidates: AuctionVoiceCandidate[]
+  resolveBidderLabel: (discordId: string) => string
 }) => {
   const textColor = getRarityTextColor(auctionItem.item.rarity)
   const highestBid = getHighestBid(auctionItem)
@@ -141,75 +208,11 @@ const AuctionItemRow = ({
       </div>
       <div className="max-w-24 font-mono text-xs">{auctionItem.starting_bid} {currency}</div>
       <div className="text-xs">
-        {highestBid ? `${highestBid.amount} ${currency} - ${highestBid.bidder_name}` : 'No bids yet'}
+        {highestBid ? `${highestBid.amount} ${currency} - ${resolveBidderLabel(highestBid.bidder_discord_id)}` : 'No bids yet'}
       </div>
       <div className="text-xs text-base-content/70">Repair {getRepairLabel(auctionItem)}</div>
-      <AddBidModal auctionItem={auctionItem} currency={currency} defaultBidderName={defaultBidderName} />
+      <AuctionItemBidControls auctionItem={auctionItem} currency={currency} candidates={candidates} />
     </ListRow>
-  )
-}
-
-const AddBidModal = ({
-  auctionItem,
-  currency,
-  defaultBidderName,
-}: {
-  auctionItem: AuctionItem
-  currency: string
-  defaultBidderName?: string
-}) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const { data, setData, post, errors } = useForm({ bidder_name: '', amount: 0 })
-  const step = getBidStep(auctionItem.item)
-  const highestBid = getHighestBid(auctionItem)
-  const minBid = highestBid ? Math.max(auctionItem.starting_bid, highestBid.amount + step) : auctionItem.starting_bid
-
-  useEffect(() => {
-    if (!isOpen) return
-    setData('amount', minBid)
-    if (defaultBidderName) {
-      setData('bidder_name', defaultBidderName)
-    }
-  }, [defaultBidderName, isOpen, minBid, setData])
-
-  const handleSubmit = () => {
-    post(route('auction-items.bids.store', { auctionItem: auctionItem.id }), {
-      preserveScroll: true,
-      onSuccess: () => {
-        setIsOpen(false)
-        router.reload({ preserveScroll: true })
-      },
-    })
-  }
-
-  return (
-    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-      <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
-          +
-        </Button>
-      </ModalTrigger>
-      <ModalTitle>Gebot eintragen</ModalTitle>
-      <ModalContent>
-        <Input errors={errors.bidder_name} value={data.bidder_name} onChange={(e) => setData('bidder_name', e.target.value)}>
-          Bieter
-        </Input>
-        <Input
-          errors={errors.amount}
-          type="number"
-          min={minBid}
-          step={step}
-          value={data.amount}
-          onChange={(e) => setData('amount', Number(e.target.value))}
-        >
-          Betrag
-        </Input>
-        <p className="mt-2 text-xs text-base-content/70">
-          Mindestgebot: {minBid} {currency} - Schritt: {step} {currency}
-        </p>
-      </ModalContent>
-      <ModalAction onClick={handleSubmit}>Speichern</ModalAction>
-    </Modal>
   )
 }
 
@@ -360,14 +363,13 @@ export default function Index({
   voiceSettings: VoiceSettings
 }) {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(auctions[0] ?? null)
-  const [preferredBidderName, setPreferredBidderName] = useState<string>('')
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(initialVoiceSettings)
   const [voiceCandidates, setVoiceCandidates] = useState<AuctionVoiceCandidate[]>([])
-  const [voiceUpdatedAt, setVoiceUpdatedAt] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
+  const getInitials = useInitials()
 
   useEffect(() => {
     setSelectedAuction((prev) => {
@@ -381,7 +383,6 @@ export default function Index({
   useEffect(() => {
     setVoiceSettings(initialVoiceSettings)
     setVoiceCandidates([])
-    setVoiceUpdatedAt(null)
   }, [initialVoiceSettings])
 
   useEffect(() => {
@@ -392,15 +393,10 @@ export default function Index({
     }
   }, [])
 
-  useEffect(() => {
-    setPreferredBidderName('')
-  }, [voiceSettings.voice_channel_id])
-
   const onAuctionSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const auctionId = Number(event.target.value)
     const newAuction = auctions.find((auction) => auction.id === auctionId) || null
     setSelectedAuction(newAuction)
-    setPreferredBidderName('')
   }
 
   const handleCreateAuction = (): void => {
@@ -445,7 +441,6 @@ export default function Index({
 
       const candidates = Array.isArray(payload?.voice_candidates) ? payload.voice_candidates : []
       setVoiceCandidates(candidates)
-      setVoiceUpdatedAt(payload?.voice_updated_at ?? null)
 
       if (showToast) {
         toast.show('Voice Kandidaten aktualisiert', 'info')
@@ -492,10 +487,19 @@ export default function Index({
   }, [selectedAuction])
 
   const candidates = useMemo<AuctionVoiceCandidate[]>(() => voiceCandidates, [voiceCandidates])
+  const candidateNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    candidates.forEach((candidate) => {
+      map[candidate.id] = candidate.name
+    })
+    return map
+  }, [candidates])
 
-  const voiceUpdatedLabel = voiceUpdatedAt
-    ? format(new Date(voiceUpdatedAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
-    : 'unbekannt'
+  const resolveBidderLabel = useCallback(
+    (discordId: string) => candidateNameById[discordId] ?? discordId,
+    [candidateNameById],
+  )
+
   const manualCooldownLabel = manualCooldownRemaining > 0 ? `Aktualisieren (${manualCooldownRemaining}s)` : 'Aktualisieren'
 
   useEffect(() => {
@@ -559,45 +563,39 @@ export default function Index({
               Schritte: Common 10, Uncommon 50, Rare 100, Very Rare 500. Consumables/Spellscrolls halbiert.
             </p>
 
-            <div className="mb-4 rounded-box bg-base-100 p-4 shadow">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold">Voice Kandidaten</p>
-                  <p className="text-xs text-base-content/70">
-                    Channel ID: {voiceSettings.voice_channel_id ?? '-'} - Letztes Update: {voiceUpdatedLabel}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleRefreshCandidates}
-                  disabled={!voiceSettings.voice_channel_id || isSyncing || manualCooldownRemaining > 0}
-                >
-                  {manualCooldownLabel}
-                </Button>
-              </div>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
               {voiceSettings.voice_channel_id ? (
-                <div className="mt-3 flex flex-wrap gap-2">
+                <>
                   {candidates.length === 0 ? (
-                    <p className="text-xs text-base-content/70">Keine aktiven Nutzer gemeldet.</p>
+                    <p className="text-xs text-base-content/70">Keine Nutzer online.</p>
                   ) : (
-                    candidates.map((candidate) => (
-                      <Button
-                        key={candidate.id}
-                        size="xs"
-                        variant="outline"
-                        onClick={() => {
-                          setPreferredBidderName(candidate.name)
-                          toast.show(`Bieter gesetzt: ${candidate.name}`, 'info')
-                        }}
-                      >
-                        {candidate.name}
-                      </Button>
-                    ))
+                    <div className="flex -space-x-2">
+                      {candidates.map((candidate) => (
+                        <div
+                          key={candidate.id}
+                          className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-base-100 bg-base-200 text-xs font-semibold"
+                          title={candidate.name}
+                        >
+                          {candidate.avatar ? (
+                            <img src={candidate.avatar} alt={candidate.name} className="h-full w-full object-cover" />
+                          ) : (
+                            getInitials(candidate.name)
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRefreshCandidates}
+                    disabled={!voiceSettings.voice_channel_id || isSyncing || manualCooldownRemaining > 0}
+                  >
+                    {manualCooldownLabel}
+                  </Button>
+                </>
               ) : (
-                <p className="mt-3 text-xs text-base-content/70">
+                <p className="text-xs text-base-content/70">
                   Keine Channel ID gesetzt. Bitte in den Administration Settings konfigurieren.
                   <span className="ml-1">
                     <Link href={route('admin.settings')} className="link">
@@ -622,7 +620,8 @@ export default function Index({
                         key={auctionItem.id}
                         auctionItem={auctionItem}
                         currency={selectedAuction.currency}
-                        defaultBidderName={preferredBidderName}
+                        candidates={candidates}
+                        resolveBidderLabel={resolveBidderLabel}
                       />
                     ))}
                   </React.Fragment>

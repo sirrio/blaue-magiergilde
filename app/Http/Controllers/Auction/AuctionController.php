@@ -26,7 +26,7 @@ class AuctionController extends Controller
                     ->orderBy('id'),
                 'auctionItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
                 'auctionItems.bids' => fn ($query) => $query
-                    ->select(['id', 'auction_item_id', 'bidder_name', 'amount', 'created_at'])
+                    ->select(['id', 'auction_item_id', 'bidder_discord_id', 'amount', 'created_at'])
                     ->orderByDesc('amount')
                     ->orderByDesc('created_at'),
             ])

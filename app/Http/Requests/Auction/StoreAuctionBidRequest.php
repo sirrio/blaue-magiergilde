@@ -26,7 +26,7 @@ class StoreAuctionBidRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'bidder_name' => ['required', 'string', 'max:255'],
+            'bidder_discord_id' => ['required', 'string', 'regex:/^[0-9]{5,}$/', 'max:32'],
             'amount' => ['required', 'integer', 'min:0'],
         ];
     }
