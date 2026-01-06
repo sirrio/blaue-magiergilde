@@ -10,7 +10,7 @@ import { Auction, AuctionItem, AuctionVoiceCandidate, Item, VoiceSettings } from
 import { Head, Link, router, useForm } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Copy, Edit, FlaskRound, Plus, ScrollText, Sword } from 'lucide-react'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
   common: 'Common',
@@ -365,6 +365,9 @@ export default function Index({
   const [voiceCandidates, setVoiceCandidates] = useState<AuctionVoiceCandidate[]>([])
   const [voiceUpdatedAt, setVoiceUpdatedAt] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
+  const cooldownIntervalRef = useRef<number | null>(null)
+  const isSyncingRef = useRef(false)
 
   useEffect(() => {
     setSelectedAuction((prev) => {
@@ -380,6 +383,14 @@ export default function Index({
     setVoiceCandidates([])
     setVoiceUpdatedAt(null)
   }, [initialVoiceSettings])
+
+  useEffect(() => {
+    return () => {
+      if (cooldownIntervalRef.current !== null) {
+        window.clearInterval(cooldownIntervalRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     setPreferredBidderName('')
@@ -404,7 +415,7 @@ export default function Index({
   }
 
   const syncVoiceCandidates = useCallback(async (showToast: boolean) => {
-    if (!voiceSettings.voice_channel_id || isSyncing) return
+    if (!voiceSettings.voice_channel_id || isSyncingRef.current) return
 
     const csrfToken = getCsrfToken()
     if (!csrfToken) {
@@ -412,6 +423,7 @@ export default function Index({
       return
     }
 
+    isSyncingRef.current = true
     setIsSyncing(true)
     try {
       const response = await fetch(route('voice-settings.sync'), {
@@ -441,11 +453,31 @@ export default function Index({
     } catch (error) {
       if (showToast) toast.show('Fehler beim Sync.', 'error')
     } finally {
+      isSyncingRef.current = false
       setIsSyncing(false)
     }
-  }, [isSyncing, voiceSettings.voice_channel_id])
+  }, [voiceSettings.voice_channel_id])
 
   const handleRefreshCandidates = () => {
+    if (manualCooldownRemaining > 0) return
+
+    setManualCooldownRemaining(5)
+    if (cooldownIntervalRef.current !== null) {
+      window.clearInterval(cooldownIntervalRef.current)
+    }
+    cooldownIntervalRef.current = window.setInterval(() => {
+      setManualCooldownRemaining((prev) => {
+        if (prev <= 1) {
+          if (cooldownIntervalRef.current !== null) {
+            window.clearInterval(cooldownIntervalRef.current)
+            cooldownIntervalRef.current = null
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
     void syncVoiceCandidates(true)
   }
 
@@ -464,6 +496,7 @@ export default function Index({
   const voiceUpdatedLabel = voiceUpdatedAt
     ? format(new Date(voiceUpdatedAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
     : 'unbekannt'
+  const manualCooldownLabel = manualCooldownRemaining > 0 ? `Aktualisieren (${manualCooldownRemaining}s)` : 'Aktualisieren'
 
   useEffect(() => {
     if (!voiceSettings.voice_channel_id) return
@@ -473,7 +506,7 @@ export default function Index({
     const intervalId = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       void syncVoiceCandidates(false)
-    }, 20000)
+    }, 15000)
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -538,9 +571,9 @@ export default function Index({
                   size="sm"
                   variant="outline"
                   onClick={handleRefreshCandidates}
-                  disabled={!voiceSettings.voice_channel_id || isSyncing}
+                  disabled={!voiceSettings.voice_channel_id || isSyncing || manualCooldownRemaining > 0}
                 >
-                  Aktualisieren
+                  {manualCooldownLabel}
                 </Button>
               </div>
               {voiceSettings.voice_channel_id ? (
