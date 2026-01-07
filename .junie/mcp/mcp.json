@@ -1,0 +1,20 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "C:\\Users\\home\\.config\\herd\\bin\\php84\\php.exe",
+            "args": [
+                "C:\\Users\\home\\Projekte\\blaue-magiergilde\\artisan",
+                "boost:mcp"
+            ]
+        },
+        "herd": {
+            "command": "C:\\Users\\home\\.config\\herd\\bin\\php84\\php.exe",
+            "args": [
+                "C:/Users/home/.config/herd/bin/herd-mcp.phar"
+            ],
+            "env": {
+                "SITE_PATH": "C:\\Users\\home\\Projekte\\blaue-magiergilde"
+            }
+        }
+    }
+}

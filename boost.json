@@ -1,0 +1,13 @@
+{
+    "agents": [
+        "codex",
+        "phpstorm"
+    ],
+    "editors": [
+        "codex",
+        "phpstorm",
+        "vscode"
+    ],
+    "guidelines": [],
+    "herd_mcp": true
+}
