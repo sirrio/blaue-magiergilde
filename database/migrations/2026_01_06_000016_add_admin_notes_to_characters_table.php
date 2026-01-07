@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -10,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('registrations', function (Blueprint $table) {
-            $table->bigInteger('discord_id')->nullable()->after('discord_name');
+        Schema::table('characters', function (Blueprint $table) {
+            $table->longText('admin_notes')->nullable()->after('notes');
         });
     }
 
@@ -20,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('registrations', function (Blueprint $table) {
-            $table->dropColumn('discord_id');
+        Schema::table('characters', function (Blueprint $table) {
+            $table->dropColumn('admin_notes');
         });
     }
 };

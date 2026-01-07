@@ -1,19 +1,12 @@
 <?php
 
-use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\Admin\CharacterRegistrationController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('registrations', [RegistrationController::class, 'index'])
+Route::get('registrations', [CharacterRegistrationController::class, 'index'])
     ->middleware(['auth'])
     ->name('registrations.index');
 
-Route::get('signup', fn () => Inertia\Inertia::render('registration/index'))
-    ->name('registrations.form');
-
-Route::post('registrations', [RegistrationController::class, 'store'])
-    ->name('registrations.store');
-
-Route::put('registrations/{registration}', [RegistrationController::class, 'update'])
+Route::patch('registrations/characters/{character}', [CharacterRegistrationController::class, 'update'])
     ->middleware(['auth'])
-    ->name('registrations.update');
+    ->name('registrations.characters.update');

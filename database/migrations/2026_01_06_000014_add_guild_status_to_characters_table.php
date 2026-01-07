@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,9 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('registrations', function (Blueprint $table) {
-            $table->longText('notes')->nullable()->after('discord_name');
+        Schema::table('characters', function (Blueprint $table) {
+            $table->string('guild_status')->default('pending')->after('user_id');
         });
+
+        DB::table('characters')->update(['guild_status' => 'approved']);
     }
 
     /**
@@ -21,8 +24,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('registrations', function (Blueprint $table) {
-            $table->dropColumn('notes');
+        Schema::table('characters', function (Blueprint $table) {
+            $table->dropColumn('guild_status');
         });
     }
 };

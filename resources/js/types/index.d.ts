@@ -124,6 +124,8 @@ export interface Character {
   downtimes: Downtime[]
   allies: Ally[]
   deleted_at: string
+  guild_status?: 'pending' | 'approved' | 'declined'
+  admin_notes?: string | null
   faction:
     | 'none'
     | 'heiler'
@@ -148,6 +150,11 @@ export interface Character {
   external_link: string
   avatar: string
   user_id: number
+  user?: {
+    id: number
+    name: string
+    discord_id?: number | null
+  }
   character?: Character
 }
 
@@ -193,18 +200,6 @@ export interface Game {
   sessions: number
   notes: string
   user_id: number
-}
-
-export interface Registration {
-  id: number
-  character_name: string
-  character_url: string
-  start_tier: 'bt' | 'lt' | 'ht'
-  tier: 'bt' | 'lt' | 'ht' | 'et'
-  discord_name: string
-  discord_id: number
-  notes: string
-  status: 'pending' | 'approved' | 'declined'
 }
 
 export interface SharedData {
