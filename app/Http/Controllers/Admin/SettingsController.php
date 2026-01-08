@@ -52,7 +52,7 @@ class SettingsController extends Controller
                         ->where('is_thread', false)
                         ->orderBy('guild_id')
                         ->orderBy('name')
-                        ->get(['id', 'guild_id', 'name', 'type', 'parent_id', 'is_thread'])
+                        ->get(['id', 'guild_id', 'name', 'type', 'parent_id', 'is_thread', 'last_synced_at'])
                         ->groupBy('guild_id')
                         ->map(fn ($channels) => $channels->values())
                         ->toArray();

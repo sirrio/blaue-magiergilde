@@ -4,8 +4,10 @@ const { guildIds } = require('./config');
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_DELAY_MS = 1200;
 const DEFAULT_ATTACHMENT_DELAY_MS = 250;
+const DEFAULT_CHANNEL_COOLDOWN_MS = 30000;
 
 let isRunning = false;
+const channelCooldowns = new Map();
 const backupStatus = {
     running: false,
     startedAt: null,
@@ -58,6 +60,26 @@ function shouldIncludeListChannel(channel) {
     return shouldIncludeSelectableChannel(channel);
 }
 
+function getChannelCooldown(channelId) {
+    const cooldownMs = Number(process.env.BOT_BACKUP_CHANNEL_COOLDOWN_MS || DEFAULT_CHANNEL_COOLDOWN_MS);
+    if (!Number.isFinite(cooldownMs) || cooldownMs <= 0) {
+        return { active: false, retryAfterMs: 0 };
+    }
+
+    const now = Date.now();
+    const lastRun = channelCooldowns.get(channelId) || 0;
+    const delta = now - lastRun;
+    if (delta < cooldownMs) {
+        return { active: true, retryAfterMs: cooldownMs - delta };
+    }
+
+    return { active: false, retryAfterMs: 0 };
+}
+
+function markChannelCooldown(channelId) {
+    channelCooldowns.set(channelId, Date.now());
+}
+
 async function fetchChannelState(appUrl, token, guildId) {
     const url = new URL('/bot/discord-backups/channels', appUrl);
     url.searchParams.set('guild_id', guildId);
@@ -75,6 +97,71 @@ async function fetchChannelState(appUrl, token, guildId) {
     const channels = Array.isArray(payload.channels) ? payload.channels : [];
 
     return new Map(channels.map(channel => [channel.id, channel]));
+}
+
+async function resolveSingleChannel(client, channelId) {
+    try {
+        return await client.channels.fetch(channelId);
+    } catch (error) {
+        console.warn(`[bot] Discord backup: failed to fetch channel ${channelId}.`, error);
+        return null;
+    }
+}
+
+function isChannelAllowed(channel, allowlistByGuild) {
+    if (!allowlistByGuild) return true;
+    const guildId = channel.guild?.id;
+    if (!guildId) return false;
+    const allowlist = allowlistByGuild.get(guildId);
+    if (!allowlist || allowlist.size === 0) return false;
+    return allowlist.has(channel.id) || (channel.parentId && allowlist.has(channel.parentId));
+}
+
+async function backupChannelSet(channels, guildId, appUrl, token) {
+    const channelState = await fetchChannelState(appUrl, token, guildId);
+    const channelPayload = channels.map(channel => ({
+        id: channel.id,
+        guild_id: guildId,
+        name: channel.name || channel.id,
+        type: resolveChannelType(channel),
+        parent_id: channel.parentId || null,
+        is_thread: Boolean(channel.isThread?.()),
+        last_message_id: channelState.get(channel.id)?.last_message_id || null,
+    }));
+
+    await postJson(appUrl, token, '/bot/discord-backups/channels', {
+        channels: channelPayload,
+    });
+
+    for (const channel of channels) {
+        if (!shouldFetchMessages(channel)) {
+            updateStatus({
+                processedChannels: backupStatus.processedChannels + 1,
+                currentChannel: null,
+            });
+            continue;
+        }
+
+        const lastMessage = channelState.get(channel.id)?.last_message_id || null;
+
+        try {
+            updateStatus({
+                currentChannel: {
+                    id: channel.id,
+                    name: channel.name || channel.id,
+                    guild_id: guildId,
+                },
+            });
+            await backupChannelMessages(channel, guildId, lastMessage, appUrl, token);
+        } catch (error) {
+            console.warn(`[bot] Discord backup: failed to backup channel ${channel.id}.`, error);
+        } finally {
+            updateStatus({
+                processedChannels: backupStatus.processedChannels + 1,
+                currentChannel: null,
+            });
+        }
+    }
 }
 
 async function listDiscordChannels(client, allowedGuildIds) {
@@ -361,56 +448,74 @@ async function runDiscordBackup(client, appUrl, allowlistByGuild) {
 
     for (const plan of guildPlans) {
         const { guildId, channels } = plan;
-        const channelState = await fetchChannelState(appUrl, token, guildId);
-
-        const channelPayload = channels.map(channel => ({
-            id: channel.id,
-            guild_id: guildId,
-            name: channel.name || channel.id,
-            type: resolveChannelType(channel),
-            parent_id: channel.parentId || null,
-            is_thread: Boolean(channel.isThread?.()),
-            last_message_id: channelState.get(channel.id)?.last_message_id || null,
-        }));
-
         try {
-            await postJson(appUrl, token, '/bot/discord-backups/channels', {
-                channels: channelPayload,
-            });
+            await backupChannelSet(channels, guildId, appUrl, token);
         } catch (error) {
             console.warn('[bot] Discord backup: failed to store channel metadata.', error);
-            continue;
         }
+    }
+}
 
-        for (const channel of channels) {
-            if (!shouldFetchMessages(channel)) {
-                updateStatus({
-                    processedChannels: backupStatus.processedChannels + 1,
-                    currentChannel: null,
-                });
-                continue;
-            }
+async function runSingleChannelBackup(client, appUrl, channelId, guildId, allowlistByGuild) {
+    const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    if (!token) {
+        console.warn('[bot] BOT_HTTP_TOKEN missing; cannot push backups to app.');
+        return;
+    }
 
-            const lastMessage = channelState.get(channel.id)?.last_message_id || null;
+    const channel = await resolveSingleChannel(client, channelId);
+    if (!channel) {
+        return;
+    }
 
-            try {
-                updateStatus({
-                    currentChannel: {
-                        id: channel.id,
-                        name: channel.name || channel.id,
-                        guild_id: guildId,
-                    },
-                });
-                await backupChannelMessages(channel, guildId, lastMessage, appUrl, token);
-            } catch (error) {
-                console.warn(`[bot] Discord backup: failed to backup channel ${channel.id}.`, error);
-            } finally {
-                updateStatus({
-                    processedChannels: backupStatus.processedChannels + 1,
-                    currentChannel: null,
-                });
+    const resolvedGuildId = channel.guild?.id || guildId;
+    if (!resolvedGuildId) {
+        console.warn('[bot] Discord backup: channel guild not found.');
+        return;
+    }
+
+    if (!isChannelAllowed(channel, allowlistByGuild)) {
+        console.warn('[bot] Discord backup: channel not allowed.');
+        return;
+    }
+
+    const channels = new Map();
+
+    if (channel.isThread?.()) {
+        channels.set(channel.id, channel);
+    } else if (shouldIncludeSelectableChannel(channel)) {
+        channels.set(channel.id, channel);
+        if (channel.threads) {
+            const threads = await collectThreads(channel);
+            for (const thread of threads) {
+                channels.set(thread.id, thread);
             }
         }
+    } else {
+        console.warn('[bot] Discord backup: channel type not supported.');
+        return;
+    }
+
+    const channelList = [...channels.values()];
+    updateStatus({
+        totalChannels: channelList.length,
+        processedChannels: 0,
+        processedMessages: 0,
+        currentChannel: null,
+    });
+
+    if (!channelList.length) {
+        updateStatus({
+            running: false,
+            finishedAt: new Date().toISOString(),
+        });
+        return;
+    }
+
+    try {
+        await backupChannelSet(channelList, resolvedGuildId, appUrl, token);
+    } catch (error) {
+        console.warn('[bot] Discord backup: single channel backup failed.', error);
     }
 }
 
@@ -451,6 +556,54 @@ function startDiscordBackup(client, appUrl, allowlistByGuild) {
     return { started: true };
 }
 
+function startDiscordBackupChannel(client, appUrl, channelId, guildId, allowlistByGuild) {
+    if (isRunning) {
+        return { started: false, error: 'Backup already running.' };
+    }
+
+    const resolvedUrl = resolveAppUrl(appUrl);
+    if (!resolvedUrl) {
+        return { started: false, error: 'App URL is missing.' };
+    }
+
+    const cooldown = getChannelCooldown(channelId);
+    if (cooldown.active) {
+        return {
+            started: false,
+            error: 'Channel cooldown active.',
+            retry_after_ms: cooldown.retryAfterMs,
+        };
+    }
+
+    markChannelCooldown(channelId);
+
+    isRunning = true;
+    updateStatus({
+        running: true,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        totalChannels: 0,
+        processedChannels: 0,
+        processedMessages: 0,
+        currentChannel: null,
+    });
+
+    void runSingleChannelBackup(client, resolvedUrl, channelId, guildId, allowlistByGuild)
+        .catch(error => {
+            console.warn('[bot] Discord backup failed.', error);
+        })
+        .finally(() => {
+            isRunning = false;
+            updateStatus({
+                running: false,
+                finishedAt: new Date().toISOString(),
+                currentChannel: null,
+            });
+        });
+
+    return { started: true };
+}
+
 function getBackupStatus() {
     return {
         running: backupStatus.running,
@@ -466,6 +619,7 @@ function getBackupStatus() {
 
 module.exports = {
     startDiscordBackup,
+    startDiscordBackupChannel,
     listDiscordChannels,
     getBackupStatus,
 };

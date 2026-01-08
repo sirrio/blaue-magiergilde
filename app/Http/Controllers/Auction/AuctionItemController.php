@@ -7,6 +7,7 @@ use App\Http\Requests\Auction\StoreAuctionItemRequest;
 use App\Models\Auction;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 class AuctionItemController extends Controller
 {
@@ -46,6 +47,12 @@ class AuctionItemController extends Controller
      */
     public function store(StoreAuctionItemRequest $request, Auction $auction): RedirectResponse
     {
+        if ($auction->status !== 'open') {
+            throw ValidationException::withMessages([
+                'auction' => 'Auktion ist geschlossen.',
+            ]);
+        }
+
         $repairCurrent = $request->input('repair_current');
         $notes = $request->input('notes');
 

@@ -81,10 +81,6 @@ class DiscordBackupController extends Controller
         $messages = $data['messages'] ?? [];
         $allowedChannelIds = $this->allowedChannelIds();
 
-        if ($messages === []) {
-            return response()->json(['stored' => 0]);
-        }
-
         if ($allowedChannelIds->isEmpty()) {
             return response()->json(['stored' => 0]);
         }
@@ -106,6 +102,13 @@ class DiscordBackupController extends Controller
                 'type' => 'unknown',
             ]
         );
+
+        if ($messages === []) {
+            $channel->last_synced_at = now();
+            $channel->save();
+
+            return response()->json(['stored' => 0]);
+        }
 
         $now = now();
         $rows = [];

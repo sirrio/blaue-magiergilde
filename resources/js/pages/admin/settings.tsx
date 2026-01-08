@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps, VoiceSettings } from '@/types'
-import { Head, Link, useForm, usePage } from '@inertiajs/react'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 export default function Settings({
@@ -29,6 +29,7 @@ export default function Settings({
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
+  const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
 
@@ -312,6 +313,60 @@ export default function Settings({
         : 'Kein aktiver Backup'
   const isBackupRunning = backupStatus?.running ?? false
 
+  const formatTimestamp = useCallback((value?: string | null) => {
+    if (!value) return 'Nie'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return 'Nie'
+    return parsed.toLocaleString()
+  }, [])
+
+  const handleChannelSync = useCallback(
+    async (channel: DiscordBackupChannel) => {
+      if (syncingChannelId) return
+      const csrfToken = getCsrfToken()
+      if (!csrfToken) {
+        toast.show('CSRF Token fehlt.', 'error')
+        return
+      }
+
+      setSyncingChannelId(channel.id)
+
+      try {
+        const response = await fetch(route('discord-backup.channels.sync', channel.id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({}),
+        })
+
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          if (response.status === 429 && payload?.retry_after_ms) {
+            const seconds = Math.max(1, Math.ceil(Number(payload.retry_after_ms) / 1000))
+            toast.show(`Bitte ${seconds}s warten, bevor du erneut synchronisierst.`, 'info')
+            return
+          }
+
+          toast.show(String(payload?.error ?? 'Channel Sync fehlgeschlagen.'), 'error')
+          return
+        }
+
+        toast.show('Channel Sync gestartet', 'info')
+        void fetchBackupStatus(false)
+        router.reload({ only: ['discordBackup'] })
+      } catch (error) {
+        toast.show('Channel Sync fehlgeschlagen.', 'error')
+      } finally {
+        setSyncingChannelId(null)
+      }
+    },
+    [fetchBackupStatus, getCsrfToken, syncingChannelId, router],
+  )
+
   const buildGroupedList = (
     guildId: string,
     channels: DiscordBackupChannel[],
@@ -386,7 +441,7 @@ export default function Settings({
             <details
               key={`${mode}-${guildId}`}
               className="rounded-box border border-base-200 p-3"
-              open={mode === 'selected' && summaryCount > 0}
+              defaultOpen={mode === 'selected' && summaryCount > 0}
             >
               <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
                 <span>Guild {guildId}</span>
@@ -397,7 +452,7 @@ export default function Settings({
                   <details
                     key={`${mode}-${guildId}-${group.id ?? 'uncategorized'}`}
                     className="rounded-box border border-base-200/70 p-2"
-                    open={mode === 'selected' && group.channels.length > 0}
+                    defaultOpen={mode === 'selected' && group.channels.length > 0}
                   >
                     <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-base-content/70">
                       <span className="truncate">{group.name}</span>
@@ -405,15 +460,36 @@ export default function Settings({
                     </summary>
                     <div className="mt-2 grid gap-2">
                       {group.channels.map((channel) => (
-                        <label key={channel.id} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-xs"
-                            checked={isChannelSelected(guildId, channel.id)}
-                            onChange={() => toggleChannel(guildId, channel.id)}
-                          />
-                          <span className="truncate">{channel.name}</span>
-                        </label>
+                        <div key={channel.id} className="flex items-center gap-2 text-sm">
+                          <label className="flex flex-1 items-center gap-2">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-xs"
+                              checked={isChannelSelected(guildId, channel.id)}
+                              onChange={() => toggleChannel(guildId, channel.id)}
+                            />
+                            <span className="truncate">{channel.name}</span>
+                          </label>
+                          {mode === 'selected' ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-base-content/60">
+                                {formatTimestamp(channel.last_synced_at)}
+                              </span>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  void handleChannelSync(channel)
+                                }}
+                                disabled={isBackupRunning || syncingChannelId === channel.id}
+                              >
+                                {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   </details>

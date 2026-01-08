@@ -138,4 +138,80 @@ class DiscordBackupController extends Controller
             'status' => $status,
         ]);
     }
+
+    public function syncChannel(DiscordChannel $discordChannel): JsonResponse
+    {
+        $user = request()->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $botUrl = trim((string) config('services.bot.http_url', ''));
+        $botToken = trim((string) config('services.bot.http_token', ''));
+
+        if ($botUrl === '' || $botToken === '') {
+            return response()->json([
+                'error' => 'Bot HTTP ist nicht konfiguriert.',
+            ], 422);
+        }
+
+        if ($discordChannel->is_thread) {
+            return response()->json([
+                'error' => 'Threads koennen nicht direkt synchronisiert werden.',
+            ], 422);
+        }
+
+        $allowedIds = DiscordBackupSetting::query()
+            ->pluck('channel_ids')
+            ->filter()
+            ->flatten()
+            ->unique()
+            ->values();
+
+        if (! $allowedIds->contains($discordChannel->id)) {
+            return response()->json([
+                'error' => 'Channel ist nicht ausgewaehlt.',
+            ], 403);
+        }
+
+        try {
+            $response = Http::timeout(10)
+                ->acceptJson()
+                ->withHeaders(['X-Bot-Token' => $botToken])
+                ->post(rtrim($botUrl, '/').'/discord-backup/channel', [
+                    'app_url' => config('app.url'),
+                    'channel_id' => $discordChannel->id,
+                    'guild_id' => $discordChannel->guild_id,
+                    'guilds' => [[
+                        'guild_id' => $discordChannel->guild_id,
+                        'channel_ids' => [$discordChannel->id],
+                    ]],
+                ]);
+        } catch (\Throwable $error) {
+            return response()->json([
+                'error' => 'Bot ist nicht erreichbar.',
+            ], 503);
+        }
+
+        if (! $response->ok()) {
+            $errorDetail = null;
+            try {
+                $payload = $response->json();
+                $errorDetail = is_array($payload) ? ($payload['error'] ?? null) : null;
+            } catch (\Throwable $error) {
+                $errorDetail = null;
+            }
+
+            $fallbackDetail = trim((string) $response->body());
+            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
+            $message = 'Bot-Request fehlgeschlagen.';
+            if ($detail) {
+                $message .= ' '.$detail;
+            }
+
+            return response()->json([
+                'error' => $message,
+            ], $response->status());
+        }
+
+        return response()->json(['status' => 'started']);
+    }
 }

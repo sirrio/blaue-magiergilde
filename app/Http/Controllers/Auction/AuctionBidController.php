@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\StoreAuctionBidRequest;
 use App\Models\AuctionBid;
 use App\Models\AuctionItem;
+use App\Models\Auction;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AuctionBidController extends Controller
 {
@@ -33,42 +36,57 @@ class AuctionBidController extends Controller
      */
     public function store(StoreAuctionBidRequest $request, AuctionItem $auctionItem): RedirectResponse
     {
-        $auctionItem->loadMissing(['item', 'auction', 'hiddenBids']);
+        DB::transaction(function () use ($request, $auctionItem): void {
+            $lockedItem = AuctionItem::query()
+                ->with(['item', 'hiddenBids'])
+                ->lockForUpdate()
+                ->findOrFail($auctionItem->id);
 
-        $step = $this->getBidStep($auctionItem->item);
-        $highestBid = (int) $auctionItem->bids()->max('amount');
-        $minBid = $highestBid > 0
-            ? max($auctionItem->starting_bid, $highestBid + $step)
-            : $auctionItem->starting_bid;
+            $lockedAuction = Auction::query()
+                ->lockForUpdate()
+                ->findOrFail($lockedItem->auction_id);
 
-        $amount = (int) $request->amount;
-        $hiddenBid = $auctionItem->hiddenBids
-            ->firstWhere('bidder_discord_id', $request->bidder_discord_id);
+            if ($lockedAuction->status !== 'open') {
+                throw ValidationException::withMessages([
+                    'auction' => 'Auktion ist geschlossen.',
+                ]);
+            }
 
-        if ($hiddenBid && $amount > $hiddenBid->max_amount) {
-            return redirect()->back()->withErrors([
-                'amount' => "Max Gebot fuer {$hiddenBid->bidder_name} ist {$hiddenBid->max_amount}.",
-            ])->withInput();
-        }
+            $step = $this->getBidStep($lockedItem->item);
+            $highestBid = (int) $lockedItem->bids()->max('amount');
+            $minBid = $highestBid > 0
+                ? max($lockedItem->starting_bid, $highestBid + $step)
+                : $lockedItem->starting_bid;
 
-        if ($amount < $minBid) {
-            return redirect()->back()->withErrors([
-                'amount' => "Mindestgebot ist {$minBid}.",
-            ])->withInput();
-        }
+            $amount = (int) $request->amount;
+            $hiddenBid = $lockedItem->hiddenBids
+                ->firstWhere('bidder_discord_id', $request->bidder_discord_id);
 
-        if (($amount - $auctionItem->starting_bid) % $step !== 0) {
-            return redirect()->back()->withErrors([
-                'amount' => "Gebote muessen in Schritten von {$step} erfolgen.",
-            ])->withInput();
-        }
+            if ($hiddenBid && $amount > $hiddenBid->max_amount) {
+                throw ValidationException::withMessages([
+                    'amount' => "Max Gebot fuer {$hiddenBid->bidder_name} ist {$hiddenBid->max_amount}.",
+                ]);
+            }
 
-        $auctionItem->bids()->create([
-            'bidder_name' => $request->bidder_name,
-            'bidder_discord_id' => $request->bidder_discord_id,
-            'amount' => $request->amount,
-            'created_by' => $request->user()->id,
-        ]);
+            if ($amount < $minBid) {
+                throw ValidationException::withMessages([
+                    'amount' => "Mindestgebot ist {$minBid}.",
+                ]);
+            }
+
+            if (($amount - $lockedItem->starting_bid) % $step !== 0) {
+                throw ValidationException::withMessages([
+                    'amount' => "Gebote muessen in Schritten von {$step} erfolgen.",
+                ]);
+            }
+
+            $lockedItem->bids()->create([
+                'bidder_name' => $request->bidder_name,
+                'bidder_discord_id' => $request->bidder_discord_id,
+                'amount' => $request->amount,
+                'created_by' => $request->user()->id,
+            ]);
+        });
 
         return redirect()->back();
     }

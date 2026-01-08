@@ -23,6 +23,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/admin/settings/discord-backup/status', [DiscordBackupController::class, 'status'])
         ->name('discord-backup.status');
 
+    Route::post('/admin/settings/discord-backup/channels/{discordChannel}/sync', [DiscordBackupController::class, 'syncChannel'])
+        ->name('discord-backup.channels.sync');
+
     Route::delete('/admin/settings/discord-backup', [DiscordBackupController::class, 'destroy'])
         ->name('discord-backup.destroy');
 

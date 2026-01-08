@@ -1,5 +1,5 @@
 const http = require('node:http');
-const { getBackupStatus, listDiscordChannels, startDiscordBackup } = require('./discordBackup');
+const { getBackupStatus, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
 const { getSnapshot } = require('./voiceStateCache');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
@@ -94,9 +94,10 @@ function startHttpServer(client) {
         const isVoiceSync = path === '/voice-sync';
         const isDiscordBackup = path === '/discord-backup';
         const isDiscordChannels = path === '/discord-channels';
+        const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordBackupStatus)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordBackupStatus && !isDiscordBackupChannel)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -165,6 +166,57 @@ function startHttpServer(client) {
                 logReject(req, result.error || 'backup rejected');
                 const status = result.error === 'App URL is missing.' ? 422 : 409;
                 respondJson(res, status, { error: result.error || 'Backup already running.' });
+                return;
+            }
+
+            respondJson(res, 202, { status: 'started' });
+            return;
+        }
+
+        if (isDiscordBackupChannel) {
+            const appUrl = String(payload?.app_url || '').trim();
+            const channelId = String(payload?.channel_id || '').trim();
+            const guildId = String(payload?.guild_id || '').trim();
+            const guildSelections = Array.isArray(payload?.guilds) ? payload.guilds : null;
+            const allowlistByGuild = new Map();
+
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            if (!guildId || !/^[0-9]{5,}$/.test(guildId)) {
+                logReject(req, 'invalid guild_id');
+                respondJson(res, 422, { error: 'Invalid guild_id.' });
+                return;
+            }
+
+            if (guildSelections) {
+                for (const guild of guildSelections) {
+                    if (!guild?.guild_id || !Array.isArray(guild?.channel_ids)) {
+                        continue;
+                    }
+                    allowlistByGuild.set(String(guild.guild_id), new Set(guild.channel_ids.map(String)));
+                }
+            }
+
+            const result = startDiscordBackupChannel(
+                client,
+                appUrl,
+                channelId,
+                guildId,
+                allowlistByGuild.size ? allowlistByGuild : null,
+            );
+            if (!result.started) {
+                logReject(req, result.error || 'backup rejected');
+                let status = 409;
+                if (result.error === 'App URL is missing.') {
+                    status = 422;
+                } else if (result.error === 'Channel cooldown active.') {
+                    status = 429;
+                }
+                respondJson(res, status, { error: result.error || 'Backup already running.', retry_after_ms: result.retry_after_ms });
                 return;
             }
 
