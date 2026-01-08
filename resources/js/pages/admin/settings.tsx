@@ -545,8 +545,8 @@ export default function Settings({
                 >
                   Backup starten
                 </Button>
-                <Button size="sm" variant="outline" as={Link} href={route('admin.discord-backup.index')}>
-                  Archiv anzeigen
+                <Button size="sm" variant="outline" as={Link} href={route('rules.index')}>
+                  Regeln anzeigen
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleBackupDelete} disabled={deleteForm.processing}>
                   Backup loeschen

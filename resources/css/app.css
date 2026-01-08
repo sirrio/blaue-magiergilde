@@ -54,4 +54,59 @@
       0 85%
     );
   }
+
+  .discord-markup {
+    line-height: 1.5;
+  }
+
+  .discord-markup h1,
+  .discord-markup h2,
+  .discord-markup h3 {
+    font-weight: 700;
+    margin: 0.5rem 0;
+  }
+
+  .discord-markup h1 {
+    font-size: 1.125rem;
+  }
+
+  .discord-markup h2 {
+    font-size: 1rem;
+  }
+
+  .discord-markup h3 {
+    font-size: 0.875rem;
+  }
+
+  .discord-markup code {
+    background: color-mix(in srgb, var(--color-base-200) 70%, transparent);
+    border-radius: 0.4rem;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.85em;
+  }
+
+  .discord-markup pre {
+    background: color-mix(in srgb, var(--color-base-200) 70%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+
+  .discord-markup pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  .discord-markup blockquote {
+    border-left: 3px solid color-mix(in srgb, var(--color-base-content) 35%, transparent);
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+    color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  }
+
+  .discord-markup a {
+    color: color-mix(in srgb, var(--color-primary) 85%, transparent);
+    text-decoration: underline;
+  }
 }

@@ -28,3 +28,4 @@ require __DIR__.'/web/bot.php';
 require __DIR__.'/web/registration.php';
 require __DIR__.'/web/user.php';
 require __DIR__.'/web/settings.php';
+require __DIR__.'/web/rules.php';
