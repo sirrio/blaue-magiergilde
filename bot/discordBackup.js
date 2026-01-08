@@ -6,6 +6,21 @@ const DEFAULT_DELAY_MS = 1200;
 const DEFAULT_ATTACHMENT_DELAY_MS = 250;
 
 let isRunning = false;
+const backupStatus = {
+    running: false,
+    startedAt: null,
+    finishedAt: null,
+    updatedAt: null,
+    totalChannels: 0,
+    processedChannels: 0,
+    processedMessages: 0,
+    currentChannel: null,
+};
+
+function updateStatus(patch) {
+    Object.assign(backupStatus, patch);
+    backupStatus.updatedAt = new Date().toISOString();
+}
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -234,6 +249,10 @@ async function processMessageBatch(appUrl, token, channelId, guildId, messages) 
         messages: payload,
     });
 
+    updateStatus({
+        processedMessages: backupStatus.processedMessages + messages.length,
+    });
+
     for (const message of messages) {
         for (const attachment of message.attachments.values()) {
             try {
@@ -295,6 +314,9 @@ async function runDiscordBackup(client, appUrl, allowlistByGuild) {
         return;
     }
 
+    const guildPlans = [];
+    let totalChannels = 0;
+
     for (const guildId of guildList) {
         let guild;
         try {
@@ -313,8 +335,33 @@ async function runDiscordBackup(client, appUrl, allowlistByGuild) {
             continue;
         }
 
-        const channelState = await fetchChannelState(appUrl, token, guildId);
         const channels = await collectChannels(guild, allowlist);
+        if (!channels.length) {
+            continue;
+        }
+
+        guildPlans.push({ guildId, channels });
+        totalChannels += channels.length;
+    }
+
+    updateStatus({
+        totalChannels,
+        processedChannels: 0,
+        processedMessages: 0,
+        currentChannel: null,
+    });
+
+    if (totalChannels === 0) {
+        updateStatus({
+            running: false,
+            finishedAt: new Date().toISOString(),
+        });
+        return;
+    }
+
+    for (const plan of guildPlans) {
+        const { guildId, channels } = plan;
+        const channelState = await fetchChannelState(appUrl, token, guildId);
 
         const channelPayload = channels.map(channel => ({
             id: channel.id,
@@ -337,15 +384,31 @@ async function runDiscordBackup(client, appUrl, allowlistByGuild) {
 
         for (const channel of channels) {
             if (!shouldFetchMessages(channel)) {
+                updateStatus({
+                    processedChannels: backupStatus.processedChannels + 1,
+                    currentChannel: null,
+                });
                 continue;
             }
 
             const lastMessage = channelState.get(channel.id)?.last_message_id || null;
 
             try {
+                updateStatus({
+                    currentChannel: {
+                        id: channel.id,
+                        name: channel.name || channel.id,
+                        guild_id: guildId,
+                    },
+                });
                 await backupChannelMessages(channel, guildId, lastMessage, appUrl, token);
             } catch (error) {
                 console.warn(`[bot] Discord backup: failed to backup channel ${channel.id}.`, error);
+            } finally {
+                updateStatus({
+                    processedChannels: backupStatus.processedChannels + 1,
+                    currentChannel: null,
+                });
             }
         }
     }
@@ -362,6 +425,15 @@ function startDiscordBackup(client, appUrl, allowlistByGuild) {
     }
 
     isRunning = true;
+    updateStatus({
+        running: true,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        totalChannels: 0,
+        processedChannels: 0,
+        processedMessages: 0,
+        currentChannel: null,
+    });
 
     void runDiscordBackup(client, resolvedUrl, allowlistByGuild)
         .catch(error => {
@@ -369,12 +441,31 @@ function startDiscordBackup(client, appUrl, allowlistByGuild) {
         })
         .finally(() => {
             isRunning = false;
+            updateStatus({
+                running: false,
+                finishedAt: new Date().toISOString(),
+                currentChannel: null,
+            });
         });
 
     return { started: true };
 }
 
+function getBackupStatus() {
+    return {
+        running: backupStatus.running,
+        started_at: backupStatus.startedAt,
+        finished_at: backupStatus.finishedAt,
+        updated_at: backupStatus.updatedAt,
+        total_channels: backupStatus.totalChannels,
+        processed_channels: backupStatus.processedChannels,
+        processed_messages: backupStatus.processedMessages,
+        current_channel: backupStatus.currentChannel,
+    };
+}
+
 module.exports = {
     startDiscordBackup,
     listDiscordChannels,
+    getBackupStatus,
 };

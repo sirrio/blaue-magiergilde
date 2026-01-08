@@ -20,6 +20,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/admin/settings/discord-backup', [DiscordBackupController::class, 'store'])
         ->name('discord-backup.store');
 
+    Route::post('/admin/settings/discord-backup/status', [DiscordBackupController::class, 'status'])
+        ->name('discord-backup.status');
+
     Route::delete('/admin/settings/discord-backup', [DiscordBackupController::class, 'destroy'])
         ->name('discord-backup.destroy');
 

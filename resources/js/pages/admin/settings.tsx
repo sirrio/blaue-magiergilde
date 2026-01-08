@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
-import { DiscordBackupChannel, DiscordBackupStats, PageProps, VoiceSettings } from '@/types'
+import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps, VoiceSettings } from '@/types'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 export default function Settings({
   voiceSettings,
@@ -28,6 +29,8 @@ export default function Settings({
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
+  const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
+  const statusIntervalRef = useRef<number | null>(null)
 
   useEffect(() => {
     setData('voice_channel_id', voiceSettings?.voice_channel_id ?? '')
@@ -36,6 +39,40 @@ export default function Settings({
   useEffect(() => {
     setSelectedByGuild(discordBackup.selected_channels ?? {})
   }, [discordBackup.selected_channels])
+
+  useEffect(() => {
+    void fetchBackupStatus(false)
+
+    return () => {
+      if (statusIntervalRef.current !== null) {
+        window.clearInterval(statusIntervalRef.current)
+        statusIntervalRef.current = null
+      }
+    }
+  }, [fetchBackupStatus])
+
+  useEffect(() => {
+    if (!backupStatus?.running) {
+      if (statusIntervalRef.current !== null) {
+        window.clearInterval(statusIntervalRef.current)
+        statusIntervalRef.current = null
+      }
+      return
+    }
+
+    if (statusIntervalRef.current !== null) return
+
+    statusIntervalRef.current = window.setInterval(() => {
+      void fetchBackupStatus(false)
+    }, 5000)
+
+    return () => {
+      if (statusIntervalRef.current !== null) {
+        window.clearInterval(statusIntervalRef.current)
+        statusIntervalRef.current = null
+      }
+    }
+  }, [backupStatus?.running, fetchBackupStatus])
 
   const selectedChannelDetails = useMemo(
     () => discordBackup.selected_channels_details ?? {},
@@ -81,11 +118,54 @@ export default function Settings({
   const isChannelSelected = (guildId: string, channelId: string) =>
     (selectedByGuild[guildId] ?? []).includes(channelId)
 
-  const getCsrfToken = () => {
+  const getCsrfToken = useCallback(() => {
     if (typeof document === 'undefined') return ''
     const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
     return meta?.content ?? ''
-  }
+  }, [])
+
+  const fetchBackupStatus = useCallback(
+    async (showToast: boolean) => {
+      const csrfToken = getCsrfToken()
+      if (!csrfToken) {
+        if (showToast) toast.show('CSRF Token fehlt.', 'error')
+        return
+      }
+
+      try {
+        const response = await fetch(route('discord-backup.status'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({}),
+        })
+
+        const payload = await response.json()
+        if (!response.ok) {
+          if (showToast) {
+            toast.show(String(payload?.error ?? 'Status konnte nicht geladen werden.'), 'error')
+          }
+          return
+        }
+
+        const status = payload?.status ?? null
+        if (!status || typeof status !== 'object') {
+          setBackupStatus(null)
+          return
+        }
+        setBackupStatus(status as DiscordBackupStatus)
+      } catch (error) {
+        if (showToast) {
+          toast.show('Status konnte nicht geladen werden.', 'error')
+        }
+      }
+    },
+    [getCsrfToken],
+  )
 
   const handleSubmit = () => {
     patch(route('voice-settings.update'), {
@@ -180,9 +260,11 @@ export default function Settings({
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Discord Backup gestartet', 'info')
+        void fetchBackupStatus(false)
       },
       onError: () => {
         toast.show('Discord Backup konnte nicht gestartet werden.', 'error')
+        void fetchBackupStatus(false)
       },
     })
   }
@@ -206,6 +288,16 @@ export default function Settings({
   const lastSyncedLabel = discordBackup.last_synced_at
     ? new Date(discordBackup.last_synced_at).toLocaleString()
     : 'Nie'
+
+  const backupProgressMax = backupStatus?.total_channels ?? 0
+  const backupProgressValue = backupStatus?.processed_channels ?? 0
+  const backupProgressLabel =
+    backupProgressMax > 0
+      ? `${backupProgressValue}/${backupProgressMax} Channels`
+      : backupStatus?.running
+        ? 'Backup laeuft...'
+        : 'Kein aktiver Backup'
+  const isBackupRunning = backupStatus?.running ?? false
 
   const buildGroupedList = (
     guildId: string,
@@ -372,6 +464,28 @@ export default function Settings({
                   <span className="font-semibold">{lastSyncedLabel}</span>
                 </div>
               </div>
+              {backupStatus ? (
+                <div className="mt-4 rounded-box border border-base-200 p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-base-content/70">
+                      {backupStatus.running ? 'Backup laeuft' : 'Backup Status'}
+                    </span>
+                    <span className="font-semibold">{backupProgressLabel}</span>
+                  </div>
+                  <div className="mt-2">
+                    <Progress
+                      className="progress-info"
+                      value={backupProgressValue}
+                      max={backupProgressMax > 0 ? backupProgressMax : 1}
+                    />
+                  </div>
+                  {backupStatus.running && backupStatus.current_channel ? (
+                    <p className="mt-2 text-[11px] text-base-content/60">
+                      Aktuell: {backupStatus.current_channel.name}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="mt-4 rounded-box border border-base-200 p-3">
                 <p className="text-sm font-semibold">Ausgewaehlte Channels</p>
                 {selectedGuildEntries.length === 0 ? (
@@ -409,7 +523,12 @@ export default function Settings({
                 <p className="mt-2 text-xs text-error">{pageErrors.discord_backup}</p>
               )}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={handleBackupStart} disabled={backupForm.processing}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBackupStart}
+                  disabled={backupForm.processing || isBackupRunning}
+                >
                   Backup starten
                 </Button>
                 <Button size="sm" variant="outline" as={Link} href={route('admin.discord-backup.index')}>

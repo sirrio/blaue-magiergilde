@@ -1,5 +1,5 @@
 const http = require('node:http');
-const { listDiscordChannels, startDiscordBackup } = require('./discordBackup');
+const { getBackupStatus, listDiscordChannels, startDiscordBackup } = require('./discordBackup');
 const { getSnapshot } = require('./voiceStateCache');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
@@ -94,13 +94,14 @@ function startHttpServer(client) {
         const isVoiceSync = path === '/voice-sync';
         const isDiscordBackup = path === '/discord-backup';
         const isDiscordChannels = path === '/discord-channels';
+        const isDiscordBackupStatus = path === '/discord-backup/status';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordBackupStatus)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
 
-        if (isRateLimited(req)) {
+        if (!isDiscordBackupStatus && isRateLimited(req)) {
             logReject(req, 'rate limited');
             respondJson(res, 429, { error: 'Too many requests.' });
             return;
@@ -125,6 +126,11 @@ function startHttpServer(client) {
 
             logReject(req, 'invalid JSON');
             respondJson(res, 400, { error: 'Invalid JSON.' });
+            return;
+        }
+
+        if (isDiscordBackupStatus) {
+            respondJson(res, 200, { status: getBackupStatus() });
             return;
         }
 

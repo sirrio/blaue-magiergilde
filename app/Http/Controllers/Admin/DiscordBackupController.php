@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -92,5 +93,49 @@ class DiscordBackupController extends Controller
         Storage::disk('local')->deleteDirectory('discord-backups');
 
         return redirect()->back();
+    }
+
+    public function status(): JsonResponse
+    {
+        $user = request()->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $botUrl = trim((string) config('services.bot.http_url', ''));
+        $botToken = trim((string) config('services.bot.http_token', ''));
+
+        if ($botUrl === '' || $botToken === '') {
+            return response()->json([
+                'error' => 'Bot HTTP ist nicht konfiguriert.',
+            ], 422);
+        }
+
+        try {
+            $response = Http::timeout(10)
+                ->acceptJson()
+                ->withHeaders(['X-Bot-Token' => $botToken])
+                ->post(rtrim($botUrl, '/').'/discord-backup/status');
+        } catch (\Throwable $error) {
+            return response()->json([
+                'error' => 'Bot ist nicht erreichbar.',
+            ], 503);
+        }
+
+        if (! $response->ok()) {
+            return response()->json([
+                'error' => 'Bot-Request fehlgeschlagen.',
+            ], 502);
+        }
+
+        $payload = $response->json();
+        $status = $payload['status'] ?? null;
+        if (! is_array($status)) {
+            return response()->json([
+                'error' => 'Ungueltige Bot-Antwort.',
+            ], 502);
+        }
+
+        return response()->json([
+            'status' => $status,
+        ]);
     }
 }

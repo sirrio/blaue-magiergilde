@@ -103,6 +103,21 @@ export interface DiscordBackupChannel {
   messages_count?: number
 }
 
+export interface DiscordBackupStatus {
+  running: boolean
+  started_at?: string | null
+  finished_at?: string | null
+  updated_at?: string | null
+  total_channels: number
+  processed_channels: number
+  processed_messages: number
+  current_channel?: {
+    id: string
+    name: string
+    guild_id: string
+  } | null
+}
+
 export interface DiscordBackupAttachment {
   id: number
   filename: string
