@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
@@ -145,6 +146,11 @@ it('lets admins trigger a discord backup run', function () {
     Config::set('services.bot.http_token', 'secret');
     Config::set('app.url', 'http://app.test');
 
+    DiscordBackupSetting::query()->create([
+        'guild_id' => '67890',
+        'channel_ids' => ['12345'],
+    ]);
+
     Http::fake([
         'http://bot.test/discord-backup' => Http::response(['status' => 'started'], 202),
     ]);
@@ -159,4 +165,74 @@ it('lets admins trigger a discord backup run', function () {
         return $request->url() === 'http://bot.test/discord-backup'
             && $request->hasHeader('X-Bot-Token', 'secret');
     });
+});
+
+it('stores selected backup channels per guild', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    DiscordChannel::query()->create([
+        'id' => '12345',
+        'guild_id' => '67890',
+        'name' => 'rules',
+        'type' => 'GuildText',
+        'is_thread' => false,
+    ]);
+
+    DiscordChannel::query()->create([
+        'id' => '99999',
+        'guild_id' => '67890',
+        'name' => 'thread',
+        'type' => 'PublicThread',
+        'is_thread' => true,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch('/admin/settings/discord-backup/channels', [
+            'guilds' => [
+                [
+                    'guild_id' => '67890',
+                    'channel_ids' => ['12345', '99999'],
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $setting = DiscordBackupSetting::query()->where('guild_id', '67890')->first();
+    expect($setting)->not->toBeNull();
+    expect($setting->channel_ids)->toBe(['12345']);
+});
+
+it('refreshes available backup channels from the bot', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'secret');
+
+    Http::fake([
+        'http://bot.test/discord-channels' => Http::response([
+            'guilds' => [
+                [
+                    'guild_id' => '67890',
+                    'channels' => [
+                        [
+                            'id' => '12345',
+                            'guild_id' => '67890',
+                            'name' => 'rules',
+                            'type' => 'GuildText',
+                            'parent_id' => null,
+                            'is_thread' => false,
+                        ],
+                    ],
+                ],
+            ],
+        ], 200),
+    ]);
+
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post('/admin/settings/discord-backup/channels')
+        ->assertRedirect();
+
+    $channel = DiscordChannel::query()->first();
+    expect($channel)->not->toBeNull();
+    expect($channel->id)->toBe('12345');
 });

@@ -31,6 +31,7 @@ const authLinks = [
 
 const adminLinks = [
   { name: 'Settings', route: 'admin.settings', method: 'get' as const },
+  { name: 'Discord Backup', route: 'admin.discord-backup.index', method: 'get' as const },
   { name: 'Items', route: 'items.index', method: 'get' as const },
   { name: 'Spells', route: 'spells.index', method: 'get' as const },
   { name: 'Shop', route: 'shops.index', method: 'get' as const },

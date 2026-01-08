@@ -87,6 +87,38 @@ export interface DiscordBackupStats {
   messages: number
   attachments: number
   last_synced_at?: string | null
+  available_channels?: Record<string, DiscordBackupChannel[]>
+  selected_channels?: Record<string, string[]>
+}
+
+export interface DiscordBackupChannel {
+  id: string
+  guild_id: string
+  name: string
+  type: string
+  parent_id?: string | null
+  is_thread: boolean
+  last_synced_at?: string | null
+  messages_count?: number
+}
+
+export interface DiscordBackupAttachment {
+  id: number
+  filename: string
+  url: string
+  storage_path?: string | null
+}
+
+export interface DiscordBackupMessage {
+  id: string
+  author_name: string
+  author_display_name?: string | null
+  content?: string | null
+  message_type: number
+  is_pinned: boolean
+  sent_at?: string | null
+  edited_at?: string | null
+  attachments: DiscordBackupAttachment[]
 }
 
 export interface Auction {

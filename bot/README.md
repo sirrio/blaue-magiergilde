@@ -27,6 +27,7 @@ Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button**
 ### Discord Backup (App)
 
 - Das Admin-Panel der App kann ein manuelles Backup aller Text-Channels und Threads starten.
+- Die App bestimmt, welche Channels gesichert werden (Auswahl im Admin-Panel).
 - Der Bot liest die Historie, laedt Attachments herunter und speichert alles in der App.
 - Voraussetzungen: `GuildMessages` + `MessageContent` Intent im Discord Developer Portal aktivieren.
 

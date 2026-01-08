@@ -29,6 +29,14 @@ function resolveChannelType(channel) {
     return typeName || String(channel.type);
 }
 
+function shouldIncludeSelectableChannel(channel) {
+    if (!channel.isTextBased?.()) return false;
+    if (channel.isThread?.()) return false;
+    if (channel.type === ChannelType.GuildForum) return false;
+
+    return true;
+}
+
 async function fetchChannelState(appUrl, token, guildId) {
     const url = new URL('/bot/discord-backups/channels', appUrl);
     url.searchParams.set('guild_id', guildId);
@@ -46,6 +54,43 @@ async function fetchChannelState(appUrl, token, guildId) {
     const channels = Array.isArray(payload.channels) ? payload.channels : [];
 
     return new Map(channels.map(channel => [channel.id, channel]));
+}
+
+async function listDiscordChannels(client, allowedGuildIds) {
+    const guildList = allowedGuildIds && allowedGuildIds.length ? allowedGuildIds : resolveGuildIds(client);
+    const guilds = [];
+
+    for (const guildId of guildList) {
+        let guild;
+        try {
+            guild = await client.guilds.fetch(guildId);
+        } catch (error) {
+            console.warn(`[bot] Discord channels: failed to fetch guild ${guildId}.`, error);
+            continue;
+        }
+
+        const guildChannels = await guild.channels.fetch();
+        const channels = [];
+
+        for (const channel of guildChannels.values()) {
+            if (!shouldIncludeSelectableChannel(channel)) {
+                continue;
+            }
+
+            channels.push({
+                id: channel.id,
+                guild_id: guildId,
+                name: channel.name || channel.id,
+                type: resolveChannelType(channel),
+                parent_id: channel.parentId || null,
+                is_thread: false,
+            });
+        }
+
+        guilds.push({ guild_id: guildId, channels });
+    }
+
+    return guilds;
 }
 
 async function postJson(appUrl, token, path, payload) {
@@ -134,12 +179,13 @@ async function collectThreads(channel) {
     return threads;
 }
 
-async function collectChannels(guild) {
+async function collectChannels(guild, allowedChannelIds) {
     const channels = new Map();
     const guildChannels = await guild.channels.fetch();
 
     for (const channel of guildChannels.values()) {
-        if (!channel.isTextBased?.()) continue;
+        if (!shouldIncludeSelectableChannel(channel)) continue;
+        if (allowedChannelIds && !allowedChannelIds.has(channel.id)) continue;
         channels.set(channel.id, channel);
 
         if (channel.threads) {
@@ -230,7 +276,7 @@ async function backupChannelMessages(channel, guildId, lastMessageId, appUrl, to
     }
 }
 
-async function runDiscordBackup(client, appUrl) {
+async function runDiscordBackup(client, appUrl, allowlistByGuild) {
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!token) {
         console.warn('[bot] BOT_HTTP_TOKEN missing; cannot push backups to app.');
@@ -252,8 +298,17 @@ async function runDiscordBackup(client, appUrl) {
             continue;
         }
 
+        if (allowlistByGuild && !allowlistByGuild.has(guildId)) {
+            continue;
+        }
+
+        const allowlist = allowlistByGuild?.get(guildId) || null;
+        if (allowlist && allowlist.size === 0) {
+            continue;
+        }
+
         const channelState = await fetchChannelState(appUrl, token, guildId);
-        const channels = await collectChannels(guild);
+        const channels = await collectChannels(guild, allowlist);
 
         const channelPayload = channels.map(channel => ({
             id: channel.id,
@@ -290,7 +345,7 @@ async function runDiscordBackup(client, appUrl) {
     }
 }
 
-function startDiscordBackup(client, appUrl) {
+function startDiscordBackup(client, appUrl, allowlistByGuild) {
     if (isRunning) {
         return { started: false, error: 'Backup already running.' };
     }
@@ -302,7 +357,7 @@ function startDiscordBackup(client, appUrl) {
 
     isRunning = true;
 
-    void runDiscordBackup(client, resolvedUrl)
+    void runDiscordBackup(client, resolvedUrl, allowlistByGuild)
         .catch(error => {
             console.warn('[bot] Discord backup failed.', error);
         })
@@ -315,4 +370,5 @@ function startDiscordBackup(client, appUrl) {
 
 module.exports = {
     startDiscordBackup,
+    listDiscordChannels,
 };

@@ -1,5 +1,5 @@
 const http = require('node:http');
-const { startDiscordBackup } = require('./discordBackup');
+const { listDiscordChannels, startDiscordBackup } = require('./discordBackup');
 const { getSnapshot } = require('./voiceStateCache');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
@@ -93,8 +93,9 @@ function startHttpServer(client) {
         const path = req.url?.split('?')[0];
         const isVoiceSync = path === '/voice-sync';
         const isDiscordBackup = path === '/discord-backup';
+        const isDiscordChannels = path === '/discord-channels';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -127,9 +128,33 @@ function startHttpServer(client) {
             return;
         }
 
+        if (isDiscordChannels) {
+            const allowedGuildIds = Array.isArray(payload?.guild_ids) ? payload.guild_ids.map(String) : null;
+            try {
+                const guilds = await listDiscordChannels(client, allowedGuildIds);
+                respondJson(res, 200, { guilds });
+            } catch (error) {
+                logReject(req, 'failed to list channels');
+                respondJson(res, 500, { error: 'Failed to list channels.' });
+            }
+            return;
+        }
+
         if (isDiscordBackup) {
             const appUrl = String(payload?.app_url || '').trim();
-            const result = startDiscordBackup(client, appUrl);
+            const guildSelections = Array.isArray(payload?.guilds) ? payload.guilds : null;
+            const allowlistByGuild = new Map();
+
+            if (guildSelections) {
+                for (const guild of guildSelections) {
+                    if (!guild?.guild_id || !Array.isArray(guild?.channel_ids)) {
+                        continue;
+                    }
+                    allowlistByGuild.set(String(guild.guild_id), new Set(guild.channel_ids.map(String)));
+                }
+            }
+
+            const result = startDiscordBackup(client, appUrl, allowlistByGuild.size ? allowlistByGuild : null);
             if (!result.started) {
                 logReject(req, result.error || 'backup rejected');
                 const status = result.error === 'App URL is missing.' ? 422 : 409;

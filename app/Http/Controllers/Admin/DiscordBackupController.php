@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -25,12 +26,29 @@ class DiscordBackupController extends Controller
             ]);
         }
 
+        $guildSelections = DiscordBackupSetting::query()
+            ->get()
+            ->map(fn (DiscordBackupSetting $setting) => [
+                'guild_id' => $setting->guild_id,
+                'channel_ids' => $setting->channel_ids ?? [],
+            ])
+            ->filter(fn (array $selection) => ! empty($selection['channel_ids']))
+            ->values()
+            ->all();
+
+        if ($guildSelections === []) {
+            return redirect()->back()->withErrors([
+                'discord_backup' => 'Keine Backup-Channels ausgewaehlt.',
+            ]);
+        }
+
         try {
             $response = Http::timeout(10)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup', [
                     'app_url' => config('app.url'),
+                    'guilds' => $guildSelections,
                 ]);
         } catch (\Throwable $error) {
             return redirect()->back()->withErrors([

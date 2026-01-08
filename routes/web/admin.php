@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Admin\DiscordBackupBrowserController;
 use App\Http\Controllers\Admin\DiscordBackupController;
+use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Auction\VoiceSettingController;
 use App\Http\Controllers\Auction\VoiceSettingSyncController;
@@ -20,4 +22,19 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/admin/settings/discord-backup', [DiscordBackupController::class, 'destroy'])
         ->name('discord-backup.destroy');
+
+    Route::post('/admin/settings/discord-backup/channels', [DiscordBackupSettingsController::class, 'refresh'])
+        ->name('discord-backup.channels.refresh');
+
+    Route::patch('/admin/settings/discord-backup/channels', [DiscordBackupSettingsController::class, 'update'])
+        ->name('discord-backup.channels.update');
+
+    Route::get('/admin/discord-backup/attachments/{discordMessageAttachment}', [DiscordBackupBrowserController::class, 'download'])
+        ->name('admin.discord-backup.attachments.show');
+
+    Route::get('/admin/discord-backup/{discordChannel}', [DiscordBackupBrowserController::class, 'show'])
+        ->name('admin.discord-backup.show');
+
+    Route::get('/admin/discord-backup', [DiscordBackupBrowserController::class, 'index'])
+        ->name('admin.discord-backup.index');
 });
