@@ -1,5 +1,10 @@
 # blaue-magiergilde
 
+## Overview
+
+Laravel 12 + React/Inertia app for RPG data (characters, items, spells, games) with a Discord bot in `bot/`. The app
+includes auctions, an item shop, and admin character management.
+
 ## Setup
 
 Install PHP dependencies:
@@ -48,6 +53,14 @@ Type-check the frontend:
 npm run types
 ```
 
-## Character Sign-up
+## Discord bot
 
-Players register their characters via the Discord bot. Admins can review and approve these registrations at `/registrations`.
+The bot lives in `bot/` and shares the root `.env` with the app. See `bot/README.md` for commands and configuration.
+
+## Admin character management
+
+Admins manage character approvals at `/registrations` (approve/decline, filters, admin notes).
+
+## Auctions
+
+Auctions are managed in-app (items, bids, hidden bids, auto rollover). The bot has no auction commands.

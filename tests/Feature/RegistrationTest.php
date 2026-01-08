@@ -1,29 +1,13 @@
 <?php
 
-use App\Models\Registration;
+use App\Models\AdminAuditLog;
+use App\Models\Character;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-it('allows guests to submit registrations', function () {
-    $response = $this->post('/registrations', [
-        'character_name' => 'Hero',
-        'character_url' => 'https://example.com/sheet',
-        'start_tier' => 'bt',
-        'tier' => 'bt',
-        'discord_name' => 'Tester#1234',
-        'discord_id' => 12345,
-        'notes' => 'First session',
-    ]);
-
-    $response->assertRedirect();
-    expect(Registration::count())->toBe(1);
-    $stored = Registration::first();
-    expect($stored->notes)->toBe('First session');
-    expect($stored->start_tier)->toBe('bt');
-});
-
-it('admins can view the registration list', function () {
+it('allows admins to view the character list', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
@@ -31,16 +15,28 @@ it('admins can view the registration list', function () {
         ->assertOk();
 });
 
-it('admins can approve a registration', function () {
+it('logs an audit entry when admin updates guild status', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $registration = Registration::factory()->create();
+    $character = Character::factory()->create(['guild_status' => 'pending']);
 
     $this->actingAs($admin)
-        ->put('/registrations/' . $registration->id, [
-            'status' => 'approved',
+        ->patch('/registrations/characters/'.$character->id, [
+            'guild_status' => 'approved',
         ])
         ->assertRedirect();
 
-    $registration->refresh();
-    expect($registration->status)->toBe('approved');
+    $character->refresh();
+    expect($character->guild_status)->toBe('approved');
+
+    $log = AdminAuditLog::query()
+        ->where('action', 'character.guild_status.updated')
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->subject_type)->toBe(Character::class);
+    expect($log->subject_id)->toBe($character->id);
+    expect($log->metadata)->toMatchArray([
+        'from' => 'pending',
+        'to' => 'approved',
+    ]);
 });

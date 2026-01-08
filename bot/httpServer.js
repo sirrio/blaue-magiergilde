@@ -1,6 +1,10 @@
 const http = require('node:http');
 const { getSnapshot } = require('./voiceStateCache');
 
+const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
+const MAX_BODY_SIZE = 10 * 1024;
+const rateLimit = new Map();
+
 function resolveListenConfig() {
     const rawUrl = String(process.env.BOT_HTTP_URL || '').trim();
     if (rawUrl) {
@@ -25,6 +29,10 @@ function readJson(req) {
         let body = '';
         req.on('data', chunk => {
             body += chunk;
+            if (body.length > MAX_BODY_SIZE) {
+                reject(new Error('Payload too large.'));
+                req.destroy();
+            }
         });
         req.on('end', () => {
             if (!body) {
@@ -46,6 +54,31 @@ function respondJson(res, status, payload) {
     res.end(JSON.stringify(payload));
 }
 
+function getClientIp(req) {
+    return req.socket?.remoteAddress || 'unknown';
+}
+
+function logReject(req, reason) {
+    const ip = getClientIp(req);
+    console.warn(`[bot] HTTP reject: ${reason} (${req.method} ${req.url}) from ${ip}`);
+}
+
+function isRateLimited(req) {
+    if (!Number.isFinite(RATE_LIMIT_WINDOW_MS) || RATE_LIMIT_WINDOW_MS <= 0) {
+        return false;
+    }
+
+    const ip = getClientIp(req);
+    const now = Date.now();
+    const lastSeen = rateLimit.get(ip) || 0;
+    if (now - lastSeen < RATE_LIMIT_WINDOW_MS) {
+        return true;
+    }
+
+    rateLimit.set(ip, now);
+    return false;
+}
+
 function startHttpServer(client) {
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!token) {
@@ -56,13 +89,21 @@ function startHttpServer(client) {
     const { host, port } = resolveListenConfig();
 
     const server = http.createServer(async (req, res) => {
-        if (req.method !== 'POST' || req.url?.split('?')[0] !== '/voice-sync') {
+        const path = req.url?.split('?')[0];
+        if (req.method !== 'POST' || path !== '/voice-sync') {
             respondJson(res, 404, { error: 'Not found.' });
+            return;
+        }
+
+        if (isRateLimited(req)) {
+            logReject(req, 'rate limited');
+            respondJson(res, 429, { error: 'Too many requests.' });
             return;
         }
 
         const providedToken = req.headers['x-bot-token'];
         if (typeof providedToken !== 'string' || providedToken !== token) {
+            logReject(req, 'unauthorized');
             respondJson(res, 401, { error: 'Unauthorized.' });
             return;
         }
@@ -71,18 +112,27 @@ function startHttpServer(client) {
         try {
             payload = await readJson(req);
         } catch (error) {
+            if (error instanceof Error && error.message === 'Payload too large.') {
+                logReject(req, 'payload too large');
+                respondJson(res, 413, { error: 'Payload too large.' });
+                return;
+            }
+
+            logReject(req, 'invalid JSON');
             respondJson(res, 400, { error: 'Invalid JSON.' });
             return;
         }
 
         const channelId = String(payload?.channel_id || '').trim();
-        if (!channelId) {
-            respondJson(res, 422, { error: 'Missing channel_id.' });
+        if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+            logReject(req, 'invalid channel_id');
+            respondJson(res, 422, { error: 'Invalid channel_id.' });
             return;
         }
 
         const { snapshot, error } = await getSnapshot(channelId, client);
         if (error) {
+            logReject(req, `voice sync error: ${error}`);
             respondJson(res, 422, { error });
             return;
         }

@@ -1,11 +1,11 @@
 # AI Agent Documentation
 
 ## 1. Overview
-This project is a Laravel 12 web application paired with a React 19 front-end using InertiaJS. It manages RPG related data such as characters, items, spells and games. No AI or ML models are integrated.
+This project is a Laravel 12 web application paired with a React 19 front-end using InertiaJS. It manages RPG-related data (characters, items, spells, games) plus auctions and admin character management. No AI or ML models are integrated.
 The repository also contains a Discord bot under `bot/` that is part of the same product and shares configuration with the app.
 
 ## 2. Architecture
-- **Backend:** PHP 8.3 with Laravel framework.
+- **Backend:** PHP 8.4 with Laravel framework.
 - **Frontend:** React and TypeScript compiled through Vite with server-side rendering enabled via InertiaJS.
 - **Discord Bot:** Node.js bot located in `bot/`, using the same root `.env` and database as the app.
 - **Database:** Migrations define tables for users, characters, adventures and related entities.
@@ -15,8 +15,8 @@ The repository also contains a Discord bot under `bot/` that is part of the same
 Requests hit Laravel route files which map to controller classes. Controllers interact with Eloquent models for CRUD operations and render React pages via Inertia. Queued jobs and cached data use the database backend configured in `.env`.
 
 ## 4. Components & Modules
-- **Models:** Character, Item, Spell, Game, etc.
-- **Controllers:** Resource controllers for characters, items, shops and more.
+- **Models:** Character, Item, Spell, Game, Auction, AuctionItem, AuctionBid, etc.
+- **Controllers:** Resource controllers for characters, items, shops, auctions and more.
 - **Routes:** REST style endpoints grouped in `routes/web/*`. Authentication routes are in `routes/auth.php`.
 - **React Components:** Located under `resources/js` for UI and forms.
 - **Bot Commands:** Located under `bot/commands`, with shared configuration from the root `.env`.
@@ -44,7 +44,6 @@ Logging defaults to a stack of channels with daily file logs and optional Slack 
 ## 10. Testing
 - PHP tests use Pest; feature tests cover authentication and profile management【F:tests/Feature/Auth/RegistrationTest.php†L1-L20】.
 - `npm run lint` executes ESLint, and TypeScript types can be checked via `npm run types`.
-- Current test run shows multiple failing assertions【6b0f08†L1-L19】【808791†L1-L10】.
 
 ## 11. Performance & Scalability
 - Database-backed queues and caching may become bottlenecks under load. Consider Redis for higher throughput.
@@ -55,7 +54,7 @@ Logging defaults to a stack of channels with daily file logs and optional Slack 
 - Node packages include React, Vite and TailwindCSS【F:package.json†L4-L57】.
 
 ## 13. Maintenance & Next Steps
-- Resolve failing Pest tests to ensure application integrity.
+- Keep tests green and extend coverage for auctions, admin character management, and bot HTTP sync.
 - Evaluate moving queue and cache to Redis for scalability.
 - Document deployment steps for SSR and queue workers.
 

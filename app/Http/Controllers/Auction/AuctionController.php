@@ -20,7 +20,7 @@ class AuctionController extends Controller
      */
     public function index(): Response
     {
-        if (!Auction::query()->exists()) {
+        if (! Auction::query()->exists()) {
             Auction::query()->create([
                 'title' => null,
                 'status' => 'open',
@@ -79,15 +79,19 @@ class AuctionController extends Controller
      */
     public function update(UpdateAuctionRequest $request, Auction $auction): RedirectResponse
     {
-        $isClosing = $auction->status !== 'closed' && $request->status === 'closed';
+        DB::transaction(function () use ($request, $auction): void {
+            $lockedAuction = Auction::query()
+                ->lockForUpdate()
+                ->findOrFail($auction->id);
 
-        DB::transaction(function () use ($request, $auction, $isClosing): void {
-            $auction->title = null;
-            $auction->status = $request->status;
-            $auction->currency = 'GP';
-            $auction->save();
+            $isClosing = $lockedAuction->status !== 'closed' && $request->status === 'closed';
 
-            if (!$isClosing) {
+            $lockedAuction->title = null;
+            $lockedAuction->status = $request->status;
+            $lockedAuction->currency = 'GP';
+            $lockedAuction->save();
+
+            if (! $isClosing) {
                 return;
             }
 
@@ -97,8 +101,9 @@ class AuctionController extends Controller
                 'currency' => 'GP',
             ]);
 
-            $carryItems = $auction->auctionItems()
+            $carryItems = $lockedAuction->auctionItems()
                 ->whereDoesntHave('bids')
+                ->lockForUpdate()
                 ->get();
 
             foreach ($carryItems as $auctionItem) {
