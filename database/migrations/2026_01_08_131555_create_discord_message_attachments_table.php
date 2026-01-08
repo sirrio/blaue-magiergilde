@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('storage_path')->nullable();
             $table->timestamps();
 
-            $table->unique(['discord_message_id', 'attachment_id']);
+            $table->unique(['discord_message_id', 'attachment_id'], 'dma_message_attachment_unique');
             $table->index('attachment_id');
             $table->foreign('discord_message_id')
                 ->references('id')
