@@ -25,18 +25,181 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
-const applyInlineFormatting = (value: string) => {
+const extractDiscordChannelId = (url: string) => {
+  const match = url.match(/discord\.com\/channels\/\d+\/(\d+)/)
+  return match ? match[1] : null
+}
+
+const stripLeadingSymbols = (value: string) => value.replace(/^[^\p{L}\p{N}]+/u, '')
+
+const extractUrlCandidate = (value: string) => {
+  const match = value.match(/https?:\/\/[^\s"'<>]+/i)
+  if (!match) return null
+  return match[0]
+    .split('&quot;')[0]
+    .split('&lt;')[0]
+    .split('&gt;')[0]
+    .split('&amp;quot;')[0]
+    .split('&amp;lt;')[0]
+    .split('&amp;gt;')[0]
+}
+
+const normalizeLinkParts = (label: string, url: string) => {
+  const cleanLabel = label.replace(/<\/?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+  const candidateUrl = extractUrlCandidate(url) || extractUrlCandidate(cleanLabel) || url.trim()
+  const trimmedUrl = candidateUrl
+    .replace(/&amp;$/gi, '')
+    .replace(/[.,:;"')\]]+$/g, '')
+    .replace(/&+$/g, '')
+  const labelIsUrl = cleanLabel.toLowerCase().startsWith('http')
+  const trimmedLabel = labelIsUrl
+    ? trimmedUrl
+    : cleanLabel
+  return {
+    label: trimmedLabel || trimmedUrl || candidateUrl,
+    url: trimmedUrl,
+  }
+}
+
+const buildLabelVariants = (value: string) => {
+  const variants = new Set<string>()
+  const trimmed = value.trim()
+  if (trimmed) variants.add(trimmed)
+
+  const stripped = stripLeadingSymbols(trimmed)
+  if (stripped) variants.add(stripped)
+
+  const withSpaces = stripped.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (withSpaces) variants.add(withSpaces)
+
+  return Array.from(variants)
+}
+
+const replaceBrokenDiscordLinks = (
+  text: string,
+  threadLinkMap?: Map<string, string>,
+  channelLinkMap?: Map<string, string>,
+) => {
+  const pattern =
+    /(https?:\/\/(?:canary\.|ptb\.)?discord\.com\/channels\/\d+\/\d+(?:\/\d+)?)"\s+target="_blank"\s+rel="noopener noreferrer">/gi
+  let result = ''
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(text))) {
+    const url = match[1]
+    const labelStart = pattern.lastIndex
+
+    result += text.slice(lastIndex, match.index)
+
+    const channelId = extractDiscordChannelId(url)
+    const candidateName =
+      (channelId && threadLinkMap?.get(channelId)) || (channelId && channelLinkMap?.get(channelId)) || ''
+    const remaining = text.slice(labelStart)
+
+    let label = ''
+    let labelEnd = labelStart
+
+    if (candidateName) {
+      for (const variant of buildLabelVariants(candidateName)) {
+        const slice = remaining.slice(0, variant.length)
+        if (slice.toLowerCase() === variant.toLowerCase()) {
+          label = slice
+          labelEnd = labelStart + slice.length
+          break
+        }
+      }
+    }
+
+    if (!label) {
+      const fallback = remaining.match(/^[^\s<]+/)
+      if (fallback) {
+        label = fallback[0]
+        labelEnd = labelStart + label.length
+      }
+    }
+
+    if (!label) {
+      label = url
+    }
+
+    result += `[${label}](${url})`
+    lastIndex = labelEnd
+    pattern.lastIndex = labelEnd
+  }
+
+  result += text.slice(lastIndex)
+  return result
+}
+
+const applyInlineFormatting = (
+  value: string,
+  threadLinkMap?: Map<string, string>,
+  channelLinkMap?: Map<string, string>,
+) => {
   let text = value
+
+  const escapeHref = (url: string) => escapeHtml(url.replace(/&amp;/g, '&'))
+
+  const buildThreadLink = (label: string, channelId: string, threadName: string) => {
+    const display = threadName || label
+    return `<a href="#thread-${channelId}" class="discord-thread-link">${escapeHtml(display)}</a>`
+  }
+
+  const buildChannelLink = (label: string, channelId: string, channelName: string) => {
+    const display = channelName || label
+    const href = route('rules.index', { channel: channelId })
+    return `<a href="${escapeHref(href)}" class="discord-thread-link">${escapeHtml(display)}</a>`
+  }
+
+  const resolveDiscordLink = (label: string, url: string) => {
+    const normalized = normalizeLinkParts(label, url)
+    if (!normalized.url || !normalized.url.startsWith('http')) {
+      return normalized.label
+    }
+    const channelId = extractDiscordChannelId(normalized.url)
+    if (!channelId) {
+      return `<a href="${escapeHref(normalized.url)}" target="_blank" rel="noopener noreferrer">${normalized.label}</a>`
+    }
+    if (threadLinkMap?.has(channelId)) {
+      return buildThreadLink(normalized.label, channelId, threadLinkMap.get(channelId) || '')
+    }
+    if (channelLinkMap?.has(channelId)) {
+      return buildChannelLink(normalized.label, channelId, channelLinkMap.get(channelId) || '')
+    }
+    return `<a href="${escapeHref(normalized.url)}" target="_blank" rel="noopener noreferrer">${normalized.label}</a>`
+  }
+
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   text = text.replace(/__(.+?)__/g, '<u>$1</u>')
   text = text.replace(/~~(.+?)~~/g, '<del>$1</del>')
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-  text = text.replace(/(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label, url) => {
+    return resolveDiscordLink(label, url)
+  })
+  const protectedHrefs: string[] = []
+  text = text.replace(/href="([^"]+)"/g, (_, url) => {
+    const token = `@@HREF_${protectedHrefs.length}@@`
+    protectedHrefs.push(url)
+    return `href="${token}"`
+  })
+  text = text.replace(/href='([^']+)'/g, (_, url) => {
+    const token = `@@HREF_${protectedHrefs.length}@@`
+    protectedHrefs.push(url)
+    return `href='${token}'`
+  })
+  text = text.replace(/(https?:\/\/[^\s<]+)/g, (match) => {
+    return resolveDiscordLink(match, match)
+  })
+  text = text.replace(/@@HREF_(\d+)@@/g, (_, index) => protectedHrefs[Number(index)] ?? '')
   return text
 }
 
-const buildDiscordHtml = (raw: string) => {
+const buildDiscordHtml = (
+  raw: string,
+  threadLinkMap?: Map<string, string>,
+  channelLinkMap?: Map<string, string>,
+) => {
   const normalized = raw.replace(/\r\n/g, '\n')
   const codeBlocks: string[] = []
   const inlineCodes: string[] = []
@@ -53,12 +216,29 @@ const buildDiscordHtml = (raw: string) => {
     return token
   })
 
+  text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+
+  text = text.replace(
+    /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>(.*?)<\/a>/gi,
+    (_, url, label) => `[${label}](${url})`,
+  )
+  text = text.replace(
+    /<a\s+[^>]*href='(https?:\/\/[^']+)'[^>]*>(.*?)<\/a>/gi,
+    (_, url, label) => `[${label}](${url})`,
+  )
+  text = text.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>/gi, (_, url) => `${url} `)
+  text = text.replace(/<a\s+[^>]*href='([^']+)'[^>]*>/gi, (_, url) => `${url} `)
+  text = text.replace(/<a\s+[^>]*href="([^"]+)"/gi, (_, url) => `${url} `)
+  text = text.replace(/<a\s+[^>]*href='([^']+)'/gi, (_, url) => `${url} `)
+  text = text.replace(/<\/?a\b[^>]*>/gi, '')
+  text = replaceBrokenDiscordLinks(text, threadLinkMap, channelLinkMap)
+
   text = escapeHtml(text)
   text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>')
   text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>')
   text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>')
   text = text.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
-  text = applyInlineFormatting(text)
+  text = applyInlineFormatting(text, threadLinkMap, channelLinkMap)
   text = text.replace(/\n/g, '<br />')
 
   text = text.replace(/@@INLINE_(\d+)@@/g, (_, index) => {
@@ -76,9 +256,17 @@ const buildDiscordHtml = (raw: string) => {
 
 const isImageAttachment = (filename: string) => /\.(png|jpe?g|gif|webp)$/i.test(filename)
 
-const MessageContent = ({ content }: { content?: string | null }) => {
+const MessageContent = ({
+  content,
+  threadLinkMap,
+  channelLinkMap,
+}: {
+  content?: string | null
+  threadLinkMap?: Map<string, string>
+  channelLinkMap?: Map<string, string>
+}) => {
   if (!content) return null
-  const html = buildDiscordHtml(content)
+  const html = buildDiscordHtml(content, threadLinkMap, channelLinkMap)
 
   return (
     <div
@@ -127,7 +315,15 @@ const MessageAttachments = ({ message }: { message: DiscordBackupMessage }) => {
   )
 }
 
-const MessageList = ({ messages }: { messages: DiscordBackupMessage[] }) => {
+const MessageList = ({
+  messages,
+  threadLinkMap,
+  channelLinkMap,
+}: {
+  messages: DiscordBackupMessage[]
+  threadLinkMap?: Map<string, string>
+  channelLinkMap?: Map<string, string>
+}) => {
   const visibleMessages = messages.filter(
     (message) => (message.content && message.content.trim() !== '') || (message.attachments ?? []).length > 0,
   )
@@ -140,7 +336,7 @@ const MessageList = ({ messages }: { messages: DiscordBackupMessage[] }) => {
     <div className="space-y-4">
       {visibleMessages.map((message) => (
         <div key={message.id} className="space-y-2">
-          <MessageContent content={message.content} />
+          <MessageContent content={message.content} threadLinkMap={threadLinkMap} channelLinkMap={channelLinkMap} />
           <MessageAttachments message={message} />
         </div>
       ))}
@@ -153,6 +349,20 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
   )
+  const channelLinkMap = useMemo(() => {
+    const map = new Map<string, string>()
+    channels.forEach((channel) => {
+      map.set(channel.id, channel.name)
+    })
+    return map
+  }, [channels])
+  const threadLinkMap = useMemo(() => {
+    const map = new Map<string, string>()
+    threads.forEach((thread) => {
+      map.set(thread.channel.id, thread.channel.name)
+    })
+    return map
+  }, [threads])
 
   return (
     <AppLayout>
@@ -213,12 +423,20 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                 <CardContent>
                   {activeChannel ? (
                     <div className="space-y-6">
-                      <MessageList messages={messages} />
+                      <MessageList
+                        messages={messages}
+                        threadLinkMap={threadLinkMap}
+                        channelLinkMap={channelLinkMap}
+                      />
                       {threads.length > 0 ? (
                         <div className="space-y-3">
                           <p className="text-xs font-semibold uppercase text-base-content/50">Threads</p>
                           {threads.map((thread) => (
-                            <details key={thread.channel.id} className="rounded-box border border-base-200 p-3">
+                            <details
+                              key={thread.channel.id}
+                              id={`thread-${thread.channel.id}`}
+                              className="rounded-box border border-base-200 p-3"
+                            >
                               <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
                                 <span className="truncate">{thread.channel.name}</span>
                                 <span className="text-xs font-normal text-base-content/60">
@@ -226,7 +444,11 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                                 </span>
                               </summary>
                               <div className="mt-3">
-                                <MessageList messages={thread.messages} />
+                                <MessageList
+                                  messages={thread.messages}
+                                  threadLinkMap={threadLinkMap}
+                                  channelLinkMap={channelLinkMap}
+                                />
                               </div>
                             </details>
                           ))}

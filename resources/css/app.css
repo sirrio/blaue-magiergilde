@@ -109,4 +109,9 @@
     color: color-mix(in srgb, var(--color-primary) 85%, transparent);
     text-decoration: underline;
   }
+
+  .discord-markup .discord-thread-link {
+    font-weight: 600;
+  }
+
 }
