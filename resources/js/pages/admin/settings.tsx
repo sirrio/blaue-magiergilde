@@ -32,6 +32,55 @@ export default function Settings({
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
 
+  const getCsrfToken = useCallback(() => {
+    if (typeof document === 'undefined') return ''
+    const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
+    return meta?.content ?? ''
+  }, [])
+
+  const fetchBackupStatus = useCallback(
+    async (showToast: boolean) => {
+      const csrfToken = getCsrfToken()
+      if (!csrfToken) {
+        if (showToast) toast.show('CSRF Token fehlt.', 'error')
+        return
+      }
+
+      try {
+        const response = await fetch(route('discord-backup.status'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({}),
+        })
+
+        const payload = await response.json()
+        if (!response.ok) {
+          if (showToast) {
+            toast.show(String(payload?.error ?? 'Status konnte nicht geladen werden.'), 'error')
+          }
+          return
+        }
+
+        const status = payload?.status ?? null
+        if (!status || typeof status !== 'object') {
+          setBackupStatus(null)
+          return
+        }
+        setBackupStatus(status as DiscordBackupStatus)
+      } catch (error) {
+        if (showToast) {
+          toast.show('Status konnte nicht geladen werden.', 'error')
+        }
+      }
+    },
+    [getCsrfToken],
+  )
+
   useEffect(() => {
     setData('voice_channel_id', voiceSettings?.voice_channel_id ?? '')
   }, [setData, voiceSettings?.voice_channel_id])
@@ -117,55 +166,6 @@ export default function Settings({
 
   const isChannelSelected = (guildId: string, channelId: string) =>
     (selectedByGuild[guildId] ?? []).includes(channelId)
-
-  const getCsrfToken = useCallback(() => {
-    if (typeof document === 'undefined') return ''
-    const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
-    return meta?.content ?? ''
-  }, [])
-
-  const fetchBackupStatus = useCallback(
-    async (showToast: boolean) => {
-      const csrfToken = getCsrfToken()
-      if (!csrfToken) {
-        if (showToast) toast.show('CSRF Token fehlt.', 'error')
-        return
-      }
-
-      try {
-        const response = await fetch(route('discord-backup.status'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-          },
-          credentials: 'same-origin',
-          body: JSON.stringify({}),
-        })
-
-        const payload = await response.json()
-        if (!response.ok) {
-          if (showToast) {
-            toast.show(String(payload?.error ?? 'Status konnte nicht geladen werden.'), 'error')
-          }
-          return
-        }
-
-        const status = payload?.status ?? null
-        if (!status || typeof status !== 'object') {
-          setBackupStatus(null)
-          return
-        }
-        setBackupStatus(status as DiscordBackupStatus)
-      } catch (error) {
-        if (showToast) {
-          toast.show('Status konnte nicht geladen werden.', 'error')
-        }
-      }
-    },
-    [getCsrfToken],
-  )
 
   const handleSubmit = () => {
     patch(route('voice-settings.update'), {
