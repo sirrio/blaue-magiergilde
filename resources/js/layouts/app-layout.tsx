@@ -1,7 +1,19 @@
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
-import { Menu } from 'lucide-react'
+import {
+  BookOpen,
+  Gavel,
+  Menu,
+  Package,
+  ScrollText,
+  Settings,
+  Shield,
+  Sparkles,
+  Store,
+  UserCheck,
+  Users,
+} from 'lucide-react'
 import { ReactNode, useRef } from 'react'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useInitials } from '@/hooks/use-initials'
@@ -12,9 +24,9 @@ interface AppLayoutProps {
 }
 
 const menuLinks = [
-  { name: 'Characters', route: 'characters.index', method: 'get' as const },
-  { name: 'Game Master Log', route: 'games.index', method: 'get' as const },
-  { name: 'Guild Handbook', route: 'rules.index', method: 'get' as const },
+  { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
+  { name: 'Game Master Log', route: 'games.index', method: 'get' as const, icon: ScrollText },
+  { name: 'Guild Handbook', route: 'rules.index', method: 'get' as const, icon: BookOpen },
 ]
 
 const accountLinks = [
@@ -31,12 +43,12 @@ const authLinks = [
 ]
 
 const adminLinks = [
-  { name: 'Settings', route: 'admin.settings', method: 'get' as const },
-  { name: 'Items', route: 'items.index', method: 'get' as const },
-  { name: 'Spells', route: 'spells.index', method: 'get' as const },
-  { name: 'Shop', route: 'shops.index', method: 'get' as const },
-  { name: 'Auctions', route: 'auctions.index', method: 'get' as const },
-  { name: 'Character Approvals', route: 'registrations.index', method: 'get' as const },
+  { name: 'Settings', route: 'admin.settings', method: 'get' as const, icon: Settings },
+  { name: 'Items', route: 'items.index', method: 'get' as const, icon: Package },
+  { name: 'Spells', route: 'spells.index', method: 'get' as const, icon: Sparkles },
+  { name: 'Shop', route: 'shops.index', method: 'get' as const, icon: Store },
+  { name: 'Auctions', route: 'auctions.index', method: 'get' as const, icon: Gavel },
+  { name: 'Character Approvals', route: 'registrations.index', method: 'get' as const, icon: UserCheck },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -58,14 +70,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {menuLinks.map((menuLink) => (
                 <li key={menuLink.route} role="none">
-                    <Link role="menuitem" className={cn(route().current(menuLink.route) ? 'menu-active' : '')} href={route(menuLink.route)}>
-                    {menuLink.name}
+                    <Link
+                      role="menuitem"
+                      className={cn(
+                        'flex items-center',
+                        route().current(menuLink.route) ? 'menu-active' : ''
+                      )}
+                      href={route(menuLink.route)}
+                    >
+                    <menuLink.icon size={16} className="mr-2" />
+                      {menuLink.name}
                   </Link>
                 </li>
               ))}
               {Boolean(auth.user.is_admin) && (
                 <li role="none">
-                  <a>Administration</a>
+                  <a className="flex items-center">
+                    <Shield size={16} className="mr-2" />
+                    Administration
+                  </a>
                   <ul className="p-2">
                     {adminLinks.map((adminLink) => (
                       <li key={adminLink.route} role="none">
@@ -73,8 +96,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           role="menuitem"
                           method={adminLink.method}
                           href={route(adminLink.route)}
-                            className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
+                            className={cn(
+                              'flex items-center',
+                              route().current(adminLink.route) ? 'menu-active' : ''
+                            )}
                         >
+                          <adminLink.icon size={16} className="mr-2" />
                           {adminLink.name}
                         </Link>
                       </li>
@@ -98,8 +125,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   role="menuitem"
                   method={menuLink.method}
                   href={route(menuLink.route)}
-                    className={cn(route().current(menuLink.route) ? 'menu-active' : '')}
+                    className={cn(
+                      'flex items-center',
+                      route().current(menuLink.route) ? 'menu-active' : ''
+                    )}
                 >
+                  <menuLink.icon size={16} className="mr-2" />
                   {menuLink.name}
                 </Link>
               </li>
@@ -107,7 +138,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {Boolean(auth.user.is_admin) && (
               <li role="none">
                 <details ref={adminDetailsRef}>
-                  <summary>Administration</summary>
+                  <summary className="flex items-center">
+                    <Shield size={16} className="mr-2" />
+                    Administration
+                  </summary>
                   <ul className="z-30 w-52 p-2">
                     {adminLinks.map((adminLink) => (
                       <li key={adminLink.route} role="none">
@@ -115,8 +149,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           role="menuitem"
                           method={adminLink.method}
                           href={route(adminLink.route)}
-                            className={cn(route().current(adminLink.route) ? 'menu-active' : '')}
+                            className={cn(
+                              'flex items-center',
+                              route().current(adminLink.route) ? 'menu-active' : ''
+                            )}
                         >
+                          <adminLink.icon size={16} className="mr-2" />
                           {adminLink.name}
                         </Link>
                       </li>
