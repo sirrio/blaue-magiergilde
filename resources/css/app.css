@@ -114,4 +114,11 @@
     font-weight: 600;
   }
 
+  .discord-markup .discord-subtext {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
+  }
+
 }

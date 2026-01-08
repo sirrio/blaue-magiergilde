@@ -238,6 +238,7 @@ const buildDiscordHtml = (
   text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>')
   text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>')
   text = text.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+  text = text.replace(/^-# (.+)$/gm, '<span class="discord-subtext">$1</span>')
   text = applyInlineFormatting(text, threadLinkMap, channelLinkMap)
   text = text.replace(/\n/g, '<br />')
 
