@@ -70,7 +70,7 @@ class StoreAuctionItemRequest extends FormRequest
                     }
 
                     if ((int) $value > $costValue) {
-                        $fail('Repariert darf nicht hoeher als die Kosten sein.');
+                        $fail('Repair amount cannot exceed the item cost.');
                     }
                 },
             ],

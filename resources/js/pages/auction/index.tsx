@@ -21,9 +21,9 @@ const rarityLabels: Record<string, string> = {
 }
 
 const statusLabels: Record<string, string> = {
-  open: 'Offen',
-  closed: 'Beendet',
-  draft: 'Entwurf',
+  open: 'Open',
+  closed: 'Closed',
+  draft: 'Draft',
 }
 
 const rarityColors: Record<string, string> = {
@@ -229,13 +229,13 @@ const AuctionItemBidControls = ({
 
   const handleBid = (candidateId: string, candidateName: string) => {
     if (!isAmountValid) {
-      toast.show(`Min ${minBid} ${currency} in Schritten von ${step}.`, 'error')
+      toast.show(`Minimum ${minBid} ${currency} in steps of ${step}.`, 'error')
       return
     }
 
     const hiddenBid = getHiddenBidForCandidate(auctionItem, candidateId)
     if (hiddenBid && minBid > hiddenBid.max_amount) {
-      toast.show(`Max Gebot fuer ${candidateName} ist ${hiddenBid.max_amount} ${currency}.`, 'error')
+      toast.show(`Max bid for ${candidateName} is ${hiddenBid.max_amount} ${currency}.`, 'error')
       return
     }
 
@@ -260,7 +260,7 @@ const AuctionItemBidControls = ({
   return (
     <div className="flex w-full flex-col items-start gap-2">
       {candidates.length === 0 ? (
-        <p className="text-xs text-base-content/70">Keine Live Nutzer.</p>
+        <p className="text-xs text-base-content/70">No live users.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {candidates.map((candidate) => {
@@ -296,7 +296,7 @@ const AuctionItemBidControls = ({
         </div>
       )}
       <p className="text-[11px] text-base-content/50">
-        Naechstes Gebot: {minBid} {currency} - Schritt {step}
+        Next bid: {minBid} {currency} - Step {step}
       </p>
     </div>
   )
@@ -320,13 +320,13 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
   )
 
   const handleDelete = (bidId: number) => {
-    if (!window.confirm('Gebot wirklich loeschen?')) return
+    if (!window.confirm('Delete bid?')) return
 
     router.delete(route('auction-bids.destroy', { auctionBid: bidId }), {
       preserveScroll: true,
       preserveState: true,
       onError: () => {
-        toast.show('Gebot konnte nicht geloescht werden.', 'error')
+        toast.show('Bid could not be deleted.', 'error')
       },
     })
   }
@@ -338,12 +338,12 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
           <History size={16} />
         </Button>
       </ModalTrigger>
-      <ModalTitle>Bietverlauf</ModalTitle>
+      <ModalTitle>Bid history</ModalTitle>
       <ModalContent>
         <p className="mb-2 text-xs text-base-content/60">{auctionItem.item.name}</p>
         {hiddenBids.length > 0 ? (
           <div className="mb-3">
-            <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Geheime Gebote</p>
+            <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Hidden bids</p>
             <div className="space-y-2">
               {hiddenBids.map((hiddenBid) => (
                 <div
@@ -365,9 +365,9 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
             </div>
           </div>
         ) : null}
-        <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Gebote</p>
+        <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Bids</p>
         {bids.length === 0 ? (
-          <p className="text-xs text-base-content/70">Keine Gebote vorhanden.</p>
+          <p className="text-xs text-base-content/70">No bids yet.</p>
         ) : (
           <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
             {bids.map((bid) => {
@@ -451,7 +451,7 @@ const HiddenBidModal = ({
 
   const handleSubmit = () => {
     if (!data.bidder_discord_id || !data.bidder_name) {
-      toast.show('Discord ID und Name angeben.', 'error')
+      toast.show('Provide Discord ID and name.', 'error')
       return
     }
 
@@ -472,13 +472,13 @@ const HiddenBidModal = ({
   }
 
   const handleDelete = (hiddenBidId: number) => {
-    if (!window.confirm('Geheimes Gebot wirklich loeschen?')) return
+    if (!window.confirm('Delete hidden bid?')) return
 
     router.delete(route('auction-hidden-bids.destroy', { auctionHiddenBid: hiddenBidId }), {
       preserveScroll: true,
       preserveState: true,
       onError: () => {
-        toast.show('Geheimes Gebot konnte nicht geloescht werden.', 'error')
+        toast.show('Hidden bid could not be deleted.', 'error')
       },
     })
   }
@@ -490,14 +490,14 @@ const HiddenBidModal = ({
           <EyeOff size={16} />
         </Button>
       </ModalTrigger>
-      <ModalTitle>Geheime Gebote</ModalTitle>
+      <ModalTitle>Hidden bids</ModalTitle>
       <ModalContent>
-        <p className="mb-3 text-xs text-base-content/60">Maximalgebote vor der Auktion, pro Spieler eines.</p>
+        <p className="mb-3 text-xs text-base-content/60">Max bids before the auction, one per player.</p>
         {candidates.length > 0 ? (
           <Select value={selectedCandidateId} onChange={handleCandidateChange}>
-            <SelectLabel>Live Kandidat auswaehlen</SelectLabel>
+            <SelectLabel>Select live candidate</SelectLabel>
             <SelectOptions>
-              <option value="">Manuell</option>
+              <option value="">Manual</option>
               {candidates.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.name}
@@ -518,13 +518,13 @@ const HiddenBidModal = ({
           value={data.max_amount}
           onChange={(e) => setData('max_amount', Number(e.target.value))}
         >
-          Max Gebot ({currency})
+          Max bid ({currency})
         </Input>
 
         <div className="mt-4">
-          <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Aktive geheime Gebote</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Active hidden bids</p>
           {hiddenBids.length === 0 ? (
-            <p className="text-xs text-base-content/70">Keine geheimen Gebote vorhanden.</p>
+            <p className="text-xs text-base-content/70">No hidden bids yet.</p>
           ) : (
             <div className="space-y-2">
               {hiddenBids.map((hiddenBid) => (
@@ -554,7 +554,7 @@ const HiddenBidModal = ({
           )}
         </div>
       </ModalContent>
-      <ModalAction onClick={handleSubmit}>Speichern</ModalAction>
+      <ModalAction onClick={handleSubmit}>Save</ModalAction>
     </Modal>
   )
 }
@@ -606,7 +606,7 @@ const AuctionItemRow = ({
                 {getAuctionItemLabel(auctionItem.item.name, auctionItem)}
               </span>
               <span className="text-xs font-normal leading-none text-base-content/70">
-                Versteigerungen: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
+                Auctions left: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
               </span>
             </div>
           </div>
@@ -618,7 +618,7 @@ const AuctionItemRow = ({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-base-content/60">Hoechstgebot:</span>
+            <span className="text-base-content/60">Highest bid:</span>
             {highestBid ? (
               <div className="flex items-center gap-2">
                 <AvatarCircle
@@ -634,7 +634,7 @@ const AuctionItemRow = ({
                 </span>
               </div>
             ) : (
-              <span className="text-base-content/70">Keine Gebote</span>
+              <span className="text-base-content/70">No bids</span>
             )}
           </div>
           <div className="w-full">
@@ -665,8 +665,8 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   const repairMax = getItemCostValue(data.item_id, items)
   const repairDefaultCurrent = repairMax ? Math.floor(repairMax / 10) : 0
   const repairLabel = repairMax
-    ? `Repariert: ${repairDefaultCurrent}/${repairMax} ${auction.currency}`
-    : `Repariert (${auction.currency})`
+    ? `Repair: ${repairDefaultCurrent}/${repairMax} ${auction.currency}`
+    : `Repair (${auction.currency})`
 
   useEffect(() => {
     if (!isOpen) return
@@ -698,10 +698,10 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
       <ModalTrigger>
         <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} disabled={!hasItems}>
           <Plus size={16} />
-          Item hinzufuegen
+          Add item
         </Button>
       </ModalTrigger>
-      <ModalTitle>Item zur Auktion hinzufuegen</ModalTitle>
+      <ModalTitle>Add item to auction</ModalTitle>
       <ModalContent>
         <Select
           value={data.item_id}
@@ -722,7 +722,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
                 </option>
               ))
             ) : (
-              <option value={0}>Keine Items vorhanden</option>
+              <option value={0}>No items available</option>
             )}
           </SelectOptions>
         </Select>
@@ -730,7 +730,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
           value={data.notes}
           onChange={(e) => setData('notes', e.target.value)}
         >
-          Notizen
+          Notes
         </Input>
         <Input
           type="number"
@@ -738,7 +738,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
           value={data.remaining_auctions}
           onChange={(e) => setData('remaining_auctions', Number(e.target.value))}
         >
-          Versteigerungen uebrig
+          Auctions left
         </Input>
         <Input
           type="number"
@@ -750,7 +750,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
           {repairLabel}
         </Input>
       </ModalContent>
-      <ModalAction onClick={handleSubmit}>Speichern</ModalAction>
+      <ModalAction onClick={handleSubmit}>Save</ModalAction>
     </Modal>
   )
 }
@@ -811,14 +811,14 @@ export default function Index({
   const handleCopyAuction = () => {
     if (!selectedAuction) return
     navigator.clipboard.writeText(buildDiscordText(selectedAuction)).then(() => {
-      toast.show('Auktion kopiert', 'info')
+      toast.show('Auction copied', 'info')
     })
   }
 
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
     const confirmed = window.confirm(
-      'Auktion wirklich schliessen? Offene Items ohne Gebot werden in eine neue Auktion uebernommen.',
+      'Close this auction? Unsold items without bids will move to a new auction.',
     )
     if (!confirmed) return
 
@@ -836,10 +836,10 @@ export default function Index({
     if (!voiceSettings.voice_channel_id || isSyncingRef.current) return
 
     const csrfToken = getCsrfToken()
-    if (!csrfToken) {
-      if (showToast) toast.show('CSRF Token fehlt.', 'error')
-      return
-    }
+      if (!csrfToken) {
+        if (showToast) toast.show('Missing CSRF token.', 'error')
+        return
+      }
 
     isSyncingRef.current = true
     setIsSyncing(true)
@@ -857,7 +857,7 @@ export default function Index({
 
       const payload = await response.json()
       if (!response.ok) {
-        if (showToast) toast.show(String(payload?.error ?? 'Fehler beim Sync.'), 'error')
+        if (showToast) toast.show(String(payload?.error ?? 'Sync failed.'), 'error')
         return
       }
 
@@ -865,10 +865,10 @@ export default function Index({
       setVoiceCandidates(candidates)
 
       if (showToast) {
-        toast.show('Voice Kandidaten aktualisiert', 'info')
+        toast.show('Voice candidates updated', 'info')
       }
     } catch (error) {
-      if (showToast) toast.show('Fehler beim Sync.', 'error')
+      if (showToast) toast.show('Sync failed.', 'error')
     } finally {
       isSyncingRef.current = false
       setIsSyncing(false)
@@ -920,7 +920,7 @@ export default function Index({
     [useMockCandidates, voiceCandidates],
   )
 
-  const manualCooldownLabel = manualCooldownRemaining > 0 ? `Aktualisieren (${manualCooldownRemaining}s)` : 'Aktualisieren'
+  const manualCooldownLabel = manualCooldownRemaining > 0 ? `Refresh (${manualCooldownRemaining}s)` : 'Refresh'
 
   useEffect(() => {
     if (!voiceSettings.voice_channel_id) return
@@ -948,15 +948,15 @@ export default function Index({
 
   return (
     <AppLayout>
-      <Head title="Auktionen" />
+      <Head title="Auctions" />
       <div className="container mx-auto max-w-3xl px-2 py-4 md:px-0">
         <div className="join mb-4 flex items-end">
           <Select className="join-item w-full" value={selectedAuction?.id || ''} onChange={onAuctionSelectChange}>
-            <SelectLabel>Auktionen</SelectLabel>
+            <SelectLabel>Auctions</SelectLabel>
             <SelectOptions>
               {auctions.map((auction) => (
                 <option key={auction.id} value={auction.id}>
-                  {`${auction.title ?? `Auktion #${String(auction.id).padStart(3, '0')}`} - ${formatAuctionCreatedAt(auction.created_at)}`}
+                  {`${auction.title ?? `Auction #${String(auction.id).padStart(3, '0')}`} - ${formatAuctionCreatedAt(auction.created_at)}`}
                 </option>
               ))}
             </SelectOptions>
@@ -968,7 +968,7 @@ export default function Index({
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={handleCopyAuction}>
                 <Copy size={16} />
-                Discord kopieren
+                Copy for Discord
               </Button>
               <Button
                 size="sm"
@@ -977,20 +977,20 @@ export default function Index({
                 onClick={handleCloseAuction}
                 disabled={selectedAuction.status === 'closed'}
               >
-                Auktion schliessen
+                Close auction
               </Button>
               <AddAuctionItemModal auction={selectedAuction} items={items} />
               <span className="text-xs text-base-content/60">Status: {statusLabels[selectedAuction.status]}</span>
             </div>
             <p className="mb-4 text-[11px] text-base-content/60">
-              Schritte: 10 / 50 / 100 / 500 - Consumables/Spellscrolls halbiert
+              Steps: 10 / 50 / 100 / 500 - consumables/spellscrolls halved
             </p>
 
             <div className="mb-4 flex flex-wrap items-center gap-3">
               {voiceSettings.voice_channel_id || useMockCandidates ? (
                 <>
                   {candidates.length === 0 ? (
-                    <p className="text-xs text-base-content/70">Keine Nutzer online.</p>
+                    <p className="text-xs text-base-content/70">No users online.</p>
                   ) : (
                     <div className="flex -space-x-2">
                       {candidates.map((candidate) => (
@@ -1017,10 +1017,10 @@ export default function Index({
                 </>
               ) : (
                 <p className="text-xs text-base-content/70">
-                  Keine Channel ID gesetzt. Bitte in den Administration Settings konfigurieren.
+                  No channel ID set. Configure it in Administration Settings.
                   <span className="ml-1">
                     <Link href={route('admin.settings')} className="link">
-                      Zu den Settings
+                      Go to settings
                     </Link>
                   </span>
                 </p>
@@ -1028,7 +1028,7 @@ export default function Index({
             </div>
 
             {groupedItems.length === 0 ? (
-              <div className="text-sm opacity-70">Noch keine Items in dieser Auktion.</div>
+              <div className="text-sm opacity-70">No items in this auction yet.</div>
             ) : (
               <List>
                 {groupedItems.map((group) => (
@@ -1050,7 +1050,7 @@ export default function Index({
             )}
           </>
         ) : (
-          <div className="text-sm opacity-70">Keine Auktionen vorhanden.</div>
+          <div className="text-sm opacity-70">No auctions available.</div>
         )}
       </div>
     </AppLayout>

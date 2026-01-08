@@ -48,7 +48,7 @@ class AuctionBidController extends Controller
 
             if ($lockedAuction->status !== 'open') {
                 throw ValidationException::withMessages([
-                    'auction' => 'Auktion ist geschlossen.',
+                    'auction' => 'Auction is closed.',
                 ]);
             }
 
@@ -64,19 +64,19 @@ class AuctionBidController extends Controller
 
             if ($hiddenBid && $amount > $hiddenBid->max_amount) {
                 throw ValidationException::withMessages([
-                    'amount' => "Max Gebot fuer {$hiddenBid->bidder_name} ist {$hiddenBid->max_amount}.",
+                    'amount' => "Max bid for {$hiddenBid->bidder_name} is {$hiddenBid->max_amount}.",
                 ]);
             }
 
             if ($amount < $minBid) {
                 throw ValidationException::withMessages([
-                    'amount' => "Mindestgebot ist {$minBid}.",
+                    'amount' => "Minimum bid is {$minBid}.",
                 ]);
             }
 
             if (($amount - $lockedItem->starting_bid) % $step !== 0) {
                 throw ValidationException::withMessages([
-                    'amount' => "Gebote muessen in Schritten von {$step} erfolgen.",
+                    'amount' => "Bids must be in steps of {$step}.",
                 ]);
             }
 

@@ -13,8 +13,8 @@ interface AppLayoutProps {
 
 const menuLinks = [
   { name: 'Characters', route: 'characters.index', method: 'get' as const },
-  { name: 'Mastered Games', route: 'games.index', method: 'get' as const },
-  { name: 'Rules', route: 'rules.index', method: 'get' as const },
+  { name: 'Game Master Log', route: 'games.index', method: 'get' as const },
+  { name: 'Guild Handbook', route: 'rules.index', method: 'get' as const },
 ]
 
 const accountLinks = [
@@ -35,8 +35,8 @@ const adminLinks = [
   { name: 'Items', route: 'items.index', method: 'get' as const },
   { name: 'Spells', route: 'spells.index', method: 'get' as const },
   { name: 'Shop', route: 'shops.index', method: 'get' as const },
-  { name: 'Auktionen', route: 'auctions.index', method: 'get' as const },
-  { name: 'Registrations', route: 'registrations.index', method: 'get' as const },
+  { name: 'Auctions', route: 'auctions.index', method: 'get' as const },
+  { name: 'Character Approvals', route: 'registrations.index', method: 'get' as const },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {

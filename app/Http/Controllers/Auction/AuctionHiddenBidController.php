@@ -30,7 +30,7 @@ class AuctionHiddenBidController extends Controller
 
             if ($lockedAuction->status !== 'open') {
                 throw ValidationException::withMessages([
-                    'auction' => 'Auktion ist geschlossen.',
+                    'auction' => 'Auction is closed.',
                 ]);
             }
 

@@ -408,16 +408,16 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
 
   return (
     <AppLayout>
-      <Head title="Rules" />
+      <Head title="Guild Handbook" />
       <div className="container mx-auto flex max-w-6xl flex-col gap-4 px-2 py-4 md:px-0">
         <div className="flex flex-col gap-4 md:flex-row">
           <aside className="md:w-64">
             <Card className="card-xs">
               <CardBody>
-                <CardTitle>Rules</CardTitle>
+                <CardTitle>Guild Handbook</CardTitle>
                 <CardContent>
                   {channels.length === 0 ? (
-                    <p className="text-xs text-base-content/60">Keine Regeln gespeichert.</p>
+                    <p className="text-xs text-base-content/60">Keine Inhalte gespeichert.</p>
                   ) : (
                     <div className="flex flex-col gap-2">
                       <select
@@ -461,7 +461,7 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
           <section className="flex-1">
             <Card className="card-xs">
               <CardBody>
-                <CardTitle>{activeChannel ? activeChannel.name : 'Regeln'}</CardTitle>
+                <CardTitle>{activeChannel ? activeChannel.name : 'Guild Handbook'}</CardTitle>
                 <CardContent>
                   {activeChannel ? (
                     <div className="space-y-6">
@@ -504,7 +504,7 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                     </div>
                   ) : (
                     <p className="text-sm text-base-content/60">
-                      Keine Regeln gefunden. Waehle im Admin-Bereich die Rule-Channels aus.
+                      Keine Inhalte gefunden. Waehle im Admin-Bereich die Text-Channels aus.
                     </p>
                   )}
                 </CardContent>

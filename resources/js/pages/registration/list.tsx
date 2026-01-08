@@ -163,7 +163,7 @@ export default function RegistrationList({ characters }: { characters: AdminChar
 
   return (
     <AppLayout>
-      <Head title="Registrations" />
+      <Head title="Character Approvals" />
       <div className="container mx-auto max-w-4xl px-2 py-4 md:px-0">
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <Input type="search" placeholder="Search by character or user..." value={search} onChange={handleSearch}>

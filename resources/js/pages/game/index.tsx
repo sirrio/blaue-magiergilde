@@ -51,14 +51,14 @@ export default function MasteredGames({ games, user, characters }: Props) {
 
   return (
     <AppLayout>
-      <Head title="Mastered Games" />
+      <Head title="Game Master Log" />
       <div className="container mx-auto max-w-7xl space-y-8 px-4 py-6">
         <section className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">
-              Mastered Games <span className="text-base-content/70 ml-2 text-lg">{games.length} Games</span>
+              Game Master Log <span className="text-base-content/70 ml-2 text-lg">{games.length} Sessions</span>
             </h1>
-            <p className="text-base-content/70 text-sm">Manage your progress with a summary of all mastered games.</p>
+            <p className="text-base-content/70 text-sm">Track your progress with a summary of all GM sessions.</p>
           </div>
           <StoreGameModal>
             <Button variant="outline" size="sm" className="flex items-center">

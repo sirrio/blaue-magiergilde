@@ -49,7 +49,7 @@ class AuctionItemController extends Controller
     {
         if ($auction->status !== 'open') {
             throw ValidationException::withMessages([
-                'auction' => 'Auktion ist geschlossen.',
+                'auction' => 'Auction is closed.',
             ]);
         }
 

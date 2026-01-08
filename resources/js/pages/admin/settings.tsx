@@ -502,6 +502,70 @@ export default function Settings({
     )
   }
 
+  const renderSelectedGroups = (entries: [string, DiscordBackupChannel[]][]) => {
+    return (
+      <div className="mt-3 flex flex-col gap-4">
+        {entries.map(([guildId, channels]) => {
+          const selectedCount = (selectedByGuild[guildId] ?? []).length
+
+          return (
+            <div key={`selected-${guildId}`} className="rounded-box border border-base-200 p-3">
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>Guild {guildId}</span>
+                <span className="text-xs font-normal text-base-content/60">{selectedCount}</span>
+              </div>
+              <div className="mt-3 flex flex-col gap-3">
+                {buildGroupedList(guildId, channels, 'selected').map((group) => (
+                  <div
+                    key={`selected-${guildId}-${group.id ?? 'uncategorized'}`}
+                    className="rounded-box border border-base-200/70 p-2"
+                  >
+                    <div className="flex items-center justify-between text-xs font-semibold text-base-content/70">
+                      <span className="truncate">{group.name}</span>
+                      <span className="text-[11px] font-normal text-base-content/60">{group.channels.length}</span>
+                    </div>
+                    <div className="mt-2 grid gap-2">
+                      {group.channels.map((channel) => (
+                        <div key={channel.id} className="flex items-center gap-2 text-sm">
+                          <label className="flex flex-1 items-center gap-2">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-xs"
+                              checked={isChannelSelected(guildId, channel.id)}
+                              onChange={() => toggleChannel(guildId, channel.id)}
+                            />
+                            <span className="truncate">{channel.name}</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-base-content/60">
+                              {formatTimestamp(channel.last_synced_at)}
+                            </span>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                void handleChannelSync(channel)
+                              }}
+                              disabled={isBackupRunning || syncingChannelId === channel.id}
+                            >
+                              {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <AppLayout>
       <Head title="Admin Settings" />
@@ -511,7 +575,7 @@ export default function Settings({
             <CardTitle>Discord Bot</CardTitle>
             <CardContent>
               <p className="text-xs text-base-content/70">
-                Die Voice Channel ID steuert die Live-Kandidatenliste in den Auktionen.
+                Die Voice Channel ID steuert die Live-Kandidatenliste in den Auctions.
               </p>
               <div className="mt-3 flex flex-wrap items-end gap-2">
                 <Input
@@ -580,7 +644,7 @@ export default function Settings({
                 {selectedGuildEntries.length === 0 ? (
                   <p className="mt-3 text-xs text-base-content/70">Noch keine Channels ausgewaehlt.</p>
                 ) : (
-                  renderGuildGroups(selectedGuildEntries, 'selected')
+                  renderSelectedGroups(selectedGuildEntries)
                 )}
               </div>
               <div className="mt-4 rounded-box border border-base-200 p-3">
@@ -622,7 +686,7 @@ export default function Settings({
                   Backup starten
                 </Button>
                 <Button size="sm" variant="outline" as={Link} href={route('rules.index')}>
-                  Regeln anzeigen
+                  Open handbook
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleBackupDelete} disabled={deleteForm.processing}>
                   Backup loeschen
