@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupMessage } from '@/types'
 import { Head, Link } from '@inertiajs/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { SyntheticEvent } from 'react'
 
 type ThreadBlock = {
   channel: DiscordBackupChannel
@@ -394,14 +395,15 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
     setOpenThreadId(threadId)
   }, [])
 
-  const handleThreadToggle = useCallback((threadId: string) => {
-    return (event: React.SyntheticEvent<HTMLDetailsElement>) => {
-      const isOpen = event.currentTarget.open
-      setOpenThreadId((previous) => {
-        if (isOpen) return threadId
-        return previous === threadId ? null : previous
-      })
-    }
+  const handleThreadToggle = useCallback((event: SyntheticEvent<HTMLDetailsElement>) => {
+    const threadId = event.currentTarget.dataset.threadId
+    if (!threadId) return
+
+    const isOpen = event.currentTarget.open
+    setOpenThreadId((previous) => {
+      if (isOpen) return threadId
+      return previous === threadId ? null : previous
+    })
   }, [])
 
   return (
@@ -477,8 +479,9 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                               key={thread.channel.id}
                               id={`thread-${thread.channel.id}`}
                               className="rounded-box border border-base-200 p-3"
+                              data-thread-id={thread.channel.id}
                               open={openThreadId === thread.channel.id}
-                              onToggle={handleThreadToggle(thread.channel.id)}
+                              onToggle={handleThreadToggle}
                             >
                               <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
                                 <span className="truncate">{thread.channel.name}</span>
