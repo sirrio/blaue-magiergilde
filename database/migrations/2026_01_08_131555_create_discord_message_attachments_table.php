@@ -11,6 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('discord_message_attachments')) {
+            Schema::table('discord_message_attachments', function (Blueprint $table) {
+                $table->unique(['discord_message_id', 'attachment_id'], 'dma_message_attachment_unique');
+            });
+
+            return;
+        }
+
         Schema::create('discord_message_attachments', function (Blueprint $table) {
             $table->id();
             $table->string('discord_message_id', 32);
