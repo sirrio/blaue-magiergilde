@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupMessage } from '@/types'
 import { Head, Link } from '@inertiajs/react'
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type ThreadBlock = {
   channel: DiscordBackupChannel
@@ -261,10 +261,12 @@ const MessageContent = ({
   content,
   threadLinkMap,
   channelLinkMap,
+  onThreadLinkClick,
 }: {
   content?: string | null
   threadLinkMap?: Map<string, string>
   channelLinkMap?: Map<string, string>
+  onThreadLinkClick?: (threadId: string) => void
 }) => {
   if (!content) return null
   const html = buildDiscordHtml(content, threadLinkMap, channelLinkMap)
@@ -272,6 +274,17 @@ const MessageContent = ({
   return (
     <div
       className="discord-markup text-sm text-base-content/90"
+      onClick={(event) => {
+        const target = event.target as HTMLElement | null
+        const anchor = target?.closest('a')
+        const href = anchor?.getAttribute('href') ?? ''
+        if (href.startsWith('#thread-')) {
+          const threadId = href.replace('#thread-', '')
+          if (threadId && onThreadLinkClick) {
+            onThreadLinkClick(threadId)
+          }
+        }
+      }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
@@ -320,10 +333,12 @@ const MessageList = ({
   messages,
   threadLinkMap,
   channelLinkMap,
+  onThreadLinkClick,
 }: {
   messages: DiscordBackupMessage[]
   threadLinkMap?: Map<string, string>
   channelLinkMap?: Map<string, string>
+  onThreadLinkClick?: (threadId: string) => void
 }) => {
   const visibleMessages = messages.filter(
     (message) => (message.content && message.content.trim() !== '') || (message.attachments ?? []).length > 0,
@@ -337,7 +352,12 @@ const MessageList = ({
     <div className="space-y-4">
       {visibleMessages.map((message) => (
         <div key={message.id} className="space-y-2">
-          <MessageContent content={message.content} threadLinkMap={threadLinkMap} channelLinkMap={channelLinkMap} />
+          <MessageContent
+            content={message.content}
+            threadLinkMap={threadLinkMap}
+            channelLinkMap={channelLinkMap}
+            onThreadLinkClick={onThreadLinkClick}
+          />
           <MessageAttachments message={message} />
         </div>
       ))}
@@ -346,6 +366,7 @@ const MessageList = ({
 }
 
 export default function RulesIndex({ channels, activeChannelId, messages, threads }: RulesPageProps) {
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null)
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
@@ -364,6 +385,24 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
     })
     return map
   }, [threads])
+
+  useEffect(() => {
+    setOpenThreadId(null)
+  }, [activeChannelId])
+
+  const handleThreadLinkClick = useCallback((threadId: string) => {
+    setOpenThreadId(threadId)
+  }, [])
+
+  const handleThreadToggle = useCallback((threadId: string) => {
+    return (event: React.SyntheticEvent<HTMLDetailsElement>) => {
+      const isOpen = event.currentTarget.open
+      setOpenThreadId((previous) => {
+        if (isOpen) return threadId
+        return previous === threadId ? null : previous
+      })
+    }
+  }, [])
 
   return (
     <AppLayout>
@@ -428,6 +467,7 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                         messages={messages}
                         threadLinkMap={threadLinkMap}
                         channelLinkMap={channelLinkMap}
+                        onThreadLinkClick={handleThreadLinkClick}
                       />
                       {threads.length > 0 ? (
                         <div className="space-y-3">
@@ -437,6 +477,8 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                               key={thread.channel.id}
                               id={`thread-${thread.channel.id}`}
                               className="rounded-box border border-base-200 p-3"
+                              open={openThreadId === thread.channel.id}
+                              onToggle={handleThreadToggle(thread.channel.id)}
                             >
                               <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
                                 <span className="truncate">{thread.channel.name}</span>
@@ -449,6 +491,7 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                                   messages={thread.messages}
                                   threadLinkMap={threadLinkMap}
                                   channelLinkMap={channelLinkMap}
+                                  onThreadLinkClick={handleThreadLinkClick}
                                 />
                               </div>
                             </details>
