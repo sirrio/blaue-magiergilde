@@ -82,6 +82,13 @@ export interface VoiceSettings {
   voice_channel_id?: string | null
 }
 
+export interface DiscordBackupStats {
+  channels: number
+  messages: number
+  attachments: number
+  last_synced_at?: string | null
+}
+
 export interface Auction {
   id: number
   title?: string | null

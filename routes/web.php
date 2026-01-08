@@ -1,8 +1,8 @@
 <?php
 
+use App\Http\Controllers\AppearanceController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\AppearanceController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -24,6 +24,7 @@ require __DIR__.'/web/spell.php';
 require __DIR__.'/web/shop.php';
 require __DIR__.'/web/auction.php';
 require __DIR__.'/web/admin.php';
+require __DIR__.'/web/bot.php';
 require __DIR__.'/web/registration.php';
 require __DIR__.'/web/user.php';
 require __DIR__.'/web/settings.php';

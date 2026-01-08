@@ -64,3 +64,7 @@ Admins manage character approvals at `/registrations` (approve/decline, filters,
 ## Auctions
 
 Auctions are managed in-app (items, bids, hidden bids, auto rollover). The bot has no auction commands.
+
+## Discord backup
+
+Admins can trigger a manual backup of all text channels + threads (including attachments) from the admin settings page.

@@ -1,4 +1,5 @@
 const http = require('node:http');
+const { startDiscordBackup } = require('./discordBackup');
 const { getSnapshot } = require('./voiceStateCache');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
@@ -90,7 +91,10 @@ function startHttpServer(client) {
 
     const server = http.createServer(async (req, res) => {
         const path = req.url?.split('?')[0];
-        if (req.method !== 'POST' || path !== '/voice-sync') {
+        const isVoiceSync = path === '/voice-sync';
+        const isDiscordBackup = path === '/discord-backup';
+
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -120,6 +124,20 @@ function startHttpServer(client) {
 
             logReject(req, 'invalid JSON');
             respondJson(res, 400, { error: 'Invalid JSON.' });
+            return;
+        }
+
+        if (isDiscordBackup) {
+            const appUrl = String(payload?.app_url || '').trim();
+            const result = startDiscordBackup(client, appUrl);
+            if (!result.started) {
+                logReject(req, result.error || 'backup rejected');
+                const status = result.error === 'App URL is missing.' ? 422 : 409;
+                respondJson(res, status, { error: result.error || 'Backup already running.' });
+                return;
+            }
+
+            respondJson(res, 202, { status: 'started' });
             return;
         }
 

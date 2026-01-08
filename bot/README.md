@@ -24,6 +24,12 @@ Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button**
 
 - Voice-Channel Kandidaten werden von der App aus per HTTP-Endpoint synchronisiert (kein Slash-Command).
 
+### Discord Backup (App)
+
+- Das Admin-Panel der App kann ein manuelles Backup aller Text-Channels und Threads starten.
+- Der Bot liest die Historie, laedt Attachments herunter und speichert alles in der App.
+- Voraussetzungen: `GuildMessages` + `MessageContent` Intent im Discord Developer Portal aktivieren.
+
 ### Auktionen (App)
 
 - Auktionen werden in der App verwaltet; beim Schliessen wird automatisch eine neue Auktion erstellt.
@@ -51,6 +57,10 @@ Setze folgende Variablen in der Root-`.env`:
 - `BOT_HTTP_URL` - base URL for the bot HTTP server (no path, e.g. `http://127.0.0.1:3125`).
 - `BOT_HTTP_HOST` - optional: listen host override (default: 127.0.0.1).
 - `BOT_HTTP_PORT` - optional: listen port override (default: 3125).
+- `BOT_HTTP_RATE_LIMIT_MS` - optional: throttle inbound bot HTTP requests (default: 15000).
+- `BOT_BACKUP_BATCH_SIZE` - optional: message batch size per channel (default: 100).
+- `BOT_BACKUP_DELAY_MS` - optional: delay between message batches (default: 1200).
+- `BOT_BACKUP_ATTACHMENT_DELAY_MS` - optional: delay between attachment uploads (default: 250).
 DB nutzt die gleichen Laravel-Variablen:
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
 
