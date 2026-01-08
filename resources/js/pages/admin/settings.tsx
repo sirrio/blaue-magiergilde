@@ -262,7 +262,14 @@ export default function Settings({
         toast.show('Discord Backup gestartet', 'info')
         void fetchBackupStatus(false)
       },
-      onError: () => {
+      onError: (formErrors) => {
+        const message = formErrors?.discord_backup ? String(formErrors.discord_backup) : ''
+        if (message.toLowerCase().includes('backup already running')) {
+          toast.show('Backup laeuft bereits.', 'info')
+          void fetchBackupStatus(false)
+          return
+        }
+
         toast.show('Discord Backup konnte nicht gestartet werden.', 'error')
         void fetchBackupStatus(false)
       },
@@ -285,9 +292,15 @@ export default function Settings({
     })
   }
 
-  const lastSyncedLabel = discordBackup.last_synced_at
-    ? new Date(discordBackup.last_synced_at).toLocaleString()
-    : 'Nie'
+  const lastSyncedLabel = backupStatus?.running
+    ? backupStatus?.started_at
+      ? `Laufend seit ${new Date(backupStatus.started_at).toLocaleString()}`
+      : 'Backup laeuft...'
+    : backupStatus?.finished_at
+      ? new Date(backupStatus.finished_at).toLocaleString()
+      : discordBackup.last_synced_at
+        ? new Date(discordBackup.last_synced_at).toLocaleString()
+        : 'Nie'
 
   const backupProgressMax = backupStatus?.total_channels ?? 0
   const backupProgressValue = backupStatus?.processed_channels ?? 0
@@ -519,9 +532,10 @@ export default function Settings({
                   Auswahl speichern
                 </Button>
               </div>
-              {pageErrors?.discord_backup && (
+              {pageErrors?.discord_backup &&
+              !String(pageErrors.discord_backup).toLowerCase().includes('backup already running') ? (
                 <p className="mt-2 text-xs text-error">{pageErrors.discord_backup}</p>
-              )}
+              ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   size="sm"
