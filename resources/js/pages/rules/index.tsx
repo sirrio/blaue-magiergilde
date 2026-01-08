@@ -3,7 +3,6 @@ import { cn } from '@/lib/utils'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupMessage } from '@/types'
 import { Head, Link } from '@inertiajs/react'
-import { format } from 'date-fns'
 import { useMemo } from 'react'
 
 type ThreadBlock = {
@@ -16,11 +15,6 @@ interface RulesPageProps {
   activeChannelId?: string | null
   messages: DiscordBackupMessage[]
   threads: ThreadBlock[]
-}
-
-const formatTimestamp = (value?: string | null) => {
-  if (!value) return ''
-  return format(new Date(value), 'dd.MM.yyyy HH:mm')
 }
 
 const escapeHtml = (value: string) =>
@@ -134,24 +128,20 @@ const MessageAttachments = ({ message }: { message: DiscordBackupMessage }) => {
 }
 
 const MessageList = ({ messages }: { messages: DiscordBackupMessage[] }) => {
-  if (messages.length === 0) {
+  const visibleMessages = messages.filter(
+    (message) => (message.content && message.content.trim() !== '') || (message.attachments ?? []).length > 0,
+  )
+
+  if (visibleMessages.length === 0) {
     return <p className="text-xs text-base-content/60">Keine Nachrichten.</p>
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {messages.map((message) => (
-        <div key={message.id} className="rounded-box border border-base-200 bg-base-100/60 p-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
-            <p className="font-semibold text-base-content">
-              {message.author_display_name || message.author_name}
-            </p>
-            <p className="text-base-content/50">{formatTimestamp(message.sent_at)}</p>
-          </div>
-          <div className="mt-2">
-            <MessageContent content={message.content} />
-            <MessageAttachments message={message} />
-          </div>
+    <div className="space-y-4">
+      {visibleMessages.map((message) => (
+        <div key={message.id} className="space-y-2">
+          <MessageContent content={message.content} />
+          <MessageAttachments message={message} />
         </div>
       ))}
     </div>
