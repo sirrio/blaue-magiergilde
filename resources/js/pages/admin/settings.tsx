@@ -43,7 +43,7 @@ export default function Settings({
     async (showToast: boolean) => {
       const csrfToken = getCsrfToken()
       if (!csrfToken) {
-        if (showToast) toast.show('CSRF Token fehlt.', 'error')
+        if (showToast) toast.show('Missing CSRF token.', 'error')
         return
       }
 
@@ -62,7 +62,7 @@ export default function Settings({
         const payload = await response.json()
         if (!response.ok) {
           if (showToast) {
-            toast.show(String(payload?.error ?? 'Status konnte nicht geladen werden.'), 'error')
+            toast.show(String(payload?.error ?? 'Status could not be loaded.'), 'error')
           }
           return
         }
@@ -75,7 +75,7 @@ export default function Settings({
         setBackupStatus(status as DiscordBackupStatus)
       } catch (error) {
         if (showToast) {
-          toast.show('Status konnte nicht geladen werden.', 'error')
+          toast.show('Status could not be loaded.', 'error')
         }
       }
     },
@@ -172,10 +172,10 @@ export default function Settings({
     patch(route('voice-settings.update'), {
       preserveScroll: true,
       onSuccess: () => {
-        toast.show('Einstellungen gespeichert', 'info')
+        toast.show('Settings saved.', 'info')
       },
       onError: () => {
-        toast.show('Einstellungen konnten nicht gespeichert werden.', 'error')
+        toast.show('Settings could not be saved.', 'error')
       },
     })
   }
@@ -185,7 +185,7 @@ export default function Settings({
 
     const csrfToken = getCsrfToken()
     if (!csrfToken) {
-      toast.show('CSRF Token fehlt.', 'error')
+      toast.show('Missing CSRF token.', 'error')
       return
     }
 
@@ -205,7 +205,7 @@ export default function Settings({
 
       const payload = await response.json()
       if (!response.ok) {
-        toast.show(String(payload?.error ?? 'Channel-Liste konnte nicht geladen werden.'), 'error')
+        toast.show(String(payload?.error ?? 'Channel list could not be loaded.'), 'error')
         return
       }
 
@@ -218,9 +218,9 @@ export default function Settings({
       })
 
       setAvailableChannelGroups(nextGroups)
-      toast.show('Channel-Liste aktualisiert', 'info')
+      toast.show('Channel list updated.', 'info')
     } catch (error) {
-      toast.show('Channel-Liste konnte nicht geladen werden.', 'error')
+      toast.show('Channel list could not be loaded.', 'error')
     } finally {
       setIsRefreshingChannels(false)
     }
@@ -248,10 +248,10 @@ export default function Settings({
     selectionForm.patch(route('discord-backup.channels.update'), {
       preserveScroll: true,
       onSuccess: () => {
-        toast.show('Backup-Channels gespeichert', 'info')
+        toast.show('Backup channels saved.', 'info')
       },
       onError: () => {
-        toast.show('Backup-Channels konnten nicht gespeichert werden.', 'error')
+        toast.show('Backup channels could not be saved.', 'error')
       },
     })
   }
@@ -260,48 +260,48 @@ export default function Settings({
     backupForm.post(route('discord-backup.store'), {
       preserveScroll: true,
       onSuccess: () => {
-        toast.show('Discord Backup gestartet', 'info')
+        toast.show('Discord backup started.', 'info')
         void fetchBackupStatus(false)
       },
       onError: (formErrors) => {
         const message = formErrors?.discord_backup ? String(formErrors.discord_backup) : ''
         if (message.toLowerCase().includes('backup already running')) {
-          toast.show('Backup laeuft bereits.', 'info')
+          toast.show('Backup already running.', 'info')
           void fetchBackupStatus(false)
           return
         }
 
-        toast.show('Discord Backup konnte nicht gestartet werden.', 'error')
+        toast.show('Discord backup could not be started.', 'error')
         void fetchBackupStatus(false)
       },
     })
   }
 
   const handleBackupDelete = () => {
-    if (!window.confirm('Discord Backup wirklich loeschen?')) {
+    if (!window.confirm('Delete Discord backup?')) {
       return
     }
 
     deleteForm.delete(route('discord-backup.destroy'), {
       preserveScroll: true,
       onSuccess: () => {
-        toast.show('Discord Backup geloescht', 'info')
+        toast.show('Discord backup deleted.', 'info')
       },
       onError: () => {
-        toast.show('Discord Backup konnte nicht geloescht werden.', 'error')
+        toast.show('Discord backup could not be deleted.', 'error')
       },
     })
   }
 
   const lastSyncedLabel = backupStatus?.running
     ? backupStatus?.started_at
-      ? `Laufend seit ${new Date(backupStatus.started_at).toLocaleString()}`
-      : 'Backup laeuft...'
+      ? `Running since ${new Date(backupStatus.started_at).toLocaleString()}`
+      : 'Backup running...'
     : backupStatus?.finished_at
       ? new Date(backupStatus.finished_at).toLocaleString()
       : discordBackup.last_synced_at
         ? new Date(discordBackup.last_synced_at).toLocaleString()
-        : 'Nie'
+        : 'Never'
 
   const backupProgressMax = backupStatus?.total_channels ?? 0
   const backupProgressValue = backupStatus?.processed_channels ?? 0
@@ -309,14 +309,14 @@ export default function Settings({
     backupProgressMax > 0
       ? `${backupProgressValue}/${backupProgressMax} Channels`
       : backupStatus?.running
-        ? 'Backup laeuft...'
-        : 'Kein aktiver Backup'
+        ? 'Backup running...'
+        : 'No active backup'
   const isBackupRunning = backupStatus?.running ?? false
 
   const formatTimestamp = useCallback((value?: string | null) => {
-    if (!value) return 'Nie'
+    if (!value) return 'Never'
     const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) return 'Nie'
+    if (Number.isNaN(parsed.getTime())) return 'Never'
     return parsed.toLocaleString()
   }, [])
 
@@ -325,7 +325,7 @@ export default function Settings({
       if (syncingChannelId) return
       const csrfToken = getCsrfToken()
       if (!csrfToken) {
-        toast.show('CSRF Token fehlt.', 'error')
+        toast.show('Missing CSRF token.', 'error')
         return
       }
 
@@ -347,19 +347,19 @@ export default function Settings({
         if (!response.ok) {
           if (response.status === 429 && payload?.retry_after_ms) {
             const seconds = Math.max(1, Math.ceil(Number(payload.retry_after_ms) / 1000))
-            toast.show(`Bitte ${seconds}s warten, bevor du erneut synchronisierst.`, 'info')
+            toast.show(`Wait ${seconds}s before syncing again.`, 'info')
             return
           }
 
-          toast.show(String(payload?.error ?? 'Channel Sync fehlgeschlagen.'), 'error')
+          toast.show(String(payload?.error ?? 'Channel sync failed.'), 'error')
           return
         }
 
-        toast.show('Channel Sync gestartet', 'info')
+        toast.show('Channel sync started.', 'info')
         void fetchBackupStatus(false)
         router.reload({ only: ['discordBackup'] })
       } catch (error) {
-        toast.show('Channel Sync fehlgeschlagen.', 'error')
+        toast.show('Channel sync failed.', 'error')
       } finally {
         setSyncingChannelId(null)
       }
@@ -395,7 +395,7 @@ export default function Settings({
       if (!grouped.has(key)) {
         grouped.set(key, {
           id: categoryId,
-          name: categoryId ? categories.get(categoryId) ?? channel.parent_id ?? 'Kategorie' : 'Ohne Kategorie',
+          name: categoryId ? categories.get(categoryId) ?? channel.parent_id ?? 'Category' : 'Uncategorized',
           channels: [],
         })
       }
@@ -414,10 +414,6 @@ export default function Settings({
       })
   }
 
-  const selectedGuildEntries = Object.keys(selectedByGuild)
-    .filter((guildId) => (selectedByGuild[guildId] ?? []).length > 0)
-    .map((guildId) => [guildId, mergedChannelGroups[guildId] ?? []] as [string, DiscordBackupChannel[]])
-
   const availableGuildEntries = (Object.entries(availableChannelGroups) as [string, DiscordBackupChannel[]][])
     .map(([guildId, channels]) => {
       const availableCount = channels.filter(
@@ -426,6 +422,34 @@ export default function Settings({
       return availableCount > 0 ? [guildId, channels] : null
     })
     .filter(Boolean) as [string, DiscordBackupChannel[]][]
+
+  const selectedChannelsFlat = useMemo(() => {
+    const selected = new Map<string, DiscordBackupChannel>()
+    const lookup = new Map<string, DiscordBackupChannel>()
+
+    Object.values(mergedChannelGroups).forEach((channels) => {
+      channels.forEach((channel) => {
+        lookup.set(channel.id, channel)
+      })
+    })
+
+    Object.entries(selectedByGuild).forEach(([guildId, channelIds]) => {
+      channelIds.forEach((channelId) => {
+        if (selected.has(channelId)) return
+        const channel = lookup.get(channelId)
+        selected.set(channelId, channel ?? {
+          id: channelId,
+          guild_id: guildId,
+          name: channelId,
+          type: 'GuildText',
+          parent_id: null,
+          is_thread: false,
+        })
+      })
+    })
+
+    return Array.from(selected.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [mergedChannelGroups, selectedByGuild])
 
   const renderGuildGroups = (entries: [string, DiscordBackupChannel[]][], mode: 'selected' | 'available') => {
     return (
@@ -502,70 +526,6 @@ export default function Settings({
     )
   }
 
-  const renderSelectedGroups = (entries: [string, DiscordBackupChannel[]][]) => {
-    return (
-      <div className="mt-3 flex flex-col gap-4">
-        {entries.map(([guildId, channels]) => {
-          const selectedCount = (selectedByGuild[guildId] ?? []).length
-
-          return (
-            <div key={`selected-${guildId}`} className="rounded-box border border-base-200 p-3">
-              <div className="flex items-center justify-between text-sm font-semibold">
-                <span>Guild {guildId}</span>
-                <span className="text-xs font-normal text-base-content/60">{selectedCount}</span>
-              </div>
-              <div className="mt-3 flex flex-col gap-3">
-                {buildGroupedList(guildId, channels, 'selected').map((group) => (
-                  <div
-                    key={`selected-${guildId}-${group.id ?? 'uncategorized'}`}
-                    className="rounded-box border border-base-200/70 p-2"
-                  >
-                    <div className="flex items-center justify-between text-xs font-semibold text-base-content/70">
-                      <span className="truncate">{group.name}</span>
-                      <span className="text-[11px] font-normal text-base-content/60">{group.channels.length}</span>
-                    </div>
-                    <div className="mt-2 grid gap-2">
-                      {group.channels.map((channel) => (
-                        <div key={channel.id} className="flex items-center gap-2 text-sm">
-                          <label className="flex flex-1 items-center gap-2">
-                            <input
-                              type="checkbox"
-                              className="checkbox checkbox-xs"
-                              checked={isChannelSelected(guildId, channel.id)}
-                              onChange={() => toggleChannel(guildId, channel.id)}
-                            />
-                            <span className="truncate">{channel.name}</span>
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-base-content/60">
-                              {formatTimestamp(channel.last_synced_at)}
-                            </span>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                void handleChannelSync(channel)
-                              }}
-                              disabled={isBackupRunning || syncingChannelId === channel.id}
-                            >
-                              {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
     <AppLayout>
       <Head title="Admin Settings" />
@@ -575,7 +535,7 @@ export default function Settings({
             <CardTitle>Discord Bot</CardTitle>
             <CardContent>
               <p className="text-xs text-base-content/70">
-                Die Voice Channel ID steuert die Live-Kandidatenliste in den Auctions.
+                The voice channel ID controls the live candidate list in auctions.
               </p>
               <div className="mt-3 flex flex-wrap items-end gap-2">
                 <Input
@@ -586,7 +546,7 @@ export default function Settings({
                   Voice Channel ID
                 </Input>
                 <Button size="sm" variant="outline" onClick={handleSubmit} disabled={processing}>
-                  Speichern
+                  Save
                 </Button>
               </div>
             </CardContent>
@@ -597,7 +557,7 @@ export default function Settings({
             <CardTitle>Discord Backup</CardTitle>
             <CardContent>
               <p className="text-xs text-base-content/70">
-                Sichert alle Text-Channels und Threads inklusive Anhangen. Backup laesst sich manuell loeschen.
+                Backs up selected text channels and threads, including attachments. Backups can be deleted manually.
               </p>
               <div className="mt-3 grid gap-2 text-sm">
                 <div className="flex items-center justify-between">
@@ -613,7 +573,7 @@ export default function Settings({
                   <span className="font-semibold">{discordBackup.attachments}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-base-content/70">Letztes Backup</span>
+                  <span className="text-base-content/70">Last backup</span>
                   <span className="font-semibold">{lastSyncedLabel}</span>
                 </div>
               </div>
@@ -621,7 +581,7 @@ export default function Settings({
                 <div className="mt-4 rounded-box border border-base-200 p-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-base-content/70">
-                      {backupStatus.running ? 'Backup laeuft' : 'Backup Status'}
+                      {backupStatus.running ? 'Backup running' : 'Backup status'}
                     </span>
                     <span className="font-semibold">{backupProgressLabel}</span>
                   </div>
@@ -634,34 +594,61 @@ export default function Settings({
                   </div>
                   {backupStatus.running && backupStatus.current_channel ? (
                     <p className="mt-2 text-[11px] text-base-content/60">
-                      Aktuell: {backupStatus.current_channel.name}
+                      Current: {backupStatus.current_channel.name}
                     </p>
                   ) : null}
                 </div>
               ) : null}
               <div className="mt-4 rounded-box border border-base-200 p-3">
-                <p className="text-sm font-semibold">Ausgewaehlte Channels</p>
-                {selectedGuildEntries.length === 0 ? (
-                  <p className="mt-3 text-xs text-base-content/70">Noch keine Channels ausgewaehlt.</p>
+                <p className="text-sm font-semibold">Selected channels</p>
+                {selectedChannelsFlat.length === 0 ? (
+                  <p className="mt-3 text-xs text-base-content/70">No channels selected yet.</p>
                 ) : (
-                  renderSelectedGroups(selectedGuildEntries)
+                  <div className="mt-3 flex flex-col gap-2">
+                    {selectedChannelsFlat.map((channel) => (
+                      <div key={channel.id} className="flex items-center gap-2 text-sm">
+                        <label className="flex flex-1 items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-xs"
+                            checked={isChannelSelected(channel.guild_id, channel.id)}
+                            onChange={() => toggleChannel(channel.guild_id, channel.id)}
+                          />
+                          <span className="truncate">{channel.name}</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-base-content/60">
+                            {formatTimestamp(channel.last_synced_at)}
+                          </span>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => void handleChannelSync(channel)}
+                            disabled={isBackupRunning || syncingChannelId === channel.id}
+                          >
+                            {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
               <div className="mt-4 rounded-box border border-base-200 p-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">Weitere Channels</p>
+                  <p className="text-sm font-semibold">Available channels</p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={handleRefreshChannels}
                     disabled={isRefreshingChannels}
                   >
-                    Channels laden
+                    Load channels
                   </Button>
                 </div>
                 {availableGuildEntries.length === 0 ? (
                   <p className="mt-3 text-xs text-base-content/70">
-                    Keine weiteren Channels geladen. Klicke auf &quot;Channels laden&quot;.
+                    No additional channels loaded. Click &quot;Load channels&quot;.
                   </p>
                 ) : (
                   renderGuildGroups(availableGuildEntries, 'available')
@@ -669,7 +656,7 @@ export default function Settings({
               </div>
               <div className="mt-3 flex justify-end">
                 <Button size="sm" variant="outline" onClick={handleSaveSelection} disabled={selectionForm.processing}>
-                  Auswahl speichern
+                  Save selection
                 </Button>
               </div>
               {pageErrors?.discord_backup &&
@@ -683,13 +670,13 @@ export default function Settings({
                   onClick={handleBackupStart}
                   disabled={backupForm.processing || isBackupRunning}
                 >
-                  Backup starten
+                  Start backup
                 </Button>
                 <Button size="sm" variant="outline" as={Link} href={route('rules.index')}>
                   Open handbook
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleBackupDelete} disabled={deleteForm.processing}>
-                  Backup loeschen
+                  Delete backup
                 </Button>
               </div>
             </CardContent>
