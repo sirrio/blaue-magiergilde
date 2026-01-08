@@ -90,6 +90,7 @@ class DiscordBackupSettingsController extends Controller
             $validChannelIds = DiscordChannel::query()
                 ->where('guild_id', $guildId)
                 ->where('is_thread', false)
+                ->where('type', '!=', 'GuildCategory')
                 ->whereIn('id', $channelIds)
                 ->pluck('id')
                 ->all();

@@ -20,7 +20,9 @@ export default function Settings({
   const backupForm = useForm({})
   const deleteForm = useForm({})
   const refreshForm = useForm({})
-  const selectionForm = useForm({})
+  const selectionForm = useForm({
+    guilds: [] as { guild_id: string; channel_ids: string[] }[],
+  })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
@@ -37,6 +39,9 @@ export default function Settings({
     () => discordBackup.available_channels ?? {},
     [discordBackup.available_channels]
   )
+
+  const isChannelSelected = (guildId: string, channelId: string) =>
+    (selectedByGuild[guildId] ?? []).includes(channelId)
 
   const handleSubmit = () => {
     patch(route('voice-settings.update'), {
@@ -80,9 +85,9 @@ export default function Settings({
       channel_ids,
     }))
 
+    selectionForm.transform(() => ({ guilds }))
     selectionForm.patch(route('discord-backup.channels.update'), {
       preserveScroll: true,
-      data: { guilds },
       onSuccess: () => {
         toast.show('Backup-Channels gespeichert', 'info')
       },
@@ -196,22 +201,93 @@ export default function Settings({
                 ) : (
                   <div className="mt-3 flex flex-col gap-4">
                     {channelGroupEntries.map(([guildId, channels]) => (
-                      <div key={guildId} className="space-y-2">
-                        <p className="text-xs font-semibold text-base-content/60">Guild {guildId}</p>
-                        <div className="grid gap-2">
-                          {channels.map((channel) => (
-                            <label key={channel.id} className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                className="checkbox checkbox-xs"
-                                checked={(selectedByGuild[guildId] ?? []).includes(channel.id)}
-                                onChange={() => toggleChannel(guildId, channel.id)}
-                              />
-                              <span className="truncate">{channel.name}</span>
-                            </label>
-                          ))}
+                      <details
+                        key={guildId}
+                        className="rounded-box border border-base-200 p-3"
+                        open={channels.some((channel) => isChannelSelected(guildId, channel.id))}
+                      >
+                        <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
+                          <span>Guild {guildId}</span>
+                          <span className="text-xs font-normal text-base-content/60">
+                            {(selectedByGuild[guildId] ?? []).length}/{channels.filter((channel) => channel.type !== 'GuildCategory').length}
+                          </span>
+                        </summary>
+                        <div className="mt-3 flex flex-col gap-3">
+                          {(() => {
+                            const categories = new Map<string, string>()
+                            channels.forEach((channel) => {
+                              if (channel.type === 'GuildCategory') {
+                                categories.set(channel.id, channel.name)
+                              }
+                            })
+
+                            const grouped = new Map<
+                              string,
+                              { id: string | null; name: string; channels: DiscordBackupChannel[] }
+                            >()
+
+                            channels.forEach((channel) => {
+                              if (channel.type === 'GuildCategory') {
+                                return
+                              }
+
+                              const categoryId = channel.parent_id && categories.has(channel.parent_id) ? channel.parent_id : null
+                              const key = categoryId ?? 'uncategorized'
+                              if (!grouped.has(key)) {
+                                grouped.set(key, {
+                                  id: categoryId,
+                                  name: categoryId ? categories.get(categoryId) ?? channel.parent_id ?? 'Kategorie' : 'Ohne Kategorie',
+                                  channels: [],
+                                })
+                              }
+                              grouped.get(key)?.channels.push(channel)
+                            })
+
+                            const groupedList = Array.from(grouped.values())
+                              .map((group) => ({
+                                ...group,
+                                channels: [...group.channels].sort((a, b) => a.name.localeCompare(b.name)),
+                              }))
+                              .sort((a, b) => {
+                                if (a.id === null && b.id !== null) return 1
+                                if (a.id !== null && b.id === null) return -1
+                                return a.name.localeCompare(b.name)
+                              })
+
+                            return groupedList.map((group) => {
+                              const isOpen = group.channels.some((channel) => isChannelSelected(guildId, channel.id))
+                              return (
+                                <details
+                                  key={group.id ?? 'uncategorized'}
+                                  className="rounded-box border border-base-200/70 p-2"
+                                  open={isOpen}
+                                >
+                                  <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-base-content/70">
+                                    <span className="truncate">{group.name}</span>
+                                    <span className="text-[11px] font-normal text-base-content/60">
+                                      {group.channels.filter((channel) => isChannelSelected(guildId, channel.id)).length}/
+                                      {group.channels.length}
+                                    </span>
+                                  </summary>
+                                  <div className="mt-2 grid gap-2">
+                                    {group.channels.map((channel) => (
+                                      <label key={channel.id} className="flex items-center gap-2 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          className="checkbox checkbox-xs"
+                                          checked={isChannelSelected(guildId, channel.id)}
+                                          onChange={() => toggleChannel(guildId, channel.id)}
+                                        />
+                                        <span className="truncate">{channel.name}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </details>
+                              )
+                            })
+                          })()}
                         </div>
-                      </div>
+                      </details>
                     ))}
                   </div>
                 )}

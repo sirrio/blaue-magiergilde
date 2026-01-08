@@ -37,6 +37,12 @@ function shouldIncludeSelectableChannel(channel) {
     return true;
 }
 
+function shouldIncludeListChannel(channel) {
+    if (channel.type === ChannelType.GuildCategory) return true;
+
+    return shouldIncludeSelectableChannel(channel);
+}
+
 async function fetchChannelState(appUrl, token, guildId) {
     const url = new URL('/bot/discord-backups/channels', appUrl);
     url.searchParams.set('guild_id', guildId);
@@ -73,7 +79,7 @@ async function listDiscordChannels(client, allowedGuildIds) {
         const channels = [];
 
         for (const channel of guildChannels.values()) {
-            if (!shouldIncludeSelectableChannel(channel)) {
+            if (!shouldIncludeListChannel(channel)) {
                 continue;
             }
 
