@@ -3,8 +3,8 @@ import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
-import { DiscordBackupChannel, DiscordBackupStats, VoiceSettings } from '@/types'
-import { Head, Link, useForm } from '@inertiajs/react'
+import { DiscordBackupChannel, DiscordBackupStats, PageProps, VoiceSettings } from '@/types'
+import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Settings({
@@ -17,12 +17,14 @@ export default function Settings({
   const { data, setData, patch, processing, errors } = useForm({
     voice_channel_id: voiceSettings?.voice_channel_id ?? '',
   })
+  const { errors: pageErrors } = usePage<PageProps>().props
   const backupForm = useForm({})
   const deleteForm = useForm({})
-  const refreshForm = useForm({})
   const selectionForm = useForm({
     guilds: [] as { guild_id: string; channel_ids: string[] }[],
   })
+  const [availableChannelGroups, setAvailableChannelGroups] = useState<Record<string, DiscordBackupChannel[]>>({})
+  const [isRefreshingChannels, setIsRefreshingChannels] = useState(false)
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
@@ -35,13 +37,55 @@ export default function Settings({
     setSelectedByGuild(discordBackup.selected_channels ?? {})
   }, [discordBackup.selected_channels])
 
-  const availableChannelGroups = useMemo(
-    () => discordBackup.available_channels ?? {},
-    [discordBackup.available_channels]
+  const selectedChannelDetails = useMemo(
+    () => discordBackup.selected_channels_details ?? {},
+    [discordBackup.selected_channels_details]
   )
+
+  const mergedChannelGroups = useMemo(() => {
+    const merged: Record<string, DiscordBackupChannel[]> = {}
+    const guildIds = new Set<string>([
+      ...Object.keys(availableChannelGroups),
+      ...Object.keys(selectedChannelDetails),
+      ...Object.keys(selectedByGuild),
+    ])
+
+    guildIds.forEach((guildId) => {
+      const channelMap = new Map<string, DiscordBackupChannel>()
+      ;(availableChannelGroups[guildId] ?? []).forEach((channel) => {
+        channelMap.set(channel.id, channel)
+      })
+      ;(selectedChannelDetails[guildId] ?? []).forEach((channel) => {
+        if (!channelMap.has(channel.id)) {
+          channelMap.set(channel.id, channel)
+        }
+      })
+      ;(selectedByGuild[guildId] ?? []).forEach((channelId) => {
+        if (!channelMap.has(channelId)) {
+          channelMap.set(channelId, {
+            id: channelId,
+            guild_id: guildId,
+            name: channelId,
+            type: 'GuildText',
+            parent_id: null,
+            is_thread: false,
+          })
+        }
+      })
+      merged[guildId] = Array.from(channelMap.values())
+    })
+
+    return merged
+  }, [availableChannelGroups, selectedChannelDetails, selectedByGuild])
 
   const isChannelSelected = (guildId: string, channelId: string) =>
     (selectedByGuild[guildId] ?? []).includes(channelId)
+
+  const getCsrfToken = () => {
+    if (typeof document === 'undefined') return ''
+    const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
+    return meta?.content ?? ''
+  }
 
   const handleSubmit = () => {
     patch(route('voice-settings.update'), {
@@ -55,16 +99,50 @@ export default function Settings({
     })
   }
 
-  const handleRefreshChannels = () => {
-    refreshForm.post(route('discord-backup.channels.refresh'), {
-      preserveScroll: true,
-      onSuccess: () => {
-        toast.show('Channel-Liste aktualisiert', 'info')
-      },
-      onError: () => {
-        toast.show('Channel-Liste konnte nicht geladen werden.', 'error')
-      },
-    })
+  const handleRefreshChannels = async () => {
+    if (isRefreshingChannels) return
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('CSRF Token fehlt.', 'error')
+      return
+    }
+
+    setIsRefreshingChannels(true)
+
+    try {
+      const response = await fetch(route('discord-backup.channels.refresh'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        toast.show(String(payload?.error ?? 'Channel-Liste konnte nicht geladen werden.'), 'error')
+        return
+      }
+
+      const guilds = Array.isArray(payload?.guilds) ? payload.guilds : []
+      const nextGroups: Record<string, DiscordBackupChannel[]> = {}
+
+      guilds.forEach((guild) => {
+        if (!guild?.guild_id || !Array.isArray(guild?.channels)) return
+        nextGroups[String(guild.guild_id)] = guild.channels as DiscordBackupChannel[]
+      })
+
+      setAvailableChannelGroups(nextGroups)
+      toast.show('Channel-Liste aktualisiert', 'info')
+    } catch (error) {
+      toast.show('Channel-Liste konnte nicht geladen werden.', 'error')
+    } finally {
+      setIsRefreshingChannels(false)
+    }
   }
 
   const toggleChannel = (guildId: string, channelId: string) => {
@@ -129,7 +207,119 @@ export default function Settings({
     ? new Date(discordBackup.last_synced_at).toLocaleString()
     : 'Nie'
 
-  const channelGroupEntries = Object.entries(availableChannelGroups) as [string, DiscordBackupChannel[]][]
+  const buildGroupedList = (
+    guildId: string,
+    channels: DiscordBackupChannel[],
+    mode: 'selected' | 'available',
+  ) => {
+    const selectedSet = new Set(selectedByGuild[guildId] ?? [])
+    const categories = new Map<string, string>()
+    channels.forEach((channel) => {
+      if (channel.type === 'GuildCategory') {
+        categories.set(channel.id, channel.name)
+      }
+    })
+
+    const filtered = channels.filter((channel) => {
+      if (channel.type === 'GuildCategory') return true
+      const isSelected = selectedSet.has(channel.id)
+      return mode === 'selected' ? isSelected : !isSelected
+    })
+
+    const grouped = new Map<string, { id: string | null; name: string; channels: DiscordBackupChannel[] }>()
+    filtered.forEach((channel) => {
+      if (channel.type === 'GuildCategory') return
+
+      const categoryId = channel.parent_id && categories.has(channel.parent_id) ? channel.parent_id : null
+      const key = categoryId ?? 'uncategorized'
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: categoryId,
+          name: categoryId ? categories.get(categoryId) ?? channel.parent_id ?? 'Kategorie' : 'Ohne Kategorie',
+          channels: [],
+        })
+      }
+      grouped.get(key)?.channels.push(channel)
+    })
+
+    return Array.from(grouped.values())
+      .map((group) => ({
+        ...group,
+        channels: [...group.channels].sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => {
+        if (a.id === null && b.id !== null) return 1
+        if (a.id !== null && b.id === null) return -1
+        return a.name.localeCompare(b.name)
+      })
+  }
+
+  const selectedGuildEntries = Object.keys(selectedByGuild)
+    .filter((guildId) => (selectedByGuild[guildId] ?? []).length > 0)
+    .map((guildId) => [guildId, mergedChannelGroups[guildId] ?? []] as [string, DiscordBackupChannel[]])
+
+  const availableGuildEntries = (Object.entries(availableChannelGroups) as [string, DiscordBackupChannel[]][])
+    .map(([guildId, channels]) => {
+      const availableCount = channels.filter(
+        (channel) => channel.type !== 'GuildCategory' && !isChannelSelected(guildId, channel.id),
+      ).length
+      return availableCount > 0 ? [guildId, channels] : null
+    })
+    .filter(Boolean) as [string, DiscordBackupChannel[]][]
+
+  const renderGuildGroups = (entries: [string, DiscordBackupChannel[]][], mode: 'selected' | 'available') => {
+    return (
+      <div className="mt-3 flex flex-col gap-4">
+        {entries.map(([guildId, channels]) => {
+          const selectedCount = (selectedByGuild[guildId] ?? []).length
+          const availableCount = channels.filter(
+            (channel) => channel.type !== 'GuildCategory' && !isChannelSelected(guildId, channel.id),
+          ).length
+          const summaryCount = mode === 'selected' ? selectedCount : availableCount
+
+          return (
+            <details
+              key={`${mode}-${guildId}`}
+              className="rounded-box border border-base-200 p-3"
+              open={mode === 'selected' && summaryCount > 0}
+            >
+              <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
+                <span>Guild {guildId}</span>
+                <span className="text-xs font-normal text-base-content/60">{summaryCount}</span>
+              </summary>
+              <div className="mt-3 flex flex-col gap-3">
+                {buildGroupedList(guildId, channels, mode).map((group) => (
+                  <details
+                    key={`${mode}-${guildId}-${group.id ?? 'uncategorized'}`}
+                    className="rounded-box border border-base-200/70 p-2"
+                    open={mode === 'selected' && group.channels.length > 0}
+                  >
+                    <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-base-content/70">
+                      <span className="truncate">{group.name}</span>
+                      <span className="text-[11px] font-normal text-base-content/60">{group.channels.length}</span>
+                    </summary>
+                    <div className="mt-2 grid gap-2">
+                      {group.channels.map((channel) => (
+                        <label key={channel.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-xs"
+                            checked={isChannelSelected(guildId, channel.id)}
+                            onChange={() => toggleChannel(guildId, channel.id)}
+                          />
+                          <span className="truncate">{channel.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </details>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <AppLayout>
@@ -183,120 +373,41 @@ export default function Settings({
                 </div>
               </div>
               <div className="mt-4 rounded-box border border-base-200 p-3">
+                <p className="text-sm font-semibold">Ausgewaehlte Channels</p>
+                {selectedGuildEntries.length === 0 ? (
+                  <p className="mt-3 text-xs text-base-content/70">Noch keine Channels ausgewaehlt.</p>
+                ) : (
+                  renderGuildGroups(selectedGuildEntries, 'selected')
+                )}
+              </div>
+              <div className="mt-4 rounded-box border border-base-200 p-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">Backup Channels</p>
+                  <p className="text-sm font-semibold">Weitere Channels</p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={handleRefreshChannels}
-                    disabled={refreshForm.processing}
+                    disabled={isRefreshingChannels}
                   >
                     Channels laden
                   </Button>
                 </div>
-                {channelGroupEntries.length === 0 ? (
+                {availableGuildEntries.length === 0 ? (
                   <p className="mt-3 text-xs text-base-content/70">
-                    Noch keine Channel geladen. Klicke auf &quot;Channels laden&quot;.
+                    Keine weiteren Channels geladen. Klicke auf &quot;Channels laden&quot;.
                   </p>
                 ) : (
-                  <div className="mt-3 flex flex-col gap-4">
-                    {channelGroupEntries.map(([guildId, channels]) => (
-                      <details
-                        key={guildId}
-                        className="rounded-box border border-base-200 p-3"
-                        open={channels.some((channel) => isChannelSelected(guildId, channel.id))}
-                      >
-                        <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
-                          <span>Guild {guildId}</span>
-                          <span className="text-xs font-normal text-base-content/60">
-                            {(selectedByGuild[guildId] ?? []).length}/{channels.filter((channel) => channel.type !== 'GuildCategory').length}
-                          </span>
-                        </summary>
-                        <div className="mt-3 flex flex-col gap-3">
-                          {(() => {
-                            const categories = new Map<string, string>()
-                            channels.forEach((channel) => {
-                              if (channel.type === 'GuildCategory') {
-                                categories.set(channel.id, channel.name)
-                              }
-                            })
-
-                            const grouped = new Map<
-                              string,
-                              { id: string | null; name: string; channels: DiscordBackupChannel[] }
-                            >()
-
-                            channels.forEach((channel) => {
-                              if (channel.type === 'GuildCategory') {
-                                return
-                              }
-
-                              const categoryId = channel.parent_id && categories.has(channel.parent_id) ? channel.parent_id : null
-                              const key = categoryId ?? 'uncategorized'
-                              if (!grouped.has(key)) {
-                                grouped.set(key, {
-                                  id: categoryId,
-                                  name: categoryId ? categories.get(categoryId) ?? channel.parent_id ?? 'Kategorie' : 'Ohne Kategorie',
-                                  channels: [],
-                                })
-                              }
-                              grouped.get(key)?.channels.push(channel)
-                            })
-
-                            const groupedList = Array.from(grouped.values())
-                              .map((group) => ({
-                                ...group,
-                                channels: [...group.channels].sort((a, b) => a.name.localeCompare(b.name)),
-                              }))
-                              .sort((a, b) => {
-                                if (a.id === null && b.id !== null) return 1
-                                if (a.id !== null && b.id === null) return -1
-                                return a.name.localeCompare(b.name)
-                              })
-
-                            return groupedList.map((group) => {
-                              const isOpen = group.channels.some((channel) => isChannelSelected(guildId, channel.id))
-                              return (
-                                <details
-                                  key={group.id ?? 'uncategorized'}
-                                  className="rounded-box border border-base-200/70 p-2"
-                                  open={isOpen}
-                                >
-                                  <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-base-content/70">
-                                    <span className="truncate">{group.name}</span>
-                                    <span className="text-[11px] font-normal text-base-content/60">
-                                      {group.channels.filter((channel) => isChannelSelected(guildId, channel.id)).length}/
-                                      {group.channels.length}
-                                    </span>
-                                  </summary>
-                                  <div className="mt-2 grid gap-2">
-                                    {group.channels.map((channel) => (
-                                      <label key={channel.id} className="flex items-center gap-2 text-sm">
-                                        <input
-                                          type="checkbox"
-                                          className="checkbox checkbox-xs"
-                                          checked={isChannelSelected(guildId, channel.id)}
-                                          onChange={() => toggleChannel(guildId, channel.id)}
-                                        />
-                                        <span className="truncate">{channel.name}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </details>
-                              )
-                            })
-                          })()}
-                        </div>
-                      </details>
-                    ))}
-                  </div>
+                  renderGuildGroups(availableGuildEntries, 'available')
                 )}
-                <div className="mt-3 flex justify-end">
-                  <Button size="sm" variant="outline" onClick={handleSaveSelection} disabled={selectionForm.processing}>
-                    Auswahl speichern
-                  </Button>
-                </div>
               </div>
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" variant="outline" onClick={handleSaveSelection} disabled={selectionForm.processing}>
+                  Auswahl speichern
+                </Button>
+              </div>
+              {pageErrors?.discord_backup && (
+                <p className="mt-2 text-xs text-error">{pageErrors.discord_backup}</p>
+              )}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={handleBackupStart} disabled={backupForm.processing}>
                   Backup starten

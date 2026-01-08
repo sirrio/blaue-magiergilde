@@ -27,8 +27,14 @@ class DiscordBackupBrowserController extends Controller
             ])
             ->toArray();
 
+        $selectedIds = collect($selected)->flatten()->filter()->unique();
+
         $channels = DiscordChannel::query()
             ->withCount('messages')
+            ->when($selectedIds->isNotEmpty(), function ($query) use ($selectedIds) {
+                $query->whereIn('id', $selectedIds)
+                    ->orWhereIn('parent_id', $selectedIds);
+            })
             ->orderBy('guild_id')
             ->orderBy('name')
             ->get([
@@ -52,6 +58,17 @@ class DiscordBackupBrowserController extends Controller
         $user = $request->user();
         abort_unless($user && $user->is_admin, 403);
 
+        $selectedIds = DiscordBackupSetting::query()
+            ->pluck('channel_ids')
+            ->filter()
+            ->flatten()
+            ->unique();
+
+        $isAllowed = $selectedIds->contains($discordChannel->id)
+            || ($discordChannel->parent_id && $selectedIds->contains($discordChannel->parent_id));
+
+        abort_unless($isAllowed, 404);
+
         $messages = DiscordMessage::query()
             ->where('discord_channel_id', $discordChannel->id)
             ->with(['attachments' => function ($query) {
@@ -71,6 +88,25 @@ class DiscordBackupBrowserController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->is_admin, 403);
+
+        $message = $discordMessageAttachment->message;
+        if (! $message) {
+            return redirect()->back();
+        }
+
+        $selectedIds = DiscordBackupSetting::query()
+            ->pluck('channel_ids')
+            ->filter()
+            ->flatten()
+            ->unique();
+
+        $parentId = $message->channel?->parent_id;
+        $isAllowed = $selectedIds->contains($message->discord_channel_id)
+            || ($parentId && $selectedIds->contains($parentId));
+
+        if (! $isAllowed) {
+            return redirect()->back();
+        }
 
         $path = $discordMessageAttachment->storage_path;
         if (! $path || ! Storage::disk('local')->exists($path)) {

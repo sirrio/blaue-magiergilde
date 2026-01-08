@@ -31,6 +31,11 @@ it('rejects bot backup calls without a valid token', function () {
 it('stores discord channels sent by the bot', function () {
     Config::set('services.bot.http_token', 'secret');
 
+    DiscordBackupSetting::query()->create([
+        'guild_id' => '67890',
+        'channel_ids' => ['12345'],
+    ]);
+
     $this->postJson('/bot/discord-backups/channels', [
         'channels' => [
             [
@@ -52,6 +57,11 @@ it('stores discord channels sent by the bot', function () {
 
 it('stores discord messages and updates the channel cursor', function () {
     Config::set('services.bot.http_token', 'secret');
+
+    DiscordBackupSetting::query()->create([
+        'guild_id' => '67890',
+        'channel_ids' => ['12345'],
+    ]);
 
     $this->postJson('/bot/discord-backups/messages', [
         'channel_id' => '12345',
@@ -101,6 +111,11 @@ it('stores discord messages and updates the channel cursor', function () {
 it('stores attachment uploads from the bot', function () {
     Config::set('services.bot.http_token', 'secret');
     Storage::fake('local');
+
+    DiscordBackupSetting::query()->create([
+        'guild_id' => '67890',
+        'channel_ids' => ['12345'],
+    ]);
 
     DiscordChannel::query()->create([
         'id' => '12345',
@@ -170,22 +185,6 @@ it('lets admins trigger a discord backup run', function () {
 it('stores selected backup channels per guild', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
-    DiscordChannel::query()->create([
-        'id' => '12345',
-        'guild_id' => '67890',
-        'name' => 'rules',
-        'type' => 'GuildText',
-        'is_thread' => false,
-    ]);
-
-    DiscordChannel::query()->create([
-        'id' => '99999',
-        'guild_id' => '67890',
-        'name' => 'thread',
-        'type' => 'PublicThread',
-        'is_thread' => true,
-    ]);
-
     $this->actingAs($admin)
         ->patch('/admin/settings/discord-backup/channels', [
             'guilds' => [
@@ -199,7 +198,7 @@ it('stores selected backup channels per guild', function () {
 
     $setting = DiscordBackupSetting::query()->where('guild_id', '67890')->first();
     expect($setting)->not->toBeNull();
-    expect($setting->channel_ids)->toBe(['12345']);
+    expect($setting->channel_ids)->toBe(['12345', '99999']);
 });
 
 it('refreshes available backup channels from the bot', function () {
@@ -229,10 +228,9 @@ it('refreshes available backup channels from the bot', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
-        ->post('/admin/settings/discord-backup/channels')
-        ->assertRedirect();
+        ->postJson('/admin/settings/discord-backup/channels')
+        ->assertOk()
+        ->assertJsonPath('guilds.0.guild_id', '67890');
 
-    $channel = DiscordChannel::query()->first();
-    expect($channel)->not->toBeNull();
-    expect($channel->id)->toBe('12345');
+    expect(DiscordChannel::count())->toBe(0);
 });

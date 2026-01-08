@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Bot\StoreDiscordAttachmentRequest;
 use App\Http\Requests\Bot\StoreDiscordChannelsRequest;
 use App\Http\Requests\Bot\StoreDiscordMessagesRequest;
+use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
@@ -37,8 +38,21 @@ class DiscordBackupController extends Controller
         $this->ensureBotToken($request);
 
         $channels = $request->validated()['channels'];
+        $allowedChannelIds = $this->allowedChannelIds();
+
+        if ($allowedChannelIds->isEmpty()) {
+            return response()->json(['stored' => 0]);
+        }
 
         foreach ($channels as $channel) {
+            $parentId = $channel['parent_id'] ?? null;
+            $isAllowed = $allowedChannelIds->contains($channel['id'])
+                || ($parentId && $allowedChannelIds->contains($parentId));
+
+            if (! $isAllowed) {
+                continue;
+            }
+
             $payload = [
                 'guild_id' => $channel['guild_id'],
                 'name' => $channel['name'],
@@ -65,8 +79,22 @@ class DiscordBackupController extends Controller
         $channelId = $data['channel_id'];
         $guildId = $data['guild_id'];
         $messages = $data['messages'] ?? [];
+        $allowedChannelIds = $this->allowedChannelIds();
 
         if ($messages === []) {
+            return response()->json(['stored' => 0]);
+        }
+
+        if ($allowedChannelIds->isEmpty()) {
+            return response()->json(['stored' => 0]);
+        }
+
+        $existingChannel = DiscordChannel::query()->find($channelId);
+        $parentId = $existingChannel?->parent_id;
+        $isAllowed = $allowedChannelIds->contains($channelId)
+            || ($parentId && $allowedChannelIds->contains($parentId));
+
+        if (! $isAllowed) {
             return response()->json(['stored' => 0]);
         }
 
@@ -181,6 +209,15 @@ class DiscordBackupController extends Controller
             return response()->json(['error' => 'Message not found.'], 404);
         }
 
+        $allowedChannelIds = $this->allowedChannelIds();
+        $parentId = $message->channel?->parent_id;
+        $isAllowed = $allowedChannelIds->contains($message->discord_channel_id)
+            || ($parentId && $allowedChannelIds->contains($parentId));
+
+        if (! $isAllowed) {
+            return response()->json(['error' => 'Channel not allowed.'], 403);
+        }
+
         $file = $request->file('file');
         if (! $file) {
             return response()->json(['error' => 'Attachment missing.'], 422);
@@ -263,5 +300,15 @@ class DiscordBackupController extends Controller
         }
 
         return $safeName;
+    }
+
+    private function allowedChannelIds()
+    {
+        return DiscordBackupSetting::query()
+            ->pluck('channel_ids')
+            ->filter()
+            ->flatten()
+            ->unique()
+            ->values();
     }
 }

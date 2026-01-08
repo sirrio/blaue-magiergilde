@@ -89,6 +89,7 @@ export interface DiscordBackupStats {
   last_synced_at?: string | null
   available_channels?: Record<string, DiscordBackupChannel[]>
   selected_channels?: Record<string, string[]>
+  selected_channels_details?: Record<string, DiscordBackupChannel[]>
 }
 
 export interface DiscordBackupChannel {

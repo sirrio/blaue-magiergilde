@@ -29,20 +29,34 @@ class SettingsController extends Controller
                 'messages' => DiscordMessage::query()->count(),
                 'attachments' => DiscordMessageAttachment::query()->count(),
                 'last_synced_at' => DiscordChannel::query()->max('last_synced_at'),
-                'available_channels' => DiscordChannel::query()
-                    ->where('is_thread', false)
-                    ->orderBy('guild_id')
-                    ->orderBy('name')
-                    ->get(['id', 'guild_id', 'name', 'type', 'parent_id', 'is_thread'])
-                    ->groupBy('guild_id')
-                    ->map(fn ($channels) => $channels->values())
-                    ->toArray(),
                 'selected_channels' => DiscordBackupSetting::query()
                     ->get()
                     ->mapWithKeys(fn (DiscordBackupSetting $setting) => [
                         $setting->guild_id => $setting->channel_ids ?? [],
                     ])
                     ->toArray(),
+                'selected_channels_details' => (function () {
+                    $selectedIds = DiscordBackupSetting::query()
+                        ->pluck('channel_ids')
+                        ->filter()
+                        ->flatten()
+                        ->unique()
+                        ->values();
+
+                    if ($selectedIds->isEmpty()) {
+                        return [];
+                    }
+
+                    return DiscordChannel::query()
+                        ->whereIn('id', $selectedIds)
+                        ->where('is_thread', false)
+                        ->orderBy('guild_id')
+                        ->orderBy('name')
+                        ->get(['id', 'guild_id', 'name', 'type', 'parent_id', 'is_thread'])
+                        ->groupBy('guild_id')
+                        ->map(fn ($channels) => $channels->values())
+                        ->toArray();
+                })(),
             ],
         ]);
     }

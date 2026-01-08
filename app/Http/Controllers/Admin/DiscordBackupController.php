@@ -57,8 +57,23 @@ class DiscordBackupController extends Controller
         }
 
         if (! $response->ok()) {
+            $errorDetail = null;
+            try {
+                $payload = $response->json();
+                $errorDetail = is_array($payload) ? ($payload['error'] ?? null) : null;
+            } catch (\Throwable $error) {
+                $errorDetail = null;
+            }
+
+            $fallbackDetail = trim((string) $response->body());
+            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
+            $message = 'Bot-Request fehlgeschlagen.';
+            if ($detail) {
+                $message .= ' '.$detail;
+            }
+
             return redirect()->back()->withErrors([
-                'discord_backup' => 'Bot-Request fehlgeschlagen.',
+                'discord_backup' => $message,
             ]);
         }
 
