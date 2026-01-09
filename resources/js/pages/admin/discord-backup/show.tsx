@@ -16,7 +16,7 @@ export default function DiscordBackupShow({ channel, messages }: DiscordBackupSh
   return (
     <AppLayout>
       <Head title={`Discord Backup · ${channel.name}`} />
-      <div className="container mx-auto max-w-4xl space-y-4 px-4 py-6">
+      <div className="container mx-auto max-w-5xl space-y-4 px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-4">
           <div>
             <h1 className="text-2xl font-bold">{channel.name}</h1>

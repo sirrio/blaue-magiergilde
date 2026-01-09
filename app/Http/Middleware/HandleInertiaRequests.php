@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\CharacterClass;
+use App\Models\DiscordBackupSetting;
+use App\Models\DiscordChannel;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -39,6 +41,25 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
+        $handbookChannels = collect();
+
+        if ($request->user()) {
+            $selectedChannelIds = DiscordBackupSetting::query()
+                ->pluck('channel_ids')
+                ->filter()
+                ->flatten()
+                ->unique()
+                ->values();
+
+            if ($selectedChannelIds->isNotEmpty()) {
+                $handbookChannels = DiscordChannel::query()
+                    ->whereIn('id', $selectedChannelIds)
+                    ->where('is_thread', false)
+                    ->where('type', 'GuildText')
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+            }
+        }
 
         return [
             ...parent::share($request),
@@ -77,6 +98,7 @@ class HandleInertiaRequests extends Middleware
                 'ht' => 'High Tier',
                 'et' => 'Epic Tier',
             ],
+            'handbookChannels' => $handbookChannels,
         ];
     }
 }

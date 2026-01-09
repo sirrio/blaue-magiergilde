@@ -1,8 +1,7 @@
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupMessage } from '@/types'
-import { Head, Link } from '@inertiajs/react'
+import { Head } from '@inertiajs/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SyntheticEvent } from 'react'
 
@@ -409,115 +408,67 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
   return (
     <AppLayout>
       <Head title="Guild Handbook" />
-      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
           <h1 className="text-2xl font-bold">Guild Handbook</h1>
           <p className="text-sm text-base-content/70">
             Browse saved guild texts and linked threads in one place.
           </p>
+          {activeChannel ? (
+            <p className="text-xs text-base-content/60">Current channel: {activeChannel.name}</p>
+          ) : null}
         </section>
-        <div className="flex flex-col gap-4 md:flex-row">
-          <aside className="md:w-64">
-            <Card className="card-xs">
-              <CardBody>
-                <CardTitle>Channels</CardTitle>
-                <CardContent>
-                  {channels.length === 0 ? (
-                    <p className="text-xs text-base-content/60">No content saved yet.</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <select
-                        className="select select-sm md:hidden"
-                        value={activeChannelId ?? ''}
-                        onChange={(event) => {
-                          const channelId = event.target.value
-                          if (channelId) {
-                            window.location.href = route('rules.index', { channel: channelId })
-                          }
-                        }}
-                      >
-                        {channels.map((channel) => (
-                          <option key={channel.id} value={channel.id}>
-                            {channel.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ul className="menu hidden gap-1 md:flex" role="menu">
-                        {channels.map((channel) => (
-                          <li key={channel.id} role="none">
-                            <Link
-                              role="menuitem"
-                              className={cn(
-                                'truncate',
-                                channel.id === activeChannelId ? 'menu-active' : '',
-                              )}
-                              href={route('rules.index', { channel: channel.id })}
-                            >
-                              {channel.name}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
+        <Card className="card-xs">
+          <CardBody>
+            <CardTitle>{activeChannel ? activeChannel.name : 'Guild Handbook'}</CardTitle>
+            <CardContent>
+              {activeChannel ? (
+                <div className="space-y-6">
+                  <MessageList
+                    messages={messages}
+                    threadLinkMap={threadLinkMap}
+                    channelLinkMap={channelLinkMap}
+                    onThreadLinkClick={handleThreadLinkClick}
+                  />
+                  {threads.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold uppercase text-base-content/50">Threads</p>
+                      {threads.map((thread) => (
+                        <details
+                          key={thread.channel.id}
+                          id={`thread-${thread.channel.id}`}
+                          className="rounded-box border border-base-200 p-3"
+                          data-thread-id={thread.channel.id}
+                          open={openThreadId === thread.channel.id}
+                          onToggle={handleThreadToggle}
+                        >
+                          <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
+                            <span className="truncate">{thread.channel.name}</span>
+                            <span className="text-xs font-normal text-base-content/60">
+                              {thread.messages.length} Messages
+                            </span>
+                          </summary>
+                          <div className="mt-3">
+                            <MessageList
+                              messages={thread.messages}
+                              threadLinkMap={threadLinkMap}
+                              channelLinkMap={channelLinkMap}
+                              onThreadLinkClick={handleThreadLinkClick}
+                            />
+                          </div>
+                        </details>
+                      ))}
                     </div>
-                  )}
-                </CardContent>
-              </CardBody>
-            </Card>
-          </aside>
-          <section className="flex-1">
-            <Card className="card-xs">
-              <CardBody>
-                <CardTitle>{activeChannel ? activeChannel.name : 'Guild Handbook'}</CardTitle>
-                <CardContent>
-                  {activeChannel ? (
-                    <div className="space-y-6">
-                      <MessageList
-                        messages={messages}
-                        threadLinkMap={threadLinkMap}
-                        channelLinkMap={channelLinkMap}
-                        onThreadLinkClick={handleThreadLinkClick}
-                      />
-                      {threads.length > 0 ? (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold uppercase text-base-content/50">Threads</p>
-                          {threads.map((thread) => (
-                            <details
-                              key={thread.channel.id}
-                              id={`thread-${thread.channel.id}`}
-                              className="rounded-box border border-base-200 p-3"
-                              data-thread-id={thread.channel.id}
-                              open={openThreadId === thread.channel.id}
-                              onToggle={handleThreadToggle}
-                            >
-                              <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
-                                <span className="truncate">{thread.channel.name}</span>
-                                <span className="text-xs font-normal text-base-content/60">
-                                  {thread.messages.length} Messages
-                                </span>
-                              </summary>
-                              <div className="mt-3">
-                                <MessageList
-                                  messages={thread.messages}
-                                  threadLinkMap={threadLinkMap}
-                                  channelLinkMap={channelLinkMap}
-                                  onThreadLinkClick={handleThreadLinkClick}
-                                />
-                              </div>
-                            </details>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-base-content/60">
-                      No content found. Select text channels in Admin settings.
-                    </p>
-                  )}
-                </CardContent>
-              </CardBody>
-            </Card>
-          </section>
-        </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-base-content/60">
+                  No content found. Select text channels in Admin settings.
+                </p>
+              )}
+            </CardContent>
+          </CardBody>
+        </Card>
       </div>
     </AppLayout>
   )

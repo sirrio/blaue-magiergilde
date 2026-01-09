@@ -11,6 +11,8 @@ export interface PageProps {
   factions: object
   features: { discord: boolean; character_manager: boolean }
   discordConnected: boolean
+  handbookChannels?: { id: string; name: string }[]
+  activeChannelId?: string | null
   ziggy: Config & { location: string }
 
   [key: string]: unknown

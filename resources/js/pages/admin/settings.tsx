@@ -529,7 +529,7 @@ export default function Settings({
   return (
     <AppLayout>
       <Head title="Admin Settings" />
-      <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
           <h1 className="text-2xl font-bold">Admin Settings</h1>
           <p className="text-sm text-base-content/70">

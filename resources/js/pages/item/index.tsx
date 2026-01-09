@@ -76,7 +76,7 @@ export default function Index({ items }: { items: Item[] }) {
   return (
     <AppLayout>
       <Head title="Items" />
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
           <h1 className="text-2xl font-bold">Items</h1>
           <p className="text-sm text-base-content/70">Browse and filter the guild inventory.</p>

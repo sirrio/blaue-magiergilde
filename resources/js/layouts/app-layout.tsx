@@ -52,12 +52,24 @@ const adminLinks = [
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, features } = usePage<PageProps>().props
+  const { auth, discordConnected, features, handbookChannels, activeChannelId } = usePage<PageProps>().props
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
+  const handbookDesktopRef = useRef<HTMLDetailsElement>(null)
+  const handbookMobileRef = useRef<HTMLDetailsElement>(null)
   useClickOutside(adminDetailsRef, () =>
     adminDetailsRef.current?.removeAttribute('open')
   )
+  useClickOutside(handbookDesktopRef, () =>
+    handbookDesktopRef.current?.removeAttribute('open')
+  )
+  useClickOutside(handbookMobileRef, () =>
+    handbookMobileRef.current?.removeAttribute('open')
+  )
+
+  const handbookChannelList = handbookChannels ?? []
+  const showHandbookDropdown = handbookChannelList.length > 0
+  const handbookLabel = 'Guild Handbook'
 
   return (
     <div className={cn('bg-base-200 min-h-screen')}>
@@ -69,7 +81,33 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {menuLinks.map((menuLink) => (
-                <li key={menuLink.route} role="none">
+                menuLink.route === 'rules.index' && showHandbookDropdown ? (
+                  <li key={menuLink.route} role="none">
+                    <details ref={handbookMobileRef}>
+                      <summary className="flex items-center">
+                        <menuLink.icon size={16} className="mr-2" />
+                        {handbookLabel}
+                      </summary>
+                      <ul className="p-2">
+                        {handbookChannelList.map((channel) => (
+                          <li key={channel.id} role="none">
+                            <Link
+                              role="menuitem"
+                              className={cn(
+                                'truncate',
+                                channel.id === activeChannelId ? 'menu-active' : ''
+                              )}
+                              href={route('rules.index', { channel: channel.id })}
+                            >
+                              {channel.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                ) : (
+                  <li key={menuLink.route} role="none">
                     <Link
                       role="menuitem"
                       className={cn(
@@ -78,10 +116,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       )}
                       href={route(menuLink.route)}
                     >
-                    <menuLink.icon size={16} className="mr-2" />
+                      <menuLink.icon size={16} className="mr-2" />
                       {menuLink.name}
-                  </Link>
-                </li>
+                    </Link>
+                  </li>
+                )
               ))}
               {Boolean(auth.user.is_admin) && (
                 <li role="none">
@@ -120,20 +159,48 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="navbar-center hidden lg:flex">
           <ul className="menu menu-horizontal space-x-1 px-1" role="menubar">
             {menuLinks.map((menuLink) => (
-              <li key={menuLink.route} role="none">
-                <Link
-                  role="menuitem"
-                  method={menuLink.method}
-                  href={route(menuLink.route)}
+              menuLink.route === 'rules.index' && showHandbookDropdown ? (
+                <li key={menuLink.route} role="none">
+                  <details ref={handbookDesktopRef}>
+                    <summary className="flex items-center">
+                      <menuLink.icon size={16} className="mr-2" />
+                      {handbookLabel}
+                    </summary>
+                    <ul className="z-30 w-56 p-2">
+                      {handbookChannelList.map((channel) => (
+                        <li key={channel.id} role="none">
+                          <Link
+                            role="menuitem"
+                            method={menuLink.method}
+                            href={route('rules.index', { channel: channel.id })}
+                            className={cn(
+                              'truncate',
+                              channel.id === activeChannelId ? 'menu-active' : ''
+                            )}
+                          >
+                            {channel.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </li>
+              ) : (
+                <li key={menuLink.route} role="none">
+                  <Link
+                    role="menuitem"
+                    method={menuLink.method}
+                    href={route(menuLink.route)}
                     className={cn(
                       'flex items-center',
                       route().current(menuLink.route) ? 'menu-active' : ''
                     )}
-                >
-                  <menuLink.icon size={16} className="mr-2" />
-                  {menuLink.name}
-                </Link>
-              </li>
+                  >
+                    <menuLink.icon size={16} className="mr-2" />
+                    {menuLink.name}
+                  </Link>
+                </li>
+              )
             ))}
             {Boolean(auth.user.is_admin) && (
               <li role="none">
@@ -235,7 +302,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </nav>
       <main>
         {features.discord && !discordConnected && (
-          <div className="container mx-auto max-w-4xl px-2 pt-4 md:px-0">
+          <div className="container mx-auto max-w-5xl px-4 pt-4">
             <div className="alert alert-warning">
               <div>
                 <p className="font-semibold">Discord is not connected.</p>

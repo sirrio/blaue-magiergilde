@@ -52,7 +52,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
   return (
     <AppLayout>
       <Head title="Game Master Log" />
-      <div className="container mx-auto max-w-7xl space-y-8 px-4 py-6">
+      <div className="container mx-auto max-w-5xl space-y-8 px-4 py-6">
         <section className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">
