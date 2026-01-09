@@ -7,6 +7,7 @@ use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Item;
 use App\Models\Shop;
+use App\Models\ShopSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -65,6 +66,13 @@ class ShopController extends Controller
 
         return Inertia::render('shop/index', [
             'shops' => $shops,
+            'shopSettings' => ShopSetting::current()->only([
+                'post_channel_id',
+                'post_channel_name',
+                'post_channel_type',
+                'post_channel_guild_id',
+                'post_channel_is_thread',
+            ]),
         ]);
     }
 

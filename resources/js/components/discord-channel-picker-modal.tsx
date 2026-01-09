@@ -16,10 +16,7 @@ type GuildSelection = {
   channel_ids: string[]
 }
 
-type SingleSelection = {
-  guild_id: string
-  channel_id: string
-} | null
+type SingleSelection = DiscordBackupChannel | null
 
 type ChannelPickerProps = {
   title: string
@@ -288,7 +285,7 @@ export default function DiscordChannelPickerModal({
                         const channelLabel = buildChannelLabel(channel, channelLookup)
                         const checked =
                           mode === 'single'
-                            ? pendingSingle?.channel_id === channel.id
+                            ? pendingSingle?.id === channel.id
                             : (pendingByGuild[guildId] ?? []).includes(channel.id)
                         return (
                           <label key={channel.id} className="flex items-center gap-2 text-sm">
@@ -299,7 +296,7 @@ export default function DiscordChannelPickerModal({
                               checked={checked}
                               onChange={() => {
                                 if (mode === 'single') {
-                                  setPendingSingle({ guild_id: guildId, channel_id: channel.id })
+                                  setPendingSingle(channel)
                                 } else {
                                   togglePendingChannel(guildId, channel.id)
                                 }

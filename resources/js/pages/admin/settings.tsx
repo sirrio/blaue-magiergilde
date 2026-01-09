@@ -209,14 +209,14 @@ export default function Settings({
     (
       selection:
         | { guild_id: string; channel_ids: string[] }[]
-        | { guild_id: string; channel_id: string }
+        | DiscordBackupChannel
         | null
     ) => {
       if (!selection) return
 
       const normalized = Array.isArray(selection)
         ? selection
-        : [{ guild_id: selection.guild_id, channel_ids: [selection.channel_id] }]
+        : [{ guild_id: selection.guild_id, channel_ids: [selection.id] }]
 
       setSelectedByGuild((current) => {
         const next = { ...current }

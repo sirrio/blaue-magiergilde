@@ -27,7 +27,7 @@ class DiscordBackupSettingsController extends Controller
 
         if ($botUrl === '' || $botToken === '') {
             return response()->json([
-                'error' => 'Bot HTTP ist nicht konfiguriert.',
+                'error' => 'Bot HTTP is not configured.',
             ], 422);
         }
 
@@ -40,13 +40,13 @@ class DiscordBackupSettingsController extends Controller
                 ]);
         } catch (\Throwable $error) {
             return response()->json([
-                'error' => 'Bot ist nicht erreichbar.',
+                'error' => 'Bot is not reachable.',
             ], 503);
         }
 
         if (! $response->ok()) {
             return response()->json([
-                'error' => 'Bot-Request fehlgeschlagen.',
+                'error' => 'Bot request failed.',
             ], 502);
         }
 
@@ -54,7 +54,7 @@ class DiscordBackupSettingsController extends Controller
         $guilds = is_array($payload['guilds'] ?? null) ? $payload['guilds'] : null;
         if (! is_array($guilds)) {
             return response()->json([
-                'error' => 'Ungueltige Bot-Antwort.',
+                'error' => 'Invalid bot response.',
             ], 502);
         }
 
