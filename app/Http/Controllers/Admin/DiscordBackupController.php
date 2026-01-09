@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
+use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ class DiscordBackupController extends Controller
 
         if ($botUrl === '' || $botToken === '') {
             return redirect()->back()->withErrors([
-                'discord_backup' => 'Bot HTTP ist nicht konfiguriert.',
+                'discord_backup' => 'Bot HTTP is not configured.',
             ]);
         }
 
@@ -39,7 +40,7 @@ class DiscordBackupController extends Controller
 
         if ($guildSelections === []) {
             return redirect()->back()->withErrors([
-                'discord_backup' => 'Keine Backup-Channels ausgewaehlt.',
+                'discord_backup' => 'No backup channels selected.',
             ]);
         }
 
@@ -53,28 +54,13 @@ class DiscordBackupController extends Controller
                 ]);
         } catch (\Throwable $error) {
             return redirect()->back()->withErrors([
-                'discord_backup' => 'Bot ist nicht erreichbar.',
+                'discord_backup' => $this->buildBotExceptionMessage($error, 'Bot is not reachable.'),
             ]);
         }
 
         if (! $response->ok()) {
-            $errorDetail = null;
-            try {
-                $payload = $response->json();
-                $errorDetail = is_array($payload) ? ($payload['error'] ?? null) : null;
-            } catch (\Throwable $error) {
-                $errorDetail = null;
-            }
-
-            $fallbackDetail = trim((string) $response->body());
-            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
-            $message = 'Bot-Request fehlgeschlagen.';
-            if ($detail) {
-                $message .= ' '.$detail;
-            }
-
             return redirect()->back()->withErrors([
-                'discord_backup' => $message,
+                'discord_backup' => $this->buildBotRequestError($response, 'Bot request failed.'),
             ]);
         }
 
@@ -105,7 +91,7 @@ class DiscordBackupController extends Controller
 
         if ($botUrl === '' || $botToken === '') {
             return response()->json([
-                'error' => 'Bot HTTP ist nicht konfiguriert.',
+                'error' => 'Bot HTTP is not configured.',
             ], 422);
         }
 
@@ -116,13 +102,13 @@ class DiscordBackupController extends Controller
                 ->post(rtrim($botUrl, '/').'/discord-backup/status');
         } catch (\Throwable $error) {
             return response()->json([
-                'error' => 'Bot ist nicht erreichbar.',
+                'error' => $this->buildBotExceptionMessage($error, 'Bot is not reachable.'),
             ], 503);
         }
 
         if (! $response->ok()) {
             return response()->json([
-                'error' => 'Bot-Request fehlgeschlagen.',
+                'error' => $this->buildBotRequestError($response, 'Bot request failed.'),
             ], 502);
         }
 
@@ -130,7 +116,7 @@ class DiscordBackupController extends Controller
         $status = $payload['status'] ?? null;
         if (! is_array($status)) {
             return response()->json([
-                'error' => 'Ungueltige Bot-Antwort.',
+                'error' => 'Invalid bot response.',
             ], 502);
         }
 
@@ -149,13 +135,13 @@ class DiscordBackupController extends Controller
 
         if ($botUrl === '' || $botToken === '') {
             return response()->json([
-                'error' => 'Bot HTTP ist nicht konfiguriert.',
+                'error' => 'Bot HTTP is not configured.',
             ], 422);
         }
 
         if ($discordChannel->is_thread) {
             return response()->json([
-                'error' => 'Threads koennen nicht direkt synchronisiert werden.',
+                'error' => 'Threads cannot be synced directly.',
             ], 422);
         }
 
@@ -168,7 +154,7 @@ class DiscordBackupController extends Controller
 
         if (! $allowedIds->contains($discordChannel->id)) {
             return response()->json([
-                'error' => 'Channel ist nicht ausgewaehlt.',
+                'error' => 'Channel is not selected.',
             ], 403);
         }
 
@@ -187,31 +173,52 @@ class DiscordBackupController extends Controller
                 ]);
         } catch (\Throwable $error) {
             return response()->json([
-                'error' => 'Bot ist nicht erreichbar.',
+                'error' => $this->buildBotExceptionMessage($error, 'Bot is not reachable.'),
             ], 503);
         }
 
         if (! $response->ok()) {
-            $errorDetail = null;
-            try {
-                $payload = $response->json();
-                $errorDetail = is_array($payload) ? ($payload['error'] ?? null) : null;
-            } catch (\Throwable $error) {
-                $errorDetail = null;
-            }
-
-            $fallbackDetail = trim((string) $response->body());
-            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
-            $message = 'Bot-Request fehlgeschlagen.';
-            if ($detail) {
-                $message .= ' '.$detail;
-            }
-
             return response()->json([
-                'error' => $message,
+                'error' => $this->buildBotRequestError($response, 'Bot request failed.'),
             ], $response->status());
         }
 
         return response()->json(['status' => 'started']);
+    }
+
+    private function buildBotRequestError(HttpResponse $response, string $fallback): string
+    {
+        $detail = null;
+
+        try {
+            $payload = $response->json();
+            if (is_array($payload)) {
+                $detail = $payload['error'] ?? $payload['message'] ?? null;
+            }
+        } catch (\Throwable $error) {
+            $detail = null;
+        }
+
+        if (! $detail) {
+            $body = trim((string) $response->body());
+            $detail = $body !== '' ? $body : null;
+        }
+
+        $message = sprintf('%s (HTTP %d).', $fallback, $response->status());
+        if ($detail) {
+            $message .= ' '.$detail;
+        }
+
+        return $message;
+    }
+
+    private function buildBotExceptionMessage(\Throwable $error, string $fallback): string
+    {
+        $detail = trim((string) $error->getMessage());
+        if ($detail === '') {
+            return $fallback;
+        }
+
+        return $fallback.' '.$detail;
     }
 }

@@ -18,14 +18,14 @@ class VoiceSettingSyncController extends Controller
         $settings = VoiceSetting::current();
 
         if (! $settings->voice_channel_id) {
-            return response()->json(['error' => 'Keine Voice Channel ID gesetzt.'], 422);
+            return response()->json(['error' => 'No voice channel ID set.'], 422);
         }
 
         $botUrl = trim((string) config('services.bot.http_url', ''));
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
-            return response()->json(['error' => 'Bot HTTP ist nicht konfiguriert.'], 422);
+            return response()->json(['error' => 'Bot HTTP is not configured.'], 422);
         }
 
         try {
@@ -36,17 +36,39 @@ class VoiceSettingSyncController extends Controller
                     'channel_id' => $settings->voice_channel_id,
                 ]);
         } catch (\Throwable $error) {
-            return response()->json(['error' => 'Bot ist nicht erreichbar.'], 502);
+            $detail = trim((string) $error->getMessage());
+            $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
+            return response()->json(['error' => $message], 502);
         }
 
         if (! $response->ok()) {
-            return response()->json(['error' => 'Bot-Request fehlgeschlagen.'], 502);
+            $detail = null;
+            try {
+                $payload = $response->json();
+                if (is_array($payload)) {
+                    $detail = $payload['error'] ?? $payload['message'] ?? null;
+                }
+            } catch (\Throwable $error) {
+                $detail = null;
+            }
+
+            if (! $detail) {
+                $body = trim((string) $response->body());
+                $detail = $body !== '' ? $body : null;
+            }
+
+            $message = sprintf('Bot request failed. (HTTP %d).', $response->status());
+            if ($detail) {
+                $message .= ' '.$detail;
+            }
+
+            return response()->json(['error' => $message], 502);
         }
 
         $payload = $response->json();
         $members = is_array($payload['members'] ?? null) ? $payload['members'] : null;
         if (! is_array($members)) {
-            return response()->json(['error' => 'Ungueltige Bot-Antwort.'], 502);
+            return response()->json(['error' => 'Invalid bot response.'], 502);
         }
 
         return response()->json([
