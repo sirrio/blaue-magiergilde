@@ -1,5 +1,6 @@
 const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
+const { postAuctionToChannel } = require('./auctionPoster');
 const { postShopToChannel } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
@@ -99,8 +100,9 @@ function startHttpServer(client) {
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isShopPost = path === '/shop-post';
+        const isAuctionPost = path === '/auction-post';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isAuctionPost)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -314,6 +316,48 @@ function startHttpServer(client) {
             logReject(req, 'invalid channel_id');
             respondJson(res, 422, { error: 'Invalid channel_id.' });
             return;
+        }
+
+        if (isAuctionPost) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const auctionId = Number(payload?.auction_id || 0);
+
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            if (!Number.isFinite(auctionId) || auctionId <= 0) {
+                logReject(req, 'invalid auction_id');
+                respondJson(res, 422, { error: 'Invalid auction_id.' });
+                return;
+            }
+
+            try {
+                const result = await postAuctionToChannel({
+                    client,
+                    channelId,
+                    auctionId,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'auction post failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Auction post failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'posted',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch (error) {
+                logReject(req, 'auction post failed');
+                respondJson(res, 500, { error: 'Auction post failed.' });
+                return;
+            }
         }
 
         const { snapshot, error } = await getSnapshot(channelId, client);

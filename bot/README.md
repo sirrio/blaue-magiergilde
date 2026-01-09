@@ -54,7 +54,7 @@ Setze folgende Variablen in der Root-`.env`:
 - `DISCORD_OWNER_IDS` - kommaseparierte Discord User IDs (Owner-only Commands)
 - `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
 
-- `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (voice sync + shop posting + backup).
+- `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (voice sync + shop/auction posting + backup).
 - `BOT_HTTP_URL` - base URL for the bot HTTP server (no path, e.g. `http://127.0.0.1:3125`).
 - `BOT_HTTP_HOST` - optional: listen host override (default: 127.0.0.1).
 - `BOT_HTTP_PORT` - optional: listen port override (default: 3125).

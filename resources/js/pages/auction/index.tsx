@@ -4,13 +4,14 @@ import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
+import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionVoiceCandidate, Item, VoiceSettings } from '@/types'
-import { Head, Link, router, useForm } from '@inertiajs/react'
+import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps, VoiceSettings } from '@/types'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Copy, EyeOff, FlaskRound, History, Plus, ScrollText, Sword, Trash2 } from 'lucide-react'
+import { Copy, EyeOff, FlaskRound, History, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -759,19 +760,35 @@ export default function Index({
   auctions,
   items,
   voiceSettings: initialVoiceSettings,
+  auctionSettings,
 }: {
   auctions: Auction[]
   items: Item[]
   voiceSettings: VoiceSettings
+  auctionSettings: AuctionSettings
 }) {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(auctions[0] ?? null)
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(initialVoiceSettings)
   const [voiceCandidates, setVoiceCandidates] = useState<AuctionVoiceCandidate[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isPostingAuction, setIsPostingAuction] = useState(false)
+  const [isSavingChannel, setIsSavingChannel] = useState(false)
+  const [postChannel, setPostChannel] = useState<AuctionSettings>(auctionSettings ?? {})
+  const [showSettings, setShowSettings] = useState(false)
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
   const voiceChannelIdRef = useRef<string | null>(initialVoiceSettings?.voice_channel_id ?? null)
+  const { auth } = usePage<PageProps>().props
+  const isAdmin = Boolean(auth?.user?.is_admin)
+  const {
+    data: voiceForm,
+    setData: setVoiceForm,
+    patch: patchVoiceSettings,
+    processing: isSavingVoice,
+  } = useForm({
+    voice_channel_id: initialVoiceSettings?.voice_channel_id ?? '',
+  })
 
   useEffect(() => {
     setSelectedAuction((prev) => {
@@ -787,12 +804,20 @@ export default function Index({
     const prevChannelId = voiceChannelIdRef.current
 
     setVoiceSettings(initialVoiceSettings)
+    setVoiceForm('voice_channel_id', nextChannelId ?? '')
 
     if (nextChannelId !== prevChannelId) {
       setVoiceCandidates([])
       voiceChannelIdRef.current = nextChannelId
     }
-  }, [initialVoiceSettings])
+  }, [initialVoiceSettings, setVoiceForm])
+
+  useEffect(() => {
+    setPostChannel(auctionSettings ?? {})
+    if (!auctionSettings?.post_channel_id) {
+      setShowSettings(true)
+    }
+  }, [auctionSettings])
 
   useEffect(() => {
     return () => {
@@ -814,6 +839,110 @@ export default function Index({
       toast.show('Auction copied', 'info')
     })
   }
+
+  const handlePostChannelSelect = useCallback(
+    async (
+      selection:
+        | DiscordBackupChannel
+        | { guild_id: string; channel_ids: string[] }[]
+        | null
+    ) => {
+      if (!selection || Array.isArray(selection)) return
+      if (isSavingChannel) return
+
+      const csrfToken = getCsrfToken()
+      if (!csrfToken) {
+        toast.show('Missing CSRF token.', 'error')
+        return
+      }
+
+      setIsSavingChannel(true)
+      const payload = {
+        post_channel_id: selection.id,
+        post_channel_name: selection.name,
+        post_channel_type: selection.type,
+        post_channel_guild_id: selection.guild_id,
+        post_channel_is_thread: selection.is_thread,
+      }
+
+      try {
+        const response = await fetch(route('auction-settings.update'), {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload),
+        })
+
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          toast.show(String(data?.error ?? 'Channel could not be saved.'), 'error')
+          return
+        }
+
+        setPostChannel({
+          post_channel_id: selection.id,
+          post_channel_name: selection.name,
+          post_channel_type: selection.type,
+          post_channel_guild_id: selection.guild_id,
+          post_channel_is_thread: selection.is_thread,
+        })
+        toast.show('Posting channel saved.', 'info')
+      } catch (error) {
+        toast.show('Channel could not be saved.', 'error')
+      } finally {
+        setIsSavingChannel(false)
+      }
+    },
+    [isSavingChannel],
+  )
+
+  const handlePostAuction = useCallback(async () => {
+    if (!selectedAuction) {
+      toast.show('Select an auction first.', 'error')
+      return
+    }
+    if (isPostingAuction) return
+    if (!postChannel.post_channel_id) {
+      toast.show('Select a posting channel first.', 'error')
+      return
+    }
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setIsPostingAuction(true)
+    try {
+      const response = await fetch(route('auctions.post', selectedAuction.id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ channel_id: postChannel.post_channel_id }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.error ?? 'Auction could not be posted.'), 'error')
+        return
+      }
+
+      toast.show('Auction post started.', 'info')
+    } catch (error) {
+      toast.show('Auction could not be posted.', 'error')
+    } finally {
+      setIsPostingAuction(false)
+    }
+  }, [isPostingAuction, postChannel.post_channel_id, selectedAuction])
 
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
@@ -922,6 +1051,19 @@ export default function Index({
 
   const manualCooldownLabel = manualCooldownRemaining > 0 ? `Refresh (${manualCooldownRemaining}s)` : 'Refresh'
 
+  const handleSaveVoiceSettings = () => {
+    patchVoiceSettings(route('voice-settings.update'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Settings saved.', 'info')
+        router.reload({ only: ['voiceSettings'] })
+      },
+      onError: () => {
+        toast.show('Settings could not be saved.', 'error')
+      },
+    })
+  }
+
   useEffect(() => {
     if (!voiceSettings.voice_channel_id) return
 
@@ -951,9 +1093,66 @@ export default function Index({
       <Head title="Auctions" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Auctions</h1>
-          <p className="text-sm text-base-content/70">Manage auctions, bids, and live voice candidates.</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Auctions</h1>
+              <p className="text-sm text-base-content/70">Manage auctions, bids, and live voice candidates.</p>
+            </div>
+            {isAdmin ? (
+              <Button size="sm" variant="ghost" onClick={() => setShowSettings((prev) => !prev)} className="gap-2">
+                <Settings size={16} />
+                Settings
+              </Button>
+            ) : null}
+          </div>
         </section>
+        {isAdmin && showSettings ? (
+          <div className="rounded-box border border-base-200 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-base-content/70">Posting channel</p>
+                <p className="text-sm font-semibold">
+                  {postChannel.post_channel_name ?? postChannel.post_channel_id ?? 'No channel selected'}
+                </p>
+              </div>
+              <DiscordChannelPickerModal
+                title="Select posting channel"
+                description="Choose where the auction should be posted."
+                confirmLabel="Save channel"
+                includeThreads={false}
+                enableThreadLoader
+                threadLoadIncludeArchived
+                threadLoadIncludePrivate={false}
+                mode="single"
+                allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+                triggerClassName="gap-2"
+                triggerSize="sm"
+                triggerVariant="outline"
+                triggerDisabled={isSavingChannel}
+                onConfirm={handlePostChannelSelect}
+              >
+                <Send size={16} />
+                Select channel
+              </DiscordChannelPickerModal>
+            </div>
+            <div className="mt-4">
+              <p className="text-xs text-base-content/70">
+                The voice channel ID controls the live candidate list in auctions.
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <Input
+                  value={voiceForm.voice_channel_id}
+                  onChange={(e) => setVoiceForm('voice_channel_id', e.target.value)}
+                >
+                  Voice Channel ID
+                </Input>
+                <Button size="sm" variant="outline" onClick={handleSaveVoiceSettings} disabled={isSavingVoice}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div className="join flex items-end">
           <Select className="join-item w-full" value={selectedAuction?.id || ''} onChange={onAuctionSelectChange}>
             <SelectLabel>Auctions</SelectLabel>
@@ -974,6 +1173,17 @@ export default function Index({
                 <Copy size={16} />
                 Copy for Discord
               </Button>
+              {isAdmin ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePostAuction}
+                  disabled={!postChannel.post_channel_id || isPostingAuction}
+                >
+                  <Send size={16} />
+                  Post auction
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 color="warning"

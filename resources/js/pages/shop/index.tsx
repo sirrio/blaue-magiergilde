@@ -8,7 +8,7 @@ import ItemRow from '@/pages/item/item-row'
 import { DiscordBackupChannel, PageProps, Shop, ShopSettings } from '@/types'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Send, Store } from 'lucide-react'
+import { Send, Settings, Store } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
@@ -16,6 +16,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const [isPosting, setIsPosting] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [postChannel, setPostChannel] = useState<ShopSettings>(shopSettings ?? {})
+  const [showSettings, setShowSettings] = useState(false)
   const { auth } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
 
@@ -30,6 +31,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
   useEffect(() => {
     setPostChannel(shopSettings ?? {})
+    if (!shopSettings?.post_channel_id) {
+      setShowSettings(true)
+    }
   }, [shopSettings])
 
   const formatShopCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
@@ -159,8 +163,18 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       <Head title="Shop" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Shop</h1>
-          <p className="text-sm text-base-content/70">Roll new shops and review the current inventory.</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Shop</h1>
+              <p className="text-sm text-base-content/70">Roll new shops and review the current inventory.</p>
+            </div>
+            {isAdmin ? (
+              <Button size="sm" variant="ghost" onClick={() => setShowSettings((prev) => !prev)} className="gap-2">
+                <Settings size={16} />
+                Settings
+              </Button>
+            ) : null}
+          </div>
         </section>
         <div className="join flex items-end">
           <Select className="join-item w-full" value={selectedShop?.id || ''} onChange={onShopSelectChange}>
@@ -178,6 +192,29 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
             Roll a new shop
           </Button>
         </div>
+        {isAdmin && showSettings ? (
+          <div className="rounded-box border border-base-200 p-3">
+            <DiscordChannelPickerModal
+              title="Select posting channel"
+              description="Choose where the shop should be posted."
+              confirmLabel="Save channel"
+              includeThreads={false}
+              enableThreadLoader
+              threadLoadIncludeArchived
+              threadLoadIncludePrivate={false}
+              mode="single"
+              allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+              triggerClassName="gap-2"
+              triggerSize="sm"
+              triggerVariant="outline"
+              triggerDisabled={isSavingChannel}
+              onConfirm={handlePostChannelSelect}
+            >
+              <Send size={18} />
+              Select channel
+            </DiscordChannelPickerModal>
+          </div>
+        ) : null}
         {isAdmin ? (
           <div className="rounded-box border border-base-200 p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -187,27 +224,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                   {postChannel.post_channel_name ?? postChannel.post_channel_id ?? 'No channel selected'}
                 </p>
               </div>
-              <DiscordChannelPickerModal
-                title="Select posting channel"
-                description="Choose where the shop should be posted."
-                confirmLabel="Save channel"
-                includeThreads={false}
-                enableThreadLoader
-                threadLoadIncludeArchived
-                threadLoadIncludePrivate={false}
-                mode="single"
-                allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
-                triggerClassName="gap-2"
-                triggerSize="sm"
-                triggerVariant="outline"
-                triggerDisabled={isSavingChannel}
-                onConfirm={handlePostChannelSelect}
-              >
-                <Send size={18} />
-                Select channel
-              </DiscordChannelPickerModal>
-            </div>
-            <div className="mt-3 flex justify-end">
               <Button
                 size="sm"
                 variant="outline"

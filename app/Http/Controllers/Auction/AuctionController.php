@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\StoreAuctionRequest;
 use App\Http\Requests\Auction\UpdateAuctionRequest;
 use App\Models\Auction;
+use App\Models\AuctionSetting;
 use App\Models\Item;
 use App\Models\VoiceSetting;
 use Illuminate\Http\RedirectResponse;
@@ -52,11 +53,19 @@ class AuctionController extends Controller
             ->get();
 
         $voiceSettings = VoiceSetting::current();
+        $auctionSettings = AuctionSetting::current();
 
         return Inertia::render('auction/index', [
             'auctions' => $auctions,
             'items' => $items,
             'voiceSettings' => $voiceSettings,
+            'auctionSettings' => $auctionSettings->only([
+                'post_channel_id',
+                'post_channel_name',
+                'post_channel_type',
+                'post_channel_guild_id',
+                'post_channel_is_thread',
+            ]),
         ]);
     }
 

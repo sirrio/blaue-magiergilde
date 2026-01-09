@@ -92,6 +92,14 @@ export interface ShopSettings {
   post_channel_is_thread?: boolean | null
 }
 
+export interface AuctionSettings {
+  post_channel_id?: string | null
+  post_channel_name?: string | null
+  post_channel_type?: string | null
+  post_channel_guild_id?: string | null
+  post_channel_is_thread?: boolean | null
+}
+
 export interface DiscordBackupStats {
   channels: number
   messages: number
