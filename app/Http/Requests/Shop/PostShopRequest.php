@@ -11,7 +11,7 @@ class PostShopRequest extends FormRequest
     {
         $user = Auth::user();
 
-        return $user?->is_admin === true;
+        return (bool) ($user?->is_admin ?? false);
     }
 
     public function rules(): array
