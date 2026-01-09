@@ -8,6 +8,8 @@ use App\Http\Controllers\Auction\AuctionPostController;
 use App\Http\Controllers\Auction\AuctionSettingController;
 use Illuminate\Support\Facades\Route;
 
+Route::pattern('auction', '[0-9]+');
+
 Route::resource('auctions', AuctionController::class)->only([
     'index',
     'store',
