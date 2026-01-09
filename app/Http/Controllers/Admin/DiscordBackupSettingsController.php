@@ -33,8 +33,10 @@ class DiscordBackupSettingsController extends Controller
             ], 422);
         }
 
+        $timeout = $includeThreads ? 30 : 15;
+
         try {
-            $response = Http::timeout(15)
+            $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-channels', [
