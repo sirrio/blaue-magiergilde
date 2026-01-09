@@ -1,3 +1,4 @@
+const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const snapshots = new Map();
 const lastFetch = new Map();
 const FETCH_COOLDOWN_MS = 60000;
@@ -47,6 +48,7 @@ function handleVoiceStateUpdate(oldState, newState) {
 }
 
 async function getSnapshot(channelId, client) {
+    attachRateLimitListener(client);
     const cached = snapshots.get(String(channelId));
     if (cached) return { snapshot: cached };
 
@@ -65,6 +67,7 @@ async function getSnapshot(channelId, client) {
     lastFetch.set(String(channelId), now);
 
     try {
+        await waitForDiscordRateLimit(client);
         const fetched = await client.channels.fetch(String(channelId));
         if (!fetched || typeof fetched.isVoiceBased !== 'function' || !fetched.isVoiceBased()) {
             return { error: 'Channel is not voice-based.' };

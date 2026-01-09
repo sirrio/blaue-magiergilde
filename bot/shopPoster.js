@@ -1,4 +1,5 @@
 const { ChannelType } = require('discord.js');
+const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
 
 function missingPermissions(permissions, required) {
@@ -105,6 +106,7 @@ async function fetchShopItems(shopId) {
 async function resolveDestination({ client, channelId, shop, threadName }) {
     let target;
     try {
+        await waitForDiscordRateLimit(client);
         target = await client.channels.fetch(channelId);
     } catch (error) {
         return { error: 'Channel not found.', status: 404 };
@@ -114,6 +116,7 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
         return { error: 'Channel must belong to a guild.', status: 422 };
     }
 
+    await waitForDiscordRateLimit(client);
     const botMember = target.guild.members.me ?? await target.guild.members.fetchMe();
 
     if (target.type === ChannelType.GuildText || target.type === ChannelType.GuildAnnouncement) {
@@ -135,6 +138,7 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
         const defaultThreadName = `Shop #${String(shop.id).padStart(3, '0')} - ${dateForName}`;
         const resolvedThreadName = (threadName || defaultThreadName).slice(0, 100);
 
+        await waitForDiscordRateLimit(client);
         const thread = await target.threads.create({
             name: resolvedThreadName,
             autoArchiveDuration: 1440,
@@ -159,6 +163,7 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
 
     if (target.type === ChannelType.PrivateThread) {
         try {
+            await waitForDiscordRateLimit(client);
             await target.members.fetch(botMember.id);
         } catch (error) {
             return {
@@ -177,6 +182,7 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
 
 async function sendOneLine(destination, line) {
     if (!line) return;
+    await waitForDiscordRateLimit(destination.client);
     await destination.send(String(line));
 }
 
@@ -188,6 +194,7 @@ async function sendLines(destination, lines) {
 }
 
 async function postShopToChannel({ client, channelId, shopId, threadName }) {
+    attachRateLimitListener(client);
     const shop = await fetchShop(shopId);
     if (!shop) {
         return { ok: false, status: 404, error: `Shop #${shopId} not found.` };

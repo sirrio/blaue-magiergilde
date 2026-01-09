@@ -1,4 +1,5 @@
 const { ChannelType } = require('discord.js');
+const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const { guildIds } = require('./config');
 
 const DEFAULT_BATCH_SIZE = 100;
@@ -101,6 +102,7 @@ async function fetchChannelState(appUrl, token, guildId) {
 
 async function resolveSingleChannel(client, channelId) {
     try {
+        await waitForDiscordRateLimit(client);
         return await client.channels.fetch(channelId);
     } catch (error) {
         console.warn(`[bot] Discord backup: failed to fetch channel ${channelId}.`, error);
@@ -165,6 +167,7 @@ async function backupChannelSet(channels, guildId, appUrl, token) {
 }
 
 async function listDiscordChannels(client, allowedGuildIds, options = {}) {
+    attachRateLimitListener(client);
     const guildList = allowedGuildIds && allowedGuildIds.length ? allowedGuildIds : resolveGuildIds(client);
     const includeThreads = Boolean(options?.includeThreads);
     const includeArchivedThreads = Boolean(options?.includeArchivedThreads);
@@ -174,12 +177,14 @@ async function listDiscordChannels(client, allowedGuildIds, options = {}) {
     for (const guildId of guildList) {
         let guild;
         try {
+            await waitForDiscordRateLimit(client);
             guild = await client.guilds.fetch(guildId);
         } catch (error) {
             console.warn(`[bot] Discord channels: failed to fetch guild ${guildId}.`, error);
             continue;
         }
 
+        await waitForDiscordRateLimit(client);
         const guildChannels = await guild.channels.fetch();
         const channels = [];
 
@@ -222,8 +227,10 @@ async function listDiscordChannels(client, allowedGuildIds, options = {}) {
 }
 
 async function listChannelThreads(client, channelId, options = {}) {
+    attachRateLimitListener(client);
     let channel;
     try {
+        await waitForDiscordRateLimit(client);
         channel = await client.channels.fetch(channelId);
     } catch (error) {
         return { ok: false, status: 404, error: 'Channel not found.' };
@@ -326,6 +333,7 @@ async function collectThreads(channel, options = {}) {
     const includePrivate = Boolean(options.includePrivate);
 
     try {
+        await waitForDiscordRateLimit(channel.client);
         const active = await channel.threads.fetchActive();
         threads.push(...active.threads.values());
     } catch (error) {
@@ -336,6 +344,7 @@ async function collectThreads(channel, options = {}) {
         const archivedTypes = includePrivate ? ['public', 'private'] : ['public'];
         for (const type of archivedTypes) {
             try {
+                await waitForDiscordRateLimit(channel.client);
                 const archived = await channel.threads.fetchArchived({ type, fetchAll: true });
                 threads.push(...archived.threads.values());
             } catch (error) {
@@ -349,6 +358,7 @@ async function collectThreads(channel, options = {}) {
 
 async function collectChannels(guild, allowedChannelIds) {
     const channels = new Map();
+    await waitForDiscordRateLimit(guild.client);
     const guildChannels = await guild.channels.fetch();
 
     for (const channel of guildChannels.values()) {
@@ -428,6 +438,7 @@ async function backupChannelMessages(channel, guildId, lastMessageId, appUrl, to
             options.before = cursor;
         }
 
+        await waitForDiscordRateLimit(channel.client);
         const batch = await channel.messages.fetch(options);
         if (!batch.size) {
             break;
@@ -449,6 +460,7 @@ async function backupChannelMessages(channel, guildId, lastMessageId, appUrl, to
 }
 
 async function runDiscordBackup(client, appUrl, allowlistByGuild) {
+    attachRateLimitListener(client);
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!token) {
         console.warn('[bot] BOT_HTTP_TOKEN missing; cannot push backups to app.');
@@ -467,6 +479,7 @@ async function runDiscordBackup(client, appUrl, allowlistByGuild) {
     for (const guildId of guildList) {
         let guild;
         try {
+            await waitForDiscordRateLimit(client);
             guild = await client.guilds.fetch(guildId);
         } catch (error) {
             console.warn(`[bot] Discord backup: failed to fetch guild ${guildId}.`, error);
@@ -517,6 +530,7 @@ async function runDiscordBackup(client, appUrl, allowlistByGuild) {
 }
 
 async function runSingleChannelBackup(client, appUrl, channelId, guildId, allowlistByGuild) {
+    attachRateLimitListener(client);
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!token) {
         console.warn('[bot] BOT_HTTP_TOKEN missing; cannot push backups to app.');
@@ -580,6 +594,7 @@ async function runSingleChannelBackup(client, appUrl, channelId, guildId, allowl
 }
 
 function startDiscordBackup(client, appUrl, allowlistByGuild) {
+    attachRateLimitListener(client);
     if (isRunning) {
         return { started: false, error: 'Backup already running.' };
     }
@@ -617,6 +632,7 @@ function startDiscordBackup(client, appUrl, allowlistByGuild) {
 }
 
 function startDiscordBackupChannel(client, appUrl, channelId, guildId, allowlistByGuild) {
+    attachRateLimitListener(client);
     if (isRunning) {
         return { started: false, error: 'Backup already running.' };
     }

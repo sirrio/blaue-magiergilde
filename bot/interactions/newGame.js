@@ -7,9 +7,12 @@ const {
     TextInputBuilder,
     TextInputStyle,
 } = require('discord.js');
+const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
 const { pendingGames } = require('../state');
 
 async function handle(interaction) {
+    attachRateLimitListener(interaction?.client);
+
     if (interaction.isButton() && interaction.customId.startsWith('tier_')) {
         const [, id, tier] = interaction.customId.split('_');
         const data = pendingGames.get(id);
@@ -129,7 +132,9 @@ async function handle(interaction) {
         const formattedDate = `${date.toLocaleString('de-DE', { day: '2-digit' })}. ${date.toLocaleString('de-DE', { month: 'long' })} ${date.toLocaleString('de-DE', { year: 'numeric' })} ${date.toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
 
         const announcement = `${tiers} - ${formattedDate} - von <@${data.userId}> - ${mention} - ${text}`;
+        await waitForDiscordRateLimit(interaction.client);
         const msg = await interaction.channel.send(announcement);
+        await waitForDiscordRateLimit(interaction.client);
         await msg.startThread({ name: 'Spiel-Thread', autoArchiveDuration: 1440 });
 
         if (data.commandInteraction) {
@@ -145,4 +150,3 @@ async function handle(interaction) {
 }
 
 module.exports = { handle };
-
