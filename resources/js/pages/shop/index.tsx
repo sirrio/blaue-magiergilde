@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerFooter, DrawerTitle } from '@/components/ui/drawer'
 import { List } from '@/components/ui/list'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
@@ -168,7 +167,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
   const hasPostDestination = Boolean(postChannel.post_channel_id)
-  const destinationActionLabel = hasPostDestination ? 'Change destination' : 'Set destination'
+  const settingsLabel = isSettingsOpen ? 'Hide settings' : 'Settings'
   const shopLabel = selectedShop
     ? `Shop #${String(selectedShop.id).padStart(3, '0')} - ${formatShopCreatedAt(selectedShop.created_at)}`
     : 'No shop selected'
@@ -202,14 +201,19 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-xs uppercase text-base-content/50">Discord</p>
-                <h2 className="text-lg font-semibold">Shop posting</h2>
+                <h2 className="text-lg font-semibold">Discord actions</h2>
                 <p className="text-xs text-base-content/70">
-                  Select a destination and post the currently selected shop.
+                  Send the current data to Discord.
                 </p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setIsSettingsOpen(true)} className="gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsSettingsOpen((prev) => !prev)}
+                className="gap-2"
+              >
                 <Settings size={16} />
-                Settings
+                {settingsLabel}
               </Button>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -221,13 +225,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
               >
                 <Send size={16} className="mr-2" />
                 Post shop
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsSettingsOpen(true)}
-              >
-                {destinationActionLabel}
               </Button>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-base-content/60">
@@ -250,22 +247,24 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
             ) : null}
           </div>
         ) : null}
-        <List>
-          {selectedShop?.shop_items.map((si) => (
-            <ItemRow key={si.id} item={si.item} shopItem={si} />
-          ))}
-        </List>
-      </div>
-      {isAdmin ? (
-        <Drawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
-          <DrawerTitle>Shop settings</DrawerTitle>
-          <DrawerContent>
-            <div className="space-y-4">
+        {isAdmin && isSettingsOpen ? (
+          <div className="rounded-box border border-base-200 bg-base-100 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-xs uppercase text-base-content/50">Settings</p>
+                <h2 className="text-lg font-semibold">Channels</h2>
+                <p className="text-xs text-base-content/70">
+                  Choose which channels to use.
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setIsSettingsOpen(false)}>
+                Hide settings
+              </Button>
+            </div>
+            <div className="mt-3 space-y-3">
               <div>
                 <p className="text-xs text-base-content/70">Posting destination</p>
-                <p className="text-sm font-semibold">
-                  {destinationText}
-                </p>
+                <p className="text-sm font-semibold">{destinationText}</p>
               </div>
               <DiscordChannelPickerModal
                 title="Select posting channel"
@@ -287,16 +286,14 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 Select channel
               </DiscordChannelPickerModal>
             </div>
-          </DrawerContent>
-          <DrawerFooter>
-            <div className="flex justify-end">
-              <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(false)}>
-                Done
-              </Button>
-            </div>
-          </DrawerFooter>
-        </Drawer>
-      ) : null}
+          </div>
+        ) : null}
+        <List>
+          {selectedShop?.shop_items.map((si) => (
+            <ItemRow key={si.id} item={si.item} shopItem={si} />
+          ))}
+        </List>
+      </div>
     </AppLayout>
   )
 }

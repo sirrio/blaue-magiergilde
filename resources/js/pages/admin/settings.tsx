@@ -1,26 +1,19 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
-import { Drawer, DrawerContent, DrawerFooter, DrawerTitle } from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
-import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps, VoiceSettings } from '@/types'
+import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps } from '@/types'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react'
 import { Settings as SettingsIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-export default function Settings({
-  voiceSettings,
+export default function Backup({
   discordBackup,
 }: {
-  voiceSettings: VoiceSettings
   discordBackup: DiscordBackupStats
 }) {
-  const { data, setData, patch, processing, errors } = useForm({
-    voice_channel_id: voiceSettings?.voice_channel_id ?? '',
-  })
   const { errors: pageErrors } = usePage<PageProps>().props
   const backupForm = useForm({})
   const deleteForm = useForm({})
@@ -33,6 +26,7 @@ export default function Settings({
   const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const [isBackupSettingsOpen, setIsBackupSettingsOpen] = useState(false)
+  const settingsLabel = isBackupSettingsOpen ? 'Hide settings' : 'Settings'
   const statusIntervalRef = useRef<number | null>(null)
 
   const getCsrfToken = useCallback(() => {
@@ -83,10 +77,6 @@ export default function Settings({
     },
     [getCsrfToken],
   )
-
-  useEffect(() => {
-    setData('voice_channel_id', voiceSettings?.voice_channel_id ?? '')
-  }, [setData, voiceSettings?.voice_channel_id])
 
   useEffect(() => {
     setSelectedByGuild(discordBackup.selected_channels ?? {})
@@ -165,18 +155,6 @@ export default function Settings({
 
   const isChannelSelected = (guildId: string, channelId: string) =>
     (selectedByGuild[guildId] ?? []).includes(channelId)
-
-  const handleSubmit = () => {
-    patch(route('voice-settings.update'), {
-      preserveScroll: true,
-      onSuccess: () => {
-        toast.show('Settings saved.', 'info')
-      },
-      onError: () => {
-        toast.show('Settings could not be saved.', 'error')
-      },
-    })
-  }
 
   const toggleChannel = (guildId: string, channelId: string) => {
     setSelectedByGuild((current) => {
@@ -384,56 +362,37 @@ export default function Settings({
 
   return (
     <AppLayout>
-      <Head title="Admin Settings" />
+      <Head title="Backup" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Admin Settings</h1>
+          <h1 className="text-2xl font-bold">Backup</h1>
           <p className="text-sm text-base-content/70">
-            Manage Discord integrations and backup preferences for the guild.
+            Manage Discord backup preferences for the guild.
           </p>
         </section>
         <Card className="card-xs">
           <CardBody>
-            <CardTitle>Discord Bot</CardTitle>
+            <CardTitle>Discord Backup</CardTitle>
             <CardContent>
-              <p className="text-xs text-base-content/70">
-                The voice channel ID controls the live candidate list in auctions.
-              </p>
-              <div className="mt-3 flex flex-wrap items-end gap-2">
-                <Input
-                  errors={errors.voice_channel_id}
-                  value={data.voice_channel_id}
-                  onChange={(e) => setData('voice_channel_id', e.target.value)}
-                >
-                  Voice Channel ID
-                </Input>
-                <Button size="sm" variant="outline" onClick={handleSubmit} disabled={processing}>
-                  Save
-                </Button>
-              </div>
-            </CardContent>
-          </CardBody>
-        </Card>
-        <Card className="card-xs">
-          <CardBody>
-            <CardTitle>
-              <div className="flex items-center justify-between gap-2">
-                <span>Discord Backup</span>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase text-base-content/50">Discord</p>
+                  <h2 className="text-lg font-semibold">Discord actions</h2>
+                  <p className="text-xs text-base-content/70">
+                    Back up selected text channels and threads, including attachments.
+                  </p>
+                </div>
                 <Button
-                  size="xs"
+                  size="sm"
                   variant="ghost"
-                  modifier="square"
-                  onClick={() => setIsBackupSettingsOpen(true)}
+                  onClick={() => setIsBackupSettingsOpen((prev) => !prev)}
+                  className="gap-2"
                 >
                   <SettingsIcon size={16} />
+                  {settingsLabel}
                 </Button>
               </div>
-            </CardTitle>
-            <CardContent>
-              <p className="text-xs text-base-content/70">
-                Backs up selected text channels and threads, including attachments. Backups can be deleted manually.
-              </p>
-              <div className="mt-3 grid gap-2 text-sm">
+              <div className="mt-4 grid gap-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-base-content/70">Channels</span>
                   <span className="font-semibold">{discordBackup.channels}</span>
@@ -495,9 +454,6 @@ export default function Settings({
                 >
                   Start backup
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsBackupSettingsOpen(true)}>
-                  Manage channels
-                </Button>
                 <Button size="sm" variant="outline" as={Link} href={route('rules.index')}>
                   Open handbook
                 </Button>
@@ -508,63 +464,72 @@ export default function Settings({
             </CardContent>
           </CardBody>
         </Card>
-      </div>
-      <Drawer isOpen={isBackupSettingsOpen} onClose={() => setIsBackupSettingsOpen(false)} wide>
-        <DrawerTitle>Backup settings</DrawerTitle>
-        <DrawerContent>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">Selected channels</p>
-            <DiscordChannelPickerModal
-              title="Add backup channels"
-              description="Select the text channels to include in backups. Threads are captured automatically."
-              confirmLabel="Add channels"
-              excludedByGuild={selectedByGuild}
-              onConfirm={handleAddChannels}
-            >
-              Add channels
-            </DiscordChannelPickerModal>
-          </div>
-          {selectedChannelsFlat.length === 0 ? (
-            <p className="mt-3 text-xs text-base-content/70">No channels selected yet.</p>
-          ) : (
-            <div className="mt-3 flex flex-col gap-2">
-              {selectedChannelsFlat.map((channel) => (
-                <div key={channel.id} className="flex items-center gap-2 text-sm">
-                  <label className="flex flex-1 items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-xs"
-                      checked={isChannelSelected(channel.guild_id, channel.id)}
-                      onChange={() => toggleChannel(channel.guild_id, channel.id)}
-                    />
-                    <span className="truncate">{channel.name}</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-base-content/60">
-                      {formatTimestamp(channel.last_synced_at)}
-                    </span>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => void handleChannelSync(channel)}
-                      disabled={isBackupRunning || syncingChannelId === channel.id}
-                    >
-                      {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
+        {isBackupSettingsOpen ? (
+          <div className="rounded-box border border-base-200 bg-base-100 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-xs uppercase text-base-content/50">Settings</p>
+                <h2 className="text-lg font-semibold">Channels</h2>
+                <p className="text-xs text-base-content/70">
+                  Choose which channels to use.
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setIsBackupSettingsOpen(false)}>
+                Hide settings
+              </Button>
             </div>
-          )}
-        </DrawerContent>
-        <DrawerFooter>
-          <div className="flex justify-end">
-            <Button size="sm" variant="outline" onClick={handleSaveSelection} disabled={selectionForm.processing}>
-              Save selection
-            </Button>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">Selected channels</p>
+              <DiscordChannelPickerModal
+                title="Add backup channels"
+                description="Select the text channels to include in backups. Threads are captured automatically."
+                confirmLabel="Add channels"
+                excludedByGuild={selectedByGuild}
+                onConfirm={handleAddChannels}
+              >
+                Add channels
+              </DiscordChannelPickerModal>
+            </div>
+            {selectedChannelsFlat.length === 0 ? (
+              <p className="mt-3 text-xs text-base-content/70">No channels selected yet.</p>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2">
+                {selectedChannelsFlat.map((channel) => (
+                  <div key={channel.id} className="flex items-center gap-2 text-sm">
+                    <label className="flex flex-1 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-xs"
+                        checked={isChannelSelected(channel.guild_id, channel.id)}
+                        onChange={() => toggleChannel(channel.guild_id, channel.id)}
+                      />
+                      <span className="truncate">{channel.name}</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-base-content/60">
+                        {formatTimestamp(channel.last_synced_at)}
+                      </span>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => void handleChannelSync(channel)}
+                        disabled={isBackupRunning || syncingChannelId === channel.id}
+                      >
+                        {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end">
+              <Button size="sm" variant="outline" onClick={handleSaveSelection} disabled={selectionForm.processing}>
+                Save selection
+              </Button>
+            </div>
           </div>
-        </DrawerFooter>
-      </Drawer>
+        ) : null}
+      </div>
     </AppLayout>
   )
 }

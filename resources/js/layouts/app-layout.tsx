@@ -43,7 +43,7 @@ const authLinks = [
 ]
 
 const adminLinks = [
-  { name: 'Settings', route: 'admin.settings', method: 'get' as const, icon: Settings },
+  { name: 'Backup', route: 'admin.settings', method: 'get' as const, icon: Settings },
   { name: 'Items', route: 'items.index', method: 'get' as const, icon: Package },
   { name: 'Spells', route: 'spells.index', method: 'get' as const, icon: Sparkles },
   { name: 'Shop', route: 'shops.index', method: 'get' as const, icon: Store },

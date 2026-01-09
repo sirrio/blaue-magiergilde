@@ -7,14 +7,13 @@ use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
-use App\Models\VoiceSetting;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SettingsController extends Controller
 {
     /**
-     * Display the admin settings page.
+     * Display the admin backup page.
      */
     public function index(): Response
     {
@@ -23,7 +22,6 @@ class SettingsController extends Controller
         abort_unless($user && $user->is_admin, 403);
 
         return Inertia::render('admin/settings', [
-            'voiceSettings' => VoiceSetting::current(),
             'discordBackup' => [
                 'channels' => DiscordChannel::query()->count(),
                 'messages' => DiscordMessage::query()->count(),
