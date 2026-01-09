@@ -1,5 +1,6 @@
 const http = require('node:http');
 const { getBackupStatus, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
+const { postShopToChannel } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
@@ -96,8 +97,9 @@ function startHttpServer(client) {
         const isDiscordChannels = path === '/discord-channels';
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
+        const isShopPost = path === '/shop-post';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordBackupStatus && !isDiscordBackupChannel)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -138,7 +140,8 @@ function startHttpServer(client) {
         if (isDiscordChannels) {
             const allowedGuildIds = Array.isArray(payload?.guild_ids) ? payload.guild_ids.map(String) : null;
             try {
-                const guilds = await listDiscordChannels(client, allowedGuildIds);
+                const includeThreads = Boolean(payload?.include_threads);
+                const guilds = await listDiscordChannels(client, allowedGuildIds, { includeThreads });
                 respondJson(res, 200, { guilds });
             } catch (error) {
                 logReject(req, 'failed to list channels');
@@ -222,6 +225,50 @@ function startHttpServer(client) {
 
             respondJson(res, 202, { status: 'started' });
             return;
+        }
+
+        if (isShopPost) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const shopId = Number(payload?.shop_id || 0);
+            const threadName = typeof payload?.thread_name === 'string' ? payload.thread_name.trim() : '';
+
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            if (!Number.isFinite(shopId) || shopId <= 0) {
+                logReject(req, 'invalid shop_id');
+                respondJson(res, 422, { error: 'Invalid shop_id.' });
+                return;
+            }
+
+            try {
+                const result = await postShopToChannel({
+                    client,
+                    channelId,
+                    shopId,
+                    threadName,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'shop post failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Shop post failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'posted',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch (error) {
+                logReject(req, 'shop post failed');
+                respondJson(res, 500, { error: 'Shop post failed.' });
+                return;
+            }
         }
 
         const channelId = String(payload?.channel_id || '').trim();

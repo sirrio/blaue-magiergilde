@@ -164,8 +164,9 @@ async function backupChannelSet(channels, guildId, appUrl, token) {
     }
 }
 
-async function listDiscordChannels(client, allowedGuildIds) {
+async function listDiscordChannels(client, allowedGuildIds, options = {}) {
     const guildList = allowedGuildIds && allowedGuildIds.length ? allowedGuildIds : resolveGuildIds(client);
+    const includeThreads = Boolean(options?.includeThreads);
     const guilds = [];
 
     for (const guildId of guildList) {
@@ -191,8 +192,22 @@ async function listDiscordChannels(client, allowedGuildIds) {
                 name: channel.name || channel.id,
                 type: resolveChannelType(channel),
                 parent_id: channel.parentId || null,
-                is_thread: false,
+                is_thread: Boolean(channel.isThread?.()),
             });
+
+            if (includeThreads && shouldIncludeSelectableChannel(channel) && channel.threads) {
+                const threads = await collectThreads(channel);
+                for (const thread of threads) {
+                    channels.push({
+                        id: thread.id,
+                        guild_id: guildId,
+                        name: thread.name || thread.id,
+                        type: resolveChannelType(thread),
+                        parent_id: thread.parentId || null,
+                        is_thread: true,
+                    });
+                }
+            }
         }
 
         guilds.push({ guild_id: guildId, channels });

@@ -1,18 +1,22 @@
 import { Button } from '@/components/ui/button'
 import { List } from '@/components/ui/list'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
+import { toast } from '@/components/ui/toast'
+import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
-import { Shop } from '@/types'
-import { Head, router } from '@inertiajs/react'
+import { PageProps, Shop } from '@/types'
+import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Store } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import { Send, Store } from 'lucide-react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 export default function Index({ shops }: { shops: Shop[] }) {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(shops[0] ?? null)
+  const [isPosting, setIsPosting] = useState(false)
+  const { auth } = usePage<PageProps>().props
+  const isAdmin = Boolean(auth?.user?.is_admin)
 
-   
   useEffect(() => {
     setSelectedShop((prev) => {
       if (prev) {
@@ -33,6 +37,61 @@ export default function Index({ shops }: { shops: Shop[] }) {
   const handleCreateShop = (): void => {
     router.post(route('shops.store'), {}, { preserveState: false, preserveScroll: true })
   }
+
+  const getCsrfToken = useCallback(() => {
+    if (typeof document === 'undefined') return ''
+    const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
+    return meta?.content ?? ''
+  }, [])
+
+  const handlePostShop = useCallback(
+    async (
+      selection:
+        | { guild_id: string; channel_id: string }
+        | { guild_id: string; channel_ids: string[] }[]
+        | null
+    ) => {
+      if (!selection || Array.isArray(selection)) return
+      if (!selectedShop) {
+        toast.show('Select a shop first.', 'error')
+        return
+      }
+      if (isPosting) return
+
+      const csrfToken = getCsrfToken()
+      if (!csrfToken) {
+        toast.show('Missing CSRF token.', 'error')
+        return
+      }
+
+      setIsPosting(true)
+      try {
+        const response = await fetch(route('shops.post', selectedShop.id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ channel_id: selection.channel_id }),
+        })
+
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          toast.show(String(payload?.error ?? 'Shop could not be posted.'), 'error')
+          return
+        }
+
+        toast.show('Shop post started.', 'info')
+      } catch (error) {
+        toast.show('Shop could not be posted.', 'error')
+      } finally {
+        setIsPosting(false)
+      }
+    },
+    [getCsrfToken, isPosting, selectedShop],
+  )
 
   return (
     <AppLayout>
@@ -57,6 +116,24 @@ export default function Index({ shops }: { shops: Shop[] }) {
             <Store size={'18'}></Store>
             Roll a new shop
           </Button>
+          {isAdmin ? (
+            <DiscordChannelPickerModal
+              title="Post shop"
+              description="Select a channel or thread to post the selected shop."
+              confirmLabel="Post shop"
+              includeThreads
+              mode="single"
+              allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+              triggerClassName="join-item gap-2"
+              triggerSize="md"
+              triggerVariant="outline"
+              triggerDisabled={!selectedShop || isPosting}
+              onConfirm={handlePostShop}
+            >
+              <Send size={18} />
+              Post shop
+            </DiscordChannelPickerModal>
+          ) : null}
         </div>
         <List>
           {selectedShop?.shop_items.map((si) => (

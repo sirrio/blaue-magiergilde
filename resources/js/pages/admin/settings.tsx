@@ -3,6 +3,7 @@ import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
+import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps, VoiceSettings } from '@/types'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react'
@@ -24,8 +25,6 @@ export default function Settings({
   const selectionForm = useForm({
     guilds: [] as { guild_id: string; channel_ids: string[] }[],
   })
-  const [availableChannelGroups, setAvailableChannelGroups] = useState<Record<string, DiscordBackupChannel[]>>({})
-  const [isRefreshingChannels, setIsRefreshingChannels] = useState(false)
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
@@ -132,16 +131,12 @@ export default function Settings({
   const mergedChannelGroups = useMemo(() => {
     const merged: Record<string, DiscordBackupChannel[]> = {}
     const guildIds = new Set<string>([
-      ...Object.keys(availableChannelGroups),
       ...Object.keys(selectedChannelDetails),
       ...Object.keys(selectedByGuild),
     ])
 
     guildIds.forEach((guildId) => {
       const channelMap = new Map<string, DiscordBackupChannel>()
-      ;(availableChannelGroups[guildId] ?? []).forEach((channel) => {
-        channelMap.set(channel.id, channel)
-      })
       ;(selectedChannelDetails[guildId] ?? []).forEach((channel) => {
         if (!channelMap.has(channel.id)) {
           channelMap.set(channel.id, channel)
@@ -163,7 +158,7 @@ export default function Settings({
     })
 
     return merged
-  }, [availableChannelGroups, selectedChannelDetails, selectedByGuild])
+  }, [selectedChannelDetails, selectedByGuild])
 
   const isChannelSelected = (guildId: string, channelId: string) =>
     (selectedByGuild[guildId] ?? []).includes(channelId)
@@ -178,52 +173,6 @@ export default function Settings({
         toast.show('Settings could not be saved.', 'error')
       },
     })
-  }
-
-  const handleRefreshChannels = async () => {
-    if (isRefreshingChannels) return
-
-    const csrfToken = getCsrfToken()
-    if (!csrfToken) {
-      toast.show('Missing CSRF token.', 'error')
-      return
-    }
-
-    setIsRefreshingChannels(true)
-
-    try {
-      const response = await fetch(route('discord-backup.channels.refresh'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': csrfToken,
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({}),
-      })
-
-      const payload = await response.json()
-      if (!response.ok) {
-        toast.show(String(payload?.error ?? 'Channel list could not be loaded.'), 'error')
-        return
-      }
-
-      const guilds = Array.isArray(payload?.guilds) ? payload.guilds : []
-      const nextGroups: Record<string, DiscordBackupChannel[]> = {}
-
-      guilds.forEach((guild) => {
-        if (!guild?.guild_id || !Array.isArray(guild?.channels)) return
-        nextGroups[String(guild.guild_id)] = guild.channels as DiscordBackupChannel[]
-      })
-
-      setAvailableChannelGroups(nextGroups)
-      toast.show('Channel list updated.', 'info')
-    } catch (error) {
-      toast.show('Channel list could not be loaded.', 'error')
-    } finally {
-      setIsRefreshingChannels(false)
-    }
   }
 
   const toggleChannel = (guildId: string, channelId: string) => {
@@ -255,6 +204,34 @@ export default function Settings({
       },
     })
   }
+
+  const handleAddChannels = useCallback(
+    (
+      selection:
+        | { guild_id: string; channel_ids: string[] }[]
+        | { guild_id: string; channel_id: string }
+        | null
+    ) => {
+      if (!selection) return
+
+      const normalized = Array.isArray(selection)
+        ? selection
+        : [{ guild_id: selection.guild_id, channel_ids: [selection.channel_id] }]
+
+      setSelectedByGuild((current) => {
+        const next = { ...current }
+        normalized.forEach((entry) => {
+          const existing = new Set(next[entry.guild_id] ?? [])
+          entry.channel_ids.forEach((id) => existing.add(id))
+          next[entry.guild_id] = Array.from(existing)
+        })
+        return next
+      })
+
+      toast.show('Channels added.', 'info')
+    },
+    [],
+  )
 
   const handleBackupStart = () => {
     backupForm.post(route('discord-backup.store'), {
@@ -367,62 +344,6 @@ export default function Settings({
     [fetchBackupStatus, getCsrfToken, syncingChannelId, router],
   )
 
-  const buildGroupedList = (
-    guildId: string,
-    channels: DiscordBackupChannel[],
-    mode: 'selected' | 'available',
-  ) => {
-    const selectedSet = new Set(selectedByGuild[guildId] ?? [])
-    const categories = new Map<string, string>()
-    channels.forEach((channel) => {
-      if (channel.type === 'GuildCategory') {
-        categories.set(channel.id, channel.name)
-      }
-    })
-
-    const filtered = channels.filter((channel) => {
-      if (channel.type === 'GuildCategory') return true
-      const isSelected = selectedSet.has(channel.id)
-      return mode === 'selected' ? isSelected : !isSelected
-    })
-
-    const grouped = new Map<string, { id: string | null; name: string; channels: DiscordBackupChannel[] }>()
-    filtered.forEach((channel) => {
-      if (channel.type === 'GuildCategory') return
-
-      const categoryId = channel.parent_id && categories.has(channel.parent_id) ? channel.parent_id : null
-      const key = categoryId ?? 'uncategorized'
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          id: categoryId,
-          name: categoryId ? categories.get(categoryId) ?? channel.parent_id ?? 'Category' : 'Uncategorized',
-          channels: [],
-        })
-      }
-      grouped.get(key)?.channels.push(channel)
-    })
-
-    return Array.from(grouped.values())
-      .map((group) => ({
-        ...group,
-        channels: [...group.channels].sort((a, b) => a.name.localeCompare(b.name)),
-      }))
-      .sort((a, b) => {
-        if (a.id === null && b.id !== null) return 1
-        if (a.id !== null && b.id === null) return -1
-        return a.name.localeCompare(b.name)
-      })
-  }
-
-  const availableGuildEntries = (Object.entries(availableChannelGroups) as [string, DiscordBackupChannel[]][])
-    .map(([guildId, channels]) => {
-      const availableCount = channels.filter(
-        (channel) => channel.type !== 'GuildCategory' && !isChannelSelected(guildId, channel.id),
-      ).length
-      return availableCount > 0 ? [guildId, channels] : null
-    })
-    .filter(Boolean) as [string, DiscordBackupChannel[]][]
-
   const selectedChannelsFlat = useMemo(() => {
     const selected = new Map<string, DiscordBackupChannel>()
     const lookup = new Map<string, DiscordBackupChannel>()
@@ -450,81 +371,6 @@ export default function Settings({
 
     return Array.from(selected.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [mergedChannelGroups, selectedByGuild])
-
-  const renderGuildGroups = (entries: [string, DiscordBackupChannel[]][], mode: 'selected' | 'available') => {
-    return (
-      <div className="mt-3 flex flex-col gap-4">
-        {entries.map(([guildId, channels]) => {
-          const selectedCount = (selectedByGuild[guildId] ?? []).length
-          const availableCount = channels.filter(
-            (channel) => channel.type !== 'GuildCategory' && !isChannelSelected(guildId, channel.id),
-          ).length
-          const summaryCount = mode === 'selected' ? selectedCount : availableCount
-
-          return (
-            <details
-              key={`${mode}-${guildId}`}
-              className="rounded-box border border-base-200 p-3"
-              defaultOpen={mode === 'selected' && summaryCount > 0}
-            >
-              <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
-                <span>Guild {guildId}</span>
-                <span className="text-xs font-normal text-base-content/60">{summaryCount}</span>
-              </summary>
-              <div className="mt-3 flex flex-col gap-3">
-                {buildGroupedList(guildId, channels, mode).map((group) => (
-                  <details
-                    key={`${mode}-${guildId}-${group.id ?? 'uncategorized'}`}
-                    className="rounded-box border border-base-200/70 p-2"
-                    defaultOpen={mode === 'selected' && group.channels.length > 0}
-                  >
-                    <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-base-content/70">
-                      <span className="truncate">{group.name}</span>
-                      <span className="text-[11px] font-normal text-base-content/60">{group.channels.length}</span>
-                    </summary>
-                    <div className="mt-2 grid gap-2">
-                      {group.channels.map((channel) => (
-                        <div key={channel.id} className="flex items-center gap-2 text-sm">
-                          <label className="flex flex-1 items-center gap-2">
-                            <input
-                              type="checkbox"
-                              className="checkbox checkbox-xs"
-                              checked={isChannelSelected(guildId, channel.id)}
-                              onChange={() => toggleChannel(guildId, channel.id)}
-                            />
-                            <span className="truncate">{channel.name}</span>
-                          </label>
-                          {mode === 'selected' ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-base-content/60">
-                                {formatTimestamp(channel.last_synced_at)}
-                              </span>
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                onClick={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  void handleChannelSync(channel)
-                                }}
-                                disabled={isBackupRunning || syncingChannelId === channel.id}
-                              >
-                                {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            </details>
-          )
-        })}
-      </div>
-    )
-  }
 
   return (
     <AppLayout>
@@ -606,7 +452,18 @@ export default function Settings({
                 </div>
               ) : null}
               <div className="mt-4 rounded-box border border-base-200 p-3">
-                <p className="text-sm font-semibold">Selected channels</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Selected channels</p>
+                  <DiscordChannelPickerModal
+                    title="Add backup channels"
+                    description="Select the text channels to include in backups. Threads are captured automatically."
+                    confirmLabel="Add channels"
+                    excludedByGuild={selectedByGuild}
+                    onConfirm={handleAddChannels}
+                  >
+                    Add channels
+                  </DiscordChannelPickerModal>
+                </div>
                 {selectedChannelsFlat.length === 0 ? (
                   <p className="mt-3 text-xs text-base-content/70">No channels selected yet.</p>
                 ) : (
@@ -638,26 +495,6 @@ export default function Settings({
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-              <div className="mt-4 rounded-box border border-base-200 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">Available channels</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleRefreshChannels}
-                    disabled={isRefreshingChannels}
-                  >
-                    Load channels
-                  </Button>
-                </div>
-                {availableGuildEntries.length === 0 ? (
-                  <p className="mt-3 text-xs text-base-content/70">
-                    No additional channels loaded. Click &quot;Load channels&quot;.
-                  </p>
-                ) : (
-                  renderGuildGroups(availableGuildEntries, 'available')
                 )}
               </div>
               <div className="mt-3 flex justify-end">

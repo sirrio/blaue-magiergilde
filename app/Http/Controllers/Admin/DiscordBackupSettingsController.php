@@ -20,6 +20,8 @@ class DiscordBackupSettingsController extends Controller
         $user = request()->user();
         abort_unless($user && $user->is_admin, 403);
 
+        $includeThreads = request()->boolean('include_threads', false);
+
         $botUrl = trim((string) config('services.bot.http_url', ''));
         $botToken = trim((string) config('services.bot.http_token', ''));
 
@@ -33,7 +35,9 @@ class DiscordBackupSettingsController extends Controller
             $response = Http::timeout(15)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
-                ->post(rtrim($botUrl, '/').'/discord-channels');
+                ->post(rtrim($botUrl, '/').'/discord-channels', [
+                    'include_threads' => $includeThreads,
+                ]);
         } catch (\Throwable $error) {
             return response()->json([
                 'error' => 'Bot ist nicht erreichbar.',
