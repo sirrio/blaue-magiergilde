@@ -21,6 +21,8 @@ class DiscordBackupSettingsController extends Controller
         abort_unless($user && $user->is_admin, 403);
 
         $includeThreads = request()->boolean('include_threads', false);
+        $includeArchivedThreads = request()->boolean('include_archived_threads', false);
+        $includePrivateThreads = request()->boolean('include_private_threads', false);
 
         $botUrl = trim((string) config('services.bot.http_url', ''));
         $botToken = trim((string) config('services.bot.http_token', ''));
@@ -37,6 +39,8 @@ class DiscordBackupSettingsController extends Controller
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-channels', [
                     'include_threads' => $includeThreads,
+                    'include_archived_threads' => $includeArchivedThreads,
+                    'include_private_threads' => $includePrivateThreads,
                 ]);
         } catch (\Throwable $error) {
             return response()->json([

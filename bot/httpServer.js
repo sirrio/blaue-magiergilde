@@ -141,7 +141,13 @@ function startHttpServer(client) {
             const allowedGuildIds = Array.isArray(payload?.guild_ids) ? payload.guild_ids.map(String) : null;
             try {
                 const includeThreads = Boolean(payload?.include_threads);
-                const guilds = await listDiscordChannels(client, allowedGuildIds, { includeThreads });
+                const includeArchivedThreads = Boolean(payload?.include_archived_threads);
+                const includePrivateThreads = Boolean(payload?.include_private_threads);
+                const guilds = await listDiscordChannels(client, allowedGuildIds, {
+                    includeThreads,
+                    includeArchivedThreads,
+                    includePrivateThreads,
+                });
                 respondJson(res, 200, { guilds });
             } catch (error) {
                 logReject(req, 'failed to list channels');

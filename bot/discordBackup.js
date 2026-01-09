@@ -167,6 +167,8 @@ async function backupChannelSet(channels, guildId, appUrl, token) {
 async function listDiscordChannels(client, allowedGuildIds, options = {}) {
     const guildList = allowedGuildIds && allowedGuildIds.length ? allowedGuildIds : resolveGuildIds(client);
     const includeThreads = Boolean(options?.includeThreads);
+    const includeArchivedThreads = Boolean(options?.includeArchivedThreads);
+    const includePrivateThreads = Boolean(options?.includePrivateThreads);
     const guilds = [];
 
     for (const guildId of guildList) {
@@ -196,7 +198,10 @@ async function listDiscordChannels(client, allowedGuildIds, options = {}) {
             });
 
             if (includeThreads && shouldIncludeSelectableChannel(channel) && channel.threads) {
-                const threads = await collectThreads(channel);
+                const threads = await collectThreads(channel, {
+                    includeArchived: includeArchivedThreads,
+                    includePrivate: includePrivateThreads,
+                });
                 for (const thread of threads) {
                     channels.push({
                         id: thread.id,
@@ -278,10 +283,12 @@ function shouldFetchMessages(channel) {
     return Boolean(channel.isTextBased?.());
 }
 
-async function collectThreads(channel) {
+async function collectThreads(channel, options = {}) {
     if (!channel.threads) return [];
 
     const threads = [];
+    const includeArchived = options.includeArchived !== false;
+    const includePrivate = Boolean(options.includePrivate);
 
     try {
         const active = await channel.threads.fetchActive();
@@ -290,12 +297,15 @@ async function collectThreads(channel) {
         console.warn('[bot] Discord backup: failed to fetch active threads.', error);
     }
 
-    for (const type of ['public', 'private']) {
-        try {
-            const archived = await channel.threads.fetchArchived({ type, fetchAll: true });
-            threads.push(...archived.threads.values());
-        } catch (error) {
-            console.warn(`[bot] Discord backup: failed to fetch archived threads (${type}).`, error);
+    if (includeArchived) {
+        const archivedTypes = includePrivate ? ['public', 'private'] : ['public'];
+        for (const type of archivedTypes) {
+            try {
+                const archived = await channel.threads.fetchArchived({ type, fetchAll: true });
+                threads.push(...archived.threads.values());
+            } catch (error) {
+                console.warn(`[bot] Discord backup: failed to fetch archived threads (${type}).`, error);
+            }
         }
     }
 

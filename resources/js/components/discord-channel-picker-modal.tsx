@@ -23,6 +23,8 @@ type ChannelPickerProps = {
   description?: string
   confirmLabel?: string
   includeThreads?: boolean
+  includeArchivedThreads?: boolean
+  includePrivateThreads?: boolean
   mode?: SelectionMode
   excludedByGuild?: Record<string, string[]>
   allowedChannelTypes?: string[]
@@ -122,6 +124,8 @@ export default function DiscordChannelPickerModal({
   description,
   confirmLabel,
   includeThreads = false,
+  includeArchivedThreads = false,
+  includePrivateThreads = false,
   mode = 'multiple',
   excludedByGuild,
   allowedChannelTypes,
@@ -171,8 +175,12 @@ export default function DiscordChannelPickerModal({
           'X-CSRF-TOKEN': csrfToken,
         },
         credentials: 'same-origin',
-        body: JSON.stringify({ include_threads: includeThreads }),
-      })
+          body: JSON.stringify({
+            include_threads: includeThreads,
+            include_archived_threads: includeArchivedThreads,
+            include_private_threads: includePrivateThreads,
+          }),
+        })
 
       const payload = await response.json()
       if (!response.ok) {
