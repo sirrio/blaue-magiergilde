@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
+import { Card, CardBody, CardContent } from '@/components/ui/card'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel } from '@/types'
 import { Head, Link } from '@inertiajs/react'
@@ -17,16 +17,18 @@ export default function DiscordBackupIndex({ channels, selected }: DiscordBackup
   return (
     <AppLayout>
       <Head title="Discord Backup" />
-      <div className="container mx-auto max-w-4xl px-2 py-4 md:px-0">
+      <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Discord Backup</h1>
+          <p className="text-sm text-base-content/70">
+            Saved channel content. Only admins have access.
+          </p>
+        </section>
         <Card className="card-xs">
           <CardBody>
-            <CardTitle>Discord Backup</CardTitle>
             <CardContent>
-              <p className="text-xs text-base-content/70">
-                Gesicherte Channel-Inhalte. Nur Admins haben Zugriff.
-              </p>
               {channels.length === 0 ? (
-                <p className="mt-4 text-sm text-base-content/70">Noch keine Backups vorhanden.</p>
+                <p className="mt-4 text-sm text-base-content/70">No backups available yet.</p>
               ) : (
                 <div className="mt-4 flex flex-col gap-2">
                   {channels.map((channel) => (
@@ -48,7 +50,7 @@ export default function DiscordBackupIndex({ channels, selected }: DiscordBackup
                           </span>
                         )}
                         <Button size="sm" variant="outline" as={Link} href={route('admin.discord-backup.show', channel.id)}>
-                          Anzeigen
+                          View
                         </Button>
                       </div>
                     </div>

@@ -82,8 +82,12 @@ export default function Index({ spells }: { spells: Spell[] }) {
   return (
     <AppLayout>
       <Head title="Spells" />
-      <div className="container mx-auto max-w-2xl px-2 py-4 md:px-0">
-        <Card className="card-xs mb-6">
+      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Spells</h1>
+          <p className="text-sm text-base-content/70">Search the spell list by school or level.</p>
+        </section>
+        <Card className="card-xs">
           <CardBody>
             <CardContent>
               <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>

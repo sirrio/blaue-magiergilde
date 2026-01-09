@@ -346,7 +346,7 @@ const MessageList = ({
   )
 
   if (visibleMessages.length === 0) {
-    return <p className="text-xs text-base-content/60">Keine Nachrichten.</p>
+    return <p className="text-xs text-base-content/60">No messages.</p>
   }
 
   return (
@@ -409,15 +409,21 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
   return (
     <AppLayout>
       <Head title="Guild Handbook" />
-      <div className="container mx-auto flex max-w-6xl flex-col gap-4 px-2 py-4 md:px-0">
+      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Guild Handbook</h1>
+          <p className="text-sm text-base-content/70">
+            Browse saved guild texts and linked threads in one place.
+          </p>
+        </section>
         <div className="flex flex-col gap-4 md:flex-row">
           <aside className="md:w-64">
             <Card className="card-xs">
               <CardBody>
-                <CardTitle>Guild Handbook</CardTitle>
+                <CardTitle>Channels</CardTitle>
                 <CardContent>
                   {channels.length === 0 ? (
-                    <p className="text-xs text-base-content/60">Keine Inhalte gespeichert.</p>
+                    <p className="text-xs text-base-content/60">No content saved yet.</p>
                   ) : (
                     <div className="flex flex-col gap-2">
                       <select
@@ -504,7 +510,7 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                     </div>
                   ) : (
                     <p className="text-sm text-base-content/60">
-                      Keine Inhalte gefunden. Waehle im Admin-Bereich die Text-Channels aus.
+                      No content found. Select text channels in Admin settings.
                     </p>
                   )}
                 </CardContent>

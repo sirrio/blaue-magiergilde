@@ -76,8 +76,12 @@ export default function Index({ items }: { items: Item[] }) {
   return (
     <AppLayout>
       <Head title="Items" />
-      <div className="container mx-auto max-w-2xl px-2 py-4 md:px-0">
-        <Card className="card-xs mb-6">
+      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Items</h1>
+          <p className="text-sm text-base-content/70">Browse and filter the guild inventory.</p>
+        </section>
+        <Card className="card-xs">
           <CardBody>
             <CardContent>
               <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>

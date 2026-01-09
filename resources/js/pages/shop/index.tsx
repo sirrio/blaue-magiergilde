@@ -37,8 +37,12 @@ export default function Index({ shops }: { shops: Shop[] }) {
   return (
     <AppLayout>
       <Head title="Shop" />
-      <div className="container mx-auto max-w-2xl px-2 py-4 md:px-0">
-        <div className="join mb-6 flex items-end">
+      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Shop</h1>
+          <p className="text-sm text-base-content/70">Roll new shops and review the current inventory.</p>
+        </section>
+        <div className="join flex items-end">
           <Select className="join-item w-full" value={selectedShop?.id || ''} onChange={onShopSelectChange}>
             <SelectLabel>Shops</SelectLabel>
             <SelectOptions>

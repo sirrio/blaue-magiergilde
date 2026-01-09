@@ -529,7 +529,13 @@ export default function Settings({
   return (
     <AppLayout>
       <Head title="Admin Settings" />
-      <div className="container mx-auto flex max-w-2xl flex-col gap-4 px-2 py-4 md:px-0">
+      <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Admin Settings</h1>
+          <p className="text-sm text-base-content/70">
+            Manage Discord integrations and backup preferences for the guild.
+          </p>
+        </section>
         <Card className="card-xs">
           <CardBody>
             <CardTitle>Discord Bot</CardTitle>

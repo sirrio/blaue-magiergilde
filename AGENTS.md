@@ -21,6 +21,11 @@ Requests hit Laravel route files which map to controller classes. Controllers in
 - **React Components:** Located under `resources/js` for UI and forms.
 - **Bot Commands:** Located under `bot/commands`, with shared configuration from the root `.env`.
 
+## 4.1 Core Pages (UI Pass Checklist)
+- **Top-level pages:** Characters, Game Master Log, Guild Handbook, Administration.
+- **Administration subpages:** Settings, Items, Spells, Shop, Auctions, Character Approvals.
+- **UI passes:** Review all pages above together to keep layout, spacing, and language consistent.
+
 ## 5. Models & Data Pipelines
 No ML models or data pipelines are defined in this repository.
 

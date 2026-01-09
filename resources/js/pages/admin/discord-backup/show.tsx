@@ -16,17 +16,17 @@ export default function DiscordBackupShow({ channel, messages }: DiscordBackupSh
   return (
     <AppLayout>
       <Head title={`Discord Backup · ${channel.name}`} />
-      <div className="container mx-auto max-w-4xl px-2 py-4 md:px-0">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="container mx-auto max-w-4xl space-y-4 px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-4">
           <div>
-            <h1 className="text-lg font-semibold">{channel.name}</h1>
+            <h1 className="text-2xl font-bold">{channel.name}</h1>
             <p className="text-xs text-base-content/70">
               {channel.guild_id} · {channel.type}
-              {channel.last_synced_at ? ` · Letztes Backup: ${new Date(channel.last_synced_at).toLocaleString()}` : ''}
+              {channel.last_synced_at ? ` · Last backup: ${new Date(channel.last_synced_at).toLocaleString()}` : ''}
             </p>
           </div>
           <Button size="sm" variant="outline" as={Link} href={route('admin.discord-backup.index')}>
-            Zurueck
+            Back
           </Button>
         </div>
 
@@ -35,7 +35,7 @@ export default function DiscordBackupShow({ channel, messages }: DiscordBackupSh
             <CardTitle>Messages</CardTitle>
             <CardContent>
               {messages.data.length === 0 ? (
-                <p className="text-sm text-base-content/70">Keine Messages gespeichert.</p>
+                <p className="text-sm text-base-content/70">No messages saved.</p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {messages.data.map((message) => (

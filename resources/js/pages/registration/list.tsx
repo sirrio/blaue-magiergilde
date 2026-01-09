@@ -72,18 +72,18 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
           <StickyNote size={14} />
         </Button>
       </ModalTrigger>
-      <ModalTitle>Admin Notiz</ModalTitle>
+      <ModalTitle>Admin Note</ModalTitle>
       <ModalContent>
         <TextArea
           value={data.admin_notes}
           onChange={(e) => setData('admin_notes', e.target.value)}
-          placeholder="Interne Notiz..."
+          placeholder="Internal note..."
         >
-          Notiz
+          Note
         </TextArea>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
-        Speichern
+        Save
       </ModalAction>
     </Modal>
   )
@@ -161,100 +161,139 @@ export default function RegistrationList({ characters }: { characters: AdminChar
     return Array.from(grouped.values())
   }, [characters])
 
+  const totalCharacters = characters.length
+  const totalUsers = groups.length
+
   return (
     <AppLayout>
       <Head title="Character Approvals" />
-      <div className="container mx-auto max-w-4xl px-2 py-4 md:px-0">
-        <div className="mb-4 flex flex-wrap items-end gap-3">
-          <Input type="search" placeholder="Search by character or user..." value={search} onChange={handleSearch}>
-            Search
-          </Input>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-base-content/60">Status:</span>
-            <Button
-              size="xs"
-              variant={statusFilter === '' ? 'solid' : 'outline'}
-              onClick={() => handleStatusChange('')}
-            >
-              Alle
-            </Button>
-            <Button
-              size="xs"
-              variant={statusFilter === 'pending' ? 'solid' : 'outline'}
-              color="warning"
-              onClick={() => handleStatusChange('pending')}
-            >
-              Ausstehend
-            </Button>
-            <Button
-              size="xs"
-              variant={statusFilter === 'approved' ? 'solid' : 'outline'}
-              color="success"
-              onClick={() => handleStatusChange('approved')}
-            >
-              Genehmigt
-            </Button>
-            <Button
-              size="xs"
-              variant={statusFilter === 'declined' ? 'solid' : 'outline'}
-              color="error"
-              onClick={() => handleStatusChange('declined')}
-            >
-              Abgelehnt
-            </Button>
+      <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h1 className="text-2xl font-bold">Character Approvals</h1>
+              <p className="text-sm text-base-content/70">
+                Review and update guild status for each character.
+              </p>
+            </div>
+            <p className="text-xs text-base-content/60">
+              {totalUsers} {totalUsers === 1 ? 'User' : 'Users'} · {totalCharacters}{' '}
+              {totalCharacters === 1 ? 'Character' : 'Characters'}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-base-content/60">Tier:</span>
-            <Button size="xs" variant={tierFilter === '' ? 'solid' : 'outline'} onClick={() => handleTierChange('')}>
-              Alle
-            </Button>
-            <Button size="xs" variant={tierFilter === 'bt' ? 'solid' : 'outline'} onClick={() => handleTierChange('bt')}>
-              BT
-            </Button>
-            <Button size="xs" variant={tierFilter === 'lt' ? 'solid' : 'outline'} onClick={() => handleTierChange('lt')}>
-              LT
-            </Button>
-            <Button size="xs" variant={tierFilter === 'ht' ? 'solid' : 'outline'} onClick={() => handleTierChange('ht')}>
-              HT
-            </Button>
-            <Button size="xs" variant={tierFilter === 'et' ? 'solid' : 'outline'} onClick={() => handleTierChange('et')}>
-              ET
-            </Button>
-            <Button
-              size="xs"
-              variant={tierFilter === 'filler' ? 'solid' : 'outline'}
-              onClick={() => handleTierChange('filler')}
-            >
-              Filler
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-base-content/60">Discord:</span>
-            <Button
-              size="xs"
-              variant={discordFilter === '' ? 'solid' : 'outline'}
-              onClick={() => handleDiscordFilterChange('')}
-            >
-              Alle
-            </Button>
-            <Button
-              size="xs"
-              variant={discordFilter === 'none' ? 'solid' : 'outline'}
-              onClick={() => handleDiscordFilterChange('none')}
-            >
-              Kein Discord
-            </Button>
-            <Button
-              size="xs"
-              variant={discordFilter === 'only' ? 'solid' : 'outline'}
-              onClick={() => handleDiscordFilterChange('only')}
-            >
-              Nur Discord
-            </Button>
+        </section>
+        <div className="rounded-box border border-base-200 bg-base-100 p-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <Input type="search" placeholder="Search by character or user..." value={search} onChange={handleSearch}>
+              Search
+            </Input>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-base-content/60">Status:</span>
+              <Button
+                size="xs"
+                variant={statusFilter === '' ? 'solid' : 'outline'}
+                onClick={() => handleStatusChange('')}
+              >
+                All
+              </Button>
+              <Button
+                size="xs"
+                variant={statusFilter === 'pending' ? 'solid' : 'outline'}
+                color="warning"
+                onClick={() => handleStatusChange('pending')}
+              >
+                Pending
+              </Button>
+              <Button
+                size="xs"
+                variant={statusFilter === 'approved' ? 'solid' : 'outline'}
+                color="success"
+                onClick={() => handleStatusChange('approved')}
+              >
+                Approved
+              </Button>
+              <Button
+                size="xs"
+                variant={statusFilter === 'declined' ? 'solid' : 'outline'}
+                color="error"
+                onClick={() => handleStatusChange('declined')}
+              >
+                Declined
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-base-content/60">Tier:</span>
+              <Button
+                size="xs"
+                variant={tierFilter === '' ? 'solid' : 'outline'}
+                onClick={() => handleTierChange('')}
+              >
+                All
+              </Button>
+              <Button
+                size="xs"
+                variant={tierFilter === 'bt' ? 'solid' : 'outline'}
+                onClick={() => handleTierChange('bt')}
+              >
+                BT
+              </Button>
+              <Button
+                size="xs"
+                variant={tierFilter === 'lt' ? 'solid' : 'outline'}
+                onClick={() => handleTierChange('lt')}
+              >
+                LT
+              </Button>
+              <Button
+                size="xs"
+                variant={tierFilter === 'ht' ? 'solid' : 'outline'}
+                onClick={() => handleTierChange('ht')}
+              >
+                HT
+              </Button>
+              <Button
+                size="xs"
+                variant={tierFilter === 'et' ? 'solid' : 'outline'}
+                onClick={() => handleTierChange('et')}
+              >
+                ET
+              </Button>
+              <Button
+                size="xs"
+                variant={tierFilter === 'filler' ? 'solid' : 'outline'}
+                onClick={() => handleTierChange('filler')}
+              >
+                Filler
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-base-content/60">Discord:</span>
+              <Button
+                size="xs"
+                variant={discordFilter === '' ? 'solid' : 'outline'}
+                onClick={() => handleDiscordFilterChange('')}
+              >
+                All
+              </Button>
+              <Button
+                size="xs"
+                variant={discordFilter === 'none' ? 'solid' : 'outline'}
+                onClick={() => handleDiscordFilterChange('none')}
+              >
+                No Discord
+              </Button>
+              <Button
+                size="xs"
+                variant={discordFilter === 'only' ? 'solid' : 'outline'}
+                onClick={() => handleDiscordFilterChange('only')}
+              >
+                Discord Only
+              </Button>
+            </div>
           </div>
         </div>
         {groups.length === 0 ? (
-          <div className="text-sm text-base-content/70">Keine Charaktere gefunden.</div>
+          <div className="text-sm text-base-content/70">No characters found.</div>
         ) : (
           <div className="space-y-6">
             {groups.map((group) => (
@@ -280,7 +319,7 @@ export default function RegistrationList({ characters }: { characters: AdminChar
                         </a>
                       </>
                     ) : (
-                      <span>Kein Discord</span>
+                      <span>No Discord</span>
                     )}
                   </span>
                 </div>
@@ -292,10 +331,10 @@ export default function RegistrationList({ characters }: { characters: AdminChar
                       <ListRow key={character.id} className="grid-cols-1">
                         <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex w-6 justify-center" title="Start Tier">
+                            <div className="flex w-6 justify-center" title="Starting tier">
                               <LogoTier tier={character.start_tier} width={16} />
                             </div>
-                            <div className="flex w-6 justify-center" title="Aktueller Tier">
+                            <div className="flex w-6 justify-center" title="Current tier">
                               <LogoTier tier={currentTier} width={16} />
                             </div>
                             <a
@@ -308,24 +347,24 @@ export default function RegistrationList({ characters }: { characters: AdminChar
                               <span className="truncate">{character.name}</span>
                             </a>
                           </div>
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={cn(
-                              'flex items-center text-xs',
-                              status === 'approved' && 'text-success',
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                'flex items-center text-xs',
+                                status === 'approved' && 'text-success',
                                 status === 'declined' && 'text-error',
                                 status === 'pending' && 'text-warning',
                               )}
                             >
                               {status === 'approved' && <CheckCircle2 size={16} />}
                               {status === 'declined' && <XCircle size={16} />}
-                            {status === 'pending' && <Clock size={16} />}
-                            <span className="ml-1 capitalize">{status}</span>
-                          </div>
-                          <AdminNoteModal character={character} />
-                          <Button
-                            size="xs"
-                            modifier="square"
+                              {status === 'pending' && <Clock size={16} />}
+                              <span className="ml-1 capitalize">{status}</span>
+                            </div>
+                            <AdminNoteModal character={character} />
+                            <Button
+                              size="xs"
+                              modifier="square"
                               variant="ghost"
                               color="warning"
                               disabled={status === 'pending'}

@@ -949,8 +949,12 @@ export default function Index({
   return (
     <AppLayout>
       <Head title="Auctions" />
-      <div className="container mx-auto max-w-3xl px-2 py-4 md:px-0">
-        <div className="join mb-4 flex items-end">
+      <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+        <section className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-2xl font-bold">Auctions</h1>
+          <p className="text-sm text-base-content/70">Manage auctions, bids, and live voice candidates.</p>
+        </section>
+        <div className="join flex items-end">
           <Select className="join-item w-full" value={selectedAuction?.id || ''} onChange={onAuctionSelectChange}>
             <SelectLabel>Auctions</SelectLabel>
             <SelectOptions>
@@ -1017,7 +1021,7 @@ export default function Index({
                 </>
               ) : (
                 <p className="text-xs text-base-content/70">
-                  No channel ID set. Configure it in Administration Settings.
+                  No channel ID set. Configure it in Admin Settings.
                   <span className="ml-1">
                     <Link href={route('admin.settings')} className="link">
                       Go to settings
