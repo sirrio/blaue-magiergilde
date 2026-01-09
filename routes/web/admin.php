@@ -32,6 +32,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/admin/settings/discord-backup/channels', [DiscordBackupSettingsController::class, 'refresh'])
         ->name('discord-backup.channels.refresh');
 
+    Route::post('/admin/settings/discord-backup/threads', [DiscordBackupSettingsController::class, 'threads'])
+        ->name('discord-backup.threads.refresh');
+
     Route::patch('/admin/settings/discord-backup/channels', [DiscordBackupSettingsController::class, 'update'])
         ->name('discord-backup.channels.update');
 

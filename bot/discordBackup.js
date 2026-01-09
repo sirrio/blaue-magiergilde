@@ -221,6 +221,41 @@ async function listDiscordChannels(client, allowedGuildIds, options = {}) {
     return guilds;
 }
 
+async function listChannelThreads(client, channelId, options = {}) {
+    let channel;
+    try {
+        channel = await client.channels.fetch(channelId);
+    } catch (error) {
+        return { ok: false, status: 404, error: 'Channel not found.' };
+    }
+
+    if (!channel || !channel.isTextBased?.() || !channel.threads) {
+        return { ok: false, status: 422, error: 'Channel has no threads.' };
+    }
+
+    const guildId = channel.guild?.id || channel.guildId;
+    if (!guildId) {
+        return { ok: false, status: 422, error: 'Channel guild missing.' };
+    }
+
+    const threads = await collectThreads(channel, {
+        includeArchived: Boolean(options?.includeArchivedThreads),
+        includePrivate: Boolean(options?.includePrivateThreads),
+    });
+
+    return {
+        ok: true,
+        threads: threads.map(thread => ({
+            id: thread.id,
+            guild_id: guildId,
+            name: thread.name || thread.id,
+            type: resolveChannelType(thread),
+            parent_id: thread.parentId || channelId,
+            is_thread: true,
+        })),
+    };
+}
+
 async function postJson(appUrl, token, path, payload) {
     const response = await fetch(`${appUrl}${path}`, {
         method: 'POST',
@@ -646,5 +681,6 @@ module.exports = {
     startDiscordBackup,
     startDiscordBackupChannel,
     listDiscordChannels,
+    listChannelThreads,
     getBackupStatus,
 };

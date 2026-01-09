@@ -25,6 +25,9 @@ type ChannelPickerProps = {
   includeThreads?: boolean
   includeArchivedThreads?: boolean
   includePrivateThreads?: boolean
+  enableThreadLoader?: boolean
+  threadLoadIncludeArchived?: boolean
+  threadLoadIncludePrivate?: boolean
   mode?: SelectionMode
   excludedByGuild?: Record<string, string[]>
   allowedChannelTypes?: string[]
@@ -59,6 +62,7 @@ const buildGroupedList = (
   excludedSet: Set<string>,
   includeThreads: boolean,
   allowedTypes?: Set<string>,
+  threadParentAllowlist?: Set<string>,
 ) => {
   const channelLookup = new Map<string, DiscordBackupChannel>()
   const categories = new Map<string, string>()
@@ -72,7 +76,10 @@ const buildGroupedList = (
 
   const filtered = channels.filter((channel) => {
     if (channel.type === 'GuildCategory') return true
-    if (!includeThreads && channel.is_thread) return false
+    if (!includeThreads && channel.is_thread) {
+      if (!threadParentAllowlist) return false
+      if (!channel.parent_id || !threadParentAllowlist.has(channel.parent_id)) return false
+    }
     if (allowedTypes && !allowedTypes.has(channel.type)) return false
     if (excludedSet.has(channel.id)) return false
     return true
@@ -126,6 +133,9 @@ export default function DiscordChannelPickerModal({
   includeThreads = false,
   includeArchivedThreads = false,
   includePrivateThreads = false,
+  enableThreadLoader = false,
+  threadLoadIncludeArchived = true,
+  threadLoadIncludePrivate = false,
   mode = 'multiple',
   excludedByGuild,
   allowedChannelTypes,
@@ -143,16 +153,21 @@ export default function DiscordChannelPickerModal({
   const [isRefreshingChannels, setIsRefreshingChannels] = useState(false)
   const [pendingByGuild, setPendingByGuild] = useState<Record<string, string[]>>({})
   const [pendingSingle, setPendingSingle] = useState<SingleSelection>(null)
+  const [threadLoadingId, setThreadLoadingId] = useState<string | null>(null)
+  const [loadedThreadParents, setLoadedThreadParents] = useState<string[]>([])
 
   const allowedTypes = useMemo(
     () => (allowedChannelTypes && allowedChannelTypes.length > 0 ? new Set(allowedChannelTypes) : undefined),
     [allowedChannelTypes],
   )
+  const threadParentAllowlist = useMemo(() => new Set(loadedThreadParents), [loadedThreadParents])
 
   useEffect(() => {
     if (!isOpen) return
     setPendingByGuild({})
     setPendingSingle(null)
+    setLoadedThreadParents([])
+    setThreadLoadingId(null)
   }, [isOpen])
 
   const handleRefreshChannels = useCallback(async () => {
@@ -197,6 +212,7 @@ export default function DiscordChannelPickerModal({
       })
 
       setAvailableChannelGroups(nextGroups)
+      setLoadedThreadParents([])
       toast.show('Channel list updated.', 'info')
     } catch (error) {
       toast.show('Channel list could not be loaded.', 'error')
@@ -204,6 +220,82 @@ export default function DiscordChannelPickerModal({
       setIsRefreshingChannels(false)
     }
   }, [includeThreads, isRefreshingChannels])
+
+  const handleLoadThreads = useCallback(async () => {
+    if (!pendingSingle) {
+      toast.show('Select a channel first.', 'error')
+      return
+    }
+
+    if (pendingSingle.is_thread) {
+      toast.show('Select a text channel to load threads.', 'error')
+      return
+    }
+
+    if (threadLoadingId) return
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setThreadLoadingId(pendingSingle.id)
+
+    try {
+      const response = await fetch(route('discord-backup.threads.refresh'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          channel_id: pendingSingle.id,
+          include_archived_threads: threadLoadIncludeArchived,
+          include_private_threads: threadLoadIncludePrivate,
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        toast.show(String(payload?.error ?? 'Threads could not be loaded.'), 'error')
+        return
+      }
+
+      const threads = Array.isArray(payload?.threads) ? (payload.threads as DiscordBackupChannel[]) : []
+      if (threads.length === 0) {
+        toast.show('No threads found.', 'info')
+        return
+      }
+
+      setAvailableChannelGroups((current) => {
+        const guildId = pendingSingle.guild_id
+        const existing = current[guildId] ?? []
+        const map = new Map(existing.map((channel) => [channel.id, channel]))
+        threads.forEach((thread) => {
+          map.set(thread.id, thread)
+        })
+        return { ...current, [guildId]: Array.from(map.values()) }
+      })
+
+      setLoadedThreadParents((current) =>
+        current.includes(pendingSingle.id) ? current : [...current, pendingSingle.id]
+      )
+      toast.show('Threads loaded.', 'info')
+    } catch (error) {
+      toast.show('Threads could not be loaded.', 'error')
+    } finally {
+      setThreadLoadingId(null)
+    }
+  }, [
+    getCsrfToken,
+    pendingSingle,
+    threadLoadingId,
+    threadLoadIncludeArchived,
+    threadLoadIncludePrivate,
+  ])
 
   const togglePendingChannel = (guildId: string, channelId: string) => {
     setPendingByGuild((current) => {
@@ -223,14 +315,16 @@ export default function DiscordChannelPickerModal({
         const excludedSet = new Set(excludedByGuild?.[guildId] ?? [])
         const availableCount = channels.filter((channel) => {
           if (channel.type === 'GuildCategory') return false
-          if (!includeThreads && channel.is_thread) return false
+          if (!includeThreads && channel.is_thread) {
+            if (!channel.parent_id || !threadParentAllowlist.has(channel.parent_id)) return false
+          }
           if (allowedTypes && !allowedTypes.has(channel.type)) return false
           return !excludedSet.has(channel.id)
         }).length
         return availableCount > 0 ? [guildId, channels] : null
       })
       .filter(Boolean) as [string, DiscordBackupChannel[]][]
-  }, [allowedTypes, availableChannelGroups, excludedByGuild, includeThreads])
+  }, [allowedTypes, availableChannelGroups, excludedByGuild, includeThreads, threadParentAllowlist])
 
   const handleConfirm = () => {
     if (mode === 'single') {
@@ -264,7 +358,13 @@ export default function DiscordChannelPickerModal({
       <div className="mt-3 flex flex-col gap-4">
         {entries.map(([guildId, channels]) => {
           const excludedSet = new Set(excludedByGuild?.[guildId] ?? [])
-          const { groups, channelLookup } = buildGroupedList(channels, excludedSet, includeThreads, allowedTypes)
+          const { groups, channelLookup } = buildGroupedList(
+            channels,
+            excludedSet,
+            includeThreads,
+            allowedTypes,
+            threadParentAllowlist,
+          )
           const summaryCount = groups.reduce((sum, group) => sum + group.channels.length, 0)
 
           if (summaryCount === 0) {
@@ -350,11 +450,23 @@ export default function DiscordChannelPickerModal({
       <ModalTitle>{title}</ModalTitle>
       <ModalContent>
         {description ? <p className="text-xs text-base-content/70">{description}</p> : null}
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold">Available channels</p>
-          <Button size="sm" variant="outline" onClick={handleRefreshChannels} disabled={isRefreshingChannels}>
-            Load channels
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {enableThreadLoader && mode === 'single' ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleLoadThreads}
+                disabled={!pendingSingle || pendingSingle.is_thread || threadLoadingId === pendingSingle?.id}
+              >
+                {threadLoadingId === pendingSingle?.id ? 'Loading threads...' : 'Load threads'}
+              </Button>
+            ) : null}
+            <Button size="sm" variant="outline" onClick={handleRefreshChannels} disabled={isRefreshingChannels}>
+              Load channels
+            </Button>
+          </div>
         </div>
         {availableGuildEntries.length === 0 ? (
           <p className="mt-3 text-xs text-base-content/70">

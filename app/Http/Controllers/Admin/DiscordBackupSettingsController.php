@@ -69,6 +69,64 @@ class DiscordBackupSettingsController extends Controller
         ]);
     }
 
+    public function threads(): JsonResponse
+    {
+        $user = request()->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $channelId = trim((string) request('channel_id', ''));
+        if ($channelId === '' || ! preg_match('/^[0-9]{5,}$/', $channelId)) {
+            return response()->json([
+                'error' => 'Invalid channel_id.',
+            ], 422);
+        }
+
+        $botUrl = trim((string) config('services.bot.http_url', ''));
+        $botToken = trim((string) config('services.bot.http_token', ''));
+
+        if ($botUrl === '' || $botToken === '') {
+            return response()->json([
+                'error' => 'Bot HTTP is not configured.',
+            ], 422);
+        }
+
+        $includeArchivedThreads = request()->boolean('include_archived_threads', true);
+        $includePrivateThreads = request()->boolean('include_private_threads', false);
+
+        try {
+            $response = Http::timeout(20)
+                ->acceptJson()
+                ->withHeaders(['X-Bot-Token' => $botToken])
+                ->post(rtrim($botUrl, '/').'/discord-threads', [
+                    'channel_id' => $channelId,
+                    'include_archived_threads' => $includeArchivedThreads,
+                    'include_private_threads' => $includePrivateThreads,
+                ]);
+        } catch (\Throwable $error) {
+            return response()->json([
+                'error' => 'Bot is not reachable.',
+            ], 503);
+        }
+
+        if (! $response->ok()) {
+            return response()->json([
+                'error' => 'Bot request failed.',
+            ], $response->status());
+        }
+
+        $payload = $response->json();
+        $threads = is_array($payload['threads'] ?? null) ? $payload['threads'] : null;
+        if (! is_array($threads)) {
+            return response()->json([
+                'error' => 'Invalid bot response.',
+            ], 502);
+        }
+
+        return response()->json([
+            'threads' => $threads,
+        ]);
+    }
+
     public function update(UpdateDiscordBackupSettingsRequest $request): RedirectResponse
     {
         $guilds = $request->validated()['guilds'] ?? [];

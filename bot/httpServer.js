@@ -1,5 +1,5 @@
 const http = require('node:http');
-const { getBackupStatus, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
+const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
 const { postShopToChannel } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
@@ -95,11 +95,12 @@ function startHttpServer(client) {
         const isVoiceSync = path === '/voice-sync';
         const isDiscordBackup = path === '/discord-backup';
         const isDiscordChannels = path === '/discord-channels';
+        const isDiscordThreads = path === '/discord-threads';
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isShopPost = path === '/shop-post';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -152,6 +153,37 @@ function startHttpServer(client) {
             } catch (error) {
                 logReject(req, 'failed to list channels');
                 respondJson(res, 500, { error: 'Failed to list channels.' });
+            }
+            return;
+        }
+
+        if (isDiscordThreads) {
+            const channelId = String(payload?.channel_id || '').trim();
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            const includeArchivedThreads = Boolean(payload?.include_archived_threads);
+            const includePrivateThreads = Boolean(payload?.include_private_threads);
+
+            try {
+                const result = await listChannelThreads(client, channelId, {
+                    includeArchivedThreads,
+                    includePrivateThreads,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'threads lookup failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Failed to list threads.' });
+                    return;
+                }
+
+                respondJson(res, 200, { threads: result.threads });
+            } catch (error) {
+                logReject(req, 'failed to list threads');
+                respondJson(res, 500, { error: 'Failed to list threads.' });
             }
             return;
         }
