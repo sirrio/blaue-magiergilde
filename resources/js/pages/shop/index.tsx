@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { List } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { DiscordBackupChannel, PageProps, Shop, ShopSettings } from '@/types'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Send, Settings, Store } from 'lucide-react'
+import { Send, Settings } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
@@ -43,6 +44,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   }
 
   const handleCreateShop = (): void => {
+    if (!window.confirm('Roll a new shop?')) {
+      return
+    }
     router.post(route('shops.store'), {}, { preserveState: false, preserveScroll: true })
   }
 
@@ -164,10 +168,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
   const hasPostDestination = Boolean(postChannel.post_channel_id)
-  const shopLabel = selectedShop
-    ? `Shop #${String(selectedShop.id).padStart(3, '0')} - ${formatShopCreatedAt(selectedShop.created_at)}`
-    : 'No shop selected'
-
   return (
     <AppLayout>
       <Head title="Shop" />
@@ -177,10 +177,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
             <h1 className="text-2xl font-bold">Shop</h1>
             <p className="text-sm text-base-content/70">Roll new shops and review the current inventory.</p>
           </div>
-          <Button onClick={handleCreateShop} color={'warning'} className="gap-2">
-            <Store size={18}></Store>
-            Roll a new shop
-          </Button>
         </section>
         <div>
           <Select className="w-full" value={selectedShop?.id || ''} onChange={onShopSelectChange}>
@@ -195,23 +191,20 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
           </Select>
         </div>
         {isAdmin ? (
-          <div className="rounded-box border border-base-200 bg-base-100 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-                  <span
-                    className={cn(
-                      'rounded-full border px-2 py-1',
-                      hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
-                    )}
-                  >
-                    {destinationText}
-                  </span>
-                  <span className="rounded-full border border-base-200 px-2 py-1">
-                    Items: {selectedShop?.shop_items.length ?? 0}
-                  </span>
-                </div>
-                <p className="text-[11px] text-base-content/50">{shopLabel}</p>
+          <div className="rounded-box bg-base-100 shadow-md p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+                <span
+                  className={cn(
+                    'rounded-full border px-2 py-1',
+                    hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
+                  )}
+                >
+                  {destinationText}
+                </span>
+                <span className="rounded-full border border-base-200 px-2 py-1">
+                  Items: {selectedShop?.shop_items.length ?? 0}
+                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -223,11 +216,18 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                   <Send size={16} className="mr-2" />
                   Post shop
                 </Button>
+                <ActionMenu
+                  items={[
+                    {
+                      label: 'Roll a new shop',
+                      onSelect: handleCreateShop,
+                    },
+                  ]}
+                />
                 <Modal>
                   <ModalTrigger>
-                    <Button size="sm" variant="outline" className="gap-2">
+                    <Button size="sm" variant="outline" modifier="square" aria-label="Configure shop">
                       <Settings size={16} />
-                      Configure
                     </Button>
                   </ModalTrigger>
                   <ModalTitle>Shop settings</ModalTitle>
@@ -261,11 +261,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 </Modal>
               </div>
             </div>
-            {!hasPostDestination ? (
-              <div className="mt-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                Select a destination before posting to Discord.
-              </div>
-            ) : null}
           </div>
         ) : null}
         <List>

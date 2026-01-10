@@ -1,3 +1,4 @@
+import { ActionMenu } from '@/components/ui/action-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
@@ -11,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps, VoiceSettings } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Copy, EyeOff, FlaskRound, History, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
+import { EyeOff, FlaskRound, History, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -104,32 +105,6 @@ const getDefaultRepairCurrent = (itemId: number, items: Item[]) => {
   return Math.floor(costValue / 10)
 }
 
-const buildDiscordText = (auction: Auction) => {
-  const lines: string[] = []
-
-  rarityOrder.forEach((rarity) => {
-    const groupItems = auction.auction_items
-      .filter((auctionItem) => auctionItem.item.rarity === rarity)
-      .sort((a, b) => {
-        const typeCompare = typeOrder[a.item.type] - typeOrder[b.item.type]
-        if (typeCompare !== 0) return typeCompare
-        return a.item.name.localeCompare(b.item.name)
-      })
-    if (groupItems.length === 0) return
-
-    lines.push(`## ${rarityLabels[rarity]}`)
-    groupItems.forEach((auctionItem) => {
-      const lineLabel = getDiscordItemLabel(auctionItem)
-      lines.push(
-        `**(${auctionItem.remaining_auctions})** - ${auctionItem.starting_bid} ${auction.currency} - ${lineLabel}`,
-      )
-    })
-    lines.push('')
-  })
-
-  return lines.join('\n').trim()
-}
-
 const getRepairMissing = (auctionItem: AuctionItem) => {
   if (auctionItem.repair_max == null || auctionItem.repair_current == null) return 0
   return Math.max(0, auctionItem.repair_max - auctionItem.repair_current)
@@ -149,15 +124,6 @@ const getAuctionItemLabel = (name: string, auctionItem: AuctionItem) => {
   parts.push(`(${rarityLabels[auctionItem.item.rarity]})`)
   parts.push(`(${getRepairMissing(auctionItem)})`)
   return parts.join(' ')
-}
-
-const getDiscordItemLabel = (auctionItem: AuctionItem) => {
-  const notes = auctionItem.notes?.trim()
-  const displayName = notes ? `${auctionItem.item.name} - ${notes}` : auctionItem.item.name
-  const itemLabel = auctionItem.item.url
-    ? `[${displayName}](${auctionItem.item.url})`
-    : displayName
-  return `${itemLabel} (${getRepairMissing(auctionItem)})`
 }
 
 const getHighestBid = (auctionItem: AuctionItem) => {
@@ -829,13 +795,6 @@ export default function Index({
     setSelectedAuction(newAuction)
   }
 
-  const handleCopyAuction = () => {
-    if (!selectedAuction) return
-    navigator.clipboard.writeText(buildDiscordText(selectedAuction)).then(() => {
-      toast.show('Auction copied', 'info')
-    })
-  }
-
   const handlePostChannelSelect = useCallback(
     async (
       selection:
@@ -948,10 +907,6 @@ export default function Index({
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
   const hasPostDestination = Boolean(postChannel.post_channel_id)
-  const auctionLabel = selectedAuction
-    ? `${selectedAuction.title ?? `Auction #${String(selectedAuction.id).padStart(3, '0')}`} - ${formatAuctionCreatedAt(selectedAuction.created_at)}`
-    : 'No auction selected'
-
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
     const confirmed = window.confirm(
@@ -1105,9 +1060,6 @@ export default function Index({
             <h1 className="text-2xl font-bold">Auctions</h1>
             <p className="text-sm text-base-content/70">Manage auctions, bids, and live voice candidates.</p>
           </div>
-          {selectedAuction ? (
-            <AddAuctionItemModal auction={selectedAuction} items={items} />
-          ) : null}
         </section>
         <div>
           <Select className="w-full" value={selectedAuction?.id || ''} onChange={onAuctionSelectChange}>
@@ -1124,35 +1076,31 @@ export default function Index({
 
         {selectedAuction ? (
           <>
-            <div className="mb-4 rounded-box border border-base-200 bg-base-100 p-3">
+            <div className="mb-4 rounded-box bg-base-100 shadow-md p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <p className="text-xs text-base-content/60">{auctionLabel}</p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-                    <span className="rounded-full border border-base-200 px-2 py-1">
-                      Status: {statusLabels[selectedAuction.status]}
-                    </span>
-                    <span className="rounded-full border border-base-200 px-2 py-1">
-                      Items: {selectedAuction.auction_items.length}
-                    </span>
-                    <span className="rounded-full border border-base-200 px-2 py-1">
-                      Steps: 10 / 50 / 100 / 500 (consumables/spellscrolls halved)
-                    </span>
-                    <span
-                      className={cn(
-                        'rounded-full border px-2 py-1',
-                        hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
-                      )}
-                    >
-                      {destinationText}
-                    </span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+                  <span className="rounded-full border border-base-200 px-2 py-1">
+                    Status: {statusLabels[selectedAuction.status]}
+                  </span>
+                  <span className="rounded-full border border-base-200 px-2 py-1">
+                    Items: {selectedAuction.auction_items.length}
+                  </span>
+                  <span className="rounded-full border border-base-200 px-2 py-1">
+                    Steps: 10 / 50 / 100 / 500 (consumables/spellscrolls halved)
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full border px-2 py-1',
+                      hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
+                    )}
+                  >
+                    {destinationText}
+                  </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={handleCopyAuction} className="gap-2">
-                    <Copy size={16} />
-                    Copy
-                  </Button>
+                  {selectedAuction ? (
+                    <AddAuctionItemModal auction={selectedAuction} items={items} />
+                  ) : null}
                   {isAdmin ? (
                     <Button
                       size="sm"
@@ -1166,11 +1114,22 @@ export default function Index({
                     </Button>
                   ) : null}
                   {isAdmin ? (
+                    <ActionMenu
+                      items={[
+                        {
+                          label: 'Close auction',
+                          onSelect: handleCloseAuction,
+                          disabled: selectedAuction.status === 'closed',
+                          tone: 'error',
+                        },
+                      ]}
+                    />
+                  ) : null}
+                  {isAdmin ? (
                     <Modal>
                       <ModalTrigger>
-                        <Button size="sm" variant="outline" className="gap-2">
+                        <Button size="sm" variant="outline" modifier="square" aria-label="Configure auction">
                           <Settings size={16} />
-                          Configure
                         </Button>
                       </ModalTrigger>
                       <ModalTitle>Auction settings</ModalTitle>
@@ -1224,24 +1183,8 @@ export default function Index({
                       </ModalContent>
                     </Modal>
                   ) : null}
-                  {isAdmin ? (
-                    <Button
-                      size="sm"
-                      color="error"
-                      variant="outline"
-                      onClick={handleCloseAuction}
-                      disabled={selectedAuction.status === 'closed'}
-                    >
-                      Close auction
-                    </Button>
-                  ) : null}
                 </div>
               </div>
-              {!hasPostDestination && isAdmin ? (
-                <div className="mt-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                  Select a destination before posting to Discord.
-                </div>
-              ) : null}
             </div>
 
             <div className="mb-4 flex flex-wrap items-center gap-3">

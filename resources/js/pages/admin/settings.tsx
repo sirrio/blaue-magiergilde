@@ -1,3 +1,4 @@
+import { ActionMenu } from '@/components/ui/action-menu'
 import { Button } from '@/components/ui/button'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
@@ -5,7 +6,7 @@ import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps } from '@/types'
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react'
+import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -362,11 +363,9 @@ export default function Backup({
             Manage Discord backup preferences for the guild.
           </p>
         </section>
-        <div className="rounded-box border border-base-200 bg-base-100 p-3">
+        <div className="rounded-box bg-base-100 shadow-md p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">
-              <p className="text-xs uppercase text-base-content/50">Discord</p>
-              <h2 className="text-lg font-semibold">Backup actions</h2>
               <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
                 <span className="rounded-full border border-base-200 px-2 py-1">Channels: {discordBackup.channels}</span>
                 <span className="rounded-full border border-base-200 px-2 py-1">Messages: {discordBackup.messages}</span>
@@ -390,11 +389,23 @@ export default function Backup({
               >
                 Start backup
               </Button>
+              <ActionMenu
+                items={[
+                  {
+                    label: 'Open handbook',
+                    onSelect: () => router.get(route('rules.index')),
+                  },
+                  {
+                    label: 'Delete backup',
+                    onSelect: handleBackupDelete,
+                    tone: 'error',
+                  },
+                ]}
+              />
               <Modal>
                 <ModalTrigger>
-                  <Button size="sm" variant="outline" className="gap-2">
+                  <Button size="sm" variant="outline" modifier="square" aria-label="Configure backup">
                     <Settings size={16} />
-                    Configure
                   </Button>
                 </ModalTrigger>
                 <ModalTitle>Backup settings</ModalTitle>
@@ -452,12 +463,6 @@ export default function Backup({
                   </div>
                 </ModalContent>
               </Modal>
-              <Button size="sm" variant="outline" as={Link} href={route('rules.index')}>
-                Open handbook
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleBackupDelete} disabled={deleteForm.processing}>
-                Delete backup
-              </Button>
             </div>
           </div>
           {backupStatus ? (
