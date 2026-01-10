@@ -81,14 +81,6 @@ export interface AuctionVoiceCandidate {
   avatar?: string | null
 }
 
-export interface VoiceSettings {
-  voice_channel_id?: string | null
-  voice_channel_name?: string | null
-  voice_channel_type?: string | null
-  voice_channel_guild_id?: string | null
-  voice_channel_is_thread?: boolean | null
-}
-
 export interface ShopSettings {
   post_channel_id?: string | null
   post_channel_name?: string | null
@@ -103,6 +95,11 @@ export interface AuctionSettings {
   post_channel_type?: string | null
   post_channel_guild_id?: string | null
   post_channel_is_thread?: boolean | null
+  voice_channel_id?: string | null
+  voice_channel_name?: string | null
+  voice_channel_type?: string | null
+  voice_channel_guild_id?: string | null
+  voice_channel_is_thread?: boolean | null
 }
 
 export interface DiscordBackupStats {

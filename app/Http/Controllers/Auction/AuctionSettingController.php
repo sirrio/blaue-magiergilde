@@ -24,6 +24,11 @@ class AuctionSettingController extends Controller
                 'post_channel_type',
                 'post_channel_guild_id',
                 'post_channel_is_thread',
+                'voice_channel_id',
+                'voice_channel_name',
+                'voice_channel_type',
+                'voice_channel_guild_id',
+                'voice_channel_is_thread',
             ]),
         ]);
     }

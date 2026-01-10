@@ -10,7 +10,7 @@ use App\Models\DiscordMessageAttachment;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class SettingsController extends Controller
+class BackupController extends Controller
 {
     /**
      * Display the admin backup page.
@@ -21,7 +21,7 @@ class SettingsController extends Controller
 
         abort_unless($user && $user->is_admin, 403);
 
-        return Inertia::render('admin/settings', [
+        return Inertia::render('admin/backup', [
             'discordBackup' => [
                 'channels' => DiscordChannel::query()->count(),
                 'messages' => DiscordMessage::query()->count(),

@@ -11,7 +11,7 @@ it('allows admins to view the character list', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
-        ->get('/registrations')
+        ->get('/admin/character-approvals')
         ->assertOk();
 });
 
@@ -20,7 +20,7 @@ it('logs an audit entry when admin updates guild status', function () {
     $character = Character::factory()->create(['guild_status' => 'pending']);
 
     $this->actingAs($admin)
-        ->patch('/registrations/characters/'.$character->id, [
+        ->patch('/admin/character-approvals/characters/'.$character->id, [
             'guild_status' => 'approved',
         ])
         ->assertRedirect();

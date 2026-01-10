@@ -15,14 +15,14 @@ describe('UI sweep', () => {
 
     const pages = [
       { path: '/characters', heading: 'Characters', name: 'characters' },
-      { path: '/games', heading: 'Game Master Log', name: 'game-master-log' },
-      { path: '/rules', heading: 'Guild Handbook', name: 'guild-handbook' },
-      { path: '/admin/settings', heading: 'Admin Settings', name: 'admin-settings' },
-      { path: '/items', heading: 'Items', name: 'items' },
-      { path: '/spells', heading: 'Spells', name: 'spells' },
-      { path: '/shops', heading: 'Shop', name: 'shop' },
-      { path: '/auctions', heading: 'Auctions', name: 'auctions' },
-      { path: '/registrations', heading: 'Character Approvals', name: 'character-approvals' },
+      { path: '/game-master-log', heading: 'Game Master Log', name: 'game-master-log' },
+      { path: '/handbook', heading: 'Guild Handbook', name: 'guild-handbook' },
+      { path: '/admin/backup', heading: 'Backup', name: 'admin-backup' },
+      { path: '/admin/items', heading: 'Items', name: 'items' },
+      { path: '/admin/spells', heading: 'Spells', name: 'spells' },
+      { path: '/admin/shops', heading: 'Shop', name: 'shop' },
+      { path: '/admin/auctions', heading: 'Auctions', name: 'auctions' },
+      { path: '/admin/character-approvals', heading: 'Character Approvals', name: 'character-approvals' },
     ]
 
     pages.forEach(({ path, heading, name }) => {

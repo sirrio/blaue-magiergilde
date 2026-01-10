@@ -43,7 +43,7 @@ export default function Backup({
       }
 
       try {
-        const response = await fetch(route('discord-backup.status'), {
+        const response = await fetch(route('admin.backup.status'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ export default function Backup({
     }))
 
     selectionForm.transform(() => ({ guilds }))
-    selectionForm.patch(route('discord-backup.channels.update'), {
+    selectionForm.patch(route('admin.backup.channels.update'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Backup channels saved.', 'info')
@@ -214,7 +214,7 @@ export default function Backup({
   )
 
   const handleBackupStart = () => {
-    backupForm.post(route('discord-backup.store'), {
+    backupForm.post(route('admin.backup.store'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Discord backup started.', 'info')
@@ -239,7 +239,7 @@ export default function Backup({
       return
     }
 
-    deleteForm.delete(route('discord-backup.destroy'), {
+    deleteForm.delete(route('admin.backup.destroy'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Discord backup deleted.', 'info')
@@ -289,7 +289,7 @@ export default function Backup({
       setSyncingChannelId(channel.id)
 
       try {
-        const response = await fetch(route('discord-backup.channels.sync', channel.id), {
+        const response = await fetch(route('admin.backup.channels.sync', channel.id), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -393,7 +393,7 @@ export default function Backup({
                 items={[
                   {
                     label: 'Open handbook',
-                    onSelect: () => router.get(route('rules.index')),
+                    onSelect: () => router.get(route('handbook.index')),
                   },
                   {
                     label: 'Delete backup',

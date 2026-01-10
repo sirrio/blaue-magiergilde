@@ -94,7 +94,7 @@ it('rolls over eligible items when closing an auction', function () {
     ]);
 
     $this->actingAs($admin)
-        ->patch("/auctions/{$auction->id}", ['status' => 'closed'])
+        ->patch("/admin/auctions/{$auction->id}", ['status' => 'closed'])
         ->assertRedirect();
 
     $auction->refresh();

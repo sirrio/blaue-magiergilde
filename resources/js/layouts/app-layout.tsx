@@ -25,8 +25,8 @@ interface AppLayoutProps {
 
 const menuLinks = [
   { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
-  { name: 'Game Master Log', route: 'games.index', method: 'get' as const, icon: ScrollText },
-  { name: 'Guild Handbook', route: 'rules.index', method: 'get' as const, icon: BookOpen },
+  { name: 'Game Master Log', route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
+  { name: 'Guild Handbook', route: 'handbook.index', method: 'get' as const, icon: BookOpen },
 ]
 
 const accountLinks = [
@@ -43,12 +43,12 @@ const authLinks = [
 ]
 
 const adminLinks = [
-  { name: 'Backup', route: 'admin.settings', method: 'get' as const, icon: Settings },
-  { name: 'Items', route: 'items.index', method: 'get' as const, icon: Package },
-  { name: 'Spells', route: 'spells.index', method: 'get' as const, icon: Sparkles },
-  { name: 'Shop', route: 'shops.index', method: 'get' as const, icon: Store },
-  { name: 'Auctions', route: 'auctions.index', method: 'get' as const, icon: Gavel },
-  { name: 'Character Approvals', route: 'registrations.index', method: 'get' as const, icon: UserCheck },
+  { name: 'Backup', route: 'admin.backup', method: 'get' as const, icon: Settings },
+  { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
+  { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
+  { name: 'Shop', route: 'admin.shops.index', method: 'get' as const, icon: Store },
+  { name: 'Auctions', route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
+  { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -81,7 +81,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {menuLinks.map((menuLink) => (
-                menuLink.route === 'rules.index' && showHandbookDropdown ? (
+                menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                   <li key={menuLink.route} role="none">
                     <details ref={handbookMobileRef}>
                       <summary className="flex items-center">
@@ -97,7 +97,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 'truncate',
                                 channel.id === activeChannelId ? 'menu-active' : ''
                               )}
-                              href={route('rules.index', { channel: channel.id })}
+                              href={route('handbook.index', { channel: channel.id })}
                             >
                               {channel.name}
                             </Link>
@@ -159,7 +159,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="navbar-center hidden lg:flex">
           <ul className="menu menu-horizontal space-x-1 px-1" role="menubar">
             {menuLinks.map((menuLink) => (
-              menuLink.route === 'rules.index' && showHandbookDropdown ? (
+              menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                 <li key={menuLink.route} role="none">
                   <details ref={handbookDesktopRef}>
                     <summary className="flex items-center">
@@ -172,7 +172,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           <Link
                             role="menuitem"
                             method={menuLink.method}
-                            href={route('rules.index', { channel: channel.id })}
+                            href={route('handbook.index', { channel: channel.id })}
                             className={cn(
                               'truncate',
                               channel.id === activeChannelId ? 'menu-active' : ''

@@ -22,7 +22,7 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
   const { tiers, errors } = usePage<PageProps>().props
 
   const handleFormSubmit = () => {
-    post(route('games.store'), {
+    post(route('game-master-log.store'), {
       preserveState: 'errors',
       preserveScroll: true,
     })

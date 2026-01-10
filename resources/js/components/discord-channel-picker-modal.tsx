@@ -182,7 +182,7 @@ export default function DiscordChannelPickerModal({
     setIsRefreshingChannels(true)
 
     try {
-      const response = await fetch(route('discord-backup.channels.refresh'), {
+      const response = await fetch(route('admin.backup.channels.refresh'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,7 +243,7 @@ export default function DiscordChannelPickerModal({
     setThreadLoadingId(pendingSingle.id)
 
     try {
-      const response = await fetch(route('discord-backup.threads.refresh'), {
+      const response = await fetch(route('admin.backup.threads.refresh'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

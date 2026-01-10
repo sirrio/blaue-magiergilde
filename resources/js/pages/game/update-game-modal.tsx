@@ -22,7 +22,7 @@ const UpdateGameModal = ({ game, children }: { game: Game; children: React.React
   const { tiers, errors } = usePage<PageProps>().props
 
   const handleFormSubmit = () => {
-    post(route('games.update', { game, _method: 'put' }), {
+    post(route('game-master-log.update', { game, _method: 'put' }), {
       preserveState: 'errors',
       preserveScroll: true,
     })

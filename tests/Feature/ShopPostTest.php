@@ -20,7 +20,7 @@ it('lets admins post a shop via the bot http endpoint', function () {
     $shop = Shop::factory()->create();
 
     $this->actingAs($admin)
-        ->postJson("/shops/{$shop->id}/post", [
+        ->postJson("/admin/shops/{$shop->id}/post", [
             'channel_id' => '12345',
         ])
         ->assertOk()
@@ -39,7 +39,7 @@ it('blocks non admins from posting shops', function () {
     $shop = Shop::factory()->create();
 
     $this->actingAs($user)
-        ->postJson("/shops/{$shop->id}/post", [
+        ->postJson("/admin/shops/{$shop->id}/post", [
             'channel_id' => '12345',
         ])
         ->assertForbidden();

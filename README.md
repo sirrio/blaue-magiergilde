@@ -59,7 +59,7 @@ The bot lives in `bot/` and shares the root `.env` with the app. See `bot/README
 
 ## Admin character management
 
-Admins manage character approvals at `/registrations` (approve/decline, filters, admin notes).
+Admins manage character approvals at `/admin/character-approvals` (approve/decline, filters, admin notes).
 
 ## Auctions
 
@@ -67,4 +67,4 @@ Auctions are managed in-app (items, bids, hidden bids, auto rollover). The bot h
 
 ## Discord backup
 
-Admins can trigger a manual backup of all text channels + threads (including attachments) from the admin settings page.
+Admins can trigger manual backups for selected text channels + threads (including attachments) from `/admin/backup`.

@@ -47,7 +47,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     if (!window.confirm('Roll a new shop?')) {
       return
     }
-    router.post(route('shops.store'), {}, { preserveState: false, preserveScroll: true })
+    router.post(route('admin.shops.store'), {}, { preserveState: false, preserveScroll: true })
   }
 
   const getCsrfToken = useCallback(() => {
@@ -82,7 +82,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       }
 
       try {
-        const response = await fetch(route('shop-settings.update'), {
+        const response = await fetch(route('admin.shop-settings.update'), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -138,7 +138,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
     setIsPosting(true)
     try {
-      const response = await fetch(route('shops.post', selectedShop.id), {
+      const response = await fetch(route('admin.shops.post', selectedShop.id), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

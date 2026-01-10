@@ -44,7 +44,7 @@ export default function SpellRow({ spell }: { spell: Spell }) {
   const textColor = getSpellSchoolTextColor(spell.spell_school || '')
 
   const handleFormSubmit = () => {
-    post(route('spells.update', { spell, _method: 'put' }), {
+    post(route('admin.spells.update', { spell, _method: 'put' }), {
       preserveState: 'errors',
       preserveScroll: true,
     })

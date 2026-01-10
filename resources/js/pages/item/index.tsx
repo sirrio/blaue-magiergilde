@@ -37,7 +37,7 @@ export default function Index({ items }: { items: Item[] }) {
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
     const buildHref = (filterValue: string | null): string =>
-      route('items.index', {
+      route('admin.items.index', {
         ...currentQueryParams,
         [filterKey]: filterValue,
       })
@@ -71,7 +71,7 @@ export default function Index({ items }: { items: Item[] }) {
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    navigateTo(route('items.index', { ...currentQueryParams, search: value }))
+    navigateTo(route('admin.items.index', { ...currentQueryParams, search: value }))
   }
 
   const activeFilters = [

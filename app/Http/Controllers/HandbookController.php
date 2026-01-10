@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class RulesController extends Controller
+class HandbookController extends Controller
 {
     public function __invoke(Request $request): Response
     {
@@ -72,7 +72,7 @@ class RulesController extends Controller
             ])->values();
         }
 
-        return Inertia::render('rules/index', [
+        return Inertia::render('handbook/index', [
             'channels' => $channels,
             'activeChannelId' => $activeChannelId,
             'messages' => $messages,

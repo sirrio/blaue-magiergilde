@@ -6,40 +6,42 @@ use App\Http\Controllers\Auction\AuctionHiddenBidController;
 use App\Http\Controllers\Auction\AuctionItemController;
 use App\Http\Controllers\Auction\AuctionPostController;
 use App\Http\Controllers\Auction\AuctionSettingController;
+use App\Http\Controllers\Auction\AuctionVoiceSyncController;
 use Illuminate\Support\Facades\Route;
 
 Route::pattern('auction', '[0-9]+');
 
-Route::resource('auctions', AuctionController::class)->only([
-    'index',
-    'store',
-    'update',
-])->middleware(['auth']);
+Route::middleware(['auth'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('auctions', AuctionController::class)->only([
+            'index',
+            'store',
+            'update',
+        ]);
 
-Route::post('auctions/{auction}/post', AuctionPostController::class)
-    ->middleware(['auth'])
-    ->name('auctions.post');
+        Route::post('auctions/{auction}/post', AuctionPostController::class)
+            ->name('auctions.post');
 
-Route::patch('auctions/settings', AuctionSettingController::class)
-    ->middleware(['auth'])
-    ->name('auction-settings.update');
+        Route::patch('auctions/settings', AuctionSettingController::class)
+            ->name('auction-settings.update');
 
-Route::post('auctions/{auction}/items', [AuctionItemController::class, 'store'])
-    ->middleware(['auth'])
-    ->name('auction-items.store');
+        Route::post('auctions/voice/sync', AuctionVoiceSyncController::class)
+            ->name('auctions.voice.sync');
 
-Route::post('auction-items/{auctionItem}/bids', [AuctionBidController::class, 'store'])
-    ->middleware(['auth'])
-    ->name('auction-items.bids.store');
+        Route::post('auctions/{auction}/items', [AuctionItemController::class, 'store'])
+            ->name('auction-items.store');
 
-Route::post('auction-items/{auctionItem}/hidden-bids', [AuctionHiddenBidController::class, 'store'])
-    ->middleware(['auth'])
-    ->name('auction-items.hidden-bids.store');
+        Route::post('auction-items/{auctionItem}/bids', [AuctionBidController::class, 'store'])
+            ->name('auction-items.bids.store');
 
-Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
-    ->middleware(['auth'])
-    ->name('auction-bids.destroy');
+        Route::post('auction-items/{auctionItem}/hidden-bids', [AuctionHiddenBidController::class, 'store'])
+            ->name('auction-items.hidden-bids.store');
 
-Route::delete('auction-hidden-bids/{auctionHiddenBid}', [AuctionHiddenBidController::class, 'destroy'])
-    ->middleware(['auth'])
-    ->name('auction-hidden-bids.destroy');
+        Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
+            ->name('auction-bids.destroy');
+
+        Route::delete('auction-hidden-bids/{auctionHiddenBid}', [AuctionHiddenBidController::class, 'destroy'])
+            ->name('auction-hidden-bids.destroy');
+    });

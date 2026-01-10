@@ -173,7 +173,7 @@ it('lets admins trigger a discord backup run', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
-        ->post('/admin/settings/discord-backup')
+        ->post('/admin/backup/discord')
         ->assertRedirect();
 
     Http::assertSent(function ($request) {
@@ -186,7 +186,7 @@ it('stores selected backup channels per guild', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
-        ->patch('/admin/settings/discord-backup/channels', [
+        ->patch('/admin/backup/discord/channels', [
             'guilds' => [
                 [
                     'guild_id' => '67890',
@@ -228,7 +228,7 @@ it('refreshes available backup channels from the bot', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
-        ->postJson('/admin/settings/discord-backup/channels')
+        ->postJson('/admin/backup/discord/channels')
         ->assertOk()
         ->assertJsonPath('guilds.0.guild_id', '67890');
 

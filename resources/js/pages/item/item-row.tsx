@@ -136,7 +136,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   }
 
   const handleSubmit = () => {
-    post(route('shop-items.add-spell', { shopItem: shopItemId }), {
+    post(route('admin.shop-items.add-spell', { shopItem: shopItemId }), {
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
@@ -231,7 +231,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       toast.show('Select at least one default spell level.', 'error')
       return
     }
-    post(route('items.update', { item, _method: 'put' }), {
+    post(route('admin.items.update', { item, _method: 'put' }), {
       preserveState: 'errors',
       preserveScroll: true,
     })

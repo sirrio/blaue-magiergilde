@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class CharacterRegistrationController extends Controller
+class CharacterApprovalController extends Controller
 {
     public function index(Request $request): Response
     {
@@ -74,7 +74,7 @@ class CharacterRegistrationController extends Controller
                 'is_filler',
             ]);
 
-        return Inertia::render('registration/list', [
+        return Inertia::render('character-approvals/list', [
             'characters' => $characters,
         ]);
     }

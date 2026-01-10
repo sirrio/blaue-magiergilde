@@ -48,7 +48,7 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
   })
 
   const handleSubmit = () => {
-    patch(route('registrations.characters.update', { character: character.id }), {
+    patch(route('admin.character-approvals.update', { character: character.id }), {
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
@@ -89,7 +89,7 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
   )
 }
 
-export default function RegistrationList({ characters }: { characters: AdminCharacter[] }) {
+export default function CharacterApprovals({ characters }: { characters: AdminCharacter[] }) {
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const navOptions = { preserveState: true, preserveScroll: true }
 
@@ -107,7 +107,7 @@ export default function RegistrationList({ characters }: { characters: AdminChar
 
   const updateFilters = (nextSearch: string, nextStatus: string, nextTier: string, nextDiscord: string) => {
     navigateTo(
-      route('registrations.index', {
+      route('admin.character-approvals.index', {
         ...currentQueryParams,
         search: nextSearch || undefined,
         status: nextStatus || undefined,
@@ -405,7 +405,7 @@ export default function RegistrationList({ characters }: { characters: AdminChar
                               color="warning"
                               disabled={status === 'pending'}
                               onClick={() =>
-                                router.patch(route('registrations.characters.update', { character: character.id }), {
+                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'pending',
                                 })
                               }
@@ -419,7 +419,7 @@ export default function RegistrationList({ characters }: { characters: AdminChar
                               color="success"
                               disabled={status === 'approved'}
                               onClick={() =>
-                                router.patch(route('registrations.characters.update', { character: character.id }), {
+                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'approved',
                                 })
                               }
@@ -433,7 +433,7 @@ export default function RegistrationList({ characters }: { characters: AdminChar
                               color="error"
                               disabled={status === 'declined'}
                               onClick={() =>
-                                router.patch(route('registrations.characters.update', { character: character.id }), {
+                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'declined',
                                 })
                               }

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class RulesAttachmentController extends Controller
+class HandbookAttachmentController extends Controller
 {
     public function __invoke(Request $request, DiscordMessageAttachment $discordMessageAttachment): RedirectResponse|StreamedResponse
     {

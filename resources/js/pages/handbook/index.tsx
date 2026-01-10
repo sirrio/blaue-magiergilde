@@ -10,7 +10,7 @@ type ThreadBlock = {
   messages: DiscordBackupMessage[]
 }
 
-interface RulesPageProps {
+interface HandbookPageProps {
   channels: DiscordBackupChannel[]
   activeChannelId?: string | null
   messages: DiscordBackupMessage[]
@@ -148,7 +148,7 @@ const applyInlineFormatting = (
 
   const buildChannelLink = (label: string, channelId: string, channelName: string) => {
     const display = channelName || label
-    const href = route('rules.index', { channel: channelId })
+    const href = route('handbook.index', { channel: channelId })
     return `<a href="${escapeHref(href)}" class="discord-thread-link">${escapeHtml(display)}</a>`
   }
 
@@ -297,7 +297,7 @@ const MessageAttachments = ({ message }: { message: DiscordBackupMessage }) => {
     <div className="mt-2 flex flex-col gap-2 text-xs">
       {message.attachments.map((attachment) => {
         const href = attachment.storage_path
-          ? route('rules.attachments.show', attachment.id)
+          ? route('handbook.attachments.show', attachment.id)
           : attachment.url
         const isImage = isImageAttachment(attachment.filename)
 
@@ -365,7 +365,7 @@ const MessageList = ({
   )
 }
 
-export default function RulesIndex({ channels, activeChannelId, messages, threads }: RulesPageProps) {
+export default function HandbookIndex({ channels, activeChannelId, messages, threads }: HandbookPageProps) {
   const [openThreadId, setOpenThreadId] = useState<string | null>(null)
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
@@ -463,7 +463,7 @@ export default function RulesIndex({ channels, activeChannelId, messages, thread
                 </div>
               ) : (
                 <p className="text-sm text-base-content/60">
-                  No content found. Select text channels in Admin settings.
+                  No content found. Select text channels in Backup.
                 </p>
               )}
             </CardContent>

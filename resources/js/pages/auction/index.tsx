@@ -9,7 +9,7 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps, VoiceSettings } from '@/types'
+import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { EyeOff, FlaskRound, History, Mic, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
@@ -207,7 +207,7 @@ const AuctionItemBidControls = ({
     }
 
     router.post(
-      route('auction-items.bids.store', { auctionItem: auctionItem.id }),
+      route('admin.auction-items.bids.store', { auctionItem: auctionItem.id }),
       { bidder_discord_id: candidateId, bidder_name: candidateName, amount: minBid },
       {
         preserveScroll: true,
@@ -289,7 +289,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
   const handleDelete = (bidId: number) => {
     if (!window.confirm('Delete bid?')) return
 
-    router.delete(route('auction-bids.destroy', { auctionBid: bidId }), {
+    router.delete(route('admin.auction-bids.destroy', { auctionBid: bidId }), {
       preserveScroll: true,
       preserveState: true,
       onError: () => {
@@ -422,7 +422,7 @@ const HiddenBidModal = ({
       return
     }
 
-    post(route('auction-items.hidden-bids.store', { auctionItem: auctionItem.id }), {
+    post(route('admin.auction-items.hidden-bids.store', { auctionItem: auctionItem.id }), {
       preserveScroll: true,
       onSuccess: () => {
         reset('bidder_discord_id', 'bidder_name')
@@ -441,7 +441,7 @@ const HiddenBidModal = ({
   const handleDelete = (hiddenBidId: number) => {
     if (!window.confirm('Delete hidden bid?')) return
 
-    router.delete(route('auction-hidden-bids.destroy', { auctionHiddenBid: hiddenBidId }), {
+    router.delete(route('admin.auction-hidden-bids.destroy', { auctionHiddenBid: hiddenBidId }), {
       preserveScroll: true,
       preserveState: true,
       onError: () => {
@@ -645,7 +645,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
 
   const handleSubmit = () => {
     if (!hasItems) return
-    post(route('auction-items.store', { auction: auction.id }), {
+    post(route('admin.auction-items.store', { auction: auction.id }), {
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
@@ -725,26 +725,23 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
 export default function Index({
   auctions,
   items,
-  voiceSettings: initialVoiceSettings,
   auctionSettings,
 }: {
   auctions: Auction[]
   items: Item[]
-  voiceSettings: VoiceSettings
   auctionSettings: AuctionSettings
 }) {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(auctions[0] ?? null)
-  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(initialVoiceSettings)
+  const [settings, setSettings] = useState<AuctionSettings>(auctionSettings ?? {})
   const [voiceCandidates, setVoiceCandidates] = useState<AuctionVoiceCandidate[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
   const [isPostingAuction, setIsPostingAuction] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingVoiceChannel, setIsSavingVoiceChannel] = useState(false)
-  const [postChannel, setPostChannel] = useState<AuctionSettings>(auctionSettings ?? {})
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
-  const voiceChannelIdRef = useRef<string | null>(initialVoiceSettings?.voice_channel_id ?? null)
+  const voiceChannelIdRef = useRef<string | null>(auctionSettings?.voice_channel_id ?? null)
   const { auth } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
 
@@ -758,19 +755,15 @@ export default function Index({
   }, [auctions, selectedAuction?.id])
 
   useEffect(() => {
-    const nextChannelId = initialVoiceSettings?.voice_channel_id ?? null
+    const nextChannelId = auctionSettings?.voice_channel_id ?? null
     const prevChannelId = voiceChannelIdRef.current
 
-    setVoiceSettings(initialVoiceSettings)
+    setSettings(auctionSettings ?? {})
 
     if (nextChannelId !== prevChannelId) {
       setVoiceCandidates([])
       voiceChannelIdRef.current = nextChannelId
     }
-  }, [initialVoiceSettings])
-
-  useEffect(() => {
-    setPostChannel(auctionSettings ?? {})
   }, [auctionSettings])
 
   useEffect(() => {
@@ -813,7 +806,7 @@ export default function Index({
       }
 
       try {
-        const response = await fetch(route('auction-settings.update'), {
+        const response = await fetch(route('admin.auction-settings.update'), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -830,13 +823,14 @@ export default function Index({
           return
         }
 
-        setPostChannel({
+        setSettings((current) => ({
+          ...current,
           post_channel_id: selection.id,
           post_channel_name: selection.name,
           post_channel_type: selection.type,
           post_channel_guild_id: selection.guild_id,
           post_channel_is_thread: selection.is_thread,
-        })
+        }))
         toast.show('Posting channel saved.', 'info')
       } catch (error) {
         toast.show('Channel could not be saved.', 'error')
@@ -853,7 +847,7 @@ export default function Index({
       return
     }
     if (isPostingAuction) return
-    if (!postChannel.post_channel_id) {
+    if (!settings.post_channel_id) {
       toast.show('Select a posting channel first.', 'error')
       return
     }
@@ -869,7 +863,7 @@ export default function Index({
 
     setIsPostingAuction(true)
     try {
-      const response = await fetch(route('auctions.post', selectedAuction.id), {
+      const response = await fetch(route('admin.auctions.post', selectedAuction.id), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -877,7 +871,7 @@ export default function Index({
           'X-CSRF-TOKEN': csrfToken,
         },
         credentials: 'same-origin',
-        body: JSON.stringify({ channel_id: postChannel.post_channel_id }),
+        body: JSON.stringify({ channel_id: settings.post_channel_id }),
       })
 
       const payload = await response.json().catch(() => ({}))
@@ -892,16 +886,16 @@ export default function Index({
     } finally {
       setIsPostingAuction(false)
     }
-  }, [isPostingAuction, postChannel.post_channel_id, selectedAuction])
+  }, [isPostingAuction, selectedAuction, settings.post_channel_id])
 
-  const destinationLabel = postChannel.post_channel_name ?? postChannel.post_channel_id ?? 'Not set'
-  const destinationKind = postChannel.post_channel_id
-    ? postChannel.post_channel_is_thread
+  const destinationLabel = settings.post_channel_name ?? settings.post_channel_id ?? 'Not set'
+  const destinationKind = settings.post_channel_id
+    ? settings.post_channel_is_thread
       ? 'Thread'
       : 'Channel'
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
-  const hasPostDestination = Boolean(postChannel.post_channel_id)
+  const hasPostDestination = Boolean(settings.post_channel_id)
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
     const confirmed = window.confirm(
@@ -910,7 +904,7 @@ export default function Index({
     if (!confirmed) return
 
     router.put(
-      route('auctions.update', { auction: selectedAuction.id }),
+      route('admin.auctions.update', { auction: selectedAuction.id }),
       { status: 'closed' },
       {
         preserveScroll: true,
@@ -920,7 +914,7 @@ export default function Index({
   }
 
   const syncVoiceCandidates = useCallback(async (showToast: boolean) => {
-    if (!voiceSettings.voice_channel_id || isSyncingRef.current) return
+    if (!settings.voice_channel_id || isSyncingRef.current) return
 
     const csrfToken = getCsrfToken()
     if (!csrfToken) {
@@ -931,7 +925,7 @@ export default function Index({
     isSyncingRef.current = true
     setIsSyncing(true)
     try {
-      const response = await fetch(route('voice-settings.sync'), {
+      const response = await fetch(route('admin.auctions.voice.sync'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -960,7 +954,7 @@ export default function Index({
       isSyncingRef.current = false
       setIsSyncing(false)
     }
-  }, [voiceSettings.voice_channel_id])
+  }, [settings.voice_channel_id])
 
   const handleRefreshCandidates = () => {
     if (manualCooldownRemaining > 0) return
@@ -1006,7 +1000,7 @@ export default function Index({
     () => (useMockCandidates ? mockVoiceCandidates : voiceCandidates),
     [useMockCandidates, voiceCandidates],
   )
-  const voiceChannelLabel = voiceSettings.voice_channel_name ?? voiceSettings.voice_channel_id ?? 'Not set'
+  const voiceChannelLabel = settings.voice_channel_name ?? settings.voice_channel_id ?? 'Not set'
 
   const manualCooldownLabel = manualCooldownRemaining > 0 ? `Refresh (${manualCooldownRemaining}s)` : 'Refresh'
 
@@ -1025,14 +1019,14 @@ export default function Index({
 
       setIsSavingVoiceChannel(true)
       router.patch(
-        route('voice-settings.update'),
+        route('admin.auction-settings.update'),
         payload,
         {
           preserveScroll: true,
           onSuccess: () => {
-            setVoiceSettings(payload)
+            setSettings((current) => ({ ...current, ...payload }))
             toast.show('Voice channel saved.', 'info')
-            router.reload({ only: ['voiceSettings'] })
+            router.reload({ only: ['auctionSettings'] })
           },
           onError: (errors) => {
             toast.show(String(errors.voice_channel_id ?? 'Voice channel could not be saved.'), 'error')
@@ -1047,7 +1041,7 @@ export default function Index({
   )
 
   useEffect(() => {
-    if (!voiceSettings.voice_channel_id) return
+    if (!settings.voice_channel_id) return
 
     void syncVoiceCandidates(false)
 
@@ -1068,7 +1062,7 @@ export default function Index({
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [syncVoiceCandidates, voiceSettings.voice_channel_id])
+  }, [syncVoiceCandidates, settings.voice_channel_id])
 
   return (
     <AppLayout>
@@ -1185,7 +1179,7 @@ export default function Index({
                     size="sm"
                     variant="outline"
                     onClick={handlePostAuction}
-                    disabled={!postChannel.post_channel_id || isPostingAuction}
+                    disabled={!settings.post_channel_id || isPostingAuction}
                     className="gap-2"
                   >
                     <Send size={16} />
@@ -1208,7 +1202,7 @@ export default function Index({
             </div>
 
             <div className="mb-4 flex flex-wrap items-center gap-3">
-              {voiceSettings.voice_channel_id || useMockCandidates ? (
+              {settings.voice_channel_id || useMockCandidates ? (
                 <>
                   {candidates.length === 0 ? (
                     <p className="text-xs text-base-content/70">No users online.</p>
@@ -1228,7 +1222,7 @@ export default function Index({
                     size="sm"
                     variant="outline"
                     onClick={handleRefreshCandidates}
-                    disabled={!voiceSettings.voice_channel_id || isSyncing || manualCooldownRemaining > 0}
+                    disabled={!settings.voice_channel_id || isSyncing || manualCooldownRemaining > 0}
                   >
                     {manualCooldownLabel}
                   </Button>

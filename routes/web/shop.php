@@ -6,19 +6,21 @@ use App\Http\Controllers\Shop\ShopPostController;
 use App\Http\Controllers\Shop\ShopSettingController;
 use Illuminate\Support\Facades\Route;
 
-Route::resource('shops', ShopController::class)->only([
-    'index',
-    'store',
-])->middleware(['auth']);
+Route::middleware(['auth'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('shops', ShopController::class)->only([
+            'index',
+            'store',
+        ]);
 
-Route::post('shops/{shop}/post', ShopPostController::class)
-    ->middleware(['auth'])
-    ->name('shops.post');
+        Route::post('shops/{shop}/post', ShopPostController::class)
+            ->name('shops.post');
 
-Route::patch('shops/settings', ShopSettingController::class)
-    ->middleware(['auth'])
-    ->name('shop-settings.update');
+        Route::patch('shops/settings', ShopSettingController::class)
+            ->name('shop-settings.update');
 
-Route::post('shop-items/{shopItem}/add-spell', AddSpellToItemController::class)
-    ->middleware(['auth'])
-    ->name('shop-items.add-spell');
+        Route::post('shop-items/{shopItem}/add-spell', AddSpellToItemController::class)
+            ->name('shop-items.add-spell');
+    });

@@ -43,7 +43,7 @@ export default function Index({ spells }: { spells: Spell[] }) {
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
     const buildHref = (filterValue: string | null): string =>
-      route('spells.index', {
+      route('admin.spells.index', {
         ...currentQueryParams,
         [filterKey]: filterValue,
       })
@@ -77,7 +77,7 @@ export default function Index({ spells }: { spells: Spell[] }) {
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    navigateTo(route('spells.index', { ...currentQueryParams, search: value }))
+    navigateTo(route('admin.spells.index', { ...currentQueryParams, search: value }))
   }
 
   const activeFilters = [

@@ -3,22 +3,22 @@
 namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auction\SyncVoiceSettingRequest;
-use App\Models\VoiceSetting;
+use App\Http\Requests\Auction\SyncAuctionVoiceRequest;
+use App\Models\AuctionSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 
-class VoiceSettingSyncController extends Controller
+class AuctionVoiceSyncController extends Controller
 {
     /**
      * Sync voice channel members via the bot HTTP endpoint.
      */
-    public function __invoke(SyncVoiceSettingRequest $request): JsonResponse
+    public function __invoke(SyncAuctionVoiceRequest $request): JsonResponse
     {
-        $settings = VoiceSetting::current();
+        $settings = AuctionSetting::current();
 
         if (! $settings->voice_channel_id) {
-            return response()->json(['error' => 'No voice channel ID set.'], 422);
+            return response()->json(['error' => 'No voice channel selected.'], 422);
         }
 
         $botUrl = trim((string) config('services.bot.http_url', ''));
