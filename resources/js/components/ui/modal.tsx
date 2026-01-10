@@ -94,7 +94,7 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false 
                 {titleElement}
               </h3>
               <div className="text-sm">{contentElement}</div>
-              <div className="modal-action">{actionElement}</div>
+              {actionElement ? <div className="modal-action">{actionElement}</div> : null}
             </div>
           </dialog>,
           document.body

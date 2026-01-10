@@ -126,6 +126,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       toast.show('Select a posting channel first.', 'error')
       return
     }
+    if (!window.confirm('Post this shop to Discord now?')) {
+      return
+    }
 
     const csrfToken = getCsrfToken()
     if (!csrfToken) {

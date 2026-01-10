@@ -857,6 +857,9 @@ export default function Index({
       toast.show('Select a posting channel first.', 'error')
       return
     }
+    if (!window.confirm('Post this auction to Discord now?')) {
+      return
+    }
 
     const csrfToken = getCsrfToken()
     if (!csrfToken) {

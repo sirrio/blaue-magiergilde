@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { DiscordBackupChannel } from '@/types'
@@ -449,34 +449,44 @@ export default function DiscordChannelPickerModal({
       </ModalTrigger>
       <ModalTitle>{title}</ModalTitle>
       <ModalContent>
-        {description ? <p className="text-xs text-base-content/70">{description}</p> : null}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold">Available channels</p>
-          <div className="flex flex-wrap gap-2">
-            {enableThreadLoader && mode === 'single' ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleLoadThreads}
-                disabled={!pendingSingle || pendingSingle.is_thread || threadLoadingId === pendingSingle?.id}
-              >
-                {threadLoadingId === pendingSingle?.id ? 'Loading threads...' : 'Load threads'}
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
+          {description ? <p className="text-xs text-base-content/70">{description}</p> : null}
+          <div className="sticky top-0 z-20 mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-base-200 bg-base-100/95 py-2 backdrop-blur">
+            <p className="text-sm font-semibold">Available channels</p>
+            <div className="flex flex-wrap gap-2">
+              {enableThreadLoader && mode === 'single' ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleLoadThreads}
+                  disabled={!pendingSingle || pendingSingle.is_thread || threadLoadingId === pendingSingle?.id}
+                >
+                  {threadLoadingId === pendingSingle?.id ? 'Loading threads...' : 'Load threads'}
+                </Button>
+              ) : null}
+              <Button size="sm" variant="outline" onClick={handleRefreshChannels} disabled={isRefreshingChannels}>
+                Load channels
               </Button>
-            ) : null}
-            <Button size="sm" variant="outline" onClick={handleRefreshChannels} disabled={isRefreshingChannels}>
-              Load channels
-            </Button>
+            </div>
+          </div>
+          <div className="pb-4">
+            {availableGuildEntries.length === 0 ? (
+              <p className="mt-3 text-xs text-base-content/70">
+                No channels loaded yet. Click &quot;Load channels&quot;.
+              </p>
+            ) : (
+              renderGuildGroups(availableGuildEntries)
+            )}
+          </div>
+          <div className="sticky bottom-0 z-20 -mx-1 border-t border-base-200 bg-base-100/95 py-2 backdrop-blur">
+            <div className="flex justify-end px-1">
+              <Button size="sm" variant="outline" onClick={handleConfirm}>
+                {confirmLabel ?? 'Confirm'}
+              </Button>
+            </div>
           </div>
         </div>
-        {availableGuildEntries.length === 0 ? (
-          <p className="mt-3 text-xs text-base-content/70">
-            No channels loaded yet. Click &quot;Load channels&quot;.
-          </p>
-        ) : (
-          renderGuildGroups(availableGuildEntries)
-        )}
       </ModalContent>
-      <ModalAction onClick={handleConfirm}>{confirmLabel ?? 'Confirm'}</ModalAction>
     </Modal>
   )
 }

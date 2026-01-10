@@ -2,6 +2,10 @@ const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
 
+function nowSql() {
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function missingPermissions(permissions, required) {
     return required.filter(perm => !permissions?.has(perm));
 }
@@ -50,6 +54,73 @@ function formatAuctionLine(row, currency) {
     const itemLabel = formatLink(displayName, row.url);
     const missing = getRepairMissing(row);
     return `**(${row.remaining_auctions})** - ${row.starting_bid} ${currency} - ${itemLabel} (${missing})`;
+}
+
+function parseMessageIds(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean).map(String);
+    if (typeof value !== 'string') return [];
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    } catch {
+        return [];
+    }
+    return [];
+}
+
+async function fetchAuctionPostState() {
+    const [rows] = await db.execute(
+        'SELECT id, last_post_channel_id, last_post_message_ids FROM auction_settings ORDER BY id ASC LIMIT 1',
+    );
+    if (!rows[0]) return null;
+    return {
+        id: rows[0].id,
+        lastPostChannelId: rows[0].last_post_channel_id,
+        lastPostMessageIds: parseMessageIds(rows[0].last_post_message_ids),
+    };
+}
+
+async function saveAuctionPostState({ settingsId, channelId, messageIds }) {
+    const payload = JSON.stringify(messageIds ?? []);
+    const timestamp = nowSql();
+
+    if (!settingsId) {
+        await db.execute(
+            'INSERT INTO auction_settings (last_post_channel_id, last_post_message_ids, created_at, updated_at) VALUES (?, ?, ?, ?)',
+            [channelId, payload, timestamp, timestamp],
+        );
+        return;
+    }
+
+    await db.execute(
+        'UPDATE auction_settings SET last_post_channel_id = ?, last_post_message_ids = ?, updated_at = ? WHERE id = ?',
+        [channelId, payload, timestamp, settingsId],
+    );
+}
+
+async function deletePreviousPosts({ client, settings }) {
+    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return;
+
+    let channel;
+    try {
+        await waitForDiscordRateLimit(client);
+        channel = await client.channels.fetch(settings.lastPostChannelId);
+    } catch {
+        return;
+    }
+
+    if (!channel?.isTextBased?.()) return;
+
+    for (const messageId of settings.lastPostMessageIds) {
+        try {
+            await waitForDiscordRateLimit(client);
+            // eslint-disable-next-line no-await-in-loop
+            await channel.messages.delete(messageId);
+        } catch {
+            // Ignore missing permissions or deleted messages.
+        }
+    }
 }
 
 async function fetchAuction(auctionId) {
@@ -161,20 +232,25 @@ async function resolveDestination({ client, channelId, auction }) {
 }
 
 async function sendOneLine(destination, line) {
-    if (!line) return;
+    if (!line) return null;
     await waitForDiscordRateLimit(destination.client);
-    await destination.send(String(line));
+    const message = await destination.send(String(line));
+    return message?.id ?? null;
 }
 
 async function sendLines(destination, lines) {
+    const messageIds = [];
     for (const line of lines) {
         // eslint-disable-next-line no-await-in-loop
-        await sendOneLine(destination, line);
+        const messageId = await sendOneLine(destination, line);
+        if (messageId) messageIds.push(messageId);
     }
+    return messageIds;
 }
 
 async function postAuctionToChannel({ client, channelId, auctionId }) {
     attachRateLimitListener(client);
+    const postState = await fetchAuctionPostState();
     const auction = await fetchAuction(auctionId);
     if (!auction) {
         return { ok: false, status: 404, error: `Auction #${auctionId} not found.` };
@@ -191,9 +267,14 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
     }
 
     const destination = destinationResult.destination;
+    const messageIds = [];
+
+    await deletePreviousPosts({ client, settings: postState });
+
     const createdAtUnix = Math.floor(new Date(auction.created_at).getTime() / 1000);
     const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(auction.created_at);
-    await sendOneLine(destination, `**Auction #${String(auction.id).padStart(3, '0')}** - Created: ${createdAtText}`);
+    const headerId = await sendOneLine(destination, `**Auction #${String(auction.id).padStart(3, '0')}** - Created: ${createdAtText}`);
+    if (headerId) messageIds.push(headerId);
 
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
@@ -217,7 +298,8 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
             if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
 
-        await sendOneLine(destination, `## ${rarityDisplayName(rarity)}`);
+        const sectionId = await sendOneLine(destination, `## ${rarityDisplayName(rarity)}`);
+        if (sectionId) messageIds.push(sectionId);
 
         const lines = [];
         typeOrder.forEach((type) => {
@@ -226,11 +308,18 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
                 lines.push(formatAuctionLine(row, auction.currency || 'GP'));
             });
         });
-        await sendLines(destination, lines);
+        messageIds.push(...await sendLines(destination, lines));
     }
 
     const updateUnix = Math.floor(Date.now() / 1000);
-    await sendOneLine(destination, `# :exclamation: Letzte aktuallisierung <t:${updateUnix}:R> :exclamation:`);
+    const updateId = await sendOneLine(destination, `# :exclamation: Letzte aktuallisierung <t:${updateUnix}:R> :exclamation:`);
+    if (updateId) messageIds.push(updateId);
+
+    await saveAuctionPostState({
+        settingsId: postState?.id ?? null,
+        channelId: destination.id,
+        messageIds,
+    });
 
     return {
         ok: true,

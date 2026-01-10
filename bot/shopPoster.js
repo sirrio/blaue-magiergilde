@@ -2,6 +2,10 @@ const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
 
+function nowSql() {
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function missingPermissions(permissions, required) {
     return required.filter(perm => !permissions?.has(perm));
 }
@@ -67,6 +71,73 @@ function formatItemLine(row) {
     const prefix = parts.join(' - ');
     const cost = row.cost ? `: ${row.cost}` : '';
     return `${prefix}${cost}`;
+}
+
+function parseMessageIds(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean).map(String);
+    if (typeof value !== 'string') return [];
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    } catch {
+        return [];
+    }
+    return [];
+}
+
+async function fetchShopPostState() {
+    const [rows] = await db.execute(
+        'SELECT id, last_post_channel_id, last_post_message_ids FROM shop_settings ORDER BY id ASC LIMIT 1',
+    );
+    if (!rows[0]) return null;
+    return {
+        id: rows[0].id,
+        lastPostChannelId: rows[0].last_post_channel_id,
+        lastPostMessageIds: parseMessageIds(rows[0].last_post_message_ids),
+    };
+}
+
+async function saveShopPostState({ settingsId, channelId, messageIds }) {
+    const payload = JSON.stringify(messageIds ?? []);
+    const timestamp = nowSql();
+
+    if (!settingsId) {
+        await db.execute(
+            'INSERT INTO shop_settings (last_post_channel_id, last_post_message_ids, created_at, updated_at) VALUES (?, ?, ?, ?)',
+            [channelId, payload, timestamp, timestamp],
+        );
+        return;
+    }
+
+    await db.execute(
+        'UPDATE shop_settings SET last_post_channel_id = ?, last_post_message_ids = ?, updated_at = ? WHERE id = ?',
+        [channelId, payload, timestamp, settingsId],
+    );
+}
+
+async function deletePreviousPosts({ client, settings }) {
+    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return;
+
+    let channel;
+    try {
+        await waitForDiscordRateLimit(client);
+        channel = await client.channels.fetch(settings.lastPostChannelId);
+    } catch {
+        return;
+    }
+
+    if (!channel?.isTextBased?.()) return;
+
+    for (const messageId of settings.lastPostMessageIds) {
+        try {
+            await waitForDiscordRateLimit(client);
+            // eslint-disable-next-line no-await-in-loop
+            await channel.messages.delete(messageId);
+        } catch {
+            // Ignore missing permissions or deleted messages.
+        }
+    }
 }
 
 async function fetchShop(shopId) {
@@ -183,18 +254,23 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
 async function sendOneLine(destination, line) {
     if (!line) return;
     await waitForDiscordRateLimit(destination.client);
-    await destination.send(String(line));
+    const message = await destination.send(String(line));
+    return message?.id ?? null;
 }
 
 async function sendLines(destination, lines) {
+    const messageIds = [];
     for (const line of lines) {
         // eslint-disable-next-line no-await-in-loop
-        await sendOneLine(destination, line);
+        const messageId = await sendOneLine(destination, line);
+        if (messageId) messageIds.push(messageId);
     }
+    return messageIds;
 }
 
 async function postShopToChannel({ client, channelId, shopId, threadName }) {
     attachRateLimitListener(client);
+    const postState = await fetchShopPostState();
     const shop = await fetchShop(shopId);
     if (!shop) {
         return { ok: false, status: 404, error: `Shop #${shopId} not found.` };
@@ -211,10 +287,14 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
     }
 
     const destination = destinationResult.destination;
+    const messageIds = [];
+
+    await deletePreviousPosts({ client, settings: postState });
 
     const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
     const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
-    await sendOneLine(destination, `**Shop #${String(shop.id).padStart(3, '0')}** - Rolled: ${createdAtText}`);
+    const headerId = await sendOneLine(destination, `**Shop #${String(shop.id).padStart(3, '0')}** - Rolled: ${createdAtText}`);
+    if (headerId) messageIds.push(headerId);
 
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
@@ -241,23 +321,33 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
             if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
 
-        await sendOneLine(destination, `## ***?? ${rarityLabel} Magic Items (${tierText}):***`);
-        await sendLines(destination, (byType.get('item') ?? []).map(formatItemLine));
+        const sectionId = await sendOneLine(destination, `## ***?? ${rarityLabel} Magic Items (${tierText}):***`);
+        if (sectionId) messageIds.push(sectionId);
+        messageIds.push(...await sendLines(destination, (byType.get('item') ?? []).map(formatItemLine)));
 
         const consumableLines = (byType.get('consumable') ?? []).map(formatItemLine);
         const scrollLines = (byType.get('spellscroll') ?? []).map(formatItemLine);
 
         if (rarity === 'common' || rarity === 'uncommon') {
-            await sendOneLine(destination, `### ${rarityLabel} Consumable`);
-            await sendLines(destination, consumableLines);
+            const consumableHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable`);
+            if (consumableHeaderId) messageIds.push(consumableHeaderId);
+            messageIds.push(...await sendLines(destination, consumableLines));
 
-            await sendOneLine(destination, `### ${rarityLabel} Spell Scroll`);
-            await sendLines(destination, scrollLines);
+            const scrollHeaderId = await sendOneLine(destination, `### ${rarityLabel} Spell Scroll`);
+            if (scrollHeaderId) messageIds.push(scrollHeaderId);
+            messageIds.push(...await sendLines(destination, scrollLines));
         } else {
-            await sendOneLine(destination, `### ${rarityLabel} Consumable/Spell Scroll`);
-            await sendLines(destination, [...consumableLines, ...scrollLines]);
+            const mixedHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable/Spell Scroll`);
+            if (mixedHeaderId) messageIds.push(mixedHeaderId);
+            messageIds.push(...await sendLines(destination, [...consumableLines, ...scrollLines]));
         }
     }
+
+    await saveShopPostState({
+        settingsId: postState?.id ?? null,
+        channelId: destination.id,
+        messageIds,
+    });
 
     return {
         ok: true,
