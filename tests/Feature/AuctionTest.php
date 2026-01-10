@@ -25,7 +25,6 @@ it('rejects bids above a hidden max', function () {
     $auctionItem = AuctionItem::query()->create([
         'auction_id' => $auction->id,
         'item_id' => $item->id,
-        'starting_bid' => 50,
         'repair_current' => 100,
         'repair_max' => 1000,
         'remaining_auctions' => 3,
@@ -63,7 +62,6 @@ it('rolls over eligible items when closing an auction', function () {
     $carryAuctionItem = AuctionItem::query()->create([
         'auction_id' => $auction->id,
         'item_id' => $carryItem->id,
-        'starting_bid' => 50,
         'repair_current' => 100,
         'repair_max' => 1000,
         'remaining_auctions' => 2,
@@ -71,7 +69,6 @@ it('rolls over eligible items when closing an auction', function () {
     $expiredAuctionItem = AuctionItem::query()->create([
         'auction_id' => $auction->id,
         'item_id' => $expiredItem->id,
-        'starting_bid' => 50,
         'repair_current' => 100,
         'repair_max' => 1000,
         'remaining_auctions' => 1,
@@ -79,7 +76,6 @@ it('rolls over eligible items when closing an auction', function () {
     $soldAuctionItem = AuctionItem::query()->create([
         'auction_id' => $auction->id,
         'item_id' => $soldItem->id,
-        'starting_bid' => 50,
         'repair_current' => 100,
         'repair_max' => 1000,
         'remaining_auctions' => 3,

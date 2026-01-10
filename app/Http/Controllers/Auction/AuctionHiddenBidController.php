@@ -20,13 +20,13 @@ class AuctionHiddenBidController extends Controller
     public function store(StoreAuctionHiddenBidRequest $request, AuctionItem $auctionItem): RedirectResponse
     {
         DB::transaction(function () use ($request, $auctionItem): void {
+            $lockedAuction = Auction::query()
+                ->lockForUpdate()
+                ->findOrFail($auctionItem->auction_id);
+
             $lockedItem = AuctionItem::query()
                 ->lockForUpdate()
                 ->findOrFail($auctionItem->id);
-
-            $lockedAuction = Auction::query()
-                ->lockForUpdate()
-                ->findOrFail($lockedItem->auction_id);
 
             if ($lockedAuction->status !== 'open') {
                 throw ValidationException::withMessages([

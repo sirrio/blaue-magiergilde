@@ -31,7 +31,7 @@ class AuctionController extends Controller
         $auctions = Auction::query()
             ->with([
                 'auctionItems' => fn ($query) => $query
-                    ->select(['id', 'auction_id', 'item_id', 'notes', 'starting_bid', 'repair_current', 'repair_max', 'remaining_auctions'])
+                    ->select(['id', 'auction_id', 'item_id', 'notes', 'repair_current', 'repair_max', 'remaining_auctions'])
                     ->orderBy('id'),
                 'auctionItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
                 'auctionItems.bids' => fn ($query) => $query
@@ -128,7 +128,6 @@ class AuctionController extends Controller
                 $newAuction->auctionItems()->create([
                     'item_id' => $auctionItem->item_id,
                     'notes' => $auctionItem->notes,
-                    'starting_bid' => $auctionItem->starting_bid,
                     'repair_current' => $auctionItem->repair_current,
                     'repair_max' => $auctionItem->repair_max,
                     'remaining_auctions' => $nextRemaining,

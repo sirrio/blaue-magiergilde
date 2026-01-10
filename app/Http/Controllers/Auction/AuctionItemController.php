@@ -7,6 +7,7 @@ use App\Http\Requests\Auction\StoreAuctionItemRequest;
 use App\Models\Auction;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AuctionItemController extends Controller
@@ -26,33 +27,11 @@ class AuctionItemController extends Controller
         return (int) $digits;
     }
 
-    private function getBidStep(Item $item): int
-    {
-        $baseStep = match ($item->rarity) {
-            'uncommon' => 50,
-            'rare' => 100,
-            'very_rare' => 500,
-            default => 10,
-        };
-
-        if (in_array($item->type, ['consumable', 'spellscroll'], true)) {
-            $baseStep = intdiv($baseStep, 2);
-        }
-
-        return max(1, $baseStep);
-    }
-
     /**
      * Store a newly created resource in storage.
      */
     public function store(StoreAuctionItemRequest $request, Auction $auction): RedirectResponse
     {
-        if ($auction->status !== 'open') {
-            throw ValidationException::withMessages([
-                'auction' => 'Auction is closed.',
-            ]);
-        }
-
         $repairCurrent = $request->input('repair_current');
         $notes = $request->input('notes');
 
@@ -76,18 +55,31 @@ class AuctionItemController extends Controller
             $repairCurrent = $costValue !== null ? intdiv($costValue, 10) : 0;
         }
 
-        $step = $item ? $this->getBidStep($item) : 1;
-        $halfRepair = (int) ceil(((int) $repairCurrent) / 2);
-        $startingBid = (int) (ceil($halfRepair / $step) * $step);
+        DB::transaction(function () use (
+            $auction,
+            $notes,
+            $request,
+            $repairCurrent,
+            $repairMax,
+        ): void {
+            $lockedAuction = Auction::query()
+                ->lockForUpdate()
+                ->findOrFail($auction->id);
 
-        $auction->auctionItems()->create([
-            'item_id' => $request->item_id,
-            'notes' => $notes,
-            'starting_bid' => $startingBid,
-            'remaining_auctions' => $request->remaining_auctions,
-            'repair_current' => $repairCurrent,
-            'repair_max' => $repairMax,
-        ]);
+            if ($lockedAuction->status !== 'open') {
+                throw ValidationException::withMessages([
+                    'auction' => 'Auction is closed.',
+                ]);
+            }
+
+            $lockedAuction->auctionItems()->create([
+                'item_id' => $request->item_id,
+                'notes' => $notes,
+                'remaining_auctions' => $request->remaining_auctions,
+                'repair_current' => $repairCurrent,
+                'repair_max' => $repairMax,
+            ]);
+        });
 
         return redirect()->back();
     }

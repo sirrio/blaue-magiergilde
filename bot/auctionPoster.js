@@ -40,6 +40,27 @@ function formatLink(name, url) {
     return `[${name}](<${url}>)`;
 }
 
+function getBidStep(row) {
+    let baseStep = 10;
+    if (row.rarity === 'uncommon') baseStep = 50;
+    if (row.rarity === 'rare') baseStep = 100;
+    if (row.rarity === 'very_rare') baseStep = 500;
+
+    if (row.type === 'consumable' || row.type === 'spellscroll') {
+        baseStep = Math.floor(baseStep / 2);
+    }
+
+    return Math.max(1, baseStep);
+}
+
+function getStartingBid(row) {
+    const step = getBidStep(row);
+    const repairCurrent = Number(row.repair_current);
+    const currentValue = Number.isFinite(repairCurrent) ? repairCurrent : 0;
+    const halfRepair = Math.ceil(currentValue / 2);
+    return Math.ceil(halfRepair / step) * step;
+}
+
 function getRepairMissing(row) {
     const repairMax = Number(row.repair_max);
     const repairCurrent = Number(row.repair_current);
@@ -53,7 +74,8 @@ function formatAuctionLine(row, currency) {
     const displayName = notes ? `${row.name} - ${notes}` : row.name;
     const itemLabel = formatLink(displayName, row.url);
     const missing = getRepairMissing(row);
-    return `**(${row.remaining_auctions})** - ${row.starting_bid} ${currency} - ${itemLabel} (${missing})`;
+    const startingBid = getStartingBid(row);
+    return `**(${row.remaining_auctions})** - ${startingBid} ${currency} - ${itemLabel} (${missing})`;
 }
 
 function parseMessageIds(value) {
@@ -136,7 +158,6 @@ async function fetchAuctionItems(auctionId) {
         `
             SELECT
                 ai.remaining_auctions,
-                ai.starting_bid,
                 ai.repair_current,
                 ai.repair_max,
                 ai.notes,

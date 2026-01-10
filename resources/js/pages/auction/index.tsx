@@ -77,6 +77,13 @@ const getBidStep = (item: Item): number => {
   return Math.max(1, baseStep)
 }
 
+const getStartingBid = (auctionItem: AuctionItem): number => {
+  const step = getBidStep(auctionItem.item)
+  const repairCurrent = auctionItem.repair_current ?? 0
+  const halfRepair = Math.ceil(repairCurrent / 2)
+  return Math.ceil(halfRepair / step) * step
+}
+
 const formatAuctionCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
 
 const getCsrfToken = () => {
@@ -190,9 +197,10 @@ const AuctionItemBidControls = ({
   highestBidderId?: string | null
 }) => {
   const step = getBidStep(auctionItem.item)
+  const startingBid = getStartingBid(auctionItem)
   const highestBid = getHighestBid(auctionItem)
-  const minBid = highestBid ? Math.max(auctionItem.starting_bid, highestBid.amount + step) : auctionItem.starting_bid
-  const isAmountValid = (minBid - auctionItem.starting_bid) % step === 0
+  const minBid = highestBid ? Math.max(startingBid, highestBid.amount + step) : startingBid
+  const isAmountValid = (minBid - startingBid) % step === 0
 
   const handleBid = (candidateId: string, candidateName: string) => {
     if (!isAmountValid) {
@@ -382,7 +390,7 @@ const HiddenBidModal = ({
   candidates: AuctionVoiceCandidate[]
 }) => {
   const [isOpen, setIsOpen] = useState(false)
-  const defaultMaxAmount = Math.max(auctionItem.starting_bid, 1)
+  const defaultMaxAmount = Math.max(getStartingBid(auctionItem), 1)
   const { data, setData, post, reset } = useForm({
     bidder_discord_id: '',
     bidder_name: '',

@@ -31,20 +31,27 @@ class AuctionBidController extends Controller
         return max(1, $baseStep);
     }
 
+    private function getStartingBid(AuctionItem $auctionItem, int $step): int
+    {
+        $repairCurrent = (int) ($auctionItem->repair_current ?? 0);
+        $halfRepair = (int) ceil($repairCurrent / 2);
+        return (int) (ceil($halfRepair / $step) * $step);
+    }
+
     /**
      * Store a newly created resource in storage.
      */
     public function store(StoreAuctionBidRequest $request, AuctionItem $auctionItem): RedirectResponse
     {
         DB::transaction(function () use ($request, $auctionItem): void {
+            $lockedAuction = Auction::query()
+                ->lockForUpdate()
+                ->findOrFail($auctionItem->auction_id);
+
             $lockedItem = AuctionItem::query()
                 ->with(['item', 'hiddenBids'])
                 ->lockForUpdate()
                 ->findOrFail($auctionItem->id);
-
-            $lockedAuction = Auction::query()
-                ->lockForUpdate()
-                ->findOrFail($lockedItem->auction_id);
 
             if ($lockedAuction->status !== 'open') {
                 throw ValidationException::withMessages([
@@ -53,10 +60,11 @@ class AuctionBidController extends Controller
             }
 
             $step = $this->getBidStep($lockedItem->item);
+            $startingBid = $this->getStartingBid($lockedItem, $step);
             $highestBid = (int) $lockedItem->bids()->max('amount');
             $minBid = $highestBid > 0
-                ? max($lockedItem->starting_bid, $highestBid + $step)
-                : $lockedItem->starting_bid;
+                ? max($startingBid, $highestBid + $step)
+                : $startingBid;
 
             $amount = (int) $request->amount;
             $hiddenBid = $lockedItem->hiddenBids
@@ -74,7 +82,7 @@ class AuctionBidController extends Controller
                 ]);
             }
 
-            if (($amount - $lockedItem->starting_bid) % $step !== 0) {
+            if (($amount - $startingBid) % $step !== 0) {
                 throw ValidationException::withMessages([
                     'amount' => "Bids must be in steps of {$step}.",
                 ]);

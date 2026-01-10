@@ -15,7 +15,6 @@ class AuctionItem extends Model
         'auction_id',
         'item_id',
         'notes',
-        'starting_bid',
         'repair_current',
         'repair_max',
         'remaining_auctions',
