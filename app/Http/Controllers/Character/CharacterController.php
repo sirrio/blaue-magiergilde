@@ -115,6 +115,9 @@ class CharacterController extends Controller
      */
     public function destroy(Character $character): RedirectResponse
     {
+        $character->guild_status = 'declined';
+        $character->save();
+
         Adventure::query()
             ->where('character_id', $character->id)
             ->whereNotNull('deleted_at')

@@ -142,6 +142,28 @@ function humanFactionName(faction) {
     return map[key] || key;
 }
 
+function normalizeGuildStatus(value) {
+    const status = String(value || '').toLowerCase();
+    if (status === 'approved' || status === 'declined' || status === 'pending') {
+        return status;
+    }
+    return 'pending';
+}
+
+function guildStatusLabel(value) {
+    const status = normalizeGuildStatus(value);
+    if (status === 'approved') return 'Approved';
+    if (status === 'declined') return 'Declined';
+    return 'Pending';
+}
+
+function guildStatusEmoji(value) {
+    const status = normalizeGuildStatus(value);
+    if (status === 'approved') return '✅';
+    if (status === 'declined') return '❌';
+    return '⏳';
+}
+
 function tryBuildLocalAvatarAttachment(character) {
     const raw = String(character.avatar || '').trim();
     if (!raw) return null;
@@ -171,6 +193,8 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level);
     const classNames = String(character.class_names || '').trim();
+    const statusLabel = guildStatusLabel(character.guild_status);
+    const statusEmoji = guildStatusEmoji(character.guild_status);
 
     const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -197,6 +221,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
         .setColor(0x4f46e5)
         .setTitle(titleParts.join(' \u00b7 '))
         .addFields(
+            { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
             { name: 'Fortschritt', value: `${buildProgressBar(inCurrent, toNextTotal)}\nNoch: **${toNext}** Bubble(s)`, inline: false },
             { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
             { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },

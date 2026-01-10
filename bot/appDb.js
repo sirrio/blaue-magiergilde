@@ -78,6 +78,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_coins,
                 c.bubble_shop_spend,
                 c.is_filler,
+                c.guild_status,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
@@ -193,10 +194,10 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
 
         const [insertCharacter] = await connection.execute(
             `
-                INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, user_id, created_at, updated_at)
-                VALUES
-                    (?, ?, 0, 0, 0, ?, ?, ?, ?)
+            INSERT INTO characters
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, user_id, guild_status, created_at, updated_at)
+            VALUES
+                    (?, ?, 0, 0, 0, ?, ?, 'pending', ?, ?)
             `,
             [name, startTier, externalLink, userId, createdAt, createdAt],
         );
@@ -285,8 +286,8 @@ async function softDeleteCharacterForDiscord(discordUser, characterId) {
         );
 
         await connection.execute(
-            'UPDATE characters SET deleted_at = ?, updated_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
-            [updatedAt, updatedAt, characterId, userId],
+            'UPDATE characters SET deleted_at = ?, updated_at = ?, guild_status = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
+            [updatedAt, updatedAt, 'declined', characterId, userId],
         );
 
         await connection.commit();
