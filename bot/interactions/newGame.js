@@ -112,8 +112,8 @@ async function handle(interaction) {
         let time = Date.parse(`${dateString}T${timeString}`);
         if (Number.isNaN(time)) time = Date.now();
 
-        const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'westwatch tales');
-        const mention = role ? `<@&${role.id}>` : '@westwatch-tales';
+        const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'magiergilde');
+        const mention = role ? `<@&${role.id}>` : '@Magiergilde';
 
         const emojiMap = {
             BT: '804713705358622800',

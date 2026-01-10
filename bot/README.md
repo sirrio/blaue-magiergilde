@@ -1,8 +1,8 @@
-# Westwatch Tales Bot
+# blauer-magiergilde-bot
 
 ## Befehle
 
-Standard-Prefix ist `wwt` (z.B. `/wwt-characters`).
+Standard-Prefix ist `mg` (z.B. `/mg-characters`).
 
 ### Charaktere (App)
 
@@ -50,7 +50,7 @@ Setze folgende Variablen in der Root-`.env`:
 - `DISCORD_BOT_TOKEN` - Bot Token
 - `DISCORD_CLIENT_ID` - Discord Application ID (wird auch für OAuth in der App genutzt)
 - `DISCORD_GUILD_IDS` - kommaseparierte Liste (für Guild-Commands, meist sofort sichtbar)
-- `DISCORD_COMMAND_PREFIX` - z.B. `wwt`
+- `DISCORD_COMMAND_PREFIX` - z.B. `mg`
 - `DISCORD_OWNER_IDS` - kommaseparierte Discord User IDs (Owner-only Commands)
 - `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
 

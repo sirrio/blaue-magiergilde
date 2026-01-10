@@ -1003,6 +1003,7 @@ export default function Index({
     () => (useMockCandidates ? mockVoiceCandidates : voiceCandidates),
     [useMockCandidates, voiceCandidates],
   )
+  const voiceChannelLabel = voiceSettings.voice_channel_name ?? voiceSettings.voice_channel_id ?? 'Not set'
 
   const manualCooldownLabel = manualCooldownRemaining > 0 ? `Refresh (${manualCooldownRemaining}s)` : 'Refresh'
 
@@ -1011,14 +1012,22 @@ export default function Index({
       if (!selection || Array.isArray(selection)) return
       if (isSavingVoiceChannel) return
 
+      const payload = {
+        voice_channel_id: selection.id,
+        voice_channel_name: selection.name,
+        voice_channel_type: selection.type,
+        voice_channel_guild_id: selection.guild_id,
+        voice_channel_is_thread: selection.is_thread,
+      }
+
       setIsSavingVoiceChannel(true)
       router.patch(
         route('voice-settings.update'),
-        { voice_channel_id: selection.id },
+        payload,
         {
           preserveScroll: true,
           onSuccess: () => {
-            setVoiceSettings({ voice_channel_id: selection.id })
+            setVoiceSettings(payload)
             toast.show('Voice channel saved.', 'info')
             router.reload({ only: ['voiceSettings'] })
           },
@@ -1140,7 +1149,7 @@ export default function Index({
                         <div className="space-y-2">
                           <p className="text-xs text-base-content/70">Voice channel</p>
                           <p className="text-sm font-semibold">
-                            {voiceSettings.voice_channel_id ?? 'Not set'}
+                            {voiceChannelLabel}
                           </p>
                           <DiscordChannelPickerModal
                             title="Select voice channel"

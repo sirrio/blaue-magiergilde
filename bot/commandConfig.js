@@ -2,7 +2,7 @@ const { commandPrefix, ownerIds } = require('./config');
 
 function normalizePrefix(input) {
     const prefix = String(input || '').trim().toLowerCase();
-    if (!prefix) return 'wwt';
+    if (!prefix) return 'mg';
     if (!/^[a-z0-9-]{1,32}$/.test(prefix)) {
         throw new Error('DISCORD_COMMAND_PREFIX must match /^[a-z0-9-]{1,32}$/');
     }
@@ -10,7 +10,7 @@ function normalizePrefix(input) {
 }
 
 function commandName(suffix) {
-    const prefix = normalizePrefix(commandPrefix || 'wwt');
+    const prefix = normalizePrefix(commandPrefix || 'mg');
     const cleanedSuffix = String(suffix || '').trim().toLowerCase();
     if (!/^[a-z0-9-]{1,32}$/.test(cleanedSuffix)) {
         throw new Error('Command suffix must match /^[a-z0-9-]{1,32}$/');
