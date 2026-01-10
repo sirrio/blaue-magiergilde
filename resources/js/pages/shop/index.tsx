@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(shops[0] ?? null)
   const [isPosting, setIsPosting] = useState(false)
+  const [isUpdatingPost, setIsUpdatingPost] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingSchedule, setIsSavingSchedule] = useState(false)
   const [settings, setSettings] = useState<ShopSettings>(shopSettings ?? {})
@@ -209,12 +210,61 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       }
 
       toast.show('Shop post started.', 'info')
+      router.reload({ only: ['shopSettings'] })
     } catch (error) {
       toast.show('Shop could not be posted.', 'error')
     } finally {
       setIsPosting(false)
     }
   }, [getCsrfToken, isPosting, selectedShop, settings.post_channel_id])
+
+  const handleUpdatePost = useCallback(async () => {
+    if (!selectedShop) {
+      toast.show('Select a shop first.', 'error')
+      return
+    }
+    if (isUpdatingPost) return
+    if (!settings.last_post_channel_id) {
+      toast.show('No previously posted shop to update.', 'error')
+      return
+    }
+    if (!window.confirm('Update the posted shop in Discord?')) {
+      return
+    }
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setIsUpdatingPost(true)
+    try {
+      const response = await fetch(route('admin.shops.update-post', selectedShop.id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.error ?? 'Shop could not be updated.'), 'error')
+        return
+      }
+
+      toast.show('Shop updated.', 'info')
+      router.reload({ only: ['shopSettings'] })
+    } catch (error) {
+      toast.show('Shop could not be updated.', 'error')
+    } finally {
+      setIsUpdatingPost(false)
+    }
+  }, [getCsrfToken, isUpdatingPost, selectedShop, settings.last_post_channel_id])
 
   const destinationLabel = settings.post_channel_name ?? settings.post_channel_id ?? 'Not set'
   const destinationKind = settings.post_channel_id
@@ -224,6 +274,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const canUpdatePost = Boolean(settings.last_post_channel_id)
 
   const weekdayOptions = [
     { value: 0, label: 'Sunday' },
@@ -364,6 +415,14 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
               >
                 <Send size={16} className="mr-2" />
                 Post shop
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleUpdatePost}
+                disabled={!selectedShop || isUpdatingPost || !canUpdatePost}
+              >
+                Update shop
               </Button>
               <ActionMenu
                 items={[

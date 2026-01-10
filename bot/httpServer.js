@@ -1,7 +1,7 @@
 const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
 const { postAuctionToChannel } = require('./auctionPoster');
-const { postShopToChannel } = require('./shopPoster');
+const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
@@ -107,9 +107,10 @@ function startHttpServer(client) {
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isShopPost = path === '/shop-post';
+        const isShopUpdate = path === '/shop-update';
         const isAuctionPost = path === '/auction-post';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isAuctionPost)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isShopUpdate && !isAuctionPost)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -320,6 +321,35 @@ function startHttpServer(client) {
             } catch (error) {
                 logReject(req, 'shop post failed');
                 respondJson(res, 500, { error: 'Shop post failed.' });
+                return;
+            }
+        }
+
+        if (isShopUpdate) {
+            const shopId = Number(payload?.shop_id || 0);
+            if (!Number.isFinite(shopId) || shopId <= 0) {
+                logReject(req, 'invalid shop_id');
+                respondJson(res, 422, { error: 'Invalid shop_id.' });
+                return;
+            }
+
+            try {
+                const result = await updateShopPost({ client, shopId });
+                if (!result.ok) {
+                    logReject(req, result.error || 'shop update failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Shop update failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'updated',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch (error) {
+                logReject(req, 'shop update failed');
+                respondJson(res, 500, { error: 'Shop update failed.' });
                 return;
             }
         }

@@ -36,6 +36,7 @@ class ShopController extends Controller
                 'post_channel_type',
                 'post_channel_guild_id',
                 'post_channel_is_thread',
+                'last_post_channel_id',
                 'auto_post_enabled',
                 'auto_post_weekday',
                 'auto_post_time',

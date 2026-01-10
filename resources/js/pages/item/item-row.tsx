@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Store, Sword, XCircle } from 'lucide-react'
+import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, StickyNote, Store, Sword, XCircle } from 'lucide-react'
 import React, { useEffect, useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -207,6 +207,46 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   )
 }
 
+const ShopItemNoteModal = ({ shopItem }: { shopItem: ShopItem }) => {
+  const { data, setData, patch, processing } = useForm({
+    notes: shopItem.notes ?? '',
+  })
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setData('notes', shopItem.notes ?? '')
+  }, [isOpen, setData, shopItem.notes])
+
+  const handleSubmit = () => {
+    patch(route('admin.shop-items.notes.update', { shopItem: shopItem.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit shop note">
+          <StickyNote size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Shop notes</ModalTitle>
+      <ModalContent>
+        <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+          Notes
+        </Input>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
+      </ModalAction>
+    </Modal>
+  )
+}
+
 export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: ShopItem }) {
   const formData = {
     id: item.id,
@@ -271,6 +311,9 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
   }
 
   const spell = shopItem?.spell
+  const shopNotes = shopItem?.notes?.trim()
+  const baseName = shopNotes ? `${item.name} - ${shopNotes}` : item.name
+  const displayName = spell ? `${baseName} - ${spell.name}` : baseName
   const dndBeyondLink = `https://www.dndbeyond.com/magic-items?filter-type=0&filter-search=${item.name}&filter-partnered-content=t`
 
   return (
@@ -278,7 +321,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       <div className={cn(textColor)}>{renderIcon(item.type)}</div>
       <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
         <span>
-          {spell ? `${item.name} - ${spell.name}` : item.name}{' '}
+          {displayName}{' '}
           <span className={'text-xs font-light italic'}>({item.pick_count})</span>
         </span>
         {autoRollSummary ? (
@@ -426,13 +469,14 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
         onClick={() =>
           copyToClipboard(
             spell
-              ? `[${item.name}](<${item.url}>) - [${spell.name}](<${spell.url}>) - [Legacy](<${spell.legacy_url}>): ${item.cost}`
-              : `[${item.name}](<${item.url}>): ${item.cost}`,
+              ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spell.url}>) - [Legacy](<${spell.legacy_url}>): ${item.cost}`
+              : `[${baseName}](<${item.url}>): ${item.cost}`,
           )
         }
       >
         <Copy size={14} />
       </Button>
+      {shopItem && <ShopItemNoteModal shopItem={shopItem} />}
       {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
       {item.url ? (
         <Button as="a" href={item.url} target="_blank" size="xs" variant="ghost" modifier="square">

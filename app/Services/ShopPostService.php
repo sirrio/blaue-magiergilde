@@ -9,6 +9,21 @@ class ShopPostService
 {
     public function post(Shop $shop, string $channelId): array
     {
+        return $this->request('/shop-post', [
+            'channel_id' => $channelId,
+            'shop_id' => $shop->id,
+        ]);
+    }
+
+    public function update(Shop $shop): array
+    {
+        return $this->request('/shop-update', [
+            'shop_id' => $shop->id,
+        ]);
+    }
+
+    private function request(string $path, array $payload): array
+    {
         $botUrl = trim((string) config('services.bot.http_url', ''));
         $botToken = trim((string) config('services.bot.http_token', ''));
 
@@ -26,10 +41,7 @@ class ShopPostService
             $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
-                ->post(rtrim($botUrl, '/').'/shop-post', [
-                    'channel_id' => $channelId,
-                    'shop_id' => $shop->id,
-                ]);
+                ->post(rtrim($botUrl, '/').$path, $payload);
         } catch (\Throwable $error) {
             $detail = trim((string) $error->getMessage());
             $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
@@ -44,8 +56,8 @@ class ShopPostService
         if (! $response->ok()) {
             $errorDetail = null;
             try {
-                $payload = $response->json();
-                $errorDetail = is_array($payload) ? ($payload['error'] ?? $payload['message'] ?? null) : null;
+                $responsePayload = $response->json();
+                $errorDetail = is_array($responsePayload) ? ($responsePayload['error'] ?? $responsePayload['message'] ?? null) : null;
             } catch (\Throwable $error) {
                 $errorDetail = null;
             }
@@ -67,7 +79,6 @@ class ShopPostService
         return [
             'ok' => true,
             'status' => 200,
-            'shop_id' => $shop->id,
         ];
     }
 }

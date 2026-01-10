@@ -39,6 +39,7 @@ export interface ShopItem {
   id: number
   item: Item
   spell?: Spell | null
+  notes?: string | null
 }
 
 export interface Shop {
@@ -86,6 +87,7 @@ export interface ShopSettings {
   post_channel_type?: string | null
   post_channel_guild_id?: string | null
   post_channel_is_thread?: boolean | null
+  last_post_channel_id?: string | null
   auto_post_enabled?: boolean | null
   auto_post_weekday?: number | null
   auto_post_time?: string | null

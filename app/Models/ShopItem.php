@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ShopItem extends Model
 {
     protected $table = 'item_shop';
-    protected $fillable = ['shop_id','item_id','spell_id'];
+    protected $fillable = ['shop_id', 'item_id', 'spell_id', 'notes'];
 
     public function item(): BelongsTo
     {

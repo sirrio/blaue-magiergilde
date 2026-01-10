@@ -55,7 +55,9 @@ function formatLink(name, url) {
 }
 
 function formatItemLine(row) {
-    const itemLink = formatLink(row.name, row.url);
+    const notes = typeof row.notes === 'string' ? row.notes.trim() : '';
+    const itemName = notes ? `${row.name} - ${notes}` : row.name;
+    const itemLink = formatLink(itemName, row.url);
     const parts = [itemLink];
 
     if (row.spell_id) {
@@ -156,6 +158,7 @@ async function fetchShopItems(shopId) {
                 i.cost,
                 i.rarity,
                 i.type,
+                si.notes,
                 s.id AS spell_id,
                 s.name AS spell_name,
                 s.url AS spell_url,
@@ -321,7 +324,7 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
             if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
 
-        const sectionId = await sendOneLine(destination, `## ***?? ${rarityLabel} Magic Items (${tierText}):***`);
+        const sectionId = await sendOneLine(destination, `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`);
         if (sectionId) messageIds.push(sectionId);
         messageIds.push(...await sendLines(destination, (byType.get('item') ?? []).map(formatItemLine)));
 
@@ -357,6 +360,20 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
     };
 }
 
+async function updateShopPost({ client, shopId }) {
+    const postState = await fetchShopPostState();
+    if (!postState?.lastPostChannelId) {
+        return { ok: false, status: 409, error: 'No previous shop post found.' };
+    }
+
+    return postShopToChannel({
+        client,
+        channelId: postState.lastPostChannelId,
+        shopId,
+    });
+}
+
 module.exports = {
     postShopToChannel,
+    updateShopPost,
 };
