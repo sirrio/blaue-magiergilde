@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { List } from '@/components/ui/list'
+import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
@@ -17,7 +18,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const [isPosting, setIsPosting] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [postChannel, setPostChannel] = useState<ShopSettings>(shopSettings ?? {})
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { auth } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
 
@@ -32,9 +32,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
   useEffect(() => {
     setPostChannel(shopSettings ?? {})
-    if (!shopSettings?.post_channel_id) {
-      setIsSettingsOpen(true)
-    }
   }, [shopSettings])
 
   const formatShopCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
@@ -167,7 +164,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
   const hasPostDestination = Boolean(postChannel.post_channel_id)
-  const settingsLabel = isSettingsOpen ? 'Hide settings' : 'Settings'
   const shopLabel = selectedShop
     ? `Shop #${String(selectedShop.id).padStart(3, '0')} - ${formatShopCreatedAt(selectedShop.created_at)}`
     : 'No shop selected'
@@ -176,12 +172,18 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     <AppLayout>
       <Head title="Shop" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Shop</h1>
-          <p className="text-sm text-base-content/70">Roll new shops and review the current inventory.</p>
+        <section className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Shop</h1>
+            <p className="text-sm text-base-content/70">Roll new shops and review the current inventory.</p>
+          </div>
+          <Button onClick={handleCreateShop} color={'warning'} className="gap-2">
+            <Store size={18}></Store>
+            Roll a new shop
+          </Button>
         </section>
-        <div className="join flex items-end">
-          <Select className="join-item w-full" value={selectedShop?.id || ''} onChange={onShopSelectChange}>
+        <div>
+          <Select className="w-full" value={selectedShop?.id || ''} onChange={onShopSelectChange}>
             <SelectLabel>Shops</SelectLabel>
             <SelectOptions>
               {shops.map((shop) => (
@@ -191,101 +193,79 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
               ))}
             </SelectOptions>
           </Select>
-          <Button onClick={handleCreateShop} color={'warning'} className="join-item">
-            <Store size={'18'}></Store>
-            Roll a new shop
-          </Button>
         </div>
         {isAdmin ? (
-          <div className="rounded-box border border-base-200 bg-base-100 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="rounded-box border border-base-200 bg-base-100 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">
-                <p className="text-xs uppercase text-base-content/50">Discord</p>
-                <h2 className="text-lg font-semibold">Discord actions</h2>
-                <p className="text-xs text-base-content/70">
-                  Send the current data to Discord.
-                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+                  <span
+                    className={cn(
+                      'rounded-full border px-2 py-1',
+                      hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
+                    )}
+                  >
+                    {destinationText}
+                  </span>
+                  <span className="rounded-full border border-base-200 px-2 py-1">
+                    Items: {selectedShop?.shop_items.length ?? 0}
+                  </span>
+                </div>
+                <p className="text-[11px] text-base-content/50">{shopLabel}</p>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsSettingsOpen((prev) => !prev)}
-                className="gap-2"
-              >
-                <Settings size={16} />
-                {settingsLabel}
-              </Button>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handlePostShop}
-                disabled={!selectedShop || isPosting || !postChannel.post_channel_id}
-              >
-                <Send size={16} className="mr-2" />
-                Post shop
-              </Button>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-base-content/60">
-              <span className="font-semibold">Destination</span>
-              <span
-                className={cn(
-                  'rounded-full border px-2 py-1 text-xs',
-                  hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
-                )}
-              >
-                {destinationText}
-              </span>
-              <span>{shopLabel}</span>
-              <span>Items: {selectedShop?.shop_items.length ?? 0}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePostShop}
+                  disabled={!selectedShop || isPosting || !postChannel.post_channel_id}
+                >
+                  <Send size={16} className="mr-2" />
+                  Post shop
+                </Button>
+                <Modal>
+                  <ModalTrigger>
+                    <Button size="sm" variant="outline" className="gap-2">
+                      <Settings size={16} />
+                      Configure
+                    </Button>
+                  </ModalTrigger>
+                  <ModalTitle>Shop settings</ModalTitle>
+                  <ModalContent>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-base-content/70">Posting destination</p>
+                        <p className="text-sm font-semibold">{destinationText}</p>
+                      </div>
+                      <DiscordChannelPickerModal
+                        title="Select posting channel"
+                        description="Choose where the shop should be posted."
+                        confirmLabel="Save channel"
+                        includeThreads={false}
+                        enableThreadLoader
+                        threadLoadIncludeArchived
+                        threadLoadIncludePrivate={false}
+                        mode="single"
+                        allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+                        triggerClassName="gap-2"
+                        triggerSize="sm"
+                        triggerVariant="outline"
+                        triggerDisabled={isSavingChannel}
+                        onConfirm={handlePostChannelSelect}
+                      >
+                        <Send size={18} />
+                        Select channel
+                      </DiscordChannelPickerModal>
+                    </div>
+                  </ModalContent>
+                </Modal>
+              </div>
             </div>
             {!hasPostDestination ? (
-              <div className="mt-3 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+              <div className="mt-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
                 Select a destination before posting to Discord.
               </div>
             ) : null}
-          </div>
-        ) : null}
-        {isAdmin && isSettingsOpen ? (
-          <div className="rounded-box border border-base-200 bg-base-100 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-base-content/50">Settings</p>
-                <h2 className="text-lg font-semibold">Channels</h2>
-                <p className="text-xs text-base-content/70">
-                  Choose which channels to use.
-                </p>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => setIsSettingsOpen(false)}>
-                Hide settings
-              </Button>
-            </div>
-            <div className="mt-3 space-y-3">
-              <div>
-                <p className="text-xs text-base-content/70">Posting destination</p>
-                <p className="text-sm font-semibold">{destinationText}</p>
-              </div>
-              <DiscordChannelPickerModal
-                title="Select posting channel"
-                description="Choose where the shop should be posted."
-                confirmLabel="Save channel"
-                includeThreads={false}
-                enableThreadLoader
-                threadLoadIncludeArchived
-                threadLoadIncludePrivate={false}
-                mode="single"
-                allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
-                triggerClassName="gap-2"
-                triggerSize="sm"
-                triggerVariant="outline"
-                triggerDisabled={isSavingChannel}
-                onConfirm={handlePostChannelSelect}
-              >
-                <Send size={18} />
-                Select channel
-              </DiscordChannelPickerModal>
-            </div>
           </div>
         ) : null}
         <List>

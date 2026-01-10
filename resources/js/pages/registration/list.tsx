@@ -163,27 +163,63 @@ export default function RegistrationList({ characters }: { characters: AdminChar
 
   const totalCharacters = characters.length
   const totalUsers = groups.length
+  const statusLabelMap: Record<string, string> = {
+    pending: 'Pending',
+    approved: 'Approved',
+    declined: 'Declined',
+  }
+  const tierLabelMap: Record<string, string> = {
+    bt: 'BT',
+    lt: 'LT',
+    ht: 'HT',
+    et: 'ET',
+    filler: 'Filler',
+  }
+  const discordLabelMap: Record<string, string> = {
+    only: 'Discord Only',
+    none: 'No Discord',
+  }
+  const activeFilters = [
+    search ? `Search: ${search}` : null,
+    statusFilter ? `Status: ${statusLabelMap[statusFilter] ?? statusFilter}` : null,
+    tierFilter ? `Tier: ${tierLabelMap[tierFilter] ?? tierFilter.toUpperCase()}` : null,
+    discordFilter ? `Discord: ${discordLabelMap[discordFilter] ?? discordFilter}` : null,
+  ].filter(Boolean) as string[]
 
   return (
     <AppLayout>
       <Head title="Character Approvals" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h1 className="text-2xl font-bold">Character Approvals</h1>
-              <p className="text-sm text-base-content/70">
-                Review and update guild status for each character.
-              </p>
-            </div>
-            <p className="text-xs text-base-content/60">
-              {totalUsers} {totalUsers === 1 ? 'User' : 'Users'} · {totalCharacters}{' '}
-              {totalCharacters === 1 ? 'Character' : 'Characters'}
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold">Character Approvals</h1>
+          <p className="text-sm text-base-content/70">Review and update guild status for each character.</p>
         </section>
-        <div className="rounded-box border border-base-200 bg-base-100 p-3">
-          <div className="flex flex-wrap items-end gap-3">
+        <div className="rounded-box border border-base-200 bg-base-100 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-xs uppercase text-base-content/50">Filters</p>
+              <h2 className="text-lg font-semibold">Review queue</h2>
+              <p className="text-xs text-base-content/70">Filter the queue by status, tier, or Discord.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+              <span className="rounded-full border border-base-200 px-2 py-1">
+                {totalUsers} {totalUsers === 1 ? 'User' : 'Users'}
+              </span>
+              <span className="rounded-full border border-base-200 px-2 py-1">
+                {totalCharacters} {totalCharacters === 1 ? 'Character' : 'Characters'}
+              </span>
+              {activeFilters.length === 0 ? (
+                <span className="text-base-content/50">No filters</span>
+              ) : (
+                activeFilters.map((filter) => (
+                  <span key={filter} className="rounded-full border border-base-200 px-2 py-1">
+                    {filter}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
             <Input type="search" placeholder="Search by character or user..." value={search} onChange={handleSearch}>
               Search
             </Input>

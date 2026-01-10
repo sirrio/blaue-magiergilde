@@ -1,4 +1,3 @@
-import { Card, CardBody, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import AppLayout from '@/layouts/app-layout'
@@ -29,6 +28,8 @@ export default function Index({ items }: { items: Item[] }) {
 
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
+  const rarityLabelMap = Object.fromEntries(rarityFilters.map((entry) => [entry.value, entry.label]))
+  const typeLabelMap = Object.fromEntries(typeFilters.map((entry) => [entry.value, entry.label]))
 
   const navigateTo = (href: string) => {
     router.get(href, {}, NAV_OPTIONS)
@@ -66,12 +67,23 @@ export default function Index({ items }: { items: Item[] }) {
     )
   }
 
-  const [search, setSearch] = useState(currentQueryParams.search || '')
+  const [search, setSearch] = useState(String(currentQueryParams.search ?? ''))
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
     navigateTo(route('items.index', { ...currentQueryParams, search: value }))
   }
+
+  const activeFilters = [
+    search ? `Search: ${search}` : null,
+    currentQueryParams.rarity
+      ? `Rarity: ${rarityLabelMap[String(currentQueryParams.rarity)] ?? currentQueryParams.rarity}`
+      : null,
+    currentQueryParams.type
+      ? `Type: ${typeLabelMap[String(currentQueryParams.type)] ?? currentQueryParams.type}`
+      : null,
+  ].filter(Boolean) as string[]
+  const totalItems = items?.length ?? 0
 
   return (
     <AppLayout>
@@ -81,17 +93,34 @@ export default function Index({ items }: { items: Item[] }) {
           <h1 className="text-2xl font-bold">Items</h1>
           <p className="text-sm text-base-content/70">Browse and filter the guild inventory.</p>
         </section>
-        <Card className="card-xs">
-          <CardBody>
-            <CardContent>
-              <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>
-                Filter
-              </Input>
-              <div className="mt-1 filter">{renderFilterOptions('rarity', rarityFilters)}</div>
-              <div className="mt-1 filter">{renderFilterOptions('type', typeFilters)}</div>
-            </CardContent>
-          </CardBody>
-        </Card>
+        <div className="rounded-box border border-base-200 bg-base-100 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-xs uppercase text-base-content/50">Filters</p>
+              <h2 className="text-lg font-semibold">Inventory filters</h2>
+              <p className="text-xs text-base-content/70">Refine the list by name, rarity, or type.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+              <span className="rounded-full border border-base-200 px-2 py-1">{totalItems} items</span>
+              {activeFilters.length === 0 ? (
+                <span className="text-base-content/50">No filters</span>
+              ) : (
+                activeFilters.map((filter) => (
+                  <span key={filter} className="rounded-full border border-base-200 px-2 py-1">
+                    {filter}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="mt-3">
+            <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>
+              Search
+            </Input>
+            <div className="mt-2 filter">{renderFilterOptions('rarity', rarityFilters)}</div>
+            <div className="mt-2 filter">{renderFilterOptions('type', typeFilters)}</div>
+          </div>
+        </div>
         <Deferred
           fallback={
             <List>

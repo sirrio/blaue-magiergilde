@@ -774,7 +774,6 @@ export default function Index({
   const [isPostingAuction, setIsPostingAuction] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [postChannel, setPostChannel] = useState<AuctionSettings>(auctionSettings ?? {})
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
@@ -814,9 +813,6 @@ export default function Index({
 
   useEffect(() => {
     setPostChannel(auctionSettings ?? {})
-    if (!auctionSettings?.post_channel_id) {
-      setIsSettingsOpen(true)
-    }
   }, [auctionSettings])
 
   useEffect(() => {
@@ -952,7 +948,6 @@ export default function Index({
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
   const hasPostDestination = Boolean(postChannel.post_channel_id)
-  const settingsLabel = isSettingsOpen ? 'Hide settings' : 'Settings'
   const auctionLabel = selectedAuction
     ? `${selectedAuction.title ?? `Auction #${String(selectedAuction.id).padStart(3, '0')}`} - ${formatAuctionCreatedAt(selectedAuction.created_at)}`
     : 'No auction selected'
@@ -1105,12 +1100,17 @@ export default function Index({
     <AppLayout>
       <Head title="Auctions" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Auctions</h1>
-          <p className="text-sm text-base-content/70">Manage auctions, bids, and live voice candidates.</p>
+        <section className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Auctions</h1>
+            <p className="text-sm text-base-content/70">Manage auctions, bids, and live voice candidates.</p>
+          </div>
+          {selectedAuction ? (
+            <AddAuctionItemModal auction={selectedAuction} items={items} />
+          ) : null}
         </section>
-        <div className="join flex items-end">
-          <Select className="join-item w-full" value={selectedAuction?.id || ''} onChange={onAuctionSelectChange}>
+        <div>
+          <Select className="w-full" value={selectedAuction?.id || ''} onChange={onAuctionSelectChange}>
             <SelectLabel>Auctions</SelectLabel>
             <SelectOptions>
               {auctions.map((auction) => (
@@ -1124,32 +1124,34 @@ export default function Index({
 
         {selectedAuction ? (
           <>
-            <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-              <div className="rounded-box border border-base-200 bg-base-100 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase text-base-content/50">Discord</p>
-                    <h2 className="text-lg font-semibold">Discord actions</h2>
-                    <p className="text-xs text-base-content/70">
-                      Send the current data to Discord.
-                    </p>
-                  </div>
-                  {isAdmin ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setIsSettingsOpen((prev) => !prev)}
-                      className="gap-2"
+            <div className="mb-4 rounded-box border border-base-200 bg-base-100 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <p className="text-xs text-base-content/60">{auctionLabel}</p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+                    <span className="rounded-full border border-base-200 px-2 py-1">
+                      Status: {statusLabels[selectedAuction.status]}
+                    </span>
+                    <span className="rounded-full border border-base-200 px-2 py-1">
+                      Items: {selectedAuction.auction_items.length}
+                    </span>
+                    <span className="rounded-full border border-base-200 px-2 py-1">
+                      Steps: 10 / 50 / 100 / 500 (consumables/spellscrolls halved)
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-full border px-2 py-1',
+                        hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
+                      )}
                     >
-                      <Settings size={16} />
-                      {settingsLabel}
-                    </Button>
-                  ) : null}
+                      {destinationText}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={handleCopyAuction}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={handleCopyAuction} className="gap-2">
                     <Copy size={16} />
-                    Copy for Discord
+                    Copy
                   </Button>
                   {isAdmin ? (
                     <Button
@@ -1157,121 +1159,90 @@ export default function Index({
                       variant="outline"
                       onClick={handlePostAuction}
                       disabled={!postChannel.post_channel_id || isPostingAuction}
+                      className="gap-2"
                     >
                       <Send size={16} />
-                      Post auction
+                      Post
+                    </Button>
+                  ) : null}
+                  {isAdmin ? (
+                    <Modal>
+                      <ModalTrigger>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <Settings size={16} />
+                          Configure
+                        </Button>
+                      </ModalTrigger>
+                      <ModalTitle>Auction settings</ModalTitle>
+                      <ModalContent>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <p className="text-xs text-base-content/70">Posting destination</p>
+                            <p className="text-sm font-semibold">{destinationText}</p>
+                            <DiscordChannelPickerModal
+                              title="Select posting channel"
+                              description="Choose where the auction should be posted."
+                              confirmLabel="Save channel"
+                              includeThreads={false}
+                              enableThreadLoader
+                              threadLoadIncludeArchived
+                              threadLoadIncludePrivate={false}
+                              mode="single"
+                              allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+                              triggerClassName="gap-2"
+                              triggerSize="sm"
+                              triggerVariant="outline"
+                              triggerDisabled={isSavingChannel}
+                              onConfirm={handlePostChannelSelect}
+                            >
+                              <Send size={16} />
+                              Select channel
+                            </DiscordChannelPickerModal>
+                          </div>
+                          <div>
+                            <p className="text-xs text-base-content/70">
+                              The voice channel ID controls the live candidate list in auctions.
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-end gap-2">
+                              <Input
+                                value={voiceForm.voice_channel_id}
+                                onChange={(e) => setVoiceForm('voice_channel_id', e.target.value)}
+                              >
+                                Voice Channel ID
+                              </Input>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleSaveVoiceSettings}
+                                disabled={isSavingVoice}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </ModalContent>
+                    </Modal>
+                  ) : null}
+                  {isAdmin ? (
+                    <Button
+                      size="sm"
+                      color="error"
+                      variant="outline"
+                      onClick={handleCloseAuction}
+                      disabled={selectedAuction.status === 'closed'}
+                    >
+                      Close auction
                     </Button>
                   ) : null}
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-base-content/60">
-                  <span className="font-semibold">Destination</span>
-                  <span
-                    className={cn(
-                      'rounded-full border px-2 py-1 text-xs',
-                      hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
-                    )}
-                  >
-                    {destinationText}
-                  </span>
-                </div>
-                {!hasPostDestination && isAdmin ? (
-                  <div className="mt-3 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                    Select a destination before posting to Discord.
-                  </div>
-                ) : null}
               </div>
-              <div className="rounded-box border border-base-200 bg-base-100 p-4">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-base-content/50">Auction</p>
-                  <h2 className="text-lg font-semibold">Auction management</h2>
-                  <p className="text-xs text-base-content/70">
-                    Add items and monitor the auction status.
-                  </p>
+              {!hasPostDestination && isAdmin ? (
+                <div className="mt-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  Select a destination before posting to Discord.
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <AddAuctionItemModal auction={selectedAuction} items={items} />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-base-content/60">
-                  <span>{auctionLabel}</span>
-                  <span>Status: {statusLabels[selectedAuction.status]}</span>
-                  <span>Items: {selectedAuction.auction_items.length}</span>
-                  <span>Steps: 10 / 50 / 100 / 500 (consumables/spellscrolls halved)</span>
-                </div>
-                <div className="mt-3 rounded-box border border-error/30 bg-error/5 p-3">
-                  <p className="text-xs font-semibold text-error">Danger zone</p>
-                  <p className="mt-1 text-xs text-base-content/60">
-                    Closing moves unsold items to the next auction.
-                  </p>
-                  <Button
-                    size="sm"
-                    color="error"
-                    variant="outline"
-                    onClick={handleCloseAuction}
-                    disabled={selectedAuction.status === 'closed'}
-                    className="mt-2"
-                  >
-                    Close auction
-                  </Button>
-                </div>
-              </div>
+              ) : null}
             </div>
-            {isAdmin && isSettingsOpen ? (
-              <div className="mb-4 rounded-box border border-base-200 bg-base-100 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-base-content/50">Settings</p>
-                  <h2 className="text-lg font-semibold">Channels</h2>
-                  <p className="text-xs text-base-content/70">
-                    Choose which channels to use.
-                  </p>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => setIsSettingsOpen(false)}>
-                  Hide settings
-                </Button>
-              </div>
-                <div className="mt-3 space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-xs text-base-content/70">Posting destination</p>
-                    <p className="text-sm font-semibold">{destinationText}</p>
-                    <DiscordChannelPickerModal
-                      title="Select posting channel"
-                      description="Choose where the auction should be posted."
-                      confirmLabel="Save channel"
-                      includeThreads={false}
-                      enableThreadLoader
-                      threadLoadIncludeArchived
-                      threadLoadIncludePrivate={false}
-                      mode="single"
-                      allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
-                      triggerClassName="gap-2"
-                      triggerSize="sm"
-                      triggerVariant="outline"
-                      triggerDisabled={isSavingChannel}
-                      onConfirm={handlePostChannelSelect}
-                    >
-                      <Send size={16} />
-                      Select channel
-                    </DiscordChannelPickerModal>
-                  </div>
-                  <div>
-                    <p className="text-xs text-base-content/70">
-                      The voice channel ID controls the live candidate list in auctions.
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-end gap-2">
-                      <Input
-                        value={voiceForm.voice_channel_id}
-                        onChange={(e) => setVoiceForm('voice_channel_id', e.target.value)}
-                      >
-                        Voice Channel ID
-                      </Input>
-                      <Button size="sm" variant="outline" onClick={handleSaveVoiceSettings} disabled={isSavingVoice}>
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
 
             <div className="mb-4 flex flex-wrap items-center gap-3">
               {voiceSettings.voice_channel_id || useMockCandidates ? (
@@ -1303,16 +1274,7 @@ export default function Index({
                   ) : null}
                 </>
               ) : (
-                <p className="text-xs text-base-content/70">
-                  No voice channel ID set.
-                  <button
-                    type="button"
-                    className="link ml-1"
-                    onClick={() => setIsSettingsOpen(true)}
-                  >
-                    Open auction settings
-                  </button>
-                </p>
+                <p className="text-xs text-base-content/70">No voice channel ID set. Update it in settings.</p>
               )}
             </div>
 
