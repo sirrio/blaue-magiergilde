@@ -16,4 +16,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Item extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected $casts = [
+        'shop_enabled' => 'boolean',
+        'default_spell_roll_enabled' => 'boolean',
+        'default_spell_level' => 'integer',
+        'default_spell_levels' => 'array',
+        'default_spell_schools' => 'array',
+    ];
 }

@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Sword, XCircle } from 'lucide-react'
+import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Store, Sword, XCircle } from 'lucide-react'
 import React, { useEffect, useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -37,19 +37,78 @@ const copyToClipboard = (text: string) => {
   })
 }
 
-const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
-  const levels = Array.from({ length: 10 }, (_, i) => i)
-  const schools = [
-    'abjuration',
-    'conjuration',
-    'divination',
-    'enchantment',
-    'evocation',
-    'illusion',
-    'necromancy',
-    'transmutation',
-  ] as const
+const spellSchoolLabels: Record<string, string> = {
+  abjuration: 'Abjuration',
+  conjuration: 'Conjuration',
+  divination: 'Divination',
+  enchantment: 'Enchantment',
+  evocation: 'Evocation',
+  illusion: 'Illusion',
+  necromancy: 'Necromancy',
+  transmutation: 'Transmutation',
+}
 
+const formatSpellLevelRange = (levels: number[]) => {
+  const sorted = Array.from(new Set(levels)).sort((a, b) => a - b)
+  if (sorted.length === 0) return ''
+
+  const ranges: string[] = []
+  let start = sorted[0]
+  let prev = sorted[0]
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const current = sorted[i]
+    if (current === prev + 1) {
+      prev = current
+      continue
+    }
+    ranges.push(start === prev ? String(start) : `${start}-${prev}`)
+    start = current
+    prev = current
+  }
+  ranges.push(start === prev ? String(start) : `${start}-${prev}`)
+
+  return ranges
+    .map((range) => {
+      if (range === '0') return 'Cantrip'
+      if (range.startsWith('0-')) return `Cantrip-${range.slice(2)}`
+      return range
+    })
+    .join(',')
+}
+
+const buildAutoRollSummary = (item: Item) => {
+  if (!item.default_spell_roll_enabled) return null
+  const levels = item.default_spell_levels ?? (item.default_spell_level !== undefined && item.default_spell_level !== null
+    ? [item.default_spell_level]
+    : [])
+  if (levels.length === 0) return null
+
+  const levelLabel = formatSpellLevelRange(levels)
+  const schools = item.default_spell_schools ?? (item.default_spell_school ? [item.default_spell_school] : [])
+  const schoolKeys = Object.keys(spellSchoolLabels)
+  const isAllSchools = new Set(schools).size === schoolKeys.length
+  const schoolLabel = schools.length > 0
+    ? (isAllSchools ? 'All' : schools.map((school) => spellSchoolLabels[school] ?? school).join('/'))
+    : 'Any school'
+  const formattedLevelLabel = /^[0-9]/.test(levelLabel) ? `L${levelLabel}` : levelLabel
+
+  return `Auto-roll: ${formattedLevelLabel} | ${schoolLabel}`
+}
+
+const spellLevels = Array.from({ length: 10 }, (_, i) => i)
+const spellSchools = [
+  'abjuration',
+  'conjuration',
+  'divination',
+  'enchantment',
+  'evocation',
+  'illusion',
+  'necromancy',
+  'transmutation',
+] as const
+
+const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   const { data, setData, post } = useForm({ spell_levels: [] as number[], spell_schools: [] as string[] })
 
   const [isOpen, setIsOpen] = useState(false)
@@ -57,7 +116,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   useEffect(() => {
     if (!isOpen) return
     setData('spell_levels', [0])
-    setData('spell_schools', [...schools])
+    setData('spell_schools', [...spellSchools])
   }, [isOpen, setData])
 
   const toggleLevel = (level: number) => {
@@ -100,7 +159,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
         <div className="mb-2">
           <p className="label">Levels</p>
           <div className="grid grid-cols-5 gap-1">
-            {levels.map((lvl) => {
+            {spellLevels.map((lvl) => {
               const id = `lvl-${lvl}`
               return (
                 <div className="flex items-center gap-1" key={lvl}>
@@ -122,7 +181,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
         <div className="mb-2">
           <p className="label">Schools</p>
           <div className="grid grid-cols-2 gap-1">
-            {schools.map((sc) => {
+            {spellSchools.map((sc) => {
               const id = `sc-${sc}`
               return (
                 <div className="flex items-center gap-1" key={sc}>
@@ -158,16 +217,59 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     cost: item.cost,
     type: item.type,
     rarity: item.rarity,
+    shop_enabled: item.shop_enabled ?? true,
+    default_spell_roll_enabled: item.default_spell_roll_enabled ?? false,
+    default_spell_levels: item.default_spell_levels ?? [],
+    default_spell_schools: item.default_spell_schools ?? [],
   }
   const { data, setData, post } = useForm(formData)
   const { errors } = usePage<PageProps>().props
   const textColor = getRarityTextColor(item.rarity)
+  const autoRollSummary = !shopItem ? buildAutoRollSummary(item) : null
+  const isShopEnabled = item.shop_enabled ?? true
 
   const handleFormSubmit = () => {
+    if (data.default_spell_roll_enabled && data.default_spell_levels.length === 0) {
+      toast.show('Select at least one default spell level.', 'error')
+      return
+    }
     post(route('items.update', { item, _method: 'put' }), {
       preserveState: 'errors',
       preserveScroll: true,
     })
+  }
+
+  const handleAutoRollToggle = (enabled: boolean) => {
+    setData('default_spell_roll_enabled', enabled)
+    if (!enabled) {
+      setData('default_spell_levels', [])
+      setData('default_spell_schools', [])
+      return
+    }
+    if (data.default_spell_levels.length === 0) {
+      setData('default_spell_levels', [0])
+    }
+    if (data.default_spell_schools.length === 0) {
+      setData('default_spell_schools', [...spellSchools])
+    }
+  }
+
+  const toggleDefaultSpellLevel = (level: number) => {
+    setData(
+      'default_spell_levels',
+      data.default_spell_levels.includes(level)
+        ? data.default_spell_levels.filter((value) => value !== level)
+        : [...data.default_spell_levels, level],
+    )
+  }
+
+  const toggleDefaultSpellSchool = (school: string) => {
+    setData(
+      'default_spell_schools',
+      data.default_spell_schools.includes(school)
+        ? data.default_spell_schools.filter((value) => value !== school)
+        : [...data.default_spell_schools, school],
+    )
   }
 
   const spell = shopItem?.spell
@@ -176,11 +278,32 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
   return (
     <ListRow>
       <div className={cn(textColor)}>{renderIcon(item.type)}</div>
-      <div className={cn(textColor, 'text-xs sm:text-sm')}>
-        {spell ? `${item.name} - ${spell.name}` : item.name}{' '}
-        <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+      <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
+        <span>
+          {spell ? `${item.name} - ${spell.name}` : item.name}{' '}
+          <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+        </span>
+        {autoRollSummary ? (
+          <span className="text-[11px] text-base-content/60">{autoRollSummary}</span>
+        ) : null}
       </div>
       <div className="max-w-20 font-mono text-xs">{item.cost ? item.cost : <span className="text-error">No cost available</span>}</div>
+      {!shopItem ? (
+        <div className="flex items-center justify-center text-xs">
+          {isShopEnabled ? (
+            <Store className="h-4 w-4 text-success" title="Included in shop rolls" aria-label="Included in shop rolls" />
+          ) : (
+            <span
+              className="relative inline-flex h-4 w-4 items-center justify-center"
+              title="Excluded from shop rolls"
+              aria-label="Excluded from shop rolls"
+            >
+              <Store className="h-4 w-4 text-base-content/40" />
+              <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
+            </span>
+          )}
+        </div>
+      ) : null}
       <Modal>
         <ModalTrigger>
           <Button size="xs" variant="ghost" modifier="square">
@@ -224,6 +347,77 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
               <option value="consumable">Consumable</option>
             </SelectOptions>
           </Select>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-xs"
+              checked={Boolean(data.shop_enabled)}
+              onChange={(e) => setData('shop_enabled', e.target.checked)}
+            />
+            <span>Include in shop rolls</span>
+          </label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.default_spell_roll_enabled)}
+                onChange={(e) => handleAutoRollToggle(e.target.checked)}
+              />
+              <span>Auto-roll spell on shop</span>
+            </label>
+            {data.default_spell_roll_enabled ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="label">Default spell levels</p>
+                  <div className="grid grid-cols-5 gap-1">
+                    {spellLevels.map((level) => {
+                      const id = `default-level-${item.id}-${level}`
+                      return (
+                        <div key={level} className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            id={id}
+                            className="checkbox checkbox-xs"
+                            checked={data.default_spell_levels.includes(level)}
+                            onChange={() => toggleDefaultSpellLevel(level)}
+                          />
+                          <label htmlFor={id} className="label cursor-pointer">
+                            {level === 0 ? 'Cantrip' : level}
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="label">Default spell schools</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {spellSchools.map((school) => {
+                      const id = `default-school-${item.id}-${school}`
+                      return (
+                        <div key={school} className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            id={id}
+                            className="checkbox checkbox-xs"
+                            checked={data.default_spell_schools.includes(school)}
+                            onChange={() => toggleDefaultSpellSchool(school)}
+                          />
+                          <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
+                            <svg className="icon h-4 w-4 fill-current">
+                              <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
+                            </svg>
+                            {school.toUpperCase()}
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </ModalContent>
         <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
       </Modal>

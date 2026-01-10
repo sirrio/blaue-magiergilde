@@ -39,6 +39,14 @@ class UpdateItemRequest extends FormRequest
             'cost' => 'string',
             'rarity' => 'required|string',
             'type' => 'required|string',
+            'shop_enabled' => 'boolean',
+            'default_spell_roll_enabled' => 'boolean',
+            'default_spell_level' => 'nullable|integer|min:0|max:9',
+            'default_spell_school' => 'nullable|in:abjuration,conjuration,divination,enchantment,evocation,illusion,necromancy,transmutation',
+            'default_spell_levels' => 'nullable|array',
+            'default_spell_levels.*' => 'integer|min:0|max:9',
+            'default_spell_schools' => 'nullable|array',
+            'default_spell_schools.*' => 'in:abjuration,conjuration,divination,enchantment,evocation,illusion,necromancy,transmutation',
         ];
     }
 }

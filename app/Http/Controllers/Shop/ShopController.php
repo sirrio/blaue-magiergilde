@@ -8,6 +8,8 @@ use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Item;
 use App\Models\Shop;
 use App\Models\ShopSetting;
+use App\Models\ShopItem;
+use App\Models\Spell;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -93,7 +95,10 @@ class ShopController extends Controller
         // of shops in a single request. Removing that loop ensures only a
         // single shop is rolled per request.
 
-        $items = Item::all()->groupBy(['rarity', function ($item) {
+        $items = Item::query()
+            ->where('shop_enabled', true)
+            ->get()
+            ->groupBy(['rarity', function ($item) {
             return ($item->rarity === 'very_rare' || $item->rarity === 'rare') && in_array($item->type, ['consumable', 'spellscroll']) ? 'consumable' : $item->type;
         }]);
 
@@ -120,10 +125,43 @@ class ShopController extends Controller
 
         $pickedItemIds = array_column($pickedItems, 'id');
 
-        DB::transaction(function () use ($pickedItemIds) {
+        DB::transaction(function () use ($pickedItems, $pickedItemIds) {
             Item::query()->whereIn('id', $pickedItemIds)->increment('pick_count');
             $shop = Shop::query()->create();
-            $shop->items()->attach($pickedItemIds);
+
+            foreach ($pickedItems as $pickedItem) {
+                $spellId = null;
+                $autoRollEnabled = ! empty($pickedItem['default_spell_roll_enabled']);
+                $spellLevels = $pickedItem['default_spell_levels'] ?? [];
+                $spellSchools = $pickedItem['default_spell_schools'] ?? [];
+
+                if ($autoRollEnabled && is_array($spellLevels) && count($spellLevels) > 0) {
+                    $normalizedLevels = array_values(array_unique(array_filter(array_map(
+                        static fn ($value) => is_numeric($value) ? (int) $value : null,
+                        $spellLevels
+                    ), static fn ($value) => $value !== null && $value >= 0 && $value <= 9)));
+                    $normalizedSchools = is_array($spellSchools)
+                        ? array_values(array_unique(array_filter(array_map(
+                            static fn ($value) => $value !== null ? (string) $value : null,
+                            $spellSchools
+                        ), static fn ($value) => $value !== null && $value !== '')))
+                        : [];
+
+                    if ($normalizedLevels !== []) {
+                        $query = Spell::query()->whereIn('spell_level', $normalizedLevels);
+                        if ($normalizedSchools !== []) {
+                            $query->whereIn('spell_school', $normalizedSchools);
+                        }
+                        $spellId = $query->inRandomOrder()->value('id');
+                    }
+                }
+
+                ShopItem::query()->create([
+                    'shop_id' => $shop->id,
+                    'item_id' => $pickedItem['id'],
+                    'spell_id' => $spellId,
+                ]);
+            }
         });
 
         return redirect()->back();
