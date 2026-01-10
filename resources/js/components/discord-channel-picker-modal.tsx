@@ -22,6 +22,8 @@ type ChannelPickerProps = {
   title: string
   description?: string
   confirmLabel?: string
+  channelsRouteName: string
+  threadsRouteName?: string
   includeThreads?: boolean
   includeArchivedThreads?: boolean
   includePrivateThreads?: boolean
@@ -130,6 +132,8 @@ export default function DiscordChannelPickerModal({
   title,
   description,
   confirmLabel,
+  channelsRouteName,
+  threadsRouteName,
   includeThreads = false,
   includeArchivedThreads = false,
   includePrivateThreads = false,
@@ -182,7 +186,7 @@ export default function DiscordChannelPickerModal({
     setIsRefreshingChannels(true)
 
     try {
-      const response = await fetch(route('admin.backup.channels.refresh'), {
+      const response = await fetch(route(channelsRouteName), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +223,7 @@ export default function DiscordChannelPickerModal({
     } finally {
       setIsRefreshingChannels(false)
     }
-  }, [includeThreads, isRefreshingChannels])
+  }, [channelsRouteName, includeThreads, isRefreshingChannels])
 
   const handleLoadThreads = useCallback(async () => {
     if (!pendingSingle) {
@@ -229,6 +233,11 @@ export default function DiscordChannelPickerModal({
 
     if (pendingSingle.is_thread) {
       toast.show('Select a text channel to load threads.', 'error')
+      return
+    }
+
+    if (!threadsRouteName) {
+      toast.show('Thread loading is not configured.', 'error')
       return
     }
 
@@ -243,7 +252,7 @@ export default function DiscordChannelPickerModal({
     setThreadLoadingId(pendingSingle.id)
 
     try {
-      const response = await fetch(route('admin.backup.threads.refresh'), {
+      const response = await fetch(route(threadsRouteName), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -295,6 +304,7 @@ export default function DiscordChannelPickerModal({
     threadLoadingId,
     threadLoadIncludeArchived,
     threadLoadIncludePrivate,
+    threadsRouteName,
   ])
 
   const togglePendingChannel = (guildId: string, channelId: string) => {

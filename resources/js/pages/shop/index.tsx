@@ -226,6 +226,8 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                       title="Select posting channel"
                       description="Choose where the shop should be posted."
                       confirmLabel="Save channel"
+                      channelsRouteName="admin.backup.channels.refresh"
+                      threadsRouteName="admin.backup.threads.refresh"
                       includeThreads={false}
                       enableThreadLoader
                       threadLoadIncludeArchived

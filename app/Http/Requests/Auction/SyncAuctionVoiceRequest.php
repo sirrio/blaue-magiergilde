@@ -14,7 +14,7 @@ class SyncAuctionVoiceRequest extends FormRequest
     {
         $user = Auth::user();
 
-        return $user->is_admin;
+        return (bool) ($user?->is_admin ?? false);
     }
 
     /**

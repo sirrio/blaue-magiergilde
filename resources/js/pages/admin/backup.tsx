@@ -417,6 +417,7 @@ export default function Backup({
                         title="Add backup channels"
                         description="Select the text channels to include in backups. Threads are captured automatically."
                         confirmLabel="Add channels"
+                        channelsRouteName="admin.backup.channels.refresh"
                         excludedByGuild={selectedByGuild}
                         onConfirm={handleAddChannels}
                       >
