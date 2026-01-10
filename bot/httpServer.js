@@ -4,7 +4,7 @@ const { postAuctionToChannel } = require('./auctionPoster');
 const { postShopToChannel } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
-const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 15000);
+const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
 const MAX_BODY_SIZE = 10 * 1024;
 const rateLimit = new Map();
 
@@ -66,20 +66,27 @@ function logReject(req, reason) {
     console.warn(`[bot] HTTP reject: ${reason} (${req.method} ${req.url}) from ${ip}`);
 }
 
-function isRateLimited(req) {
-    if (!Number.isFinite(RATE_LIMIT_WINDOW_MS) || RATE_LIMIT_WINDOW_MS <= 0) {
-        return false;
-    }
-
+function getRateLimitKey(req) {
+    const path = req.url?.split('?')[0] || 'unknown';
     const ip = getClientIp(req);
-    const now = Date.now();
-    const lastSeen = rateLimit.get(ip) || 0;
-    if (now - lastSeen < RATE_LIMIT_WINDOW_MS) {
-        return true;
+    return `${ip}:${path}`;
+}
+
+function getRateLimitStatus(req) {
+    if (!Number.isFinite(RATE_LIMIT_WINDOW_MS) || RATE_LIMIT_WINDOW_MS <= 0) {
+        return { limited: false, retryAfterMs: 0 };
     }
 
-    rateLimit.set(ip, now);
-    return false;
+    const key = getRateLimitKey(req);
+    const now = Date.now();
+    const lastSeen = rateLimit.get(key) || 0;
+    const delta = now - lastSeen;
+    if (delta < RATE_LIMIT_WINDOW_MS) {
+        return { limited: true, retryAfterMs: RATE_LIMIT_WINDOW_MS - delta };
+    }
+
+    rateLimit.set(key, now);
+    return { limited: false, retryAfterMs: 0 };
 }
 
 function startHttpServer(client) {
@@ -107,10 +114,16 @@ function startHttpServer(client) {
             return;
         }
 
-        if (!isDiscordBackupStatus && isRateLimited(req)) {
-            logReject(req, 'rate limited');
-            respondJson(res, 429, { error: 'Too many requests.' });
-            return;
+        if (!isDiscordBackupStatus) {
+            const limitStatus = getRateLimitStatus(req);
+            if (limitStatus.limited) {
+                logReject(req, 'rate limited');
+                respondJson(res, 429, {
+                    error: 'Too many requests.',
+                    retry_after_ms: Math.max(0, Math.ceil(limitStatus.retryAfterMs)),
+                });
+                return;
+            }
         }
 
         const providedToken = req.headers['x-bot-token'];

@@ -189,11 +189,13 @@ class DiscordBackupController extends Controller
     private function buildBotRequestError(HttpResponse $response, string $fallback): string
     {
         $detail = null;
+        $retryAfter = null;
 
         try {
             $payload = $response->json();
             if (is_array($payload)) {
                 $detail = $payload['error'] ?? $payload['message'] ?? null;
+                $retryAfter = $payload['retry_after_ms'] ?? null;
             }
         } catch (\Throwable $error) {
             $detail = null;
@@ -207,6 +209,10 @@ class DiscordBackupController extends Controller
         $message = sprintf('%s (HTTP %d).', $fallback, $response->status());
         if ($detail) {
             $message .= ' '.$detail;
+        }
+        if ($retryAfter !== null) {
+            $seconds = max(1, (int) ceil(((int) $retryAfter) / 1000));
+            $message .= sprintf(' Retry after %ds.', $seconds);
         }
 
         return $message;

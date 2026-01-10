@@ -43,10 +43,12 @@ class VoiceSettingSyncController extends Controller
 
         if (! $response->ok()) {
             $detail = null;
+            $retryAfter = null;
             try {
                 $payload = $response->json();
                 if (is_array($payload)) {
                     $detail = $payload['error'] ?? $payload['message'] ?? null;
+                    $retryAfter = $payload['retry_after_ms'] ?? null;
                 }
             } catch (\Throwable $error) {
                 $detail = null;
@@ -60,6 +62,10 @@ class VoiceSettingSyncController extends Controller
             $message = sprintf('Bot request failed. (HTTP %d).', $response->status());
             if ($detail) {
                 $message .= ' '.$detail;
+            }
+            if ($retryAfter !== null) {
+                $seconds = max(1, (int) ceil(((int) $retryAfter) / 1000));
+                $message .= sprintf(' Retry after %ds.', $seconds);
             }
 
             return response()->json(['error' => $message], 502);
