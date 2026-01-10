@@ -206,60 +206,60 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                   Items: {selectedShop?.shop_items.length ?? 0}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handlePostShop}
-                  disabled={!selectedShop || isPosting || !postChannel.post_channel_id}
-                >
-                  <Send size={16} className="mr-2" />
-                  Post shop
-                </Button>
-                <ActionMenu
-                  items={[
-                    {
-                      label: 'Roll a new shop',
-                      onSelect: handleCreateShop,
-                    },
-                  ]}
-                />
-                <Modal>
-                  <ModalTrigger>
-                    <Button size="sm" variant="outline" modifier="square" aria-label="Configure shop">
-                      <Settings size={16} />
-                    </Button>
-                  </ModalTrigger>
-                  <ModalTitle>Shop settings</ModalTitle>
-                  <ModalContent>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs text-base-content/70">Posting destination</p>
-                        <p className="text-sm font-semibold">{destinationText}</p>
-                      </div>
-                      <DiscordChannelPickerModal
-                        title="Select posting channel"
-                        description="Choose where the shop should be posted."
-                        confirmLabel="Save channel"
-                        includeThreads={false}
-                        enableThreadLoader
-                        threadLoadIncludeArchived
-                        threadLoadIncludePrivate={false}
-                        mode="single"
-                        allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
-                        triggerClassName="gap-2"
-                        triggerSize="sm"
-                        triggerVariant="outline"
-                        triggerDisabled={isSavingChannel}
-                        onConfirm={handlePostChannelSelect}
-                      >
-                        <Send size={18} />
-                        Select channel
-                      </DiscordChannelPickerModal>
+              <Modal>
+                <ModalTrigger>
+                  <Button size="sm" variant="outline" modifier="square" aria-label="Configure shop">
+                    <Settings size={16} />
+                  </Button>
+                </ModalTrigger>
+                <ModalTitle>Shop settings</ModalTitle>
+                <ModalContent>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-base-content/70">Posting destination</p>
+                      <p className="text-sm font-semibold">{destinationText}</p>
                     </div>
-                  </ModalContent>
-                </Modal>
-              </div>
+                    <DiscordChannelPickerModal
+                      title="Select posting channel"
+                      description="Choose where the shop should be posted."
+                      confirmLabel="Save channel"
+                      includeThreads={false}
+                      enableThreadLoader
+                      threadLoadIncludeArchived
+                      threadLoadIncludePrivate={false}
+                      mode="single"
+                      allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+                      triggerClassName="gap-2"
+                      triggerSize="sm"
+                      triggerVariant="outline"
+                      triggerDisabled={isSavingChannel}
+                      onConfirm={handlePostChannelSelect}
+                    >
+                      <Send size={18} />
+                      Select channel
+                    </DiscordChannelPickerModal>
+                  </div>
+                </ModalContent>
+              </Modal>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePostShop}
+                disabled={!selectedShop || isPosting || !postChannel.post_channel_id}
+              >
+                <Send size={16} className="mr-2" />
+                Post shop
+              </Button>
+              <ActionMenu
+                items={[
+                  {
+                    label: 'Roll a new shop',
+                    onSelect: handleCreateShop,
+                  },
+                ]}
+              />
             </div>
           </div>
         ) : null}

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps, VoiceSettings } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { EyeOff, FlaskRound, History, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
+import { EyeOff, FlaskRound, History, Mic, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -739,6 +739,7 @@ export default function Index({
   const [isSyncing, setIsSyncing] = useState(false)
   const [isPostingAuction, setIsPostingAuction] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
+  const [isSavingVoiceChannel, setIsSavingVoiceChannel] = useState(false)
   const [postChannel, setPostChannel] = useState<AuctionSettings>(auctionSettings ?? {})
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
@@ -746,14 +747,6 @@ export default function Index({
   const voiceChannelIdRef = useRef<string | null>(initialVoiceSettings?.voice_channel_id ?? null)
   const { auth } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
-  const {
-    data: voiceForm,
-    setData: setVoiceForm,
-    patch: patchVoiceSettings,
-    processing: isSavingVoice,
-  } = useForm({
-    voice_channel_id: initialVoiceSettings?.voice_channel_id ?? '',
-  })
 
   useEffect(() => {
     setSelectedAuction((prev) => {
@@ -769,13 +762,12 @@ export default function Index({
     const prevChannelId = voiceChannelIdRef.current
 
     setVoiceSettings(initialVoiceSettings)
-    setVoiceForm('voice_channel_id', nextChannelId ?? '')
 
     if (nextChannelId !== prevChannelId) {
       setVoiceCandidates([])
       voiceChannelIdRef.current = nextChannelId
     }
-  }, [initialVoiceSettings, setVoiceForm])
+  }, [initialVoiceSettings])
 
   useEffect(() => {
     setPostChannel(auctionSettings ?? {})
@@ -928,10 +920,10 @@ export default function Index({
     if (!voiceSettings.voice_channel_id || isSyncingRef.current) return
 
     const csrfToken = getCsrfToken()
-      if (!csrfToken) {
-        if (showToast) toast.show('Missing CSRF token.', 'error')
-        return
-      }
+    if (!csrfToken) {
+      if (showToast) toast.show('Missing CSRF token.', 'error')
+      return
+    }
 
     isSyncingRef.current = true
     setIsSyncing(true)
@@ -1014,18 +1006,33 @@ export default function Index({
 
   const manualCooldownLabel = manualCooldownRemaining > 0 ? `Refresh (${manualCooldownRemaining}s)` : 'Refresh'
 
-  const handleSaveVoiceSettings = () => {
-    patchVoiceSettings(route('voice-settings.update'), {
-      preserveScroll: true,
-      onSuccess: () => {
-        toast.show('Settings saved.', 'info')
-        router.reload({ only: ['voiceSettings'] })
-      },
-      onError: () => {
-        toast.show('Settings could not be saved.', 'error')
-      },
-    })
-  }
+  const handleVoiceChannelSelect = useCallback(
+    (selection: DiscordBackupChannel | { guild_id: string; channel_ids: string[] }[] | null) => {
+      if (!selection || Array.isArray(selection)) return
+      if (isSavingVoiceChannel) return
+
+      setIsSavingVoiceChannel(true)
+      router.patch(
+        route('voice-settings.update'),
+        { voice_channel_id: selection.id },
+        {
+          preserveScroll: true,
+          onSuccess: () => {
+            setVoiceSettings({ voice_channel_id: selection.id })
+            toast.show('Voice channel saved.', 'info')
+            router.reload({ only: ['voiceSettings'] })
+          },
+          onError: (errors) => {
+            toast.show(String(errors.voice_channel_id ?? 'Voice channel could not be saved.'), 'error')
+          },
+          onFinish: () => {
+            setIsSavingVoiceChannel(false)
+          },
+        },
+      )
+    },
+    [isSavingVoiceChannel, router],
+  )
 
   useEffect(() => {
     if (!voiceSettings.voice_channel_id) return
@@ -1097,93 +1104,94 @@ export default function Index({
                     {destinationText}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedAuction ? (
-                    <AddAuctionItemModal auction={selectedAuction} items={items} />
-                  ) : null}
-                  {isAdmin ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handlePostAuction}
-                      disabled={!postChannel.post_channel_id || isPostingAuction}
-                      className="gap-2"
-                    >
-                      <Send size={16} />
-                      Post
-                    </Button>
-                  ) : null}
-                  {isAdmin ? (
-                    <ActionMenu
-                      items={[
-                        {
-                          label: 'Close auction',
-                          onSelect: handleCloseAuction,
-                          disabled: selectedAuction.status === 'closed',
-                          tone: 'error',
-                        },
-                      ]}
-                    />
-                  ) : null}
-                  {isAdmin ? (
-                    <Modal>
-                      <ModalTrigger>
-                        <Button size="sm" variant="outline" modifier="square" aria-label="Configure auction">
-                          <Settings size={16} />
-                        </Button>
-                      </ModalTrigger>
-                      <ModalTitle>Auction settings</ModalTitle>
-                      <ModalContent>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <p className="text-xs text-base-content/70">Posting destination</p>
-                            <p className="text-sm font-semibold">{destinationText}</p>
-                            <DiscordChannelPickerModal
-                              title="Select posting channel"
-                              description="Choose where the auction should be posted."
-                              confirmLabel="Save channel"
-                              includeThreads={false}
-                              enableThreadLoader
-                              threadLoadIncludeArchived
-                              threadLoadIncludePrivate={false}
-                              mode="single"
-                              allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
-                              triggerClassName="gap-2"
-                              triggerSize="sm"
-                              triggerVariant="outline"
-                              triggerDisabled={isSavingChannel}
-                              onConfirm={handlePostChannelSelect}
-                            >
-                              <Send size={16} />
-                              Select channel
-                            </DiscordChannelPickerModal>
-                          </div>
-                          <div>
-                            <p className="text-xs text-base-content/70">
-                              The voice channel ID controls the live candidate list in auctions.
-                            </p>
-                            <div className="mt-2 flex flex-wrap items-end gap-2">
-                              <Input
-                                value={voiceForm.voice_channel_id}
-                                onChange={(e) => setVoiceForm('voice_channel_id', e.target.value)}
-                              >
-                                Voice Channel ID
-                              </Input>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleSaveVoiceSettings}
-                                disabled={isSavingVoice}
-                              >
-                                Save
-                              </Button>
-                            </div>
-                          </div>
+                {isAdmin ? (
+                  <Modal>
+                    <ModalTrigger>
+                      <Button size="sm" variant="outline" modifier="square" aria-label="Configure auction">
+                        <Settings size={16} />
+                      </Button>
+                    </ModalTrigger>
+                    <ModalTitle>Auction settings</ModalTitle>
+                    <ModalContent>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <p className="text-xs text-base-content/70">Posting destination</p>
+                          <p className="text-sm font-semibold">{destinationText}</p>
+                          <DiscordChannelPickerModal
+                            title="Select posting channel"
+                            description="Choose where the auction should be posted."
+                            confirmLabel="Save channel"
+                            includeThreads={false}
+                            enableThreadLoader
+                            threadLoadIncludeArchived
+                            threadLoadIncludePrivate={false}
+                            mode="single"
+                            allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+                            triggerClassName="gap-2"
+                            triggerSize="sm"
+                            triggerVariant="outline"
+                            triggerDisabled={isSavingChannel}
+                            onConfirm={handlePostChannelSelect}
+                          >
+                            <Send size={16} />
+                            Select channel
+                          </DiscordChannelPickerModal>
                         </div>
-                      </ModalContent>
-                    </Modal>
-                  ) : null}
-                </div>
+                        <div className="space-y-2">
+                          <p className="text-xs text-base-content/70">Voice channel</p>
+                          <p className="text-sm font-semibold">
+                            {voiceSettings.voice_channel_id ?? 'Not set'}
+                          </p>
+                          <DiscordChannelPickerModal
+                            title="Select voice channel"
+                            description="Choose the voice channel used for live candidates."
+                            confirmLabel="Save channel"
+                            includeThreads={false}
+                            mode="single"
+                            allowedChannelTypes={['GuildVoice', 'GuildStageVoice']}
+                            triggerClassName="gap-2"
+                            triggerSize="sm"
+                            triggerVariant="outline"
+                            triggerDisabled={isSavingVoiceChannel}
+                            onConfirm={handleVoiceChannelSelect}
+                          >
+                            <Mic size={16} />
+                            Select voice channel
+                          </DiscordChannelPickerModal>
+                        </div>
+                      </div>
+                    </ModalContent>
+                  </Modal>
+                ) : null}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {selectedAuction ? (
+                  <AddAuctionItemModal auction={selectedAuction} items={items} />
+                ) : null}
+                {isAdmin ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePostAuction}
+                    disabled={!postChannel.post_channel_id || isPostingAuction}
+                    className="gap-2"
+                  >
+                    <Send size={16} />
+                    Post
+                  </Button>
+                ) : null}
+                {isAdmin ? (
+                  <ActionMenu
+                    items={[
+                      {
+                        label: 'Close auction',
+                        onSelect: handleCloseAuction,
+                        disabled: selectedAuction.status === 'closed',
+                        tone: 'error',
+                      },
+                    ]}
+                  />
+                ) : null}
               </div>
             </div>
 
@@ -1217,7 +1225,9 @@ export default function Index({
                   ) : null}
                 </>
               ) : (
-                <p className="text-xs text-base-content/70">No voice channel ID set. Update it in settings.</p>
+                <p className="text-xs text-base-content/70">
+                  No voice channel selected. Configure it in the auction settings.
+                </p>
               )}
             </div>
 
