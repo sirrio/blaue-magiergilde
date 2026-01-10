@@ -23,8 +23,10 @@ class AuctionPostController extends Controller
 
         $channelId = $request->validated()['channel_id'];
 
+        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+
         try {
-            $response = Http::timeout(10)
+            $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/auction-post', [

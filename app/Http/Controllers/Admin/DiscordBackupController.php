@@ -44,8 +44,10 @@ class DiscordBackupController extends Controller
             ]);
         }
 
+        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+
         try {
-            $response = Http::timeout(10)
+            $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup', [
@@ -95,8 +97,10 @@ class DiscordBackupController extends Controller
             ], 422);
         }
 
+        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+
         try {
-            $response = Http::timeout(10)
+            $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup/status');
@@ -158,8 +162,10 @@ class DiscordBackupController extends Controller
             ], 403);
         }
 
+        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+
         try {
-            $response = Http::timeout(10)
+            $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup/channel', [
