@@ -229,6 +229,9 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
         await sendLines(destination, lines);
     }
 
+    const updateUnix = Math.floor(Date.now() / 1000);
+    await sendOneLine(destination, `# :exclamation: Letzte aktuallisierung <t:${updateUnix}:R> :exclamation:`);
+
     return {
         ok: true,
         destinationId: destination.id,
