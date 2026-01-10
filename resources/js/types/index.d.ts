@@ -87,6 +87,10 @@ export interface ShopSettings {
   post_channel_type?: string | null
   post_channel_guild_id?: string | null
   post_channel_is_thread?: boolean | null
+  auto_post_enabled?: boolean | null
+  auto_post_weekday?: number | null
+  auto_post_time?: string | null
+  last_auto_posted_at?: string | null
 }
 
 export interface AuctionSettings {

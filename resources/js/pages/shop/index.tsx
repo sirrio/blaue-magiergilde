@@ -18,7 +18,11 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const [selectedShop, setSelectedShop] = useState<Shop | null>(shops[0] ?? null)
   const [isPosting, setIsPosting] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
-  const [postChannel, setPostChannel] = useState<ShopSettings>(shopSettings ?? {})
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [settings, setSettings] = useState<ShopSettings>(shopSettings ?? {})
+  const [autoPostEnabled, setAutoPostEnabled] = useState(Boolean(shopSettings?.auto_post_enabled))
+  const [autoPostWeekday, setAutoPostWeekday] = useState<number>(shopSettings?.auto_post_weekday ?? 0)
+  const [autoPostTime, setAutoPostTime] = useState<string>(shopSettings?.auto_post_time ?? '09:00')
   const { auth } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
 
@@ -32,7 +36,10 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   }, [shops, selectedShop?.id])
 
   useEffect(() => {
-    setPostChannel(shopSettings ?? {})
+    setSettings(shopSettings ?? {})
+    setAutoPostEnabled(Boolean(shopSettings?.auto_post_enabled))
+    setAutoPostWeekday(shopSettings?.auto_post_weekday ?? 0)
+    setAutoPostTime(shopSettings?.auto_post_time ?? '09:00')
   }, [shopSettings])
 
   const formatShopCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
@@ -99,13 +106,14 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
           return
         }
 
-        setPostChannel({
+        setSettings((current) => ({
+          ...current,
           post_channel_id: selection.id,
           post_channel_name: selection.name,
           post_channel_type: selection.type,
           post_channel_guild_id: selection.guild_id,
           post_channel_is_thread: selection.is_thread,
-        })
+        }))
         toast.show('Posting channel saved.', 'info')
       } catch (error) {
         toast.show('Channel could not be saved.', 'error')
@@ -116,13 +124,58 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     [getCsrfToken, isSavingChannel],
   )
 
+  const handleScheduleSave = useCallback(async () => {
+    if (isSavingSchedule) return
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setIsSavingSchedule(true)
+    const payload = {
+      auto_post_enabled: autoPostEnabled,
+      auto_post_weekday: autoPostWeekday,
+      auto_post_time: autoPostTime,
+    }
+
+    try {
+      const response = await fetch(route('admin.shop-settings.update'), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(data?.error ?? 'Schedule could not be saved.'), 'error')
+        return
+      }
+
+      setSettings((current) => ({
+        ...current,
+        ...(data?.shop_settings ?? payload),
+      }))
+      toast.show('Schedule saved.', 'info')
+    } catch (error) {
+      toast.show('Schedule could not be saved.', 'error')
+    } finally {
+      setIsSavingSchedule(false)
+    }
+  }, [autoPostEnabled, autoPostTime, autoPostWeekday, getCsrfToken, isSavingSchedule])
+
   const handlePostShop = useCallback(async () => {
     if (!selectedShop) {
       toast.show('Select a shop first.', 'error')
       return
     }
     if (isPosting) return
-    if (!postChannel.post_channel_id) {
+    if (!settings.post_channel_id) {
       toast.show('Select a posting channel first.', 'error')
       return
     }
@@ -146,7 +199,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
           'X-CSRF-TOKEN': csrfToken,
         },
         credentials: 'same-origin',
-        body: JSON.stringify({ channel_id: postChannel.post_channel_id }),
+        body: JSON.stringify({ channel_id: settings.post_channel_id }),
       })
 
       const payload = await response.json().catch(() => ({}))
@@ -161,16 +214,31 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     } finally {
       setIsPosting(false)
     }
-  }, [getCsrfToken, isPosting, postChannel.post_channel_id, selectedShop])
+  }, [getCsrfToken, isPosting, selectedShop, settings.post_channel_id])
 
-  const destinationLabel = postChannel.post_channel_name ?? postChannel.post_channel_id ?? 'Not set'
-  const destinationKind = postChannel.post_channel_id
-    ? postChannel.post_channel_is_thread
+  const destinationLabel = settings.post_channel_name ?? settings.post_channel_id ?? 'Not set'
+  const destinationKind = settings.post_channel_id
+    ? settings.post_channel_is_thread
       ? 'Thread'
       : 'Channel'
     : null
   const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
-  const hasPostDestination = Boolean(postChannel.post_channel_id)
+  const hasPostDestination = Boolean(settings.post_channel_id)
+
+  const weekdayOptions = [
+    { value: 0, label: 'Sunday' },
+    { value: 1, label: 'Monday' },
+    { value: 2, label: 'Tuesday' },
+    { value: 3, label: 'Wednesday' },
+    { value: 4, label: 'Thursday' },
+    { value: 5, label: 'Friday' },
+    { value: 6, label: 'Saturday' },
+  ]
+  const savedAutoPostEnabled = Boolean(settings.auto_post_enabled)
+  const savedWeekday = settings.auto_post_weekday ?? 0
+  const savedTime = settings.auto_post_time ?? '09:00'
+  const weekdayLabel = weekdayOptions.find((option) => option.value === savedWeekday)?.label ?? 'Sunday'
+  const autoPostLabel = savedAutoPostEnabled ? `Auto post: ${weekdayLabel} ${savedTime}` : 'Auto post: Off'
   return (
     <AppLayout>
       <Head title="Shop" />
@@ -208,6 +276,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 <span className="rounded-full border border-base-200 px-2 py-1">
                   Items: {selectedShop?.shop_items.length ?? 0}
                 </span>
+                <span className="rounded-full border border-base-200 px-2 py-1">
+                  {autoPostLabel}
+                </span>
               </div>
               <Modal>
                 <ModalTrigger>
@@ -243,6 +314,43 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                       <Send size={18} />
                       Select channel
                     </DiscordChannelPickerModal>
+                    <div className="space-y-2 border-t border-base-200 pt-3">
+                      <p className="text-xs text-base-content/70">Weekly auto post</p>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-xs"
+                          checked={autoPostEnabled}
+                          onChange={(event) => setAutoPostEnabled(event.target.checked)}
+                        />
+                        Enable weekly auto post
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <select
+                          className="select select-sm"
+                          value={autoPostWeekday}
+                          onChange={(event) => setAutoPostWeekday(Number(event.target.value))}
+                        >
+                          {weekdayOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="time"
+                          className="input input-sm"
+                          value={autoPostTime}
+                          onChange={(event) => setAutoPostTime(event.target.value)}
+                        />
+                        <Button size="sm" variant="outline" onClick={handleScheduleSave} disabled={isSavingSchedule}>
+                          Save schedule
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-base-content/60">
+                        Uses Europe/Berlin time.
+                      </p>
+                    </div>
                   </div>
                 </ModalContent>
               </Modal>
@@ -252,7 +360,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 size="sm"
                 variant="outline"
                 onClick={handlePostShop}
-                disabled={!selectedShop || isPosting || !postChannel.post_channel_id}
+                disabled={!selectedShop || isPosting || !settings.post_channel_id}
               >
                 <Send size={16} className="mr-2" />
                 Post shop
