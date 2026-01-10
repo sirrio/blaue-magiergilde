@@ -47,8 +47,6 @@ class ItemController extends Controller
                 'pick_count',
                 'shop_enabled',
                 'default_spell_roll_enabled',
-                'default_spell_level',
-                'default_spell_school',
                 'default_spell_levels',
                 'default_spell_schools',
             ])
@@ -132,14 +130,6 @@ class ItemController extends Controller
         $levels = $request->input('default_spell_levels');
         $schools = $request->input('default_spell_schools');
 
-        if (! is_array($levels) && $request->filled('default_spell_level')) {
-            $levels = [$request->input('default_spell_level')];
-        }
-
-        if (! is_array($schools) && $request->filled('default_spell_school')) {
-            $schools = [$request->input('default_spell_school')];
-        }
-
         $levels = array_values(array_unique(array_filter(array_map(
             static fn ($value) => is_numeric($value) ? (int) $value : null,
             (array) $levels
@@ -154,7 +144,5 @@ class ItemController extends Controller
         $item->default_spell_roll_enabled = $autoRoll;
         $item->default_spell_levels = $autoRoll ? $levels : null;
         $item->default_spell_schools = $autoRoll ? ($schools === [] ? null : $schools) : null;
-        $item->default_spell_level = $autoRoll ? ($levels[0] ?? null) : null;
-        $item->default_spell_school = $autoRoll ? ($schools[0] ?? null) : null;
     }
 }

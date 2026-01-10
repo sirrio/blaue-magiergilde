@@ -180,8 +180,6 @@ export interface Item {
   pick_count: number
   shop_enabled?: boolean
   default_spell_roll_enabled?: boolean
-  default_spell_level?: number | null
-  default_spell_school?: Spell['spell_school'] | null
   default_spell_levels?: number[] | null
   default_spell_schools?: Spell['spell_school'][] | null
 }

@@ -79,13 +79,11 @@ const formatSpellLevelRange = (levels: number[]) => {
 
 const buildAutoRollSummary = (item: Item) => {
   if (!item.default_spell_roll_enabled) return null
-  const levels = item.default_spell_levels ?? (item.default_spell_level !== undefined && item.default_spell_level !== null
-    ? [item.default_spell_level]
-    : [])
+  const levels = item.default_spell_levels ?? []
   if (levels.length === 0) return null
 
   const levelLabel = formatSpellLevelRange(levels)
-  const schools = item.default_spell_schools ?? (item.default_spell_school ? [item.default_spell_school] : [])
+  const schools = item.default_spell_schools ?? []
   const schoolKeys = Object.keys(spellSchoolLabels)
   const isAllSchools = new Set(schools).size === schoolKeys.length
   const schoolLabel = schools.length > 0
