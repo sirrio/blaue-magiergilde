@@ -4,6 +4,7 @@ import { Link, usePage } from '@inertiajs/react'
 import {
   BookOpen,
   Gavel,
+  Map,
   Menu,
   Package,
   ScrollText,
@@ -48,6 +49,7 @@ const adminLinks = [
   { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
   { name: 'Shop', route: 'admin.shops.index', method: 'get' as const, icon: Store },
   { name: 'Auctions', route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
+  { name: 'Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
   { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
 ]
 

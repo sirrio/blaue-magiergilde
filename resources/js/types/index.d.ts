@@ -248,6 +248,34 @@ export interface Character {
   character?: Character
 }
 
+export interface RoomMap {
+  id: number
+  name: string
+  image_path: string
+  grid_columns: number
+  grid_rows: number
+  rooms?: Room[]
+}
+
+export interface RoomCharacter {
+  id: number
+  name: string
+  avatar?: string | null
+  user_id?: number | null
+}
+
+export interface Room {
+  id: number
+  room_map_id: number
+  name: string
+  grid_x: number
+  grid_y: number
+  grid_w: number
+  grid_h: number
+  character_id?: number | null
+  character?: RoomCharacter | null
+}
+
 export interface Ally {
   id: number
   name: string

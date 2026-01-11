@@ -26,6 +26,7 @@ require __DIR__.'/web/auction.php';
 require __DIR__.'/web/admin.php';
 require __DIR__.'/web/bot.php';
 require __DIR__.'/web/character-approvals.php';
+require __DIR__.'/web/rooms.php';
 require __DIR__.'/web/user.php';
 require __DIR__.'/web/settings.php';
 require __DIR__.'/web/handbook.php';
