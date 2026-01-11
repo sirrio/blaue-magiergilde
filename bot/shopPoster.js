@@ -75,17 +75,71 @@ function formatItemLine(row) {
     return `${prefix}${cost}`;
 }
 
-function parseMessageIds(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return value.filter(Boolean).map(String);
-    if (typeof value !== 'string') return [];
-    try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-    } catch {
-        return [];
+function normalizeMessageId(value) {
+    if (value === null || value === undefined) return null;
+    const id = String(value).trim();
+    return id ? id : null;
+}
+
+function parsePostPayload(value) {
+    if (!value) {
+        return {
+            legacyMessageIds: [],
+            headerMessageIds: [],
+            itemMessageIds: {},
+            shopId: null,
+        };
     }
-    return [];
+
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        } catch {
+            parsed = null;
+        }
+    }
+
+    if (Array.isArray(parsed)) {
+        return {
+            legacyMessageIds: parsed.filter(Boolean).map(String),
+            headerMessageIds: [],
+            itemMessageIds: {},
+            shopId: null,
+        };
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+        return {
+            legacyMessageIds: [],
+            headerMessageIds: [],
+            itemMessageIds: {},
+            shopId: null,
+        };
+    }
+
+    const headerMessageIds = Array.isArray(parsed.header_message_ids)
+        ? parsed.header_message_ids.map(normalizeMessageId).filter(Boolean)
+        : [];
+
+    const itemMessageIds = {};
+    if (parsed.item_message_ids && typeof parsed.item_message_ids === 'object') {
+        for (const [key, value] of Object.entries(parsed.item_message_ids)) {
+            const messageId = normalizeMessageId(value);
+            if (messageId) {
+                itemMessageIds[String(key)] = messageId;
+            }
+        }
+    }
+
+    const shopId = Number(parsed.shop_id || 0) || null;
+
+    return {
+        legacyMessageIds: [],
+        headerMessageIds,
+        itemMessageIds,
+        shopId,
+    };
 }
 
 async function fetchShopPostState() {
@@ -93,15 +147,23 @@ async function fetchShopPostState() {
         'SELECT id, last_post_channel_id, last_post_message_ids FROM shop_settings ORDER BY id ASC LIMIT 1',
     );
     if (!rows[0]) return null;
+    const parsed = parsePostPayload(rows[0].last_post_message_ids);
     return {
         id: rows[0].id,
         lastPostChannelId: rows[0].last_post_channel_id,
-        lastPostMessageIds: parseMessageIds(rows[0].last_post_message_ids),
+        legacyMessageIds: parsed.legacyMessageIds,
+        headerMessageIds: parsed.headerMessageIds,
+        itemMessageIds: parsed.itemMessageIds,
+        shopId: parsed.shopId,
     };
 }
 
-async function saveShopPostState({ settingsId, channelId, messageIds }) {
-    const payload = JSON.stringify(messageIds ?? []);
+async function saveShopPostState({ settingsId, channelId, shopId, headerMessageIds, itemMessageIds }) {
+    const payload = JSON.stringify({
+        shop_id: shopId,
+        header_message_ids: headerMessageIds ?? [],
+        item_message_ids: itemMessageIds ?? {},
+    });
     const timestamp = nowSql();
 
     if (!settingsId) {
@@ -119,7 +181,17 @@ async function saveShopPostState({ settingsId, channelId, messageIds }) {
 }
 
 async function deletePreviousPosts({ client, settings }) {
-    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return;
+    if (!settings?.lastPostChannelId) return;
+
+    const allMessageIds = new Set(
+        [
+            ...(settings.legacyMessageIds || []),
+            ...(settings.headerMessageIds || []),
+            ...Object.values(settings.itemMessageIds || {}),
+        ].filter(Boolean),
+    );
+
+    if (!allMessageIds.size) return;
 
     let channel;
     try {
@@ -131,7 +203,7 @@ async function deletePreviousPosts({ client, settings }) {
 
     if (!channel?.isTextBased?.()) return;
 
-    for (const messageId of settings.lastPostMessageIds) {
+    for (const messageId of allMessageIds) {
         try {
             await waitForDiscordRateLimit(client);
             // eslint-disable-next-line no-await-in-loop
@@ -271,6 +343,11 @@ async function sendLines(destination, lines) {
     return messageIds;
 }
 
+async function sendItemLine(destination, row) {
+    const line = formatItemLine(row);
+    return sendOneLine(destination, line);
+}
+
 async function postShopToChannel({ client, channelId, shopId, threadName }) {
     attachRateLimitListener(client);
     const postState = await fetchShopPostState();
@@ -290,14 +367,15 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
     }
 
     const destination = destinationResult.destination;
-    const messageIds = [];
+    const headerMessageIds = [];
+    const itemMessageIds = {};
 
     await deletePreviousPosts({ client, settings: postState });
 
     const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
     const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
     const headerId = await sendOneLine(destination, `**Shop #${String(shop.id).padStart(3, '0')}** - Rolled: ${createdAtText}`);
-    if (headerId) messageIds.push(headerId);
+    if (headerId) headerMessageIds.push(headerId);
 
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
@@ -325,31 +403,46 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
         }
 
         const sectionId = await sendOneLine(destination, `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`);
-        if (sectionId) messageIds.push(sectionId);
-        messageIds.push(...await sendLines(destination, (byType.get('item') ?? []).map(formatItemLine)));
-
-        const consumableLines = (byType.get('consumable') ?? []).map(formatItemLine);
-        const scrollLines = (byType.get('spellscroll') ?? []).map(formatItemLine);
+        if (sectionId) headerMessageIds.push(sectionId);
+        for (const row of byType.get('item') ?? []) {
+            // eslint-disable-next-line no-await-in-loop
+            const messageId = await sendItemLine(destination, row);
+            if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+        }
 
         if (rarity === 'common' || rarity === 'uncommon') {
             const consumableHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable`);
-            if (consumableHeaderId) messageIds.push(consumableHeaderId);
-            messageIds.push(...await sendLines(destination, consumableLines));
+            if (consumableHeaderId) headerMessageIds.push(consumableHeaderId);
+            for (const row of byType.get('consumable') ?? []) {
+                // eslint-disable-next-line no-await-in-loop
+                const messageId = await sendItemLine(destination, row);
+                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+            }
 
             const scrollHeaderId = await sendOneLine(destination, `### ${rarityLabel} Spell Scroll`);
-            if (scrollHeaderId) messageIds.push(scrollHeaderId);
-            messageIds.push(...await sendLines(destination, scrollLines));
+            if (scrollHeaderId) headerMessageIds.push(scrollHeaderId);
+            for (const row of byType.get('spellscroll') ?? []) {
+                // eslint-disable-next-line no-await-in-loop
+                const messageId = await sendItemLine(destination, row);
+                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+            }
         } else {
             const mixedHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable/Spell Scroll`);
-            if (mixedHeaderId) messageIds.push(mixedHeaderId);
-            messageIds.push(...await sendLines(destination, [...consumableLines, ...scrollLines]));
+            if (mixedHeaderId) headerMessageIds.push(mixedHeaderId);
+            for (const row of [...(byType.get('consumable') ?? []), ...(byType.get('spellscroll') ?? [])]) {
+                // eslint-disable-next-line no-await-in-loop
+                const messageId = await sendItemLine(destination, row);
+                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+            }
         }
     }
 
     await saveShopPostState({
         settingsId: postState?.id ?? null,
         channelId: destination.id,
-        messageIds,
+        shopId: shop.id,
+        headerMessageIds,
+        itemMessageIds,
     });
 
     return {
@@ -361,16 +454,84 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
 }
 
 async function updateShopPost({ client, shopId }) {
+    attachRateLimitListener(client);
     const postState = await fetchShopPostState();
     if (!postState?.lastPostChannelId) {
         return { ok: false, status: 409, error: 'No previous shop post found.' };
     }
 
-    return postShopToChannel({
-        client,
+    if (!postState.itemMessageIds || Object.keys(postState.itemMessageIds).length === 0) {
+        return { ok: false, status: 409, error: 'Previous shop post does not support updates. Re-post the shop.' };
+    }
+
+    if (postState.shopId && Number(postState.shopId) !== Number(shopId)) {
+        return { ok: false, status: 409, error: `Last posted shop is #${postState.shopId}.` };
+    }
+
+    const shop = await fetchShop(shopId);
+    if (!shop) {
+        return { ok: false, status: 404, error: `Shop #${shopId} not found.` };
+    }
+
+    const items = await fetchShopItems(shop.id);
+    if (items.length === 0) {
+        return { ok: false, status: 422, error: `Shop #${shop.id} has no items.` };
+    }
+
+    let destination;
+    try {
+        await waitForDiscordRateLimit(client);
+        destination = await client.channels.fetch(postState.lastPostChannelId);
+    } catch {
+        return { ok: false, status: 404, error: 'Destination channel not found.' };
+    }
+
+    if (!destination?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Destination channel is not text-based.' };
+    }
+
+    const updatedItemMessageIds = { ...postState.itemMessageIds };
+
+    for (const row of items) {
+        const messageId = updatedItemMessageIds[String(row.shop_item_id)];
+        const content = formatItemLine(row);
+
+        if (!messageId) {
+            // eslint-disable-next-line no-await-in-loop
+            const newMessageId = await sendOneLine(destination, content);
+            if (newMessageId) {
+                updatedItemMessageIds[String(row.shop_item_id)] = newMessageId;
+            }
+            continue;
+        }
+
+        try {
+            await waitForDiscordRateLimit(client);
+            // eslint-disable-next-line no-await-in-loop
+            await destination.messages.edit(messageId, content);
+        } catch {
+            // eslint-disable-next-line no-await-in-loop
+            const fallbackId = await sendOneLine(destination, content);
+            if (fallbackId) {
+                updatedItemMessageIds[String(row.shop_item_id)] = fallbackId;
+            }
+        }
+    }
+
+    await saveShopPostState({
+        settingsId: postState.id ?? null,
         channelId: postState.lastPostChannelId,
-        shopId,
+        shopId: shop.id,
+        headerMessageIds: postState.headerMessageIds ?? [],
+        itemMessageIds: updatedItemMessageIds,
     });
+
+    return {
+        ok: true,
+        destinationId: destination.id,
+        destinationName: destination.name || destination.id,
+        shopId: shop.id,
+    };
 }
 
 module.exports = {
