@@ -3,11 +3,12 @@ import { Input } from '@/components/ui/input'
 import { ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
+import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { PageProps, Spell } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, XCircle } from 'lucide-react'
+import { Copy, Edit, ExternalLink, Scale, XCircle } from 'lucide-react'
 
 const schoolColors: Record<string, string> = {
   abjuration: 'text-[#007BFF]', // Blue
@@ -38,10 +39,24 @@ export default function SpellRow({ spell }: { spell: Spell }) {
     legacy_url: spell.legacy_url || '',
     spell_school: spell.spell_school || '',
     spell_level: spell.spell_level,
+    ruling_changed: spell.ruling_changed ?? false,
+    ruling_note: spell.ruling_note ?? '',
   }
   const { data, setData, post } = useForm(formData)
   const { errors } = usePage<PageProps>().props
   const textColor = getSpellSchoolTextColor(spell.spell_school || '')
+  const hasRulingChange = Boolean(spell.ruling_changed)
+  const rulingNote = spell.ruling_note?.trim()
+  const rulingLabel = hasRulingChange
+    ? (rulingNote ? `Ruling: ${rulingNote}` : 'Ruling change')
+    : 'No ruling change'
+
+  const handleRulingToggle = (enabled: boolean) => {
+    setData('ruling_changed', enabled)
+    if (!enabled) {
+      setData('ruling_note', '')
+    }
+  }
 
   const handleFormSubmit = () => {
     post(route('admin.spells.update', { spell, _method: 'put' }), {
@@ -61,6 +76,9 @@ export default function SpellRow({ spell }: { spell: Spell }) {
       </div>
       <div className={cn(textColor, 'text-xs sm:text-sm')}>
         {spell.name} <span className={'text-xs font-light italic'}>(Level {spell.spell_level})</span>
+      </div>
+      <div className="flex items-center justify-center text-xs" title={rulingLabel} aria-label={rulingLabel}>
+        <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
       </div>
       <Modal>
         <ModalTrigger>
@@ -120,6 +138,22 @@ export default function SpellRow({ spell }: { spell: Spell }) {
               <option value="transmutation">Transmutation</option>
             </SelectOptions>
           </Select>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.ruling_changed)}
+                onChange={(e) => handleRulingToggle(e.target.checked)}
+              />
+              <span>Ruling changed</span>
+            </label>
+            {data.ruling_changed ? (
+              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+                Ruling note
+              </TextArea>
+            ) : null}
+          </div>
         </ModalContent>
         <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
       </Modal>

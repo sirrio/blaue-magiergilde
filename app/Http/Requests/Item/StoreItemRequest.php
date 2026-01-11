@@ -39,11 +39,14 @@ class StoreItemRequest extends FormRequest
             'rarity' => 'required|string',
             'type' => 'required|string',
             'shop_enabled' => 'boolean',
+            'guild_enabled' => 'boolean',
             'default_spell_roll_enabled' => 'boolean',
             'default_spell_levels' => 'nullable|array',
             'default_spell_levels.*' => 'integer|min:0|max:9',
             'default_spell_schools' => 'nullable|array',
             'default_spell_schools.*' => 'in:abjuration,conjuration,divination,enchantment,evocation,illusion,necromancy,transmutation',
+            'ruling_changed' => 'boolean',
+            'ruling_note' => 'nullable|string|max:500',
         ];
     }
 }

@@ -181,9 +181,12 @@ export interface Item {
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare'
   pick_count: number
   shop_enabled?: boolean
+  guild_enabled?: boolean
   default_spell_roll_enabled?: boolean
   default_spell_levels?: number[] | null
   default_spell_schools?: Spell['spell_school'][] | null
+  ruling_changed?: boolean
+  ruling_note?: string | null
 }
 
 export interface Spell {
@@ -193,6 +196,8 @@ export interface Spell {
   legacy_url: string
   spell_school: 'abjuration' | 'conjuration' | 'divination' | 'enchantment' | 'evocation' | 'illusion' | 'necromancy' | 'transmutation'
   spell_level: number
+  ruling_changed?: boolean
+  ruling_note?: string | null
 }
 
 export interface CharacterClass {

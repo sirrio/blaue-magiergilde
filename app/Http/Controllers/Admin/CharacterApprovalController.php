@@ -68,6 +68,7 @@ class CharacterApprovalController extends Controller
                 'external_link',
                 'start_tier',
                 'guild_status',
+                'notes',
                 'admin_notes',
                 'dm_bubbles',
                 'bubble_shop_spend',

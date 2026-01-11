@@ -33,7 +33,7 @@ class SpellController extends Controller
 
         $spells = $spellQuery
             ->orderBy('spell_level')
-            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level'])
+            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'ruling_changed', 'ruling_note'])
             ->get();
 
         return Inertia::render('spell/index', [
@@ -79,7 +79,20 @@ class SpellController extends Controller
      */
     public function update(UpdateSpellRequest $request, Spell $spells)
     {
-        //
+        $spells->name = $request->name;
+        $spells->url = $request->input('url');
+        $spells->legacy_url = $request->input('legacy_url');
+        $spells->spell_school = $request->input('spell_school');
+        $spells->spell_level = (int) $request->input('spell_level', 0);
+
+        $hasRulingChange = $request->boolean('ruling_changed');
+        $note = $hasRulingChange ? trim((string) $request->input('ruling_note', '')) : '';
+        $spells->ruling_changed = $hasRulingChange;
+        $spells->ruling_note = $note !== '' ? $note : null;
+
+        $spells->save();
+
+        return redirect()->back();
     }
 
     /**

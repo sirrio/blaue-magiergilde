@@ -46,9 +46,12 @@ class ItemController extends Controller
                 'type',
                 'pick_count',
                 'shop_enabled',
+                'guild_enabled',
                 'default_spell_roll_enabled',
                 'default_spell_levels',
                 'default_spell_schools',
+                'ruling_changed',
+                'ruling_note',
             ])
             ->get();
 
@@ -78,6 +81,8 @@ class ItemController extends Controller
         $item->rarity = $request->rarity;
         $item->type = $request->type;
         $item->shop_enabled = $request->boolean('shop_enabled', true);
+        $item->guild_enabled = $request->boolean('guild_enabled', true);
+        $this->applyRulingNote($item, $request);
         $this->applyDefaultSpellRoll($item, $request);
         $item->save();
 
@@ -111,6 +116,8 @@ class ItemController extends Controller
         $item->rarity = $request->rarity;
         $item->type = $request->type;
         $item->shop_enabled = $request->boolean('shop_enabled', true);
+        $item->guild_enabled = $request->boolean('guild_enabled', true);
+        $this->applyRulingNote($item, $request);
         $this->applyDefaultSpellRoll($item, $request);
         $item->save();
 
@@ -144,5 +151,14 @@ class ItemController extends Controller
         $item->default_spell_roll_enabled = $autoRoll;
         $item->default_spell_levels = $autoRoll ? $levels : null;
         $item->default_spell_schools = $autoRoll ? ($schools === [] ? null : $schools) : null;
+    }
+
+    private function applyRulingNote(Item $item, Request $request): void
+    {
+        $hasRulingChange = $request->boolean('ruling_changed');
+        $note = $hasRulingChange ? trim((string) $request->input('ruling_note', '')) : '';
+
+        $item->ruling_changed = $hasRulingChange;
+        $item->ruling_note = $note !== '' ? $note : null;
     }
 }

@@ -10,4 +10,8 @@ class Spell extends Model
 {
     /** @use HasFactory<\Database\Factories\SpellsFactory> */
     use HasFactory, SoftDeletes;
+
+    protected $casts = [
+        'ruling_changed' => 'boolean',
+    ];
 }

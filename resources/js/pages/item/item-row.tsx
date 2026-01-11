@@ -3,11 +3,12 @@ import { Input } from '@/components/ui/input'
 import { ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
+import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, StickyNote, Store, Sword, XCircle } from 'lucide-react'
+import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Scale, Shield, StickyNote, Store, Sword, XCircle } from 'lucide-react'
 import React, { useEffect, useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -256,15 +257,24 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     type: item.type,
     rarity: item.rarity,
     shop_enabled: item.shop_enabled ?? true,
+    guild_enabled: item.guild_enabled ?? true,
     default_spell_roll_enabled: item.default_spell_roll_enabled ?? false,
     default_spell_levels: item.default_spell_levels ?? [],
     default_spell_schools: item.default_spell_schools ?? [],
+    ruling_changed: item.ruling_changed ?? false,
+    ruling_note: item.ruling_note ?? '',
   }
   const { data, setData, post } = useForm(formData)
   const { errors } = usePage<PageProps>().props
   const textColor = getRarityTextColor(item.rarity)
   const autoRollSummary = !shopItem ? buildAutoRollSummary(item) : null
   const isShopEnabled = item.shop_enabled ?? true
+  const isGuildEnabled = item.guild_enabled ?? true
+  const hasRulingChange = Boolean(item.ruling_changed)
+  const rulingNote = item.ruling_note?.trim()
+  const rulingLabel = hasRulingChange
+    ? (rulingNote ? `Ruling: ${rulingNote}` : 'Ruling change')
+    : 'No ruling change'
 
   const handleFormSubmit = () => {
     if (data.default_spell_roll_enabled && data.default_spell_levels.length === 0) {
@@ -310,6 +320,13 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     )
   }
 
+  const handleRulingToggle = (enabled: boolean) => {
+    setData('ruling_changed', enabled)
+    if (!enabled) {
+      setData('ruling_note', '')
+    }
+  }
+
   const spell = shopItem?.spell
   const shopNotes = shopItem?.notes?.trim()
   const baseName = shopNotes ? `${item.name} - ${shopNotes}` : item.name
@@ -330,7 +347,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       </div>
       <div className="max-w-20 font-mono text-xs">{item.cost ? item.cost : <span className="text-error">No cost available</span>}</div>
       {!shopItem ? (
-        <div className="flex items-center justify-center text-xs">
+        <div className="flex items-center justify-center gap-2 text-xs">
           {isShopEnabled ? (
             <Store className="h-4 w-4 text-success" title="Included in shop rolls" aria-label="Included in shop rolls" />
           ) : (
@@ -343,6 +360,23 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
               <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
             </span>
           )}
+          {isGuildEnabled ? (
+            <Shield className="h-4 w-4 text-success" title="Allowed in guild" aria-label="Allowed in guild" />
+          ) : (
+            <span
+              className="relative inline-flex h-4 w-4 items-center justify-center"
+              title="Not allowed in guild"
+              aria-label="Not allowed in guild"
+            >
+              <Shield className="h-4 w-4 text-base-content/40" />
+              <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
+            </span>
+          )}
+        </div>
+      ) : null}
+      {!shopItem ? (
+        <div className="flex items-center justify-center text-xs" title={rulingLabel} aria-label={rulingLabel}>
+          <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
         </div>
       ) : null}
       <Modal>
@@ -397,6 +431,31 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
             />
             <span>Include in shop rolls</span>
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-xs"
+              checked={Boolean(data.guild_enabled)}
+              onChange={(e) => setData('guild_enabled', e.target.checked)}
+            />
+            <span>Allowed in guild</span>
+          </label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.ruling_changed)}
+                onChange={(e) => handleRulingToggle(e.target.checked)}
+              />
+              <span>Ruling changed</span>
+            </label>
+            {data.ruling_changed ? (
+              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+                Ruling note
+              </TextArea>
+            ) : null}
+          </div>
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm">
               <input

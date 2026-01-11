@@ -22,6 +22,7 @@ type AdminCharacter = Pick<
   | 'guild_status'
   | 'user'
   | 'admin_notes'
+  | 'notes'
   | 'adventures'
   | 'dm_bubbles'
   | 'bubble_shop_spend'
@@ -363,6 +364,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                   {group.characters.map((character) => {
                     const status = getStatusLabel(character.guild_status)
                     const currentTier = calculateTier(character)
+                    const characterNotes = character.notes?.trim()
                     return (
                       <ListRow key={character.id} className="grid-cols-1">
                         <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
@@ -373,15 +375,22 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                             <div className="flex w-6 justify-center" title="Current tier">
                               <LogoTier tier={currentTier} width={16} />
                             </div>
-                            <a
-                              href={character.external_link}
-                              className="flex min-w-0 items-center gap-2 text-sm link"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <img src="/images/dnd-beyond-logo.svg" className="h-6 w-6" alt="sheet-link" />
-                              <span className="truncate">{character.name}</span>
-                            </a>
+                            <div className="flex min-w-0 flex-col">
+                              <a
+                                href={character.external_link}
+                                className="flex min-w-0 items-center gap-2 text-sm link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <img src="/images/dnd-beyond-logo.svg" className="h-6 w-6" alt="sheet-link" />
+                                <span className="truncate">{character.name}</span>
+                              </a>
+                              {characterNotes ? (
+                                <span className="max-w-xs truncate text-xs text-base-content/60" title={characterNotes}>
+                                  {characterNotes}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="flex items-center gap-3">
                             <div

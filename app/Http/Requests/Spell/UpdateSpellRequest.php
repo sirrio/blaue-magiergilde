@@ -11,7 +11,9 @@ class UpdateSpellRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        $user = Auth::user();
+
+        return (bool) ($user?->is_admin);
     }
 
     /**
@@ -22,7 +24,15 @@ class UpdateSpellRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'id' => 'required|numeric|exists:spells,id',
+            'name' => 'required|string',
+            'url' => 'nullable|url',
+            'legacy_url' => 'nullable|url',
+            'spell_school' => 'nullable|in:abjuration,conjuration,divination,enchantment,evocation,illusion,necromancy,transmutation',
+            'spell_level' => 'required|integer|min:0|max:9',
+            'ruling_changed' => 'boolean',
+            'ruling_note' => 'nullable|string|max:500',
         ];
     }
 }
+use Illuminate\Support\Facades\Auth;
