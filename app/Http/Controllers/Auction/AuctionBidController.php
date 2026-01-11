@@ -7,10 +7,13 @@ use App\Http\Requests\Auction\StoreAuctionBidRequest;
 use App\Models\AuctionBid;
 use App\Models\AuctionItem;
 use App\Models\Auction;
+use App\Models\AuctionSetting;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuctionBidController extends Controller
@@ -43,7 +46,9 @@ class AuctionBidController extends Controller
      */
     public function store(StoreAuctionBidRequest $request, AuctionItem $auctionItem): RedirectResponse
     {
-        DB::transaction(function () use ($request, $auctionItem): void {
+        $createdBid = null;
+
+        DB::transaction(function () use ($request, $auctionItem, &$createdBid): void {
             $lockedAuction = Auction::query()
                 ->lockForUpdate()
                 ->findOrFail($auctionItem->auction_id);
@@ -88,13 +93,17 @@ class AuctionBidController extends Controller
                 ]);
             }
 
-            $lockedItem->bids()->create([
+            $createdBid = $lockedItem->bids()->create([
                 'bidder_name' => $request->bidder_name,
                 'bidder_discord_id' => $request->bidder_discord_id,
                 'amount' => $request->amount,
                 'created_by' => $request->user()->id,
             ]);
         });
+
+        if ($createdBid instanceof AuctionBid) {
+            $this->notifyVoiceHighestBid($auctionItem, $createdBid);
+        }
 
         return redirect()->back();
     }
@@ -107,8 +116,67 @@ class AuctionBidController extends Controller
         $user = $request->user();
         abort_unless($user && $user->is_admin, 403);
 
+        $auctionItem = $auctionBid->auctionItem;
         $auctionBid->delete();
 
+        if ($auctionItem) {
+            $highestBid = AuctionBid::query()
+                ->where('auction_item_id', $auctionItem->id)
+                ->orderByDesc('amount')
+                ->orderByDesc('created_at')
+                ->first();
+
+            $this->notifyVoiceHighestBid($auctionItem, $highestBid);
+        }
+
         return redirect()->back();
+    }
+
+    private function notifyVoiceHighestBid(AuctionItem $auctionItem, ?AuctionBid $highestBid): void
+    {
+        $settings = AuctionSetting::current();
+        if (! $settings->voice_channel_id) {
+            return;
+        }
+
+        $botUrl = trim((string) config('services.bot.http_url', ''));
+        $botToken = trim((string) config('services.bot.http_token', ''));
+        if ($botUrl === '' || $botToken === '') {
+            return;
+        }
+
+        $payload = [
+            'channel_id' => $settings->voice_channel_id,
+            'auction_item_id' => $auctionItem->id,
+            'clear' => $highestBid === null,
+        ];
+
+        if ($highestBid) {
+            $payload['bidder_discord_id'] = $highestBid->bidder_discord_id;
+            $payload['bidder_name'] = $highestBid->bidder_name;
+            $payload['amount'] = $highestBid->amount;
+        }
+
+        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+
+        try {
+            $response = Http::timeout($timeout)
+                ->acceptJson()
+                ->withHeaders(['X-Bot-Token' => $botToken])
+                ->post(rtrim($botUrl, '/').'/auction-voice-bid', $payload);
+
+            if (! $response->ok()) {
+                Log::warning('Auction voice bid notify failed', [
+                    'auction_item_id' => $auctionItem->id,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $error) {
+            Log::warning('Auction voice bid notify exception', [
+                'auction_item_id' => $auctionItem->id,
+                'error' => $error->getMessage(),
+            ]);
+        }
     }
 }

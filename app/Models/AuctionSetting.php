@@ -19,12 +19,14 @@ class AuctionSetting extends Model
         'voice_channel_is_thread',
         'last_post_channel_id',
         'last_post_message_ids',
+        'last_voice_bid_message_ids',
     ];
 
     protected $casts = [
         'post_channel_is_thread' => 'boolean',
         'voice_channel_is_thread' => 'boolean',
         'last_post_message_ids' => 'array',
+        'last_voice_bid_message_ids' => 'array',
     ];
 
     public static function current(): self

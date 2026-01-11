@@ -1,6 +1,7 @@
 const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
 const { postAuctionToChannel } = require('./auctionPoster');
+const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
@@ -109,8 +110,9 @@ function startHttpServer(client) {
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isAuctionPost = path === '/auction-post';
+        const isAuctionVoiceBid = path === '/auction-voice-bid';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isShopUpdate && !isAuctionPost)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isShopUpdate && !isAuctionPost && !isAuctionVoiceBid)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -354,13 +356,6 @@ function startHttpServer(client) {
             }
         }
 
-        const channelId = String(payload?.channel_id || '').trim();
-        if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
-            logReject(req, 'invalid channel_id');
-            respondJson(res, 422, { error: 'Invalid channel_id.' });
-            return;
-        }
-
         if (isAuctionPost) {
             const channelId = String(payload?.channel_id || '').trim();
             const auctionId = Number(payload?.auction_id || 0);
@@ -401,6 +396,68 @@ function startHttpServer(client) {
                 respondJson(res, 500, { error: 'Auction post failed.' });
                 return;
             }
+        }
+
+        if (isAuctionVoiceBid) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const auctionItemId = Number(payload?.auction_item_id || 0);
+            const bidderDiscordId = payload?.bidder_discord_id ? String(payload.bidder_discord_id).trim() : '';
+            const bidderName = typeof payload?.bidder_name === 'string' ? payload.bidder_name.trim() : '';
+            const amount = Number(payload?.amount || 0);
+            const clear = Boolean(payload?.clear);
+
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            if (!Number.isFinite(auctionItemId) || auctionItemId <= 0) {
+                logReject(req, 'invalid auction_item_id');
+                respondJson(res, 422, { error: 'Invalid auction_item_id.' });
+                return;
+            }
+
+            if (!clear && (!Number.isFinite(amount) || amount <= 0)) {
+                logReject(req, 'invalid amount');
+                respondJson(res, 422, { error: 'Invalid amount.' });
+                return;
+            }
+
+            try {
+                const result = await postVoiceHighestBid({
+                    client,
+                    channelId,
+                    auctionItemId,
+                    bidderDiscordId,
+                    bidderName,
+                    amount,
+                    clear,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'auction voice bid failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Auction voice bid failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: clear ? 'cleared' : 'posted',
+                    message_id: result.message_id ?? null,
+                });
+                return;
+            } catch (error) {
+                logReject(req, 'auction voice bid failed');
+                respondJson(res, 500, { error: 'Auction voice bid failed.' });
+                return;
+            }
+        }
+
+        const channelId = String(payload?.channel_id || '').trim();
+        if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+            logReject(req, 'invalid channel_id');
+            respondJson(res, 422, { error: 'Invalid channel_id.' });
+            return;
         }
 
         const { snapshot, error } = await getSnapshot(channelId, client);
