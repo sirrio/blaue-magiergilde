@@ -10,6 +10,12 @@ import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return ''
+  const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
+  return meta?.content ?? ''
+}
+
 export default function Backup({
   discordBackup,
 }: {
@@ -27,12 +33,6 @@ export default function Backup({
   const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
-
-  const getCsrfToken = useCallback(() => {
-    if (typeof document === 'undefined') return ''
-    const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
-    return meta?.content ?? ''
-  }, [])
 
   const fetchBackupStatus = useCallback(
     async (showToast: boolean) => {
@@ -74,7 +74,7 @@ export default function Backup({
         }
       }
     },
-    [getCsrfToken],
+    [],
   )
 
   useEffect(() => {
