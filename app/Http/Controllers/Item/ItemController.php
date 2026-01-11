@@ -85,6 +85,7 @@ class ItemController extends Controller
         $items = $itemQuery
             ->orderBy('rarity')
             ->orderBy('type')
+            ->orderBy('name')
             ->select([
                 'id',
                 'name',

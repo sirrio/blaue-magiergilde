@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Spell\StoreSpellRequest;
 use App\Http\Requests\Spell\UpdateSpellRequest;
 use App\Models\Spell;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 
 class SpellController extends Controller
@@ -65,6 +66,7 @@ class SpellController extends Controller
 
         $spells = $spellQuery
             ->orderBy('spell_level')
+            ->orderBy('name')
             ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'guild_enabled', 'ruling_changed', 'ruling_note'])
             ->get();
 
@@ -85,9 +87,25 @@ class SpellController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreSpellRequest $request)
+    public function store(StoreSpellRequest $request): RedirectResponse
     {
-        //
+        $spell = new Spell();
+
+        $spell->name = $request->name;
+        $spell->url = $request->input('url');
+        $spell->legacy_url = $request->input('legacy_url');
+        $spell->spell_school = $request->input('spell_school');
+        $spell->spell_level = (int) $request->input('spell_level', 0);
+        $spell->guild_enabled = $request->boolean('guild_enabled', true);
+
+        $hasRulingChange = $request->boolean('ruling_changed');
+        $note = $hasRulingChange ? trim((string) $request->input('ruling_note', '')) : '';
+        $spell->ruling_changed = $hasRulingChange;
+        $spell->ruling_note = $note !== '' ? $note : null;
+
+        $spell->save();
+
+        return redirect()->back();
     }
 
     /**

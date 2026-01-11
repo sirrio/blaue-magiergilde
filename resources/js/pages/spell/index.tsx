@@ -1,15 +1,143 @@
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
+import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
+import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
 import SpellRow from '@/pages/spell/spell-row'
 import { Spell } from '@/types'
-import { Deferred, Head, router } from '@inertiajs/react'
-import { LoaderCircle } from 'lucide-react'
-import React, { useState } from 'react'
+import { Deferred, Head, router, useForm } from '@inertiajs/react'
+import { LoaderCircle, Plus } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 
 interface FilterOption {
   label: string
   value: string
+}
+
+const StoreSpellModal = () => {
+  const [isOpen, setIsOpen] = useState(false)
+  const { data, setData, post, processing, reset, errors } = useForm({
+    name: '',
+    url: '',
+    legacy_url: '',
+    spell_school: 'abjuration',
+    spell_level: 0,
+    guild_enabled: true,
+    ruling_changed: false,
+    ruling_note: '',
+  })
+
+  useEffect(() => {
+    if (!isOpen) return
+    reset()
+    setData('guild_enabled', true)
+    setData('spell_school', 'abjuration')
+    setData('spell_level', 0)
+    setData('ruling_changed', false)
+    setData('ruling_note', '')
+  }, [isOpen, reset, setData])
+
+  const handleRulingToggle = (enabled: boolean) => {
+    setData('ruling_changed', enabled)
+    if (!enabled) {
+      setData('ruling_note', '')
+    }
+  }
+
+  const handleSubmit = () => {
+    post(route('admin.spells.store'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        reset()
+        router.reload({ only: ['spells'] })
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="sm" onClick={() => setIsOpen(true)}>
+          <Plus size={14} /> Add spell
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Add spell</ModalTitle>
+      <ModalContent>
+        <Input errors={errors.name} placeholder="Fireball" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+          Name
+        </Input>
+        <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
+          URL
+        </Input>
+        <Input
+          errors={errors.legacy_url}
+          placeholder="https://..."
+          type="url"
+          value={data.legacy_url}
+          onChange={(e) => setData('legacy_url', e.target.value)}
+        >
+          Legacy URL
+        </Input>
+        <Input
+          errors={errors.spell_level}
+          placeholder="3"
+          type="number"
+          value={data.spell_level}
+          onChange={(e) => setData('spell_level', Number(e.target.value))}
+        >
+          Spell Level
+        </Input>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-xs"
+            checked={Boolean(data.guild_enabled)}
+            onChange={(e) => setData('guild_enabled', e.target.checked)}
+          />
+          <span>Allowed in guild</span>
+        </label>
+        <Select
+          errors={errors.spell_school}
+          value={data.spell_school}
+          onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
+        >
+          <SelectLabel>School</SelectLabel>
+          <SelectOptions>
+            <option value="abjuration">Abjuration</option>
+            <option value="conjuration">Conjuration</option>
+            <option value="divination">Divination</option>
+            <option value="enchantment">Enchantment</option>
+            <option value="evocation">Evocation</option>
+            <option value="illusion">Illusion</option>
+            <option value="necromancy">Necromancy</option>
+            <option value="transmutation">Transmutation</option>
+          </SelectOptions>
+        </Select>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-xs"
+              checked={Boolean(data.ruling_changed)}
+              onChange={(e) => handleRulingToggle(e.target.checked)}
+            />
+            <span>Ruling changed</span>
+          </label>
+          {data.ruling_changed ? (
+            <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+              Ruling note
+            </TextArea>
+          ) : null}
+        </div>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
+      </ModalAction>
+    </Modal>
+  )
 }
 
 export default function Index({ spells }: { spells: Spell[] }) {
@@ -121,9 +249,12 @@ export default function Index({ spells }: { spells: Spell[] }) {
     <AppLayout>
       <Head title="Spells" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Spells</h1>
-          <p className="text-sm text-base-content/70">Search the spell list by school or level.</p>
+        <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-bold">Spells</h1>
+            <p className="text-sm text-base-content/70">Search the spell list by school or level.</p>
+          </div>
+          <StoreSpellModal />
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
