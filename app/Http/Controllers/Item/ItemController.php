@@ -20,6 +20,11 @@ class ItemController extends Controller
     {
         $rarity = request('rarity');
         $type = request('type');
+        $guild = request('guild');
+        $shop = request('shop');
+        $spell = request('spell');
+        $info = request('info');
+        $ruling = request('ruling');
         $searchTerm = request('search');
 
         $itemQuery = Item::query();
@@ -32,6 +37,49 @@ class ItemController extends Controller
         }
         if (! empty($type)) {
             $itemQuery->where('type', $type);
+        }
+        if ($guild === 'allowed') {
+            $itemQuery->where('guild_enabled', true);
+        } elseif ($guild === 'blocked') {
+            $itemQuery->where(function ($query) {
+                $query->whereNull('guild_enabled')->orWhere('guild_enabled', false);
+            });
+        }
+        if ($shop === 'included') {
+            $itemQuery->where('shop_enabled', true);
+        } elseif ($shop === 'excluded') {
+            $itemQuery->where(function ($query) {
+                $query->whereNull('shop_enabled')->orWhere('shop_enabled', false);
+            });
+        }
+        if ($spell === 'attached') {
+            $itemQuery->where('default_spell_roll_enabled', true);
+        } elseif ($spell === 'none') {
+            $itemQuery->where(function ($query) {
+                $query->whereNull('default_spell_roll_enabled')->orWhere('default_spell_roll_enabled', false);
+            });
+        }
+        if ($info === 'complete') {
+            $itemQuery
+                ->whereNotNull('cost')
+                ->where('cost', '!=', '')
+                ->whereNotNull('url')
+                ->where('url', '!=', '');
+        } elseif ($info === 'missing') {
+            $itemQuery->where(function ($query) {
+                $query
+                    ->whereNull('cost')
+                    ->orWhere('cost', '')
+                    ->orWhereNull('url')
+                    ->orWhere('url', '');
+            });
+        }
+        if ($ruling === 'changed') {
+            $itemQuery->where('ruling_changed', true);
+        } elseif ($ruling === 'none') {
+            $itemQuery->where(function ($query) {
+                $query->whereNull('ruling_changed')->orWhere('ruling_changed', false);
+            });
         }
 
         $items = $itemQuery

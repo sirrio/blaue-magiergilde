@@ -196,6 +196,7 @@ export interface Spell {
   legacy_url: string
   spell_school: 'abjuration' | 'conjuration' | 'divination' | 'enchantment' | 'evocation' | 'illusion' | 'necromancy' | 'transmutation'
   spell_level: number
+  guild_enabled?: boolean
   ruling_changed?: boolean
   ruling_note?: string | null
 }

@@ -12,6 +12,11 @@ import { Head, router, useForm } from '@inertiajs/react'
 import { CheckCircle2, Clock, ExternalLink, StickyNote, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
+interface FilterOption {
+  label: string
+  value: string
+}
+
 type AdminCharacter = Pick<
   Character,
   | 'id'
@@ -93,51 +98,80 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
 export default function CharacterApprovals({ characters }: { characters: AdminCharacter[] }) {
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const navOptions = { preserveState: true, preserveScroll: true }
+  const normalizedParams = {
+    ...currentQueryParams,
+    discord:
+      currentQueryParams.discord ??
+      (currentQueryParams.no_discord === '1' ? 'none' : undefined),
+  }
 
   const navigateTo = (href: string) => {
     router.get(href, {}, navOptions)
   }
 
-  const initialDiscordFilter =
-    (currentQueryParams.discord as string | undefined) ??
-    (currentQueryParams.no_discord === '1' ? 'none' : '')
-  const [search, setSearch] = useState(currentQueryParams.search || '')
-  const [statusFilter, setStatusFilter] = useState(currentQueryParams.status || '')
-  const [tierFilter, setTierFilter] = useState(currentQueryParams.tier || '')
-  const [discordFilter, setDiscordFilter] = useState(initialDiscordFilter || '')
+  const [search, setSearch] = useState(String(currentQueryParams.search ?? ''))
 
-  const updateFilters = (nextSearch: string, nextStatus: string, nextTier: string, nextDiscord: string) => {
+  const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(value)
     navigateTo(
       route('admin.character-approvals.index', {
-        ...currentQueryParams,
-        search: nextSearch || undefined,
-        status: nextStatus || undefined,
-        tier: nextTier || undefined,
-        discord: nextDiscord || undefined,
+        ...normalizedParams,
+        search: value || undefined,
         no_discord: undefined,
       }),
     )
   }
 
-  const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(value)
-    updateFilters(value, String(statusFilter), String(tierFilter), String(discordFilter))
-  }
+  const statusFilters: FilterOption[] = [
+    { label: 'Pending', value: 'pending' },
+    { label: 'Approved', value: 'approved' },
+    { label: 'Declined', value: 'declined' },
+  ]
 
-  const handleStatusChange = (nextStatus: string) => {
-    setStatusFilter(nextStatus)
-    updateFilters(String(search), nextStatus, String(tierFilter), String(discordFilter))
-  }
+  const tierFilters: FilterOption[] = [
+    { label: 'BT', value: 'bt' },
+    { label: 'LT', value: 'lt' },
+    { label: 'HT', value: 'ht' },
+    { label: 'ET', value: 'et' },
+    { label: 'Filler', value: 'filler' },
+  ]
 
-  const handleTierChange = (nextTier: string) => {
-    setTierFilter(nextTier)
-    updateFilters(String(search), String(statusFilter), nextTier, String(discordFilter))
-  }
+  const discordFilters: FilterOption[] = [
+    { label: 'Discord Only', value: 'only' },
+    { label: 'No Discord', value: 'none' },
+  ]
 
-  const handleDiscordFilterChange = (nextFilter: string) => {
-    const nextValue = discordFilter === nextFilter ? '' : nextFilter
-    setDiscordFilter(nextValue)
-    updateFilters(String(search), String(statusFilter), String(tierFilter), nextValue)
+  const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
+    const buildHref = (filterValue: string | null): string =>
+      route('admin.character-approvals.index', {
+        ...normalizedParams,
+        [filterKey]: filterValue,
+        no_discord: undefined,
+      })
+
+    return (
+      <div className="filter">
+        <input
+          className="btn btn-xs filter-reset"
+          type="radio"
+          name={filterKey}
+          aria-label="All"
+          defaultChecked={!normalizedParams[filterKey]}
+          onClick={() => navigateTo(buildHref(null))}
+        />
+        {filters.map(({ label, value }) => (
+          <input
+            key={value}
+            className="btn btn-xs"
+            type="radio"
+            name={filterKey}
+            aria-label={label}
+            defaultChecked={normalizedParams[filterKey] === value}
+            onClick={() => navigateTo(buildHref(value))}
+          />
+        ))}
+      </div>
+    )
   }
 
   const groups = useMemo<CharacterGroup[]>(() => {
@@ -182,9 +216,15 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
   }
   const activeFilters = [
     search ? `Search: ${search}` : null,
-    statusFilter ? `Status: ${statusLabelMap[statusFilter] ?? statusFilter}` : null,
-    tierFilter ? `Tier: ${tierLabelMap[tierFilter] ?? tierFilter.toUpperCase()}` : null,
-    discordFilter ? `Discord: ${discordLabelMap[discordFilter] ?? discordFilter}` : null,
+    normalizedParams.status
+      ? `Status: ${statusLabelMap[String(normalizedParams.status)] ?? normalizedParams.status}`
+      : null,
+    normalizedParams.tier
+      ? `Tier: ${tierLabelMap[String(normalizedParams.tier)] ?? String(normalizedParams.tier).toUpperCase()}`
+      : null,
+    normalizedParams.discord
+      ? `Discord: ${discordLabelMap[String(normalizedParams.discord)] ?? normalizedParams.discord}`
+      : null,
   ].filter(Boolean) as string[]
 
   return (
@@ -224,108 +264,19 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
             <Input type="search" placeholder="Search by character or user..." value={search} onChange={handleSearch}>
               Search
             </Input>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-base-content/60">Status:</span>
-              <Button
-                size="xs"
-                variant={statusFilter === '' ? 'solid' : 'outline'}
-                onClick={() => handleStatusChange('')}
-              >
-                All
-              </Button>
-              <Button
-                size="xs"
-                variant={statusFilter === 'pending' ? 'solid' : 'outline'}
-                color="warning"
-                onClick={() => handleStatusChange('pending')}
-              >
-                Pending
-              </Button>
-              <Button
-                size="xs"
-                variant={statusFilter === 'approved' ? 'solid' : 'outline'}
-                color="success"
-                onClick={() => handleStatusChange('approved')}
-              >
-                Approved
-              </Button>
-              <Button
-                size="xs"
-                variant={statusFilter === 'declined' ? 'solid' : 'outline'}
-                color="error"
-                onClick={() => handleStatusChange('declined')}
-              >
-                Declined
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-base-content/60">Tier:</span>
-              <Button
-                size="xs"
-                variant={tierFilter === '' ? 'solid' : 'outline'}
-                onClick={() => handleTierChange('')}
-              >
-                All
-              </Button>
-              <Button
-                size="xs"
-                variant={tierFilter === 'bt' ? 'solid' : 'outline'}
-                onClick={() => handleTierChange('bt')}
-              >
-                BT
-              </Button>
-              <Button
-                size="xs"
-                variant={tierFilter === 'lt' ? 'solid' : 'outline'}
-                onClick={() => handleTierChange('lt')}
-              >
-                LT
-              </Button>
-              <Button
-                size="xs"
-                variant={tierFilter === 'ht' ? 'solid' : 'outline'}
-                onClick={() => handleTierChange('ht')}
-              >
-                HT
-              </Button>
-              <Button
-                size="xs"
-                variant={tierFilter === 'et' ? 'solid' : 'outline'}
-                onClick={() => handleTierChange('et')}
-              >
-                ET
-              </Button>
-              <Button
-                size="xs"
-                variant={tierFilter === 'filler' ? 'solid' : 'outline'}
-                onClick={() => handleTierChange('filler')}
-              >
-                Filler
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-base-content/60">Discord:</span>
-              <Button
-                size="xs"
-                variant={discordFilter === '' ? 'solid' : 'outline'}
-                onClick={() => handleDiscordFilterChange('')}
-              >
-                All
-              </Button>
-              <Button
-                size="xs"
-                variant={discordFilter === 'none' ? 'solid' : 'outline'}
-                onClick={() => handleDiscordFilterChange('none')}
-              >
-                No Discord
-              </Button>
-              <Button
-                size="xs"
-                variant={discordFilter === 'only' ? 'solid' : 'outline'}
-                onClick={() => handleDiscordFilterChange('only')}
-              >
-                Discord Only
-              </Button>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Status:</span>
+                {renderFilterOptions('status', statusFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Tier:</span>
+                {renderFilterOptions('tier', tierFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Discord:</span>
+                {renderFilterOptions('discord', discordFilters)}
+              </div>
             </div>
           </div>
         </div>

@@ -17,6 +17,9 @@ class SpellController extends Controller
     {
         $spellSchool = request('spell_school', null);
         $spellLevel = request('spell_level', null);
+        $guild = request('guild');
+        $info = request('info');
+        $ruling = request('ruling');
         $searchTerm = request('search', '');
 
         $spellQuery = Spell::query();
@@ -30,10 +33,39 @@ class SpellController extends Controller
         if (! empty($spellLevel)) {
             $spellQuery->where('spell_level', $spellLevel);
         }
+        if ($guild === 'allowed') {
+            $spellQuery->where('guild_enabled', true);
+        } elseif ($guild === 'blocked') {
+            $spellQuery->where(function ($query) {
+                $query->whereNull('guild_enabled')->orWhere('guild_enabled', false);
+            });
+        }
+        if ($info === 'complete') {
+            $spellQuery
+                ->whereNotNull('url')
+                ->where('url', '!=', '')
+                ->whereNotNull('spell_school')
+                ->where('spell_school', '!=', '');
+        } elseif ($info === 'missing') {
+            $spellQuery->where(function ($query) {
+                $query
+                    ->whereNull('url')
+                    ->orWhere('url', '')
+                    ->orWhereNull('spell_school')
+                    ->orWhere('spell_school', '');
+            });
+        }
+        if ($ruling === 'changed') {
+            $spellQuery->where('ruling_changed', true);
+        } elseif ($ruling === 'none') {
+            $spellQuery->where(function ($query) {
+                $query->whereNull('ruling_changed')->orWhere('ruling_changed', false);
+            });
+        }
 
         $spells = $spellQuery
             ->orderBy('spell_level')
-            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'ruling_changed', 'ruling_note'])
+            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'guild_enabled', 'ruling_changed', 'ruling_note'])
             ->get();
 
         return Inertia::render('spell/index', [
@@ -84,6 +116,7 @@ class SpellController extends Controller
         $spells->legacy_url = $request->input('legacy_url');
         $spells->spell_school = $request->input('spell_school');
         $spells->spell_level = (int) $request->input('spell_level', 0);
+        $spells->guild_enabled = $request->boolean('guild_enabled', true);
 
         $hasRulingChange = $request->boolean('ruling_changed');
         $note = $hasRulingChange ? trim((string) $request->input('ruling_note', '')) : '';

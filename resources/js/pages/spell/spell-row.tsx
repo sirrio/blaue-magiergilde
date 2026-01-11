@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { PageProps, Spell } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, Scale, XCircle } from 'lucide-react'
+import { Copy, Edit, ExternalLink, Scale, Shield, XCircle } from 'lucide-react'
 
 const schoolColors: Record<string, string> = {
   abjuration: 'text-[#007BFF]', // Blue
@@ -39,6 +39,7 @@ export default function SpellRow({ spell }: { spell: Spell }) {
     legacy_url: spell.legacy_url || '',
     spell_school: spell.spell_school || '',
     spell_level: spell.spell_level,
+    guild_enabled: spell.guild_enabled ?? true,
     ruling_changed: spell.ruling_changed ?? false,
     ruling_note: spell.ruling_note ?? '',
   }
@@ -50,6 +51,7 @@ export default function SpellRow({ spell }: { spell: Spell }) {
   const rulingLabel = hasRulingChange
     ? (rulingNote ? `Ruling: ${rulingNote}` : 'Ruling change')
     : 'No ruling change'
+  const isGuildEnabled = spell.guild_enabled ?? true
 
   const handleRulingToggle = (enabled: boolean) => {
     setData('ruling_changed', enabled)
@@ -76,6 +78,20 @@ export default function SpellRow({ spell }: { spell: Spell }) {
       </div>
       <div className={cn(textColor, 'text-xs sm:text-sm')}>
         {spell.name} <span className={'text-xs font-light italic'}>(Level {spell.spell_level})</span>
+      </div>
+      <div className="flex items-center justify-center text-xs">
+        {isGuildEnabled ? (
+          <Shield className="h-4 w-4 text-success" title="Allowed in guild" aria-label="Allowed in guild" />
+        ) : (
+          <span
+            className="relative inline-flex h-4 w-4 items-center justify-center"
+            title="Not allowed in guild"
+            aria-label="Not allowed in guild"
+          >
+            <Shield className="h-4 w-4 text-base-content/40" />
+            <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
+          </span>
+        )}
       </div>
       <div className="flex items-center justify-center text-xs" title={rulingLabel} aria-label={rulingLabel}>
         <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
@@ -121,6 +137,15 @@ export default function SpellRow({ spell }: { spell: Spell }) {
           >
             Spell Level
           </Input>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-xs"
+              checked={Boolean(data.guild_enabled)}
+              onChange={(e) => setData('guild_enabled', e.target.checked)}
+            />
+            <span>Allowed in guild</span>
+          </label>
           <Select
             errors={errors.spell_school}
             value={data.spell_school}

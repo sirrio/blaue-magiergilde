@@ -26,10 +26,40 @@ export default function Index({ items }: { items: Item[] }) {
     { label: 'Spell Scroll', value: 'spellscroll' },
   ]
 
+  const guildFilters: FilterOption[] = [
+    { label: 'Allowed', value: 'allowed' },
+    { label: 'Restricted', value: 'blocked' },
+  ]
+
+  const shopFilters: FilterOption[] = [
+    { label: 'Included', value: 'included' },
+    { label: 'Excluded', value: 'excluded' },
+  ]
+
+  const spellFilters: FilterOption[] = [
+    { label: 'Auto-roll', value: 'attached' },
+    { label: 'No auto-roll', value: 'none' },
+  ]
+
+  const infoFilters: FilterOption[] = [
+    { label: 'Complete', value: 'complete' },
+    { label: 'Missing', value: 'missing' },
+  ]
+
+  const rulingFilters: FilterOption[] = [
+    { label: 'Changed', value: 'changed' },
+    { label: 'Standard', value: 'none' },
+  ]
+
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
   const rarityLabelMap = Object.fromEntries(rarityFilters.map((entry) => [entry.value, entry.label]))
   const typeLabelMap = Object.fromEntries(typeFilters.map((entry) => [entry.value, entry.label]))
+  const guildLabelMap = Object.fromEntries(guildFilters.map((entry) => [entry.value, entry.label]))
+  const shopLabelMap = Object.fromEntries(shopFilters.map((entry) => [entry.value, entry.label]))
+  const spellLabelMap = Object.fromEntries(spellFilters.map((entry) => [entry.value, entry.label]))
+  const infoLabelMap = Object.fromEntries(infoFilters.map((entry) => [entry.value, entry.label]))
+  const rulingLabelMap = Object.fromEntries(rulingFilters.map((entry) => [entry.value, entry.label]))
 
   const navigateTo = (href: string) => {
     router.get(href, {}, NAV_OPTIONS)
@@ -82,9 +112,23 @@ export default function Index({ items }: { items: Item[] }) {
     currentQueryParams.type
       ? `Type: ${typeLabelMap[String(currentQueryParams.type)] ?? currentQueryParams.type}`
       : null,
+    currentQueryParams.guild
+      ? `Guild: ${guildLabelMap[String(currentQueryParams.guild)] ?? currentQueryParams.guild}`
+      : null,
+    currentQueryParams.shop
+      ? `Shop: ${shopLabelMap[String(currentQueryParams.shop)] ?? currentQueryParams.shop}`
+      : null,
+    currentQueryParams.spell
+      ? `Auto-roll: ${spellLabelMap[String(currentQueryParams.spell)] ?? currentQueryParams.spell}`
+      : null,
+    currentQueryParams.info
+      ? `Details: ${infoLabelMap[String(currentQueryParams.info)] ?? currentQueryParams.info}`
+      : null,
+    currentQueryParams.ruling
+      ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
+      : null,
   ].filter(Boolean) as string[]
   const totalItems = items?.length ?? 0
-
   return (
     <AppLayout>
       <Head title="Items" />
@@ -98,7 +142,7 @@ export default function Index({ items }: { items: Item[] }) {
             <div className="space-y-1">
               <p className="text-xs uppercase text-base-content/50">Filters</p>
               <h2 className="text-lg font-semibold">Inventory filters</h2>
-              <p className="text-xs text-base-content/70">Refine the list by name, rarity, or type.</p>
+              <p className="text-xs text-base-content/70">Refine the list by status, rarity, or info.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">{totalItems} items</span>
@@ -117,8 +161,36 @@ export default function Index({ items }: { items: Item[] }) {
             <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>
               Search
             </Input>
-            <div className="mt-2 filter">{renderFilterOptions('rarity', rarityFilters)}</div>
-            <div className="mt-2 filter">{renderFilterOptions('type', typeFilters)}</div>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Rarity:</span>
+                {renderFilterOptions('rarity', rarityFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Type:</span>
+                {renderFilterOptions('type', typeFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Guild:</span>
+                {renderFilterOptions('guild', guildFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Shop:</span>
+                {renderFilterOptions('shop', shopFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Auto-roll:</span>
+                {renderFilterOptions('spell', spellFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Details:</span>
+                {renderFilterOptions('info', infoFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Ruling:</span>
+                {renderFilterOptions('ruling', rulingFilters)}
+              </div>
+            </div>
           </div>
         </div>
         <Deferred

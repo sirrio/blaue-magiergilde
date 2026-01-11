@@ -32,10 +32,28 @@ export default function Index({ spells }: { spells: Spell[] }) {
     })),
   ]
 
+  const guildFilters: FilterOption[] = [
+    { label: 'Allowed', value: 'allowed' },
+    { label: 'Restricted', value: 'blocked' },
+  ]
+
+  const infoFilters: FilterOption[] = [
+    { label: 'Complete', value: 'complete' },
+    { label: 'Missing', value: 'missing' },
+  ]
+
+  const rulingFilters: FilterOption[] = [
+    { label: 'Changed', value: 'changed' },
+    { label: 'Standard', value: 'none' },
+  ]
+
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
   const schoolLabelMap = Object.fromEntries(spellSchoolFilters.map((entry) => [entry.value, entry.label]))
   const levelLabelMap = Object.fromEntries(spellLevelFilters.map((entry) => [entry.value, entry.label]))
+  const guildLabelMap = Object.fromEntries(guildFilters.map((entry) => [entry.value, entry.label]))
+  const infoLabelMap = Object.fromEntries(infoFilters.map((entry) => [entry.value, entry.label]))
+  const rulingLabelMap = Object.fromEntries(rulingFilters.map((entry) => [entry.value, entry.label]))
 
   const navigateTo = (href: string) => {
     router.get(href, {}, NAV_OPTIONS)
@@ -88,9 +106,17 @@ export default function Index({ spells }: { spells: Spell[] }) {
     currentQueryParams.spell_level
       ? `Level: ${levelLabelMap[String(currentQueryParams.spell_level)] ?? currentQueryParams.spell_level}`
       : null,
+    currentQueryParams.guild
+      ? `Guild: ${guildLabelMap[String(currentQueryParams.guild)] ?? currentQueryParams.guild}`
+      : null,
+    currentQueryParams.info
+      ? `Details: ${infoLabelMap[String(currentQueryParams.info)] ?? currentQueryParams.info}`
+      : null,
+    currentQueryParams.ruling
+      ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
+      : null,
   ].filter(Boolean) as string[]
   const totalSpells = spells?.length ?? 0
-
   return (
     <AppLayout>
       <Head title="Spells" />
@@ -104,7 +130,7 @@ export default function Index({ spells }: { spells: Spell[] }) {
             <div className="space-y-1">
               <p className="text-xs uppercase text-base-content/50">Filters</p>
               <h2 className="text-lg font-semibold">Spell filters</h2>
-              <p className="text-xs text-base-content/70">Narrow down by name, school, or level.</p>
+              <p className="text-xs text-base-content/70">Narrow down by status, school, or level.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">{totalSpells} spells</span>
@@ -123,8 +149,28 @@ export default function Index({ spells }: { spells: Spell[] }) {
             <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>
               Search
             </Input>
-            <div className="mt-2 filter">{renderFilterOptions('spell_school', spellSchoolFilters)}</div>
-            <div className="mt-2 filter">{renderFilterOptions('spell_level', spellLevelFilters)}</div>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">School:</span>
+                {renderFilterOptions('spell_school', spellSchoolFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Level:</span>
+                {renderFilterOptions('spell_level', spellLevelFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Guild:</span>
+                {renderFilterOptions('guild', guildFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Details:</span>
+                {renderFilterOptions('info', infoFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Ruling:</span>
+                {renderFilterOptions('ruling', rulingFilters)}
+              </div>
+            </div>
           </div>
         </div>
         <Deferred
