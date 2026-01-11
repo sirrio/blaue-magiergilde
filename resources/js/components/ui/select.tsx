@@ -13,6 +13,7 @@ type SelectProps = {
 
 type SelectLabelProps = {
   children: ReactNode
+  className?: string
 }
 
 type SelectOptionsProps = {
@@ -44,8 +45,8 @@ export const Select: React.FC<SelectProps> = ({
   )
 }
 
-export const SelectLabel: React.FC<SelectLabelProps> = ({ children }) => {
-  return <label className="label">{children}</label>
+export const SelectLabel: React.FC<SelectLabelProps> = ({ children, className = '' }) => {
+  return <label className={cn('label', className)}>{children}</label>
 }
 
 export const SelectOptions: React.FC<SelectOptionsProps> = ({ children }) => {

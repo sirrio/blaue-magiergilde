@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Room\StoreRoomMapRequest;
 use App\Http\Requests\Room\StoreRoomRequest;
+use App\Http\Requests\Room\UpdateRoomMapRequest;
 use App\Http\Requests\Room\UpdateRoomRequest;
 use App\Models\Room;
 use App\Models\RoomMap;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -61,6 +64,40 @@ class RoomController extends Controller
         Room::query()->create($request->validated());
 
         return redirect()->back();
+    }
+
+    public function storeMap(StoreRoomMapRequest $request): RedirectResponse
+    {
+        $payload = $request->validated();
+        $path = $request->file('image')->store('room-maps', 'public');
+
+        $map = RoomMap::query()->create([
+            'name' => $payload['name'],
+            'grid_columns' => $payload['grid_columns'],
+            'grid_rows' => $payload['grid_rows'],
+            'image_path' => Storage::url($path),
+        ]);
+
+        return redirect()->route('admin.rooms.index', ['map' => $map->id]);
+    }
+
+    public function updateMap(UpdateRoomMapRequest $request, RoomMap $roomMap): RedirectResponse
+    {
+        $payload = $request->validated();
+        $updates = [
+            'name' => $payload['name'],
+            'grid_columns' => $payload['grid_columns'],
+            'grid_rows' => $payload['grid_rows'],
+        ];
+
+        if ($request->file('image')) {
+            $path = $request->file('image')->store('room-maps', 'public');
+            $updates['image_path'] = Storage::url($path);
+        }
+
+        $roomMap->update($updates);
+
+        return redirect()->route('admin.rooms.index', ['map' => $roomMap->id]);
     }
 
     public function update(UpdateRoomRequest $request, Room $room): RedirectResponse

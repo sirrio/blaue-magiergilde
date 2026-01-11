@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { FileInput } from '@/components/ui/file-input'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
@@ -6,7 +7,7 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { PageProps, Room, RoomCharacter, RoomMap } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { Check, MapPin, Minus, Plus, Trash2 } from 'lucide-react'
+import { Check, MapPin, Minus, Pencil, Plus, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInitials } from '@/hooks/use-initials'
 
@@ -30,6 +31,13 @@ type RoomFormData = {
   grid_w: number
   grid_h: number
   character_id: number | null
+}
+
+type RoomMapFormData = {
+  name: string
+  grid_columns: number
+  grid_rows: number
+  image: File | null
 }
 
 const mapSelectionToForm = (selection: RoomSelection, mapId: number): RoomFormData => ({
@@ -165,6 +173,105 @@ const RoomFormModal = ({
   )
 }
 
+const RoomMapFormModal = ({
+  open,
+  mode,
+  map,
+  onClose,
+}: {
+  open: boolean
+  mode: 'create' | 'edit'
+  map?: RoomMap | null
+  onClose: () => void
+}) => {
+  const { errors } = usePage<PageProps>().props
+  const { data, setData, processing, reset, post, patch } = useForm<RoomMapFormData>({
+    name: '',
+    grid_columns: 38,
+    grid_rows: 38,
+    image: null,
+  })
+
+  useEffect(() => {
+    if (!open) return
+    reset()
+    setData({
+      name: map?.name ?? '',
+      grid_columns: map?.grid_columns ?? 38,
+      grid_rows: map?.grid_rows ?? 38,
+      image: null,
+    })
+  }, [map, open, reset, setData])
+
+  const handleSubmit = () => {
+    if (mode === 'create') {
+      post(route('admin.rooms.maps.store'), {
+        forceFormData: true,
+        onSuccess: () => onClose(),
+      })
+      return
+    }
+
+    if (!map) return
+    patch(route('admin.rooms.maps.update', { roomMap: map.id }), {
+      forceFormData: true,
+      onSuccess: () => onClose(),
+    })
+  }
+
+  return (
+    <Modal isOpen={open} onClose={onClose}>
+      <ModalTitle>{mode === 'create' ? 'Add floor' : 'Edit floor'}</ModalTitle>
+      <ModalContent>
+        <Input
+          errors={errors.name}
+          placeholder="Floor name"
+          value={data.name}
+          onChange={(e) => setData('name', e.target.value)}
+        >
+          Name
+        </Input>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            errors={errors.grid_columns}
+            type="number"
+            min={1}
+            max={200}
+            value={data.grid_columns}
+            onChange={(e) => setData('grid_columns', Number(e.target.value))}
+          >
+            Grid columns
+          </Input>
+          <Input
+            errors={errors.grid_rows}
+            type="number"
+            min={1}
+            max={200}
+            value={data.grid_rows}
+            onChange={(e) => setData('grid_rows', Number(e.target.value))}
+          >
+            Grid rows
+          </Input>
+        </div>
+        <FileInput
+          errors={errors.image ? `${errors.image} The file might be too large.` : ''}
+          onChange={(e) => setData('image', e.target?.files?.[0] ?? null)}
+        >
+          {mode === 'create' ? 'Map image' : 'Replace image (optional)'}
+        </FileInput>
+        <p className="text-xs text-base-content/60">
+          {mode === 'create'
+            ? 'Upload a map and define the grid size for this floor.'
+            : 'Update the floor details or upload a new map image.'}
+        </p>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        {mode === 'create' ? 'Save' : 'Update'}
+      </ModalAction>
+    </Modal>
+  )
+}
+
 export default function Rooms({
   roomMaps,
   roomMap,
@@ -178,6 +285,9 @@ export default function Rooms({
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null)
   const [draftSelection, setDraftSelection] = useState<RoomSelection | null>(null)
   const [editingRoom, setEditingRoom] = useState<Room | null>(null)
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+  const [mapModalMode, setMapModalMode] = useState<'create' | 'edit'>('create')
+  const [mapModalTarget, setMapModalTarget] = useState<RoomMap | null>(null)
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [zoom, setZoom] = useState(1)
@@ -307,14 +417,40 @@ export default function Rooms({
     })
   }
 
+  const openCreateMapModal = () => {
+    setMapModalMode('create')
+    setMapModalTarget(null)
+    setIsMapModalOpen(true)
+  }
+
+  const openEditMapModal = () => {
+    if (!activeMap) return
+    setMapModalMode('edit')
+    setMapModalTarget(activeMap)
+    setIsMapModalOpen(true)
+  }
+
   if (!activeMap) {
     return (
       <AppLayout>
         <Head title="Rooms" />
         <div className="container mx-auto max-w-5xl px-4 py-6">
-          <h1 className="text-2xl font-bold">Rooms</h1>
-          <p className="text-sm text-base-content/70">No room maps configured yet.</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Rooms</h1>
+              <p className="text-sm text-base-content/70">No room maps configured yet.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={openCreateMapModal}>
+              Add floor
+            </Button>
+          </div>
         </div>
+        <RoomMapFormModal
+          open={isMapModalOpen}
+          mode={mapModalMode}
+          map={mapModalTarget}
+          onClose={() => setIsMapModalOpen(false)}
+        />
       </AppLayout>
     )
   }
@@ -604,20 +740,29 @@ export default function Rooms({
               Assign characters to rooms on the castle map. Drag a grid area to add a room.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Select
-              value={String(activeMap.id)}
-              onChange={(e) => router.get(route('admin.rooms.index', { map: e.target.value }))}
-            >
-              <SelectLabel>Floor</SelectLabel>
-              <SelectOptions>
-                {roomMaps.map((map) => (
-                  <option key={map.id} value={map.id}>
-                    {map.name}
-                  </option>
-                ))}
-              </SelectOptions>
-            </Select>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="min-w-[200px]">
+              <Select
+                value={String(activeMap.id)}
+                onChange={(e) => router.get(route('admin.rooms.index', { map: e.target.value }))}
+                className="select-sm"
+              >
+                <SelectLabel className="sr-only">Floor</SelectLabel>
+                <SelectOptions>
+                  {roomMaps.map((map) => (
+                    <option key={map.id} value={map.id}>
+                      {map.name}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+            </div>
+            <Button size="sm" variant="outline" onClick={openCreateMapModal}>
+              <Plus size={14} /> Add floor
+            </Button>
+            <Button size="sm" variant="outline" onClick={openEditMapModal}>
+              <Pencil size={14} /> Edit floor
+            </Button>
             {selection ? (
               <Button size="sm" variant="outline" onClick={resetSelection}>
                 Clear selection
@@ -632,7 +777,7 @@ export default function Rooms({
             Grid: {gridColumns} x {gridRows} | Rooms: {roomList.length}
           </div>
           <div className="mt-4 flex flex-col gap-4 lg:flex-row">
-            <div className="relative w-full max-w-4xl overflow-hidden rounded-xl border border-base-200 bg-base-200">
+            <div className="relative w-full max-w-4xl overflow-hidden rounded-xl border border-base-200 bg-neutral/70">
               <div ref={containerRef} className="relative w-full aspect-square">
                 <canvas
                   ref={canvasRef}
@@ -645,6 +790,8 @@ export default function Rooms({
                   onPointerUp={handlePointerUp}
                   onContextMenu={(event) => event.preventDefault()}
                 />
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_55%,rgba(0,0,0,0.45))]" />
+                <div className="pointer-events-none absolute inset-0 opacity-25 mix-blend-soft-light bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.04)_0,rgba(255,255,255,0.04)_1px,rgba(0,0,0,0.02)_1px,rgba(0,0,0,0.02)_2px)]" />
                 <div className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-full border border-base-200 bg-base-100/90 px-2 py-1 text-xs shadow-sm">
                   <Button size="xs" variant="ghost" onClick={handleZoomOut}>
                     <Minus size={12} />
@@ -663,13 +810,14 @@ export default function Rooms({
                     const avatarSize = Math.max(20, Math.min(32, height * 0.6))
                     const showLabel = width > 40 && height > 28
                     const avatarSrc = resolveAvatarSrc(character?.avatar ?? null)
+                    const isAssigned = Boolean(character?.id)
                     return (
                       <button
                         key={room.id}
                         type="button"
                         className={cn(
                           'pointer-events-auto absolute flex flex-col items-center justify-center gap-1 rounded-lg border text-[12px] text-base-content shadow-md backdrop-blur-[1px]',
-                          character ? 'border-primary/60 bg-primary/15' : 'border-base-200/70 bg-base-100/70',
+                          isAssigned ? 'border-primary/60 bg-primary/15' : 'border-base-200/30 bg-base-100/5',
                         )}
                         style={{ left, top, width, height }}
                         onClick={(event) => {
@@ -678,21 +826,21 @@ export default function Rooms({
                           resetSelection()
                         }}
                       >
-                        {avatarSrc ? (
+                        {isAssigned && avatarSrc ? (
                           <img
                             src={avatarSrc}
                             alt={character.name}
                             className="rounded-full border border-base-100 object-cover shadow-sm ring-1 ring-base-100/60"
                             style={{ width: avatarSize, height: avatarSize }}
                           />
-                        ) : (
+                        ) : isAssigned ? (
                           <div
                             className="rounded-full bg-base-200 text-[11px] font-semibold flex items-center justify-center shadow-sm ring-1 ring-base-100/60"
                             style={{ width: avatarSize, height: avatarSize }}
                           >
                             {getInitials(character?.name ?? room.name)}
                           </div>
-                        )}
+                        ) : null}
                         {showLabel ? (
                           <span className="truncate max-w-full rounded-full bg-base-100/90 px-2 py-0.5 text-[11px] font-semibold text-base-content shadow-sm ring-1 ring-base-100/70">
                             {character?.name ?? room.name}
@@ -781,6 +929,13 @@ export default function Rooms({
           onDelete={handleDeleteRoom}
         />
       ) : null}
+
+      <RoomMapFormModal
+        open={isMapModalOpen}
+        mode={mapModalMode}
+        map={mapModalTarget}
+        onClose={() => setIsMapModalOpen(false)}
+      />
     </AppLayout>
   )
 }
