@@ -25,6 +25,7 @@ class CharacterApprovalController extends Controller
 
         $charactersQuery = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
+            ->withCount('room')
             ->with([
                 'user:id,name,discord_id',
                 'adventures:id,character_id,duration,has_additional_bubble',

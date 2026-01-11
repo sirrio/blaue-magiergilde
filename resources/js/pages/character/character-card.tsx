@@ -23,7 +23,7 @@ import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, Swords, Download, XCircle } from 'lucide-react'
+import { Anvil, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Swords, Download, XCircle } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -44,6 +44,7 @@ export function CharacterCard({ character }: { character: Character }) {
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
   const guildStatus = character.guild_status ?? 'pending'
+  const hasRoom = (character.room_count ?? 0) > 0
   const statusLabel = guildStatus === 'approved' ? 'Approved' : guildStatus === 'declined' ? 'Declined' : 'Pending'
   const statusIcon = guildStatus === 'approved'
     ? <CheckCircle2 size={14} />
@@ -88,6 +89,11 @@ export function CharacterCard({ character }: { character: Character }) {
           </CardAction>
           <CardTitle className={cn('pb-0 flex items-center gap-2')}>
             <span>{character.name}</span>
+            {hasRoom ? (
+              <span className="text-primary/70" title="Room assigned">
+                <MapPin size={14} />
+              </span>
+            ) : null}
             <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
               {statusIcon}
             </span>

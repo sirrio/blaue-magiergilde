@@ -195,6 +195,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const classNames = String(character.class_names || '').trim();
     const statusLabel = guildStatusLabel(character.guild_status);
     const statusEmoji = guildStatusEmoji(character.guild_status);
+    const hasRoom = safeInt(character.has_room) > 0;
 
     const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -222,6 +223,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
         .setTitle(titleParts.join(' \u00b7 '))
         .addFields(
             { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
+            { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
             { name: 'Fortschritt', value: `${buildProgressBar(inCurrent, toNextTotal)}\nNoch: **${toNext}** Bubble(s)`, inline: false },
             { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
             { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },

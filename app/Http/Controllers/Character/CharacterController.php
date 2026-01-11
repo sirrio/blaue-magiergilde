@@ -24,6 +24,7 @@ class CharacterController extends Controller
         $characters = Character::query()
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->withTrashed()
+            ->withCount('room')
             ->with('adventures')
             ->orderBy('position')
             ->get();

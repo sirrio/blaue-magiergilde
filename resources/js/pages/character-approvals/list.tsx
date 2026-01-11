@@ -9,7 +9,7 @@ import { calculateTier } from '@/helper/calculateTier'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { CheckCircle2, Clock, ExternalLink, StickyNote, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, StickyNote, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 interface FilterOption {
@@ -32,6 +32,7 @@ type AdminCharacter = Pick<
   | 'dm_bubbles'
   | 'bubble_shop_spend'
   | 'is_filler'
+  | 'room_count'
 >
 
 type CharacterGroup = {
@@ -52,6 +53,7 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
   const { data, setData, patch, processing } = useForm({
     admin_notes: character.admin_notes ?? '',
   })
+  const hasAdminNote = Boolean(character.admin_notes?.trim())
 
   const handleSubmit = () => {
     patch(route('admin.character-approvals.update', { character: character.id }), {
@@ -73,7 +75,7 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
             setData('admin_notes', character.admin_notes ?? '')
             setIsOpen(true)
           }}
-          className={cn(character.admin_notes ? 'text-warning' : 'text-base-content/60')}
+          className={cn(hasAdminNote ? 'text-warning' : 'text-base-content/40')}
         >
           <StickyNote size={14} />
         </Button>
@@ -316,13 +318,11 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                     const status = getStatusLabel(character.guild_status)
                     const currentTier = calculateTier(character)
                     const characterNotes = character.notes?.trim()
+                    const hasRoom = (character.room_count ?? 0) > 0
                     return (
                       <ListRow key={character.id} className="grid-cols-1">
-                        <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex w-6 justify-center" title="Starting tier">
-                              <LogoTier tier={character.start_tier} width={16} />
-                            </div>
+                        <div className="col-span-full flex flex-wrap items-center gap-3 md:flex-nowrap">
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
                             <div className="flex w-6 justify-center" title="Current tier">
                               <LogoTier tier={currentTier} width={16} />
                             </div>
@@ -333,7 +333,6 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                <img src="/images/dnd-beyond-logo.svg" className="h-6 w-6" alt="sheet-link" />
                                 <span className="truncate">{character.name}</span>
                               </a>
                               {characterNotes ? (
@@ -343,20 +342,34 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                               ) : null}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <div
+                          <div className="flex w-full flex-wrap items-center gap-2 text-xs text-base-content/70 md:w-auto">
+                            <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
+                              {hasRoom ? (
+                                <MapPin size={12} className="text-primary/70" />
+                              ) : (
+                                <MapPinOff size={12} className="text-base-content/40" />
+                              )}
+                              <span>{hasRoom ? 'Room' : 'No room'}</span>
+                            </span>
+                            <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
+                              <LogoTier tier={character.start_tier} width={12} />
+                              <span>Start</span>
+                            </span>
+                            <span
                               className={cn(
-                                'flex items-center text-xs',
+                                'flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5',
                                 status === 'approved' && 'text-success',
                                 status === 'declined' && 'text-error',
                                 status === 'pending' && 'text-warning',
                               )}
                             >
-                              {status === 'approved' && <CheckCircle2 size={16} />}
-                              {status === 'declined' && <XCircle size={16} />}
-                              {status === 'pending' && <Clock size={16} />}
-                              <span className="ml-1 capitalize">{status}</span>
-                            </div>
+                              {status === 'approved' && <CheckCircle2 size={12} />}
+                              {status === 'declined' && <XCircle size={12} />}
+                              {status === 'pending' && <Clock size={12} />}
+                              <span className="capitalize">{status}</span>
+                            </span>
+                          </div>
+                          <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-base-200/60 pt-3 md:w-auto md:border-t-0 md:border-l-2 md:border-base-300/70 md:pt-0 md:pl-4">
                             <AdminNoteModal character={character} />
                             <Button
                               size="xs"

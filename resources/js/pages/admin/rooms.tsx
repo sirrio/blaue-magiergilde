@@ -350,12 +350,29 @@ export default function Rooms({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code !== 'Space') return
+      const target = event.target as HTMLElement | null
+      const isTypingTarget =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      if (isTypingTarget) return
       event.preventDefault()
       setSpacePressed(true)
     }
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.code !== 'Space') return
-      event.preventDefault()
+      const target = event.target as HTMLElement | null
+      const isTypingTarget =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      if (!isTypingTarget) {
+        event.preventDefault()
+      }
       setSpacePressed(false)
     }
     window.addEventListener('keydown', handleKeyDown)

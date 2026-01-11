@@ -215,6 +215,7 @@ export interface Character {
   allies: Ally[]
   deleted_at: string
   guild_status?: 'pending' | 'approved' | 'declined'
+  room_count?: number
   admin_notes?: string | null
   faction:
     | 'none'

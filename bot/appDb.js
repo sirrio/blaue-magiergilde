@@ -79,6 +79,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.bubble_shop_spend,
                 c.is_filler,
                 c.guild_status,
+                CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
@@ -86,6 +87,7 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
+            LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
                     character_id,
@@ -140,6 +142,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_coins,
                 c.bubble_shop_spend,
                 c.is_filler,
+                CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
@@ -147,6 +150,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
+            LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
                     character_id,
