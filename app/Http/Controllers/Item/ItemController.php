@@ -105,7 +105,7 @@ class ItemController extends Controller
             ->get();
 
         return Inertia::render('item/index', [
-            'items' => Inertia::defer(fn () => $items)->merge(),
+            'items' => Inertia::defer(fn () => $items),
         ]);
     }
 
