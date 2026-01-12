@@ -14,12 +14,21 @@ class BackstockController extends Controller
     public function index(): Response
     {
         $backstockItems = BackstockItem::query()
-            ->whereHas('item')
             ->with([
                 'item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type']),
             ])
             ->orderBy('id')
-            ->get(['id', 'item_id', 'notes', 'created_at']);
+            ->get([
+                'id',
+                'item_id',
+                'item_name',
+                'item_url',
+                'item_cost',
+                'item_rarity',
+                'item_type',
+                'notes',
+                'created_at',
+            ]);
 
         $items = Item::query()
             ->orderBy('name')

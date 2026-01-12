@@ -7,7 +7,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ShopItem extends Model
 {
     protected $table = 'item_shop';
-    protected $fillable = ['shop_id', 'item_id', 'spell_id', 'notes'];
+    protected $fillable = [
+        'shop_id',
+        'item_id',
+        'item_name',
+        'item_url',
+        'item_cost',
+        'item_rarity',
+        'item_type',
+        'spell_id',
+        'spell_name',
+        'spell_url',
+        'spell_legacy_url',
+        'spell_level',
+        'spell_school',
+        'notes',
+    ];
 
     public function item(): BelongsTo
     {

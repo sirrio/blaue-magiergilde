@@ -82,6 +82,7 @@ class ShopRollService
 
             foreach ($pickedItems as $pickedItem) {
                 $spellId = null;
+                $spellSnapshot = null;
                 $autoRollEnabled = ! empty($pickedItem['default_spell_roll_enabled']);
                 $spellLevels = $pickedItem['default_spell_levels'] ?? [];
                 $spellSchools = $pickedItem['default_spell_schools'] ?? [];
@@ -99,18 +100,31 @@ class ShopRollService
                         : [];
 
                     if ($normalizedLevels !== []) {
-                        $query = Spell::query()->whereIn('spell_level', $normalizedLevels);
+                        $query = Spell::query()
+                            ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school'])
+                            ->whereIn('spell_level', $normalizedLevels);
                         if ($normalizedSchools !== []) {
                             $query->whereIn('spell_school', $normalizedSchools);
                         }
-                        $spellId = $query->inRandomOrder()->value('id');
+                        $spellSnapshot = $query->inRandomOrder()->first();
+                        $spellId = $spellSnapshot?->id;
                     }
                 }
 
                 ShopItem::query()->create([
                     'shop_id' => $shop->id,
                     'item_id' => $pickedItem['id'],
+                    'item_name' => $pickedItem['name'] ?? null,
+                    'item_url' => $pickedItem['url'] ?? null,
+                    'item_cost' => $pickedItem['cost'] ?? null,
+                    'item_rarity' => $pickedItem['rarity'] ?? null,
+                    'item_type' => $pickedItem['type'] ?? null,
                     'spell_id' => $spellId,
+                    'spell_name' => $spellSnapshot?->name,
+                    'spell_url' => $spellSnapshot?->url,
+                    'spell_legacy_url' => $spellSnapshot?->legacy_url,
+                    'spell_level' => $spellSnapshot?->spell_level,
+                    'spell_school' => $spellSnapshot?->spell_school,
                 ]);
             }
         });

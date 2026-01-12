@@ -161,15 +161,15 @@ async function fetchAuctionItems(auctionId) {
                 ai.repair_current,
                 ai.repair_max,
                 ai.notes,
-                i.name,
-                i.url,
-                i.rarity,
-                i.type
+                COALESCE(ai.item_name, i.name) AS name,
+                COALESCE(ai.item_url, i.url) AS url,
+                COALESCE(ai.item_cost, i.cost) AS cost,
+                COALESCE(ai.item_rarity, i.rarity) AS rarity,
+                COALESCE(ai.item_type, i.type) AS type
             FROM auction_items ai
-            INNER JOIN items i ON i.id = ai.item_id
+            LEFT JOIN items i ON i.id = ai.item_id
             WHERE ai.auction_id = ?
-              AND i.deleted_at IS NULL
-            ORDER BY i.name ASC
+            ORDER BY COALESCE(ai.item_name, i.name) ASC
         `,
         [auctionId],
     );

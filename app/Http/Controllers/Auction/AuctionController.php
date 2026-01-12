@@ -32,7 +32,20 @@ class AuctionController extends Controller
         $auctions = Auction::query()
             ->with([
                 'auctionItems' => fn ($query) => $query
-                    ->select(['id', 'auction_id', 'item_id', 'notes', 'repair_current', 'repair_max', 'remaining_auctions'])
+                    ->select([
+                        'id',
+                        'auction_id',
+                        'item_id',
+                        'item_name',
+                        'item_url',
+                        'item_cost',
+                        'item_rarity',
+                        'item_type',
+                        'notes',
+                        'repair_current',
+                        'repair_max',
+                        'remaining_auctions',
+                    ])
                     ->orderBy('id'),
                 'auctionItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
                 'auctionItems.bids' => fn ($query) => $query
@@ -125,6 +138,11 @@ class AuctionController extends Controller
                 if ($nextRemaining <= 0) {
                     BackstockItem::query()->create([
                         'item_id' => $auctionItem->item_id,
+                        'item_name' => $auctionItem->item_name,
+                        'item_url' => $auctionItem->item_url,
+                        'item_cost' => $auctionItem->item_cost,
+                        'item_rarity' => $auctionItem->item_rarity,
+                        'item_type' => $auctionItem->item_type,
                         'notes' => $auctionItem->notes,
                     ]);
                     continue;
@@ -132,6 +150,11 @@ class AuctionController extends Controller
 
                 $newAuction->auctionItems()->create([
                     'item_id' => $auctionItem->item_id,
+                    'item_name' => $auctionItem->item_name,
+                    'item_url' => $auctionItem->item_url,
+                    'item_cost' => $auctionItem->item_cost,
+                    'item_rarity' => $auctionItem->item_rarity,
+                    'item_type' => $auctionItem->item_type,
                     'notes' => $auctionItem->notes,
                     'repair_current' => $auctionItem->repair_current,
                     'repair_max' => $auctionItem->repair_max,

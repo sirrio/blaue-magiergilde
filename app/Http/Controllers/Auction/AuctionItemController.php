@@ -47,7 +47,9 @@ class AuctionItemController extends Controller
             $notes = null;
         }
 
-        $item = Item::query()->select(['id', 'cost', 'rarity', 'type'])->find($request->item_id);
+        $item = Item::query()
+            ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
+            ->find($request->item_id);
         $costValue = $this->parseCostValue($item?->cost);
         $repairMax = $costValue;
 
@@ -61,6 +63,7 @@ class AuctionItemController extends Controller
             $request,
             $repairCurrent,
             $repairMax,
+            $item,
         ): void {
             $lockedAuction = Auction::query()
                 ->lockForUpdate()
@@ -74,6 +77,11 @@ class AuctionItemController extends Controller
 
             $lockedAuction->auctionItems()->create([
                 'item_id' => $request->item_id,
+                'item_name' => $item?->name,
+                'item_url' => $item?->url,
+                'item_cost' => $item?->cost,
+                'item_rarity' => $item?->rarity,
+                'item_type' => $item?->type,
                 'notes' => $notes,
                 'remaining_auctions' => $request->remaining_auctions,
                 'repair_current' => $repairCurrent,

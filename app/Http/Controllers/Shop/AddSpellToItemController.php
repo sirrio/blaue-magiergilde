@@ -21,6 +21,11 @@ class AddSpellToItemController extends Controller
 
         if ($spell) {
             $shopItem->spell_id = $spell->id;
+            $shopItem->spell_name = $spell->name;
+            $shopItem->spell_url = $spell->url;
+            $shopItem->spell_legacy_url = $spell->legacy_url;
+            $shopItem->spell_level = $spell->spell_level;
+            $shopItem->spell_school = $spell->spell_school;
             $shopItem->save();
         }
 

@@ -8,7 +8,7 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
 import { cn } from '@/lib/utils'
-import { DiscordBackupChannel, PageProps, Shop, ShopSettings } from '@/types'
+import { DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopSettings } from '@/types'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Send, Settings } from 'lucide-react'
@@ -49,6 +49,19 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     const shopId = Number(event.target.value)
     const newShop = shops.find((shop) => shop.id === shopId) || null
     setSelectedShop(newShop)
+  }
+
+  const getShopItemSnapshot = (shopItem: ShopItem): Item => {
+    const item = shopItem.item ?? ({} as Item)
+    return {
+      id: item.id ?? 0,
+      name: item.name ?? shopItem.item_name ?? 'Unknown item',
+      url: item.url ?? shopItem.item_url ?? '',
+      cost: item.cost ?? shopItem.item_cost ?? '',
+      rarity: (item.rarity ?? shopItem.item_rarity ?? 'common') as Item['rarity'],
+      type: (item.type ?? shopItem.item_type ?? 'item') as Item['type'],
+      pick_count: item.pick_count ?? 0,
+    }
   }
 
   const handleCreateShop = (): void => {
@@ -437,7 +450,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         ) : null}
         <List>
           {selectedShop?.shop_items.map((si) => (
-            <ItemRow key={si.id} item={si.item} shopItem={si} />
+            <ItemRow key={si.id} item={getShopItemSnapshot(si)} shopItem={si} />
           ))}
         </List>
       </div>

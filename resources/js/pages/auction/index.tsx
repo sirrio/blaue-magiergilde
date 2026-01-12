@@ -63,6 +63,19 @@ const renderIcon = (type: string): JSX.Element | null => {
   return typeIcons[type] || null
 }
 
+const getAuctionItemSnapshot = (auctionItem: AuctionItem): Item => {
+  const item = auctionItem.item ?? ({} as Item)
+  return {
+    id: item.id ?? 0,
+    name: item.name ?? auctionItem.item_name ?? 'Unknown item',
+    url: item.url ?? auctionItem.item_url ?? '',
+    cost: item.cost ?? auctionItem.item_cost ?? '',
+    rarity: (item.rarity ?? auctionItem.item_rarity ?? 'common') as Item['rarity'],
+    type: (item.type ?? auctionItem.item_type ?? 'item') as Item['type'],
+    pick_count: item.pick_count ?? 0,
+  }
+}
+
 const getBidStep = (item: Item): number => {
   let baseStep = 10
 
@@ -78,7 +91,8 @@ const getBidStep = (item: Item): number => {
 }
 
 const getStartingBid = (auctionItem: AuctionItem): number => {
-  const step = getBidStep(auctionItem.item)
+  const item = getAuctionItemSnapshot(auctionItem)
+  const step = getBidStep(item)
   const repairCurrent = auctionItem.repair_current ?? 0
   const halfRepair = Math.ceil(repairCurrent / 2)
   return Math.ceil(halfRepair / step) * step
@@ -123,12 +137,13 @@ const getRepairLabel = (auctionItem: AuctionItem) => {
 }
 
 const getAuctionItemLabel = (name: string, auctionItem: AuctionItem) => {
+  const item = getAuctionItemSnapshot(auctionItem)
   const parts: string[] = [name]
   const notes = auctionItem.notes?.trim()
   if (notes) {
     parts.push(`(${notes})`)
   }
-  parts.push(`(${rarityLabels[auctionItem.item.rarity]})`)
+  parts.push(`(${rarityLabels[item.rarity]})`)
   parts.push(`(${getRepairMissing(auctionItem)})`)
   return parts.join(' ')
 }
@@ -196,7 +211,8 @@ const AuctionItemBidControls = ({
   candidates: AuctionVoiceCandidate[]
   highestBidderId?: string | null
 }) => {
-  const step = getBidStep(auctionItem.item)
+  const item = getAuctionItemSnapshot(auctionItem)
+  const step = getBidStep(item)
   const startingBid = getStartingBid(auctionItem)
   const highestBid = getHighestBid(auctionItem)
   const minBid = highestBid ? Math.max(startingBid, highestBid.amount + step) : startingBid
@@ -293,6 +309,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
       ),
     [auctionItem.bids],
   )
+  const item = getAuctionItemSnapshot(auctionItem)
 
   const handleDelete = (bidId: number) => {
     if (!window.confirm('Delete bid?')) return
@@ -315,7 +332,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
       </ModalTrigger>
       <ModalTitle>Bid history</ModalTitle>
       <ModalContent>
-        <p className="mb-2 text-xs text-base-content/60">{auctionItem.item.name}</p>
+        <p className="mb-2 text-xs text-base-content/60">{item.name}</p>
         {hiddenBids.length > 0 ? (
           <div className="mb-3">
             <p className="mb-1 text-[10px] font-semibold uppercase text-base-content/50">Hidden bids</p>
@@ -543,7 +560,8 @@ const AuctionItemRow = ({
   currency: string
   candidates: AuctionVoiceCandidate[]
 }) => {
-  const textColor = getRarityTextColor(auctionItem.item.rarity)
+  const item = getAuctionItemSnapshot(auctionItem)
+  const textColor = getRarityTextColor(item.rarity)
   const highestBid = getHighestBid(auctionItem)
   const bidCandidates = useMemo(() => {
     const merged = new Map<string, AuctionVoiceCandidate>()
@@ -574,11 +592,11 @@ const AuctionItemRow = ({
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className={cn(textColor, 'flex h-4 w-4 shrink-0 items-center justify-center')}>
-              {renderIcon(auctionItem.item.type)}
+              {renderIcon(item.type)}
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <span className={cn(textColor, 'text-sm font-semibold leading-none')}>
-                {getAuctionItemLabel(auctionItem.item.name, auctionItem)}
+                {getAuctionItemLabel(item.name, auctionItem)}
               </span>
               <span className="text-xs font-normal leading-none text-base-content/70">
                 Auctions left: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
@@ -993,11 +1011,13 @@ export default function Index({
       .map((rarity) => ({
         rarity,
         items: selectedAuction.auction_items
-          .filter((auctionItem) => auctionItem.item.rarity === rarity)
+          .filter((auctionItem) => getAuctionItemSnapshot(auctionItem).rarity === rarity)
           .sort((a, b) => {
-            const typeCompare = typeOrder[a.item.type] - typeOrder[b.item.type]
+            const itemA = getAuctionItemSnapshot(a)
+            const itemB = getAuctionItemSnapshot(b)
+            const typeCompare = typeOrder[itemA.type] - typeOrder[itemB.type]
             if (typeCompare !== 0) return typeCompare
-            return a.item.name.localeCompare(b.item.name)
+            return itemA.name.localeCompare(itemB.name)
           }),
       }))
       .filter((group) => group.items.length > 0)

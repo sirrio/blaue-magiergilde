@@ -224,24 +224,23 @@ async function fetchShopItems(shopId) {
         `
             SELECT
                 si.id AS shop_item_id,
-                i.id AS item_id,
-                i.name,
-                i.url,
-                i.cost,
-                i.rarity,
-                i.type,
+                si.item_id,
+                COALESCE(si.item_name, i.name) AS name,
+                COALESCE(si.item_url, i.url) AS url,
+                COALESCE(si.item_cost, i.cost) AS cost,
+                COALESCE(si.item_rarity, i.rarity) AS rarity,
+                COALESCE(si.item_type, i.type) AS type,
                 si.notes,
-                s.id AS spell_id,
-                s.name AS spell_name,
-                s.url AS spell_url,
-                s.legacy_url AS spell_legacy_url,
-                s.spell_level
+                si.spell_id,
+                COALESCE(si.spell_name, s.name) AS spell_name,
+                COALESCE(si.spell_url, s.url) AS spell_url,
+                COALESCE(si.spell_legacy_url, s.legacy_url) AS spell_legacy_url,
+                COALESCE(si.spell_level, s.spell_level) AS spell_level
             FROM item_shop si
-            INNER JOIN items i ON i.id = si.item_id
+            LEFT JOIN items i ON i.id = si.item_id
             LEFT JOIN spells s ON s.id = si.spell_id
             WHERE si.shop_id = ?
-              AND i.deleted_at IS NULL
-            ORDER BY i.name ASC
+            ORDER BY COALESCE(si.item_name, i.name) ASC
         `,
         [shopId],
     );

@@ -43,6 +43,19 @@ const renderIcon = (type: string): JSX.Element | null => {
   return typeIcons[type] || null
 }
 
+const getBackstockItemSnapshot = (entry: BackstockItem): Item => {
+  const item = entry.item ?? ({} as Item)
+  return {
+    id: item.id ?? 0,
+    name: item.name ?? entry.item_name ?? 'Unknown item',
+    url: item.url ?? entry.item_url ?? '',
+    cost: item.cost ?? entry.item_cost ?? '',
+    rarity: (item.rarity ?? entry.item_rarity ?? 'common') as Item['rarity'],
+    type: (item.type ?? entry.item_type ?? 'item') as Item['type'],
+    pick_count: item.pick_count ?? 0,
+  }
+}
+
 type BackstockGroup = {
   rarity: string
   items: BackstockItem[]
@@ -52,8 +65,9 @@ const buildGroups = (items: BackstockItem[]): BackstockGroup[] => {
   const byRarity = new Map<string, Map<string, BackstockItem[]>>()
 
   items.forEach((entry) => {
-    const rarity = entry.item?.rarity ?? 'common'
-    const type = entry.item?.type ?? 'item'
+    const item = getBackstockItemSnapshot(entry)
+    const rarity = item.rarity ?? 'common'
+    const type = item.type ?? 'item'
     if (!byRarity.has(rarity)) byRarity.set(rarity, new Map())
     const byType = byRarity.get(rarity)
     if (!byType?.has(type)) byType?.set(type, [])
@@ -364,22 +378,23 @@ export default function BackstockIndex({
                 </p>
                 <List>
                   {group.items.map((entry) => {
+                    const item = getBackstockItemSnapshot(entry)
                     const notes = entry.notes?.trim()
-                    const itemName = notes ? `${entry.item.name} - ${notes}` : entry.item.name
-                    const textColor = getRarityTextColor(entry.item.rarity)
+                    const itemName = notes ? `${item.name} - ${notes}` : item.name
+                    const textColor = getRarityTextColor(item.rarity)
                     return (
                       <ListRow key={entry.id}>
-                        <div className={cn(textColor)}>{renderIcon(entry.item.type)}</div>
+                        <div className={cn(textColor)}>{renderIcon(item.type)}</div>
                         <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
                           <span>{itemName}</span>
                         </div>
                         <div className="max-w-24 font-mono text-xs">
-                          {entry.item.cost ? entry.item.cost : <span className="text-error">No cost</span>}
+                          {item.cost ? item.cost : <span className="text-error">No cost</span>}
                         </div>
-                        {entry.item.url ? (
+                        {item.url ? (
                           <Button
                             as="a"
-                            href={entry.item.url}
+                            href={item.url}
                             target="_blank"
                             size="xs"
                             variant="ghost"

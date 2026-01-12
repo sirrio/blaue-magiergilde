@@ -9,6 +9,11 @@ class BackstockItem extends Model
 {
     protected $fillable = [
         'item_id',
+        'item_name',
+        'item_url',
+        'item_cost',
+        'item_rarity',
+        'item_type',
         'notes',
     ];
 

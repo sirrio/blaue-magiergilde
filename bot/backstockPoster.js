@@ -135,15 +135,14 @@ async function fetchBackstockItems() {
             SELECT
                 bi.id,
                 bi.notes,
-                i.name,
-                i.url,
-                i.cost,
-                i.rarity,
-                i.type
+                COALESCE(bi.item_name, i.name) AS name,
+                COALESCE(bi.item_url, i.url) AS url,
+                COALESCE(bi.item_cost, i.cost) AS cost,
+                COALESCE(bi.item_rarity, i.rarity) AS rarity,
+                COALESCE(bi.item_type, i.type) AS type
             FROM backstock_items bi
-            INNER JOIN items i ON i.id = bi.item_id
-            WHERE i.deleted_at IS NULL
-            ORDER BY i.name ASC
+            LEFT JOIN items i ON i.id = bi.item_id
+            ORDER BY COALESCE(bi.item_name, i.name) ASC
         `,
     );
     return rows;

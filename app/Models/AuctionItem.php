@@ -14,6 +14,11 @@ class AuctionItem extends Model
     protected $fillable = [
         'auction_id',
         'item_id',
+        'item_name',
+        'item_url',
+        'item_cost',
+        'item_rarity',
+        'item_type',
         'notes',
         'repair_current',
         'repair_max',

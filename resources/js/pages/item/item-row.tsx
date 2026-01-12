@@ -6,7 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { Item, PageProps, ShopItem } from '@/types'
+import { Item, PageProps, ShopItem, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Scale, Shield, StickyNote, Store, Sword, XCircle } from 'lucide-react'
 import React, { useEffect, useState, JSX } from 'react'
@@ -30,6 +30,24 @@ const getRarityTextColor = (rarity: string): string => {
 
 const renderIcon = (type: string): JSX.Element | null => {
   return typeIcons[type] || null
+}
+
+const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
+  if (!shopItem) return null
+  if (shopItem.spell) return shopItem.spell
+  if (!shopItem.spell_name) return null
+
+  return {
+    id: 0,
+    name: shopItem.spell_name ?? 'Unknown spell',
+    url: shopItem.spell_url ?? '',
+    legacy_url: shopItem.spell_legacy_url ?? '',
+    spell_level: shopItem.spell_level ?? 0,
+    spell_school: (shopItem.spell_school ?? 'abjuration') as Spell['spell_school'],
+    guild_enabled: shopItem.spell ? shopItem.spell.guild_enabled : undefined,
+    ruling_changed: shopItem.spell ? shopItem.spell.ruling_changed : undefined,
+    ruling_note: shopItem.spell ? shopItem.spell.ruling_note : undefined,
+  }
 }
 
 const copyToClipboard = (text: string) => {
@@ -327,11 +345,14 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     }
   }
 
-  const spell = shopItem?.spell
+  const spell = getShopSpellSnapshot(shopItem)
   const shopNotes = shopItem?.notes?.trim()
   const baseName = shopNotes ? `${item.name} - ${shopNotes}` : item.name
   const displayName = spell ? `${baseName} - ${spell.name}` : baseName
   const dndBeyondLink = `https://www.dndbeyond.com/magic-items?filter-type=0&filter-search=${item.name}&filter-partnered-content=t`
+  const spellUrl = spell?.url || shopItem?.spell_url || ''
+  const spellLegacyUrl = spell?.legacy_url || shopItem?.spell_legacy_url || ''
+  const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
 
   return (
     <ListRow>
@@ -528,7 +549,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
         onClick={() =>
           copyToClipboard(
             spell
-              ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spell.url}>) - [Legacy](<${spell.legacy_url}>): ${item.cost}`
+              ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${item.cost}`
               : `[${baseName}](<${item.url}>): ${item.cost}`,
           )
         }
