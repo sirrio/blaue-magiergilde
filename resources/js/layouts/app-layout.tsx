@@ -44,15 +44,35 @@ const authLinks = [
   { name: 'Logout', route: 'logout', method: 'post' as const },
 ]
 
-const adminLinks = [
-  { name: 'Backup', route: 'admin.backup', method: 'get' as const, icon: Settings },
-  { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
-  { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
-  { name: 'Shop', route: 'admin.shops.index', method: 'get' as const, icon: Store },
-  { name: 'Backstock', route: 'admin.backstock.index', method: 'get' as const, icon: Archive },
-  { name: 'Auctions', route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
-  { name: 'Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
-  { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
+const adminSections = [
+  {
+    label: 'Marketplace',
+    links: [
+      { name: 'Shop', route: 'admin.shops.index', method: 'get' as const, icon: Store },
+      { name: 'Auctions', route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
+      { name: 'Backstock', route: 'admin.backstock.index', method: 'get' as const, icon: Archive },
+    ],
+  },
+  {
+    label: 'Compendium',
+    links: [
+      { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
+      { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
+    ],
+  },
+  {
+    label: 'Administration',
+    links: [
+      { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
+      { name: 'Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
+    ],
+  },
+  {
+    label: 'System',
+    links: [
+      { name: 'Backup', route: 'admin.backup', method: 'get' as const, icon: Settings },
+    ],
+  },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -133,20 +153,27 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     Administration
                   </a>
                   <ul className="p-2">
-                    {adminLinks.map((adminLink) => (
-                      <li key={adminLink.route} role="none">
-                        <Link
-                          role="menuitem"
-                          method={adminLink.method}
-                          href={route(adminLink.route)}
-                            className={cn(
-                              'flex items-center',
-                              route().current(adminLink.route) ? 'menu-active' : ''
-                            )}
-                        >
-                          <adminLink.icon size={16} className="mr-2" />
-                          {adminLink.name}
-                        </Link>
+                    {adminSections.map((section) => (
+                      <li key={section.label} role="none">
+                        <span className="menu-title">{section.label}</span>
+                        <ul className="before:hidden ml-0 pl-0">
+                          {section.links.map((adminLink) => (
+                            <li key={adminLink.route} role="none">
+                              <Link
+                                role="menuitem"
+                                method={adminLink.method}
+                                href={route(adminLink.route)}
+                                className={cn(
+                                  'flex items-center',
+                                  route().current(adminLink.route) ? 'menu-active' : ''
+                                )}
+                              >
+                                <adminLink.icon size={16} className="mr-2" />
+                                {adminLink.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>
@@ -214,20 +241,27 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     Administration
                   </summary>
                   <ul className="z-30 w-52 p-2">
-                    {adminLinks.map((adminLink) => (
-                      <li key={adminLink.route} role="none">
-                        <Link
-                          role="menuitem"
-                          method={adminLink.method}
-                          href={route(adminLink.route)}
-                            className={cn(
-                              'flex items-center',
-                              route().current(adminLink.route) ? 'menu-active' : ''
-                            )}
-                        >
-                          <adminLink.icon size={16} className="mr-2" />
-                          {adminLink.name}
-                        </Link>
+                    {adminSections.map((section) => (
+                      <li key={section.label} role="none">
+                        <span className="menu-title">{section.label}</span>
+                        <ul className="before:hidden ml-0 pl-0">
+                          {section.links.map((adminLink) => (
+                            <li key={adminLink.route} role="none">
+                              <Link
+                                role="menuitem"
+                                method={adminLink.method}
+                                href={route(adminLink.route)}
+                                className={cn(
+                                  'flex items-center',
+                                  route().current(adminLink.route) ? 'menu-active' : ''
+                                )}
+                              >
+                                <adminLink.icon size={16} className="mr-2" />
+                                {adminLink.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>
