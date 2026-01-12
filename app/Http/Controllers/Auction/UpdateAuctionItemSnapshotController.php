@@ -15,12 +15,14 @@ class UpdateAuctionItemSnapshotController extends Controller
         $name = trim((string) $payload['name']);
         $url = trim((string) ($payload['url'] ?? ''));
         $cost = trim((string) ($payload['cost'] ?? ''));
+        $notes = trim((string) ($payload['notes'] ?? ''));
 
         $auctionItem->item_name = $name;
         $auctionItem->item_url = $url === '' ? null : $url;
         $auctionItem->item_cost = $cost === '' ? null : $cost;
         $auctionItem->item_rarity = $payload['rarity'];
         $auctionItem->item_type = $payload['type'];
+        $auctionItem->notes = $notes === '' ? null : $notes;
         $auctionItem->snapshot_custom = true;
         $auctionItem->save();
 

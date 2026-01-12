@@ -1,4 +1,3 @@
-import { ActionMenu } from '@/components/ui/action-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
@@ -12,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
+import { Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2, XCircle } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -556,6 +555,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     name: item.name ?? '',
     url: item.url ?? '',
     cost: item.cost ?? '',
+    notes: auctionItem.notes ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
   })
@@ -567,10 +567,11 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
       name: item.name ?? '',
       url: item.url ?? '',
       cost: item.cost ?? '',
+      notes: auctionItem.notes ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
     })
-  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, auctionItem.notes, item.cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.auction-items.snapshot.update', { auctionItem: auctionItem.id }), {
@@ -605,6 +606,9 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
         </Input>
         <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
           Cost
+        </Input>
+        <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+          Notes
         </Input>
         <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
           <SelectLabel>Rarity</SelectLabel>
@@ -705,7 +709,7 @@ const AuctionItemRow = ({
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1 border-l border-base-200 pl-2">
             <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
             <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
               <RotateCcw size={16} />
@@ -795,7 +799,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} disabled={!hasItems}>
+        <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} disabled={!hasItems} className="gap-2">
           <Plus size={16} />
           Add item
         </Button>
@@ -1026,7 +1030,7 @@ export default function Index({
       ? 'Thread'
       : 'Channel'
     : null
-  const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
+  const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
@@ -1226,6 +1230,14 @@ export default function Index({
             <div className="mb-4 rounded-box bg-base-100 shadow-md p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+                  <span
+                    className={cn(
+                      'rounded-full border px-2 py-1',
+                      hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
+                    )}
+                  >
+                    {destinationText}
+                  </span>
                   <span className="rounded-full border border-base-200 px-2 py-1">
                     Status: {statusLabels[selectedAuction.status]}
                   </span>
@@ -1234,14 +1246,6 @@ export default function Index({
                   </span>
                   <span className="rounded-full border border-base-200 px-2 py-1">
                     Steps: 10 / 50 / 100 / 500 (consumables/spellscrolls halved)
-                  </span>
-                  <span
-                    className={cn(
-                      'rounded-full border px-2 py-1',
-                      hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
-                    )}
-                  >
-                    {destinationText}
                   </span>
                 </div>
                 {isAdmin ? (
@@ -1320,20 +1324,21 @@ export default function Index({
                     className="gap-2"
                   >
                     <Send size={16} />
-                    Post
+                    Post auction
                   </Button>
                 ) : null}
                 {isAdmin ? (
-                  <ActionMenu
-                    items={[
-                      {
-                        label: 'Close auction',
-                        onSelect: handleCloseAuction,
-                        disabled: selectedAuction.status === 'closed',
-                        tone: 'error',
-                      },
-                    ]}
-                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    color="error"
+                    onClick={handleCloseAuction}
+                    disabled={selectedAuction.status === 'closed'}
+                    className="gap-2"
+                  >
+                    <XCircle size={16} />
+                    Close auction
+                  </Button>
                 ) : null}
               </div>
             </div>

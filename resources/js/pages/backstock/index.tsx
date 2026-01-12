@@ -341,7 +341,8 @@ export default function BackstockIndex({
       ? 'Thread'
       : 'Channel'
     : null
-  const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
+  const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
+  const hasPostDestination = Boolean(settings.post_channel_id)
 
   return (
     <AppLayout>
@@ -352,37 +353,6 @@ export default function BackstockIndex({
             <h1 className="text-2xl font-bold">Backstock</h1>
             <p className="text-sm text-base-content/70">Manage items carried over from auctions.</p>
           </div>
-          <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
-            <ModalTrigger>
-              <Button size="sm" variant="outline" onClick={() => setIsAddOpen(true)} disabled={!hasItems}>
-                <Plus size={16} className="mr-2" />
-                Add item
-              </Button>
-            </ModalTrigger>
-            <ModalTitle>Add item to backstock</ModalTitle>
-            <ModalContent>
-              <Select value={String(data.item_id)} onChange={(event) => setData('item_id', Number(event.target.value))}>
-                <SelectLabel>Item</SelectLabel>
-                <SelectOptions>
-                  {hasItems ? (
-                    items.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value={0}>No items available</option>
-                  )}
-                </SelectOptions>
-              </Select>
-              <Input value={data.notes} onChange={(event) => setData('notes', event.target.value)}>
-                Notes (optional)
-              </Input>
-            </ModalContent>
-            <ModalAction onClick={handleAddItem} disabled={processing}>
-              Add item
-            </ModalAction>
-          </Modal>
         </section>
 
         <div className="rounded-box bg-base-100 shadow-md p-3">
@@ -391,7 +361,7 @@ export default function BackstockIndex({
               <span
                 className={cn(
                   'rounded-full border px-2 py-1',
-                  settings.post_channel_id ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
+                  hasPostDestination ? 'border-base-200 text-base-content/70' : 'border-warning text-warning',
                 )}
               >
                 {destinationText}
@@ -439,13 +409,45 @@ export default function BackstockIndex({
             </Modal>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
+              <ModalTrigger>
+                <Button size="sm" variant="outline" onClick={() => setIsAddOpen(true)} disabled={!hasItems} className="gap-2">
+                  <Plus size={16} />
+                  Add item
+                </Button>
+              </ModalTrigger>
+              <ModalTitle>Add item to backstock</ModalTitle>
+              <ModalContent>
+                <Select value={String(data.item_id)} onChange={(event) => setData('item_id', Number(event.target.value))}>
+                  <SelectLabel>Item</SelectLabel>
+                  <SelectOptions>
+                    {hasItems ? (
+                      items.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value={0}>No items available</option>
+                    )}
+                  </SelectOptions>
+                </Select>
+                <Input value={data.notes} onChange={(event) => setData('notes', event.target.value)}>
+                  Notes (optional)
+                </Input>
+              </ModalContent>
+              <ModalAction onClick={handleAddItem} disabled={processing}>
+                Add item
+              </ModalAction>
+            </Modal>
             <Button
               size="sm"
               variant="outline"
               onClick={handlePostBackstock}
               disabled={isPosting || !settings.post_channel_id}
+              className="gap-2"
             >
-              <Send size={16} className="mr-2" />
+              <Send size={16} />
               Post backstock
             </Button>
           </div>
@@ -500,38 +502,40 @@ export default function BackstockIndex({
                         <div className="max-w-24 font-mono text-xs">
                           {item.cost ? item.cost : <span className="text-error">No cost</span>}
                         </div>
-                        <BackstockItemSnapshotModal entry={entry} item={item} />
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          modifier="square"
-                          aria-label="Refresh listing"
-                          onClick={handleSnapshotRefresh}
-                        >
-                          <RotateCcw size={14} />
-                        </Button>
-                        {item.url ? (
+                        <div className="flex items-center gap-1 border-l border-base-200 pl-2">
+                          <BackstockItemSnapshotModal entry={entry} item={item} />
                           <Button
-                            as="a"
-                            href={item.url}
-                            target="_blank"
                             size="xs"
                             variant="ghost"
                             modifier="square"
-                            aria-label="Open item"
+                            aria-label="Refresh listing"
+                            onClick={handleSnapshotRefresh}
                           >
-                            <ExternalLink size={14} />
+                            <RotateCcw size={14} />
                           </Button>
-                        ) : null}
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          modifier="square"
-                          aria-label="Remove from backstock"
-                          onClick={() => handleRemove(entry.id)}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
+                          {item.url ? (
+                            <Button
+                              as="a"
+                              href={item.url}
+                              target="_blank"
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              aria-label="Open item"
+                            >
+                              <ExternalLink size={14} />
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            modifier="square"
+                            aria-label="Remove from backstock"
+                            onClick={() => handleRemove(entry.id)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
                       </ListRow>
                     )
                   })}

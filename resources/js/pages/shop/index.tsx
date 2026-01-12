@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { ActionMenu } from '@/components/ui/action-menu'
 import { List } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
@@ -11,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopSettings } from '@/types'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Send, Settings } from 'lucide-react'
+import { Plus, RotateCcw, Send, Settings } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
@@ -285,7 +284,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       ? 'Thread'
       : 'Channel'
     : null
-  const destinationText = destinationKind ? `${destinationKind}: ${destinationLabel}` : 'Destination not set'
+  const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
   const canUpdatePost = Boolean(settings.last_post_channel_id)
 
@@ -425,8 +424,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 variant="outline"
                 onClick={handlePostShop}
                 disabled={!selectedShop || isPosting || !settings.post_channel_id}
+                className="gap-2"
               >
-                <Send size={16} className="mr-2" />
+                <Send size={16} />
                 Post shop
               </Button>
               <Button
@@ -434,17 +434,15 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 variant="outline"
                 onClick={handleUpdatePost}
                 disabled={!selectedShop || isUpdatingPost || !canUpdatePost}
+                className="gap-2"
               >
-                Update shop
+                <RotateCcw size={16} />
+                Update post
               </Button>
-              <ActionMenu
-                items={[
-                  {
-                    label: 'Roll a new shop',
-                    onSelect: handleCreateShop,
-                  },
-                ]}
-              />
+              <Button size="sm" variant="outline" onClick={handleCreateShop} className="gap-2">
+                <Plus size={16} />
+                Roll new shop
+              </Button>
             </div>
           </div>
         ) : null}
