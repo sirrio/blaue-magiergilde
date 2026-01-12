@@ -9,8 +9,8 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { BackstockItem, BackstockSettings, DiscordBackupChannel, Item } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { ExternalLink, FlaskRound, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
-import React, { useCallback, useMemo, useState, JSX } from 'react'
+import { Edit, ExternalLink, FlaskRound, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useState, JSX } from 'react'
 
 const rarityLabels: Record<string, string> = {
   common: 'Common',
@@ -47,11 +47,11 @@ const getBackstockItemSnapshot = (entry: BackstockItem): Item => {
   const item = entry.item ?? ({} as Item)
   return {
     id: item.id ?? 0,
-    name: item.name ?? entry.item_name ?? 'Unknown item',
-    url: item.url ?? entry.item_url ?? '',
-    cost: item.cost ?? entry.item_cost ?? '',
-    rarity: (item.rarity ?? entry.item_rarity ?? 'common') as Item['rarity'],
-    type: (item.type ?? entry.item_type ?? 'item') as Item['type'],
+    name: entry.item_name ?? item.name ?? 'Unknown item',
+    url: entry.item_url ?? item.url ?? '',
+    cost: entry.item_cost ?? item.cost ?? '',
+    rarity: (entry.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
+    type: (entry.item_type ?? item.type ?? 'item') as Item['type'],
     pick_count: item.pick_count ?? 0,
   }
 }
@@ -83,7 +83,11 @@ const buildGroups = (items: BackstockItem[]): BackstockGroup[] => {
     typeOrder.forEach((type) => {
       const entries = byType.get(type)
       if (!entries) return
-      entries.sort((a, b) => String(a.item?.name ?? '').localeCompare(String(b.item?.name ?? '')))
+      entries.sort((a, b) => {
+        const nameA = getBackstockItemSnapshot(a).name
+        const nameB = getBackstockItemSnapshot(b).name
+        return String(nameA).localeCompare(String(nameB))
+      })
     })
 
     const orderedItems = typeOrder.flatMap((type) => byType.get(type) ?? [])
@@ -92,6 +96,86 @@ const buildGroups = (items: BackstockItem[]): BackstockGroup[] => {
   })
 
   return groups
+}
+
+const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; item: Item }) => {
+  const { data, setData, patch, processing } = useForm({
+    name: item.name ?? '',
+    url: item.url ?? '',
+    cost: item.cost ?? '',
+    rarity: item.rarity ?? 'common',
+    type: item.type ?? 'item',
+  })
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setData({
+      name: item.name ?? '',
+      url: item.url ?? '',
+      cost: item.cost ?? '',
+      rarity: item.rarity ?? 'common',
+      type: item.type ?? 'item',
+    })
+  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData])
+
+  const handleSubmit = () => {
+    patch(route('admin.backstock-items.snapshot.update', { backstockItem: entry.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        router.reload({ preserveScroll: true, preserveState: true })
+      },
+      onError: (errors) => {
+        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
+          <Edit size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Edit listing</ModalTitle>
+      <ModalContent>
+        <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+          Name
+        </Input>
+        <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
+          URL
+        </Input>
+        <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
+          Cost
+        </Input>
+        <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+          <SelectLabel>Rarity</SelectLabel>
+          <SelectOptions>
+            <option value="common">Common</option>
+            <option value="uncommon">Uncommon</option>
+            <option value="rare">Rare</option>
+            <option value="very_rare">Very Rare</option>
+          </SelectOptions>
+        </Select>
+        <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+          <SelectLabel>Type</SelectLabel>
+          <SelectOptions>
+            <option value="item">Item</option>
+            <option value="spellscroll">Spell Scroll</option>
+            <option value="consumable">Consumable</option>
+          </SelectOptions>
+        </Select>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
+      </ModalAction>
+    </Modal>
+  )
 }
 
 export default function BackstockIndex({
@@ -382,15 +466,50 @@ export default function BackstockIndex({
                     const notes = entry.notes?.trim()
                     const itemName = notes ? `${item.name} - ${notes}` : item.name
                     const textColor = getRarityTextColor(item.rarity)
+                    const isCustomListing = Boolean(entry.snapshot_custom)
+
+                    const handleSnapshotRefresh = () => {
+                      if (!window.confirm('Refresh this listing from the compendium?')) return
+
+                      router.post(route('admin.backstock-items.snapshot.refresh', { backstockItem: entry.id }), {}, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                          toast.show('Listing refreshed.', 'info')
+                          router.reload({ preserveScroll: true, preserveState: true })
+                        },
+                        onError: (errors) => {
+                          const message = errors.snapshot || 'Listing could not be refreshed.'
+                          toast.show(String(message), 'error')
+                        },
+                      })
+                    }
+
                     return (
                       <ListRow key={entry.id}>
                         <div className={cn(textColor)}>{renderIcon(item.type)}</div>
                         <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
-                          <span>{itemName}</span>
+                          <span>
+                            {itemName}
+                            {isCustomListing ? (
+                              <span className="ml-2 rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
+                                Custom listing
+                              </span>
+                            ) : null}
+                          </span>
                         </div>
                         <div className="max-w-24 font-mono text-xs">
                           {item.cost ? item.cost : <span className="text-error">No cost</span>}
                         </div>
+                        <BackstockItemSnapshotModal entry={entry} item={item} />
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          modifier="square"
+                          aria-label="Refresh listing"
+                          onClick={handleSnapshotRefresh}
+                        >
+                          <RotateCcw size={14} />
+                        </Button>
                         {item.url ? (
                           <Button
                             as="a"

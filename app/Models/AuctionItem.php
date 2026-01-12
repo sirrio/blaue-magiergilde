@@ -19,10 +19,15 @@ class AuctionItem extends Model
         'item_cost',
         'item_rarity',
         'item_type',
+        'snapshot_custom',
         'notes',
         'repair_current',
         'repair_max',
         'remaining_auctions',
+    ];
+
+    protected $casts = [
+        'snapshot_custom' => 'boolean',
     ];
 
     public function auction(): BelongsTo

@@ -82,6 +82,7 @@ class AuctionItemController extends Controller
                 'item_cost' => $item?->cost,
                 'item_rarity' => $item?->rarity,
                 'item_type' => $item?->type,
+                'snapshot_custom' => false,
                 'notes' => $notes,
                 'remaining_auctions' => $request->remaining_auctions,
                 'repair_current' => $repairCurrent,

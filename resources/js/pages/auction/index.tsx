@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { EyeOff, FlaskRound, History, Mic, Plus, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
+import { Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -67,11 +67,11 @@ const getAuctionItemSnapshot = (auctionItem: AuctionItem): Item => {
   const item = auctionItem.item ?? ({} as Item)
   return {
     id: item.id ?? 0,
-    name: item.name ?? auctionItem.item_name ?? 'Unknown item',
-    url: item.url ?? auctionItem.item_url ?? '',
-    cost: item.cost ?? auctionItem.item_cost ?? '',
-    rarity: (item.rarity ?? auctionItem.item_rarity ?? 'common') as Item['rarity'],
-    type: (item.type ?? auctionItem.item_type ?? 'item') as Item['type'],
+    name: auctionItem.item_name ?? item.name ?? 'Unknown item',
+    url: auctionItem.item_url ?? item.url ?? '',
+    cost: auctionItem.item_cost ?? item.cost ?? '',
+    rarity: (auctionItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
+    type: (auctionItem.item_type ?? item.type ?? 'item') as Item['type'],
     pick_count: item.pick_count ?? 0,
   }
 }
@@ -551,6 +551,86 @@ const HiddenBidModal = ({
   )
 }
 
+const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionItem; item: Item }) => {
+  const { data, setData, patch, processing } = useForm({
+    name: item.name ?? '',
+    url: item.url ?? '',
+    cost: item.cost ?? '',
+    rarity: item.rarity ?? 'common',
+    type: item.type ?? 'item',
+  })
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setData({
+      name: item.name ?? '',
+      url: item.url ?? '',
+      cost: item.cost ?? '',
+      rarity: item.rarity ?? 'common',
+      type: item.type ?? 'item',
+    })
+  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData])
+
+  const handleSubmit = () => {
+    patch(route('admin.auction-items.snapshot.update', { auctionItem: auctionItem.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        router.reload({ preserveScroll: true, preserveState: true })
+      },
+      onError: (errors) => {
+        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
+          <Edit size={16} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Edit listing</ModalTitle>
+      <ModalContent>
+        <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+          Name
+        </Input>
+        <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
+          URL
+        </Input>
+        <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
+          Cost
+        </Input>
+        <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+          <SelectLabel>Rarity</SelectLabel>
+          <SelectOptions>
+            <option value="common">Common</option>
+            <option value="uncommon">Uncommon</option>
+            <option value="rare">Rare</option>
+            <option value="very_rare">Very Rare</option>
+          </SelectOptions>
+        </Select>
+        <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+          <SelectLabel>Type</SelectLabel>
+          <SelectOptions>
+            <option value="item">Item</option>
+            <option value="spellscroll">Spell Scroll</option>
+            <option value="consumable">Consumable</option>
+          </SelectOptions>
+        </Select>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
+      </ModalAction>
+    </Modal>
+  )
+}
+
 const AuctionItemRow = ({
   auctionItem,
   currency,
@@ -563,6 +643,7 @@ const AuctionItemRow = ({
   const item = getAuctionItemSnapshot(auctionItem)
   const textColor = getRarityTextColor(item.rarity)
   const highestBid = getHighestBid(auctionItem)
+  const isCustomListing = Boolean(auctionItem.snapshot_custom)
   const bidCandidates = useMemo(() => {
     const merged = new Map<string, AuctionVoiceCandidate>()
 
@@ -586,6 +667,22 @@ const AuctionItemRow = ({
     : null
   const highestBidderName = highestBid?.bidder_name ?? ''
 
+  const handleSnapshotRefresh = () => {
+    if (!window.confirm('Refresh this listing from the compendium?')) return
+
+    router.post(route('admin.auction-items.snapshot.refresh', { auctionItem: auctionItem.id }), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Listing refreshed.', 'info')
+        router.reload({ preserveScroll: true, preserveState: true })
+      },
+      onError: (errors) => {
+        const message = errors.snapshot || 'Listing could not be refreshed.'
+        toast.show(String(message), 'error')
+      },
+    })
+  }
+
   return (
     <ListRow className="grid-cols-1">
       <div className="col-span-full flex w-full flex-col gap-2">
@@ -598,12 +695,21 @@ const AuctionItemRow = ({
               <span className={cn(textColor, 'text-sm font-semibold leading-none')}>
                 {getAuctionItemLabel(item.name, auctionItem)}
               </span>
+              {isCustomListing ? (
+                <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
+                  Custom listing
+                </span>
+              ) : null}
               <span className="text-xs font-normal leading-none text-base-content/70">
                 Auctions left: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
               </span>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
+            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
+              <RotateCcw size={16} />
+            </Button>
             <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} />
             <BidHistoryModal auctionItem={auctionItem} currency={currency} />
           </div>

@@ -119,6 +119,7 @@ class ShopRollService
                     'item_cost' => $pickedItem['cost'] ?? null,
                     'item_rarity' => $pickedItem['rarity'] ?? null,
                     'item_type' => $pickedItem['type'] ?? null,
+                    'snapshot_custom' => false,
                     'spell_id' => $spellId,
                     'spell_name' => $spellSnapshot?->name,
                     'spell_url' => $spellSnapshot?->url,

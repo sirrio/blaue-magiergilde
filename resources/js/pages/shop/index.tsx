@@ -55,11 +55,11 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     const item = shopItem.item ?? ({} as Item)
     return {
       id: item.id ?? 0,
-      name: item.name ?? shopItem.item_name ?? 'Unknown item',
-      url: item.url ?? shopItem.item_url ?? '',
-      cost: item.cost ?? shopItem.item_cost ?? '',
-      rarity: (item.rarity ?? shopItem.item_rarity ?? 'common') as Item['rarity'],
-      type: (item.type ?? shopItem.item_type ?? 'item') as Item['type'],
+      name: shopItem.item_name ?? item.name ?? 'Unknown item',
+      url: shopItem.item_url ?? item.url ?? '',
+      cost: shopItem.item_cost ?? item.cost ?? '',
+      rarity: (shopItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
+      type: (shopItem.item_type ?? item.type ?? 'item') as Item['type'],
       pick_count: item.pick_count ?? 0,
     }
   }

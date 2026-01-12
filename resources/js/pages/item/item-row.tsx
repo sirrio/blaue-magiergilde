@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, FlaskRound, ScrollText, Scale, Shield, StickyNote, Store, Sword, XCircle } from 'lucide-react'
+import { Copy, Edit, ExternalLink, FlaskRound, RotateCcw, ScrollText, Scale, Shield, StickyNote, Store, Sword, XCircle } from 'lucide-react'
 import React, { useEffect, useState, JSX } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -34,20 +34,21 @@ const renderIcon = (type: string): JSX.Element | null => {
 
 const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
   if (!shopItem) return null
-  if (shopItem.spell) return shopItem.spell
-  if (!shopItem.spell_name) return null
-
-  return {
-    id: 0,
-    name: shopItem.spell_name ?? 'Unknown spell',
-    url: shopItem.spell_url ?? '',
-    legacy_url: shopItem.spell_legacy_url ?? '',
-    spell_level: shopItem.spell_level ?? 0,
-    spell_school: (shopItem.spell_school ?? 'abjuration') as Spell['spell_school'],
-    guild_enabled: shopItem.spell ? shopItem.spell.guild_enabled : undefined,
-    ruling_changed: shopItem.spell ? shopItem.spell.ruling_changed : undefined,
-    ruling_note: shopItem.spell ? shopItem.spell.ruling_note : undefined,
+  if (shopItem.spell_name) {
+    return {
+      id: 0,
+      name: shopItem.spell_name ?? 'Unknown spell',
+      url: shopItem.spell_url ?? '',
+      legacy_url: shopItem.spell_legacy_url ?? '',
+      spell_level: shopItem.spell_level ?? 0,
+      spell_school: (shopItem.spell_school ?? 'abjuration') as Spell['spell_school'],
+      guild_enabled: shopItem.spell ? shopItem.spell.guild_enabled : undefined,
+      ruling_changed: shopItem.spell ? shopItem.spell.ruling_changed : undefined,
+      ruling_note: shopItem.spell ? shopItem.spell.ruling_note : undefined,
+    }
   }
+  if (shopItem.spell) return shopItem.spell
+  return null
 }
 
 const copyToClipboard = (text: string) => {
@@ -266,6 +267,86 @@ const ShopItemNoteModal = ({ shopItem }: { shopItem: ShopItem }) => {
   )
 }
 
+const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: Item }) => {
+  const { data, setData, patch, processing } = useForm({
+    name: item.name ?? '',
+    url: item.url ?? '',
+    cost: item.cost ?? '',
+    rarity: item.rarity ?? 'common',
+    type: item.type ?? 'item',
+  })
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setData({
+      name: item.name ?? '',
+      url: item.url ?? '',
+      cost: item.cost ?? '',
+      rarity: item.rarity ?? 'common',
+      type: item.type ?? 'item',
+    })
+  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData])
+
+  const handleSubmit = () => {
+    patch(route('admin.shop-items.snapshot.update', { shopItem: shopItem.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        router.reload({ preserveScroll: true, preserveState: true })
+      },
+      onError: (errors) => {
+        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
+          <Edit size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Edit listing</ModalTitle>
+      <ModalContent>
+        <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+          Name
+        </Input>
+        <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
+          URL
+        </Input>
+        <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
+          Cost
+        </Input>
+        <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+          <SelectLabel>Rarity</SelectLabel>
+          <SelectOptions>
+            <option value="common">Common</option>
+            <option value="uncommon">Uncommon</option>
+            <option value="rare">Rare</option>
+            <option value="very_rare">Very Rare</option>
+          </SelectOptions>
+        </Select>
+        <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+          <SelectLabel>Type</SelectLabel>
+          <SelectOptions>
+            <option value="item">Item</option>
+            <option value="spellscroll">Spell Scroll</option>
+            <option value="consumable">Consumable</option>
+          </SelectOptions>
+        </Select>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
+      </ModalAction>
+    </Modal>
+  )
+}
+
 export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: ShopItem }) {
   const formData = {
     id: item.id,
@@ -353,6 +434,24 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
   const spellUrl = spell?.url || shopItem?.spell_url || ''
   const spellLegacyUrl = spell?.legacy_url || shopItem?.spell_legacy_url || ''
   const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
+  const isCustomListing = Boolean(shopItem?.snapshot_custom)
+
+  const handleSnapshotRefresh = () => {
+    if (!shopItem) return
+    if (!window.confirm('Refresh this listing from the compendium?')) return
+
+    router.post(route('admin.shop-items.snapshot.refresh', { shopItem: shopItem.id }), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Listing refreshed.', 'info')
+        router.reload({ preserveScroll: true, preserveState: true })
+      },
+      onError: (errors) => {
+        const message = errors.snapshot || 'Listing could not be refreshed.'
+        toast.show(String(message), 'error')
+      },
+    })
+  }
 
   return (
     <ListRow>
@@ -361,6 +460,11 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
         <span>
           {displayName}{' '}
           <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+          {shopItem && isCustomListing ? (
+            <span className="ml-2 rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
+              Custom listing
+            </span>
+          ) : null}
         </span>
         {autoRollSummary ? (
           <span className="text-[11px] text-base-content/60">{autoRollSummary}</span>
@@ -400,148 +504,157 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
           <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
         </div>
       ) : null}
-      <Modal>
-        <ModalTrigger>
-          <Button size="xs" variant="ghost" modifier="square">
-            <Edit size={14} />
+      {shopItem ? (
+        <>
+          <ShopItemSnapshotModal shopItem={shopItem} item={item} />
+          <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
+            <RotateCcw size={14} />
           </Button>
-        </ModalTrigger>
-        <ModalTitle>
-          <div className="flex items-center">
-            Update item
-            <div className="tooltip tooltip-right w-16" data-tip="Search on D&D Beyond">
-              <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center">
-                <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
-              </a>
-            </div>
-          </div>
-        </ModalTitle>
-        <ModalContent>
-          <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-            Name
-          </Input>
-          <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
-            URL
-          </Input>
-          <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-            Cost
-          </Input>
-          <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-            <SelectLabel>Rarity</SelectLabel>
-            <SelectOptions>
-              <option value="common">Common</option>
-              <option value="uncommon">Uncommon</option>
-              <option value="rare">Rare</option>
-              <option value="very_rare">Very Rare</option>
-            </SelectOptions>
-          </Select>
-          <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-            <SelectLabel>Type</SelectLabel>
-            <SelectOptions>
-              <option value="item">Item</option>
-              <option value="spellscroll">Spell Scroll</option>
-              <option value="consumable">Consumable</option>
-            </SelectOptions>
-          </Select>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-xs"
-              checked={Boolean(data.shop_enabled)}
-              onChange={(e) => setData('shop_enabled', e.target.checked)}
-            />
-            <span>Include in shop rolls</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-xs"
-              checked={Boolean(data.guild_enabled)}
-              onChange={(e) => setData('guild_enabled', e.target.checked)}
-            />
-            <span>Allowed in guild</span>
-          </label>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-xs"
-                checked={Boolean(data.ruling_changed)}
-                onChange={(e) => handleRulingToggle(e.target.checked)}
-              />
-              <span>Ruling changed</span>
-            </label>
-            {data.ruling_changed ? (
-              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
-                Ruling note
-              </TextArea>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-xs"
-                checked={Boolean(data.default_spell_roll_enabled)}
-                onChange={(e) => handleAutoRollToggle(e.target.checked)}
-              />
-              <span>Auto-roll spell on shop</span>
-            </label>
-            {data.default_spell_roll_enabled ? (
-              <div className="space-y-3">
-                <div>
-                  <p className="label">Default spell levels</p>
-                  <div className="grid grid-cols-5 gap-1">
-                    {spellLevels.map((level) => {
-                      const id = `default-level-${item.id}-${level}`
-                      return (
-                        <div key={level} className="flex items-center gap-1">
-                          <input
-                            type="checkbox"
-                            id={id}
-                            className="checkbox checkbox-xs"
-                            checked={data.default_spell_levels.includes(level)}
-                            onChange={() => toggleDefaultSpellLevel(level)}
-                          />
-                          <label htmlFor={id} className="label cursor-pointer">
-                            {level === 0 ? 'Cantrip' : level}
-                          </label>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <p className="label">Default spell schools</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {spellSchools.map((school) => {
-                      const id = `default-school-${item.id}-${school}`
-                      return (
-                        <div key={school} className="flex items-center gap-1">
-                          <input
-                            type="checkbox"
-                            id={id}
-                            className="checkbox checkbox-xs"
-                            checked={data.default_spell_schools.includes(school)}
-                            onChange={() => toggleDefaultSpellSchool(school)}
-                          />
-                          <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
-                            <svg className="icon h-4 w-4 fill-current">
-                              <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
-                            </svg>
-                            {school.toUpperCase()}
-                          </label>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+        </>
+      ) : (
+        <Modal>
+          <ModalTrigger>
+            <Button size="xs" variant="ghost" modifier="square">
+              <Edit size={14} />
+            </Button>
+          </ModalTrigger>
+          <ModalTitle>
+            <div className="flex items-center">
+              Update item
+              <div className="tooltip tooltip-right w-16" data-tip="Search on D&D Beyond">
+                <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center">
+                  <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
+                </a>
               </div>
-            ) : null}
-          </div>
-        </ModalContent>
-        <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
-      </Modal>
+            </div>
+          </ModalTitle>
+          <ModalContent>
+            <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+              Name
+            </Input>
+            <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
+              URL
+            </Input>
+            <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
+              Cost
+            </Input>
+            <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+              <SelectLabel>Rarity</SelectLabel>
+              <SelectOptions>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="very_rare">Very Rare</option>
+              </SelectOptions>
+            </Select>
+            <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+              <SelectLabel>Type</SelectLabel>
+              <SelectOptions>
+                <option value="item">Item</option>
+                <option value="spellscroll">Spell Scroll</option>
+                <option value="consumable">Consumable</option>
+              </SelectOptions>
+            </Select>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.shop_enabled)}
+                onChange={(e) => setData('shop_enabled', e.target.checked)}
+              />
+              <span>Include in shop rolls</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.guild_enabled)}
+                onChange={(e) => setData('guild_enabled', e.target.checked)}
+              />
+              <span>Allowed in guild</span>
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  checked={Boolean(data.ruling_changed)}
+                  onChange={(e) => handleRulingToggle(e.target.checked)}
+                />
+                <span>Ruling changed</span>
+              </label>
+              {data.ruling_changed ? (
+                <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+                  Ruling note
+                </TextArea>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  checked={Boolean(data.default_spell_roll_enabled)}
+                  onChange={(e) => handleAutoRollToggle(e.target.checked)}
+                />
+                <span>Auto-roll spell on shop</span>
+              </label>
+              {data.default_spell_roll_enabled ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="label">Default spell levels</p>
+                    <div className="grid grid-cols-5 gap-1">
+                      {spellLevels.map((level) => {
+                        const id = `default-level-${item.id}-${level}`
+                        return (
+                          <div key={level} className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              id={id}
+                              className="checkbox checkbox-xs"
+                              checked={data.default_spell_levels.includes(level)}
+                              onChange={() => toggleDefaultSpellLevel(level)}
+                            />
+                            <label htmlFor={id} className="label cursor-pointer">
+                              {level === 0 ? 'Cantrip' : level}
+                            </label>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="label">Default spell schools</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      {spellSchools.map((school) => {
+                        const id = `default-school-${item.id}-${school}`
+                        return (
+                          <div key={school} className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              id={id}
+                              className="checkbox checkbox-xs"
+                              checked={data.default_spell_schools.includes(school)}
+                              onChange={() => toggleDefaultSpellSchool(school)}
+                            />
+                            <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
+                              <svg className="icon h-4 w-4 fill-current">
+                                <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
+                              </svg>
+                              {school.toUpperCase()}
+                            </label>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </ModalContent>
+          <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
+        </Modal>
+      )}
       <Button
         size="xs"
         variant="ghost"

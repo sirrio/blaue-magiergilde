@@ -7,6 +7,8 @@ use App\Http\Controllers\Auction\AuctionItemController;
 use App\Http\Controllers\Auction\AuctionPostController;
 use App\Http\Controllers\Auction\AuctionSettingController;
 use App\Http\Controllers\Auction\AuctionVoiceSyncController;
+use App\Http\Controllers\Auction\RefreshAuctionItemSnapshotController;
+use App\Http\Controllers\Auction\UpdateAuctionItemSnapshotController;
 use Illuminate\Support\Facades\Route;
 
 Route::pattern('auction', '[0-9]+');
@@ -38,6 +40,12 @@ Route::middleware(['auth'])
 
         Route::post('auction-items/{auctionItem}/hidden-bids', [AuctionHiddenBidController::class, 'store'])
             ->name('auction-items.hidden-bids.store');
+
+        Route::patch('auction-items/{auctionItem}/snapshot', UpdateAuctionItemSnapshotController::class)
+            ->name('auction-items.snapshot.update');
+
+        Route::post('auction-items/{auctionItem}/snapshot/refresh', RefreshAuctionItemSnapshotController::class)
+            ->name('auction-items.snapshot.refresh');
 
         Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
             ->name('auction-bids.destroy');

@@ -37,12 +37,13 @@ export interface User {
 
 export interface ShopItem {
   id: number
-  item: Item
+  item?: Item | null
   item_name?: string | null
   item_url?: string | null
   item_cost?: string | null
   item_rarity?: Item['rarity'] | string | null
   item_type?: Item['type'] | string | null
+  snapshot_custom?: boolean | null
   spell?: Spell | null
   spell_name?: string | null
   spell_url?: string | null
@@ -60,12 +61,13 @@ export interface Shop {
 
 export interface BackstockItem {
   id: number
-  item: Item
+  item?: Item | null
   item_name?: string | null
   item_url?: string | null
   item_cost?: string | null
   item_rarity?: Item['rarity'] | string | null
   item_type?: Item['type'] | string | null
+  snapshot_custom?: boolean | null
   notes?: string | null
   created_at?: string
 }
@@ -88,12 +90,13 @@ export interface AuctionHiddenBid {
 
 export interface AuctionItem {
   id: number
-  item: Item
+  item?: Item | null
   item_name?: string | null
   item_url?: string | null
   item_cost?: string | null
   item_rarity?: Item['rarity'] | string | null
   item_type?: Item['type'] | string | null
+  snapshot_custom?: boolean | null
   notes?: string | null
   repair_current?: number | null
   repair_max?: number | null

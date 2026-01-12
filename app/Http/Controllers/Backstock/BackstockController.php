@@ -26,6 +26,7 @@ class BackstockController extends Controller
                 'item_cost',
                 'item_rarity',
                 'item_type',
+                'snapshot_custom',
                 'notes',
                 'created_at',
             ]);

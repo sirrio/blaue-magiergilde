@@ -15,6 +15,7 @@ class ShopItem extends Model
         'item_cost',
         'item_rarity',
         'item_type',
+        'snapshot_custom',
         'spell_id',
         'spell_name',
         'spell_url',
@@ -22,6 +23,10 @@ class ShopItem extends Model
         'spell_level',
         'spell_school',
         'notes',
+    ];
+
+    protected $casts = [
+        'snapshot_custom' => 'boolean',
     ];
 
     public function item(): BelongsTo

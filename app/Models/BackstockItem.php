@@ -14,7 +14,12 @@ class BackstockItem extends Model
         'item_cost',
         'item_rarity',
         'item_type',
+        'snapshot_custom',
         'notes',
+    ];
+
+    protected $casts = [
+        'snapshot_custom' => 'boolean',
     ];
 
     public function item(): BelongsTo

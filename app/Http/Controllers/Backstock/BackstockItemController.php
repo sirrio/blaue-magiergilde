@@ -26,6 +26,7 @@ class BackstockItemController extends Controller
         $payload['item_cost'] = $item?->cost;
         $payload['item_rarity'] = $item?->rarity;
         $payload['item_type'] = $item?->type;
+        $payload['snapshot_custom'] = false;
 
         BackstockItem::query()->create($payload);
 
