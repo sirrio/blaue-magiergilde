@@ -48,6 +48,13 @@ export interface Shop {
   shop_items: ShopItem[]
 }
 
+export interface BackstockItem {
+  id: number
+  item: Item
+  notes?: string | null
+  created_at?: string
+}
+
 export interface AuctionBid {
   id: number
   bidder_name: string
@@ -92,6 +99,15 @@ export interface ShopSettings {
   auto_post_weekday?: number | null
   auto_post_time?: string | null
   last_auto_posted_at?: string | null
+}
+
+export interface BackstockSettings {
+  post_channel_id?: string | null
+  post_channel_name?: string | null
+  post_channel_type?: string | null
+  post_channel_guild_id?: string | null
+  post_channel_is_thread?: boolean | null
+  last_post_channel_id?: string | null
 }
 
 export interface AuctionSettings {

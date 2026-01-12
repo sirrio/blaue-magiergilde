@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
 import {
+  Archive,
   BookOpen,
   Gavel,
   Map,
@@ -48,6 +49,7 @@ const adminLinks = [
   { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
   { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
   { name: 'Shop', route: 'admin.shops.index', method: 'get' as const, icon: Store },
+  { name: 'Backstock', route: 'admin.backstock.index', method: 'get' as const, icon: Archive },
   { name: 'Auctions', route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
   { name: 'Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
   { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },

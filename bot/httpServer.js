@@ -2,6 +2,7 @@ const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
 const { postAuctionToChannel } = require('./auctionPoster');
 const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
+const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 
@@ -109,10 +110,11 @@ function startHttpServer(client) {
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
+        const isBackstockPost = path === '/backstock-post';
         const isAuctionPost = path === '/auction-post';
         const isAuctionVoiceBid = path === '/auction-voice-bid';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isShopUpdate && !isAuctionPost && !isAuctionVoiceBid)) {
+        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isShopUpdate && !isBackstockPost && !isAuctionPost && !isAuctionVoiceBid)) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
@@ -352,6 +354,40 @@ function startHttpServer(client) {
             } catch (error) {
                 logReject(req, 'shop update failed');
                 respondJson(res, 500, { error: 'Shop update failed.' });
+                return;
+            }
+        }
+
+        if (isBackstockPost) {
+            const channelId = String(payload?.channel_id || '').trim();
+
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            try {
+                const result = await postBackstockToChannel({
+                    client,
+                    channelId,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'backstock post failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Backstock post failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'posted',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch (error) {
+                logReject(req, 'backstock post failed');
+                respondJson(res, 500, { error: 'Backstock post failed.' });
                 return;
             }
         }

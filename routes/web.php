@@ -23,6 +23,7 @@ require __DIR__.'/web/item.php';
 require __DIR__.'/web/spell.php';
 require __DIR__.'/web/shop.php';
 require __DIR__.'/web/auction.php';
+require __DIR__.'/web/backstock.php';
 require __DIR__.'/web/admin.php';
 require __DIR__.'/web/bot.php';
 require __DIR__.'/web/character-approvals.php';

@@ -7,6 +7,7 @@ use App\Http\Requests\Auction\StoreAuctionRequest;
 use App\Http\Requests\Auction\UpdateAuctionRequest;
 use App\Models\Auction;
 use App\Models\AuctionSetting;
+use App\Models\BackstockItem;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +123,10 @@ class AuctionController extends Controller
                 $nextRemaining = $remaining - 1;
 
                 if ($nextRemaining <= 0) {
+                    BackstockItem::query()->create([
+                        'item_id' => $auctionItem->item_id,
+                        'notes' => $auctionItem->notes,
+                    ]);
                     continue;
                 }
 
