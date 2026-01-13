@@ -646,6 +646,11 @@ export default function Rooms({
     return normalized
   }, [])
 
+  const snapRotation = useCallback(
+    (value: number, step: number) => normalizeRotation(Math.round(value / step) * step),
+    [normalizeRotation],
+  )
+
   const findRoomAt = useCallback(
     (gridX: number, gridY: number) =>
       roomList.find(
@@ -1151,7 +1156,8 @@ export default function Rooms({
     if (!data) return
     const currentAngle = Math.atan2(world.y - data.center.y, world.x - data.center.x)
     const delta = ((currentAngle - data.startAngle) * 180) / Math.PI
-    const nextRotation = normalizeRotation(data.startRotation + delta)
+    const rawRotation = normalizeRotation(data.startRotation + delta)
+    const nextRotation = event.shiftKey ? snapRotation(rawRotation, 15) : rawRotation
     updateAssetOverride(asset.id, { rotation: Number(nextRotation.toFixed(2)) })
   }
 
