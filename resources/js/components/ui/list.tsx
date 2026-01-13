@@ -1,9 +1,11 @@
 import React, { PropsWithChildren } from 'react'
 import { cn } from '@/lib/utils'
 
-export const List = ({ children }: PropsWithChildren) => {
+type ListProps = PropsWithChildren<{ className?: string }>
+
+export const List = ({ children, className }: ListProps) => {
   return (
-    <ul className="list w-full rounded-box bg-base-100 shadow-md">
+    <ul className={cn('list w-full rounded-box bg-base-100 shadow-md', className)}>
       {children}
     </ul>
   )
