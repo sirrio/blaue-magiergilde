@@ -10,3 +10,7 @@ Route::get('admin/character-approvals', [CharacterApprovalController::class, 'in
 Route::patch('admin/character-approvals/characters/{character}', [CharacterApprovalController::class, 'update'])
     ->middleware(['auth'])
     ->name('admin.character-approvals.update');
+
+Route::delete('admin/character-approvals/users/{user}', [CharacterApprovalController::class, 'destroyUser'])
+    ->middleware(['auth'])
+    ->name('admin.character-approvals.users.destroy');

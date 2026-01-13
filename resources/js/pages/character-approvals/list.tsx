@@ -9,7 +9,7 @@ import { calculateTier } from '@/helper/calculateTier'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, StickyNote, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 interface FilterOption {
@@ -92,6 +92,59 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
         Save
+      </ModalAction>
+    </Modal>
+  )
+}
+
+const DeleteUserModal = ({
+  userId,
+  userLabel,
+}: {
+  userId: number
+  userLabel: string
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const { data, setData, processing, delete: destroy, reset } = useForm({ confirm: '' })
+  const canDelete = data.confirm.trim().toUpperCase() === 'DELETE'
+
+  const handleClose = () => {
+    setIsOpen(false)
+    reset()
+  }
+
+  const handleDelete = () => {
+    if (!canDelete) return
+    destroy(route('admin.character-approvals.users.destroy', { user: userId }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        handleClose()
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
+          <UserX size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Delete account</ModalTitle>
+      <ModalContent>
+        <p className="text-sm text-base-content/70">
+          This will soft delete {userLabel} and all linked characters. Type DELETE to confirm.
+        </p>
+        <Input
+          value={data.confirm}
+          onChange={(event) => setData('confirm', event.target.value)}
+          placeholder="Type DELETE to confirm"
+        >
+          Confirm
+        </Input>
+      </ModalContent>
+      <ModalAction onClick={handleDelete} disabled={!canDelete || processing} variant="error">
+        Delete account
       </ModalAction>
     </Modal>
   )
@@ -311,6 +364,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                     ) : (
                       <span>No Discord</span>
                     )}
+                    <DeleteUserModal userId={Number(group.key)} userLabel={group.label} />
                   </span>
                 </div>
                 <List>

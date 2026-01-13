@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Character;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -123,6 +125,39 @@ class CharacterApprovalController extends Controller
         }
 
         $character->save();
+
+        return redirect()->back();
+    }
+
+    public function destroyUser(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor && $actor->is_admin, 403);
+
+        $request->validate([
+            'confirm' => ['required', 'string', 'in:DELETE'],
+        ]);
+
+        DB::transaction(function () use ($user, $actor) {
+            $characters = Character::query()->where('user_id', $user->id);
+            $characterCount = (clone $characters)->count();
+
+            $characters->update(['guild_status' => 'declined']);
+            $characters->delete();
+
+            $user->delete();
+
+            AdminAuditLog::query()->create([
+                'actor_user_id' => $actor->id,
+                'action' => 'user.soft_deleted',
+                'subject_type' => User::class,
+                'subject_id' => $user->id,
+                'metadata' => [
+                    'user_name' => $user->name,
+                    'character_count' => $characterCount,
+                ],
+            ]);
+        });
 
         return redirect()->back();
     }

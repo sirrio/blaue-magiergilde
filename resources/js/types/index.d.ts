@@ -315,6 +315,7 @@ export interface RoomAsset {
   scale_x?: number | null
   scale_y?: number | null
   rotation: number
+  locked?: boolean
   z_index?: number | null
 }
 

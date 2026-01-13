@@ -17,6 +17,7 @@ type ModalActionProps = {
   children: ReactNode;
   variant?: '' | 'success' | 'error';
   onClick?: () => void;
+  disabled?: boolean;
 };
 
 export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false }: ModalProps) => {
@@ -111,7 +112,7 @@ export const ModalContent = ({ children }: ModalContentProps) => <>{children}</>
 
 export const ModalTitle = ({ children }: ModalTitleProps) => <>{children}</>;
 
-export const ModalAction = ({ children, variant, onClick }: ModalActionProps) => (
+export const ModalAction = ({ children, variant, onClick, disabled = false }: ModalActionProps) => (
   <button
     type="button"
     className={cn(
@@ -119,6 +120,7 @@ export const ModalAction = ({ children, variant, onClick }: ModalActionProps) =>
       variant === 'success' ? 'btn-success' : '',
       variant === 'error' ? 'btn-error' : ''
     )}
+    disabled={disabled}
     onClick={() => {
       onClick?.();
     }}

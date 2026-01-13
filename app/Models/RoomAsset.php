@@ -24,6 +24,7 @@ class RoomAsset extends Model
         'scale_x',
         'scale_y',
         'rotation',
+        'locked',
         'z_index',
     ];
 
@@ -34,6 +35,7 @@ class RoomAsset extends Model
         'scale_x' => 'float',
         'scale_y' => 'float',
         'rotation' => 'float',
+        'locked' => 'bool',
     ];
 
     public function getFilePathAttribute(?string $value): ?string

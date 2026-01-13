@@ -20,6 +20,7 @@ class UpdateRoomAssetRequest extends FormRequest
             'scale_x' => ['nullable', 'numeric', 'min:0.1', 'max:5'],
             'scale_y' => ['nullable', 'numeric', 'min:0.1', 'max:5'],
             'rotation' => ['required', 'numeric', 'min:-360', 'max:360'],
+            'locked' => ['nullable', 'boolean'],
             'z_index' => ['nullable', 'integer'],
         ];
     }

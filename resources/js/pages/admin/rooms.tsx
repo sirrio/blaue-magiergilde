@@ -8,7 +8,26 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { PageProps, Room, RoomAsset, RoomCharacter, RoomMap } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, ImagePlus, Loader2, MapPin, Maximize2, Minimize2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  ImagePlus,
+  Loader2,
+  Lock,
+  MapPin,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  Unlock,
+} from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInitials } from '@/hooks/use-initials'
 
@@ -115,13 +134,52 @@ const RoomFormModal = ({
   onDelete?: () => void
 }) => {
   const { errors } = usePage<PageProps>().props
+  const [characterSearch, setCharacterSearch] = useState('')
+  const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false)
+  const [activeCharacterIndex, setActiveCharacterIndex] = useState(0)
+  const characterInputRef = useRef<HTMLInputElement | null>(null)
   const { data, setData, processing, reset } = useForm<RoomFormData>(initialValues)
 
   useEffect(() => {
     if (!open) return
     reset()
     setData({ ...initialValues })
+    const selected = characters.find((character) => character.id === initialValues.character_id) ?? null
+    setCharacterSearch(selected ? buildCharacterLabel(selected) : '')
+    setIsCharacterMenuOpen(false)
+    setActiveCharacterIndex(0)
   }, [open, initialValues, reset, setData])
+
+  const selectedCharacter = useMemo(
+    () => characters.find((character) => character.id === data.character_id) ?? null,
+    [characters, data.character_id],
+  )
+
+  const filteredCharacters = useMemo(() => {
+    const query = characterSearch.trim().toLowerCase()
+    if (!query) return characters
+    return characters.filter((character) => buildCharacterLabel(character).toLowerCase().includes(query))
+  }, [characters, characterSearch])
+
+  const characterOptions = useMemo(() => {
+    const base = filteredCharacters.map((character) => ({
+      id: character.id,
+      label: buildCharacterLabel(character),
+    }))
+    return [{ id: null, label: 'Unassigned' }, ...base]
+  }, [filteredCharacters])
+
+  useEffect(() => {
+    if (!isCharacterMenuOpen) return
+    setActiveCharacterIndex(0)
+  }, [characterSearch, isCharacterMenuOpen])
+
+  const applyCharacterSelection = (option: { id: number | null; label: string }) => {
+    setData('character_id', option.id)
+    setCharacterSearch(option.id ? option.label : '')
+    setIsCharacterMenuOpen(false)
+    setActiveCharacterIndex(0)
+  }
 
   const handleSubmit = () => {
     onSubmit(data)
@@ -139,20 +197,74 @@ const RoomFormModal = ({
         >
           Name
         </Input>
-        <Select
-          value={data.character_id ? String(data.character_id) : ''}
-          onChange={(e) => setData('character_id', e.target.value ? Number(e.target.value) : null)}
-        >
-          <SelectLabel>Assigned character</SelectLabel>
-          <SelectOptions>
-            <option value="">Unassigned</option>
-            {characters.map((character) => (
-              <option key={character.id} value={character.id}>
-                {buildCharacterLabel(character)}
-              </option>
-            ))}
-          </SelectOptions>
-        </Select>
+        <div className="relative w-full">
+          <label className="label" htmlFor="room-character-search">
+            Assigned character
+          </label>
+          <input
+            id="room-character-search"
+            ref={characterInputRef}
+            className="input w-full"
+            placeholder={selectedCharacter ? buildCharacterLabel(selectedCharacter) : 'Unassigned'}
+            value={characterSearch}
+            onChange={(event) => {
+              setCharacterSearch(event.target.value)
+              setIsCharacterMenuOpen(true)
+            }}
+            onFocus={() => setIsCharacterMenuOpen(true)}
+            onBlur={() => {
+              window.setTimeout(() => {
+                setIsCharacterMenuOpen(false)
+                if (!characterSearch.trim() && selectedCharacter) {
+                  setCharacterSearch(buildCharacterLabel(selectedCharacter))
+                }
+              }, 100)
+            }}
+            onKeyDown={(event) => {
+              if (!isCharacterMenuOpen) return
+              if (event.key === 'ArrowDown') {
+                event.preventDefault()
+                setActiveCharacterIndex((current) => Math.min(current + 1, characterOptions.length - 1))
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault()
+                setActiveCharacterIndex((current) => Math.max(current - 1, 0))
+              } else if (event.key === 'Enter') {
+                event.preventDefault()
+                const option = characterOptions[activeCharacterIndex]
+                if (option) {
+                  applyCharacterSelection(option)
+                }
+              } else if (event.key === 'Escape') {
+                event.preventDefault()
+                setIsCharacterMenuOpen(false)
+              }
+            }}
+          />
+          {isCharacterMenuOpen ? (
+            <div className="absolute left-0 right-0 z-20 mt-2 max-h-56 overflow-auto rounded-lg border border-base-200 bg-base-100 shadow-lg">
+              {characterOptions.map((option, index) => (
+                <button
+                  key={option.id ?? 'unassigned'}
+                  type="button"
+                  className={cn(
+                    'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                    index === activeCharacterIndex ? 'bg-base-200/70' : 'hover:bg-base-200/50',
+                  )}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => applyCharacterSelection(option)}
+                >
+                  <span className="truncate">{option.label}</span>
+                  {option.id !== null && option.id === data.character_id ? (
+                    <Check size={14} className="text-primary/70" />
+                  ) : null}
+                </button>
+              ))}
+              {characterSearch.trim() && filteredCharacters.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-base-content/50">No matches</div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Input
             errors={errors.grid_x}
@@ -366,6 +478,7 @@ export default function Rooms({
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
   const dragDistanceRef = useRef(0)
   const pointerRoomIdRef = useRef<number | null>(null)
+  const autoSelectRoomRef = useRef(true)
   const assetDragOffsetRef = useRef<{ x: number; y: number } | null>(null)
   const assetScaleRef = useRef<{
     id: number
@@ -582,7 +695,7 @@ export default function Rooms({
   const libraryTotalPages = Math.max(1, Math.ceil(libraryTotal / libraryPerPage))
 
   useEffect(() => {
-    if (canManageRooms || selectedRoomId) return
+    if (canManageRooms || selectedRoomId || !autoSelectRoomRef.current) return
     const assignedRoom = roomList.find((room) => room.character?.user_id === userId) ?? null
     if (assignedRoom) {
       setSelectedRoomId(assignedRoom.id)
@@ -590,8 +703,8 @@ export default function Rooms({
   }, [canManageRooms, roomList, selectedRoomId, userId])
 
   useEffect(() => {
-    setSelectedAssetId(null)
-  }, [selectedRoomId])
+    autoSelectRoomRef.current = true
+  }, [activeMap.id])
 
   const getTransform = useCallback(() => {
     if (!mapImage || canvasSize.width === 0 || canvasSize.height === 0) return null
@@ -832,6 +945,7 @@ export default function Rooms({
       if (roomId) {
         const room = roomList.find((entry) => entry.id === roomId)
         if (room && canEditRoom(room)) {
+          autoSelectRoomRef.current = false
           setSelectedRoomId(room.id)
           setSelectedAssetId(null)
         }
@@ -984,13 +1098,14 @@ export default function Rooms({
     if (!canvas) return
     event.stopPropagation()
     setSelectedAssetId(asset.id)
-    setDraggingAssetId(asset.id)
     setScalingAssetId(null)
     setRotatingAssetId(null)
+    const state = getAssetState(asset)
+    if (state.locked) return
+    setDraggingAssetId(asset.id)
     const rect = canvas.getBoundingClientRect()
     const world = getWorldFromScreen(event.clientX - rect.left, event.clientY - rect.top)
     if (!world) return
-    const state = getAssetState(asset)
     assetDragOffsetRef.current = {
       x: state.pos_x - world.x,
       y: state.pos_y - world.y,
@@ -1012,6 +1127,7 @@ export default function Rooms({
     if (!world) return
     const offset = assetDragOffsetRef.current ?? { x: 0, y: 0 }
     const state = getAssetState(asset)
+    if (state.locked) return
     const nextPos = clampAssetPosition(room, state, {
       x: world.x + offset.x,
       y: world.y + offset.y,
@@ -1050,17 +1166,18 @@ export default function Rooms({
     setSelectedAssetId(asset.id)
     setDraggingAssetId(null)
     setRotatingAssetId(null)
+    const currentState = getAssetState(asset)
+    if (currentState.locked) return
     setScalingAssetId(asset.id)
-    const state = getAssetState(asset)
     assetScaleRef.current = {
       id: asset.id,
       handle,
-      startScaleX: state.scale_x ?? state.scale ?? 1,
-      startScaleY: state.scale_y ?? state.scale ?? 1,
-      center: { x: state.pos_x, y: state.pos_y },
-      naturalWidth: state.width ?? 64,
-      naturalHeight: state.height ?? 64,
-      rotation: state.rotation ?? 0,
+      startScaleX: currentState.scale_x ?? currentState.scale ?? 1,
+      startScaleY: currentState.scale_y ?? currentState.scale ?? 1,
+      center: { x: currentState.pos_x, y: currentState.pos_y },
+      naturalWidth: currentState.width ?? 64,
+      naturalHeight: currentState.height ?? 64,
+      rotation: currentState.rotation ?? 0,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -1072,6 +1189,7 @@ export default function Rooms({
   ) => {
     if (scalingAssetId !== asset.id) return
     if (!canEditAssets(room)) return
+    if (getAssetState(asset).locked) return
     const world = getWorldFromPointer(event)
     if (!world) return
     const data = assetScaleRef.current
@@ -1130,6 +1248,7 @@ export default function Rooms({
     setSelectedAssetId(asset.id)
     setDraggingAssetId(null)
     setScalingAssetId(null)
+    if (getAssetState(asset).locked) return
     setRotatingAssetId(asset.id)
     const world = getWorldFromPointer(event)
     if (!world) return
@@ -1151,6 +1270,7 @@ export default function Rooms({
   ) => {
     if (rotatingAssetId !== asset.id) return
     if (!canEditAssets(room)) return
+    if (getAssetState(asset).locked) return
     const world = getWorldFromPointer(event)
     if (!world) return
     const data = assetRotateRef.current
@@ -1233,6 +1353,7 @@ export default function Rooms({
         scale: overrides.scale ?? asset.scale ?? (scaleX + scaleY) / 2,
         scale_x: scaleX,
         scale_y: scaleY,
+        locked: overrides.locked ?? asset.locked ?? false,
       }
     },
     [assetOverrides],
@@ -1354,7 +1475,16 @@ export default function Rooms({
   const persistAsset = useCallback(
     async (
       assetId: number,
-      payload: { pos_x: number; pos_y: number; scale_x: number; scale_y: number; rotation: number; z_index?: number; scale?: number },
+      payload: {
+        pos_x: number
+        pos_y: number
+        scale_x: number
+        scale_y: number
+        rotation: number
+        z_index?: number
+        scale?: number
+        locked?: boolean
+      },
     ) => {
       const csrfToken = getCsrfToken()
       if (!csrfToken) {
@@ -1386,6 +1516,57 @@ export default function Rooms({
       }
     },
     [getCsrfToken],
+  )
+
+  const handleAssetLockToggle = useCallback(
+    async (asset: RoomAsset) => {
+      const state = getAssetState(asset)
+      const nextLocked = !state.locked
+      if (nextLocked) {
+        setDraggingAssetId(null)
+        setScalingAssetId(null)
+        setRotatingAssetId(null)
+        assetDragOffsetRef.current = null
+        assetScaleRef.current = null
+        assetRotateRef.current = null
+      }
+      updateAssetOverride(asset.id, { locked: nextLocked })
+      await persistAsset(asset.id, {
+        pos_x: state.pos_x,
+        pos_y: state.pos_y,
+        scale_x: state.scale_x ?? state.scale ?? 1,
+        scale_y: state.scale_y ?? state.scale ?? 1,
+        scale: state.scale,
+        rotation: state.rotation,
+        z_index: state.z_index,
+        locked: nextLocked,
+      })
+    },
+    [getAssetState, persistAsset, updateAssetOverride],
+  )
+
+  const handleAssetReset = useCallback(
+    async (asset: RoomAsset) => {
+      const state = getAssetState(asset)
+      if (state.locked) return
+      updateAssetOverride(asset.id, {
+        scale: 1,
+        scale_x: 1,
+        scale_y: 1,
+        rotation: 0,
+      })
+      await persistAsset(asset.id, {
+        pos_x: state.pos_x,
+        pos_y: state.pos_y,
+        scale_x: 1,
+        scale_y: 1,
+        scale: 1,
+        rotation: 0,
+        z_index: state.z_index,
+        locked: state.locked,
+      })
+    },
+    [getAssetState, persistAsset, updateAssetOverride],
   )
 
   const handleAssetUpload = () => {
@@ -1670,13 +1851,19 @@ export default function Rooms({
                   {assetBoxes.map(({ asset, room, left, top, width, height }) => {
                     const editable = canEditAssets(room)
                     const isSelected = selectedAssetId === asset.id
-                    const showHandles = editable && isSelected
+                    const isLocked = asset.locked ?? false
+                    const showHandles = editable && isSelected && !isLocked
+                    const showActions = editable && isSelected
                     return (
                       <div
                         key={`asset-${asset.id}`}
                         className={cn(
                           'absolute flex items-center justify-center',
-                          editable ? 'pointer-events-auto cursor-grab' : 'pointer-events-none opacity-80',
+                          editable
+                            ? isLocked
+                              ? 'pointer-events-auto cursor-not-allowed'
+                              : 'pointer-events-auto cursor-grab'
+                            : 'pointer-events-none opacity-80',
                           draggingAssetId === asset.id && 'cursor-grabbing',
                         )}
                         style={{
@@ -1735,19 +1922,52 @@ export default function Rooms({
                             </>
                           ) : null}
                         </div>
-                        {showHandles ? (
-                          <button
-                            type="button"
-                            className="absolute -left-7 -top-7 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-base-200 bg-base-100/95 text-base-content/70 shadow-sm hover:bg-base-200/70 hover:text-base-content"
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleAssetDelete(asset.id, room)
-                            }}
-                            aria-label="Remove asset"
-                          >
-                            <Trash2 size={12} />
-                          </button>
+                        {showActions ? (
+                          <div className="absolute left-1/2 -top-14 z-30 flex -translate-x-1/2 items-center gap-1">
+                            <button
+                              type="button"
+                              className="flex h-6 w-6 items-center justify-center rounded-full border border-base-200 bg-base-100/95 text-base-content/70 shadow-sm hover:bg-base-200/70 hover:text-base-content"
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleAssetDelete(asset.id, room)
+                              }}
+                              aria-label="Remove asset"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                'flex h-6 w-6 items-center justify-center rounded-full border border-base-200 bg-base-100/95 text-base-content/70 shadow-sm hover:bg-base-200/70 hover:text-base-content',
+                                isLocked && 'text-primary hover:text-primary',
+                              )}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleAssetLockToggle(asset)
+                              }}
+                              aria-label={isLocked ? 'Unlock asset' : 'Lock asset'}
+                            >
+                              {isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                'flex h-6 w-6 items-center justify-center rounded-full border border-base-200 bg-base-100/95 text-base-content/70 shadow-sm hover:bg-base-200/70 hover:text-base-content',
+                                isLocked && 'cursor-not-allowed opacity-50 hover:bg-base-100/95 hover:text-base-content/70',
+                              )}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                if (isLocked) return
+                                handleAssetReset(asset)
+                              }}
+                              aria-label="Reset asset"
+                            >
+                              <RotateCcw size={12} />
+                            </button>
+                          </div>
                         ) : null}
                       </div>
                     )
@@ -1811,7 +2031,7 @@ export default function Rooms({
                     const isAssigned = Boolean(character?.id)
                     const isSelectedRoom = selectedRoomId === room.id
                     const hasRoomSelection = selectedRoomId !== null
-                    if (!showLabel || isSelectedRoom) return null
+                    if (!showLabel || (!canManageRooms && isSelectedRoom)) return null
 
                     return (
                       <div key={`label-${room.id}`} className="absolute" style={{ left, top, width, height }}>

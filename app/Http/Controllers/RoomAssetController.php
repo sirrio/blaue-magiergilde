@@ -124,6 +124,9 @@ class RoomAssetController extends Controller
         $roomAsset->scale_x = $scaleX;
         $roomAsset->scale_y = $scaleY;
         $roomAsset->rotation = $payload['rotation'];
+        if (array_key_exists('locked', $payload)) {
+            $roomAsset->locked = (bool) $payload['locked'];
+        }
         if (array_key_exists('z_index', $payload)) {
             $roomAsset->z_index = $payload['z_index'];
         }
