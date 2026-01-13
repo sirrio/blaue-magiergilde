@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { PageProps, Room, RoomAsset, RoomCharacter, RoomMap } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { Check, ChevronLeft, ChevronRight, ImagePlus, Loader2, MapPin, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, ImagePlus, Loader2, MapPin, Maximize2, Minimize2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInitials } from '@/hooks/use-initials'
 
@@ -346,6 +346,7 @@ export default function Rooms({
   const [libraryLoading, setLibraryLoading] = useState(false)
   const [libraryError, setLibraryError] = useState<string | null>(null)
   const [isLibraryOpen, setIsLibraryOpen] = useState(false)
+  const [isCanvasExpanded, setIsCanvasExpanded] = useState(false)
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
   const [mapModalMode, setMapModalMode] = useState<'create' | 'edit'>('create')
   const [mapModalTarget, setMapModalTarget] = useState<RoomMap | null>(null)
@@ -830,7 +831,7 @@ export default function Rooms({
 
       if (roomId) {
         const room = roomList.find((entry) => entry.id === roomId)
-        if (room) {
+        if (room && canEditRoom(room)) {
           setSelectedRoomId(room.id)
           setSelectedAssetId(null)
         }
@@ -1260,6 +1261,8 @@ export default function Rooms({
   const selectedAsset = selectedAssetEntry ? getAssetState(selectedAssetEntry.asset) : null
   const selectedAssetRoom = selectedAssetEntry?.room ?? null
   const canEditSelectedRoom = canEditAssets(selectedRoom)
+  const showTopPanel = !canManageRooms && isCanvasExpanded
+  const showSidePanel = canManageRooms || !isCanvasExpanded
 
   const assetBoxes = useMemo(() => {
     if (!mapImage) return []
@@ -1532,9 +1535,78 @@ export default function Rooms({
             <MapPin size={14} />
             Grid: {gridColumns} x {gridRows} | Rooms: {roomList.length}
           </div>
-          <div className="mt-4 flex flex-col gap-4 lg:flex-row">
-            <div className="flex flex-col gap-2 flex-1 min-w-0">
-              <div className="relative w-full overflow-hidden rounded-xl border border-base-200 bg-neutral/70 lg:max-w-none">
+          {showTopPanel ? (
+            <div className="mt-4 grid w-full gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-base-200 bg-base-100 px-3 py-2 text-xs">
+                <p className="text-[11px] uppercase text-base-content/50">Your room</p>
+                <div className="mt-2 flex items-center gap-2">
+                  {selectedRoom ? (
+                    <>
+                      {selectedRoom.character?.avatar ? (
+                        <img
+                          src={resolveAvatarSrc(selectedRoom.character?.avatar)}
+                          alt={selectedRoom.character?.name ?? selectedRoom.name}
+                          className="h-6 w-6 rounded-full border border-base-200 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-base-200 bg-base-100 text-[10px] font-semibold text-base-content/70">
+                          {getInitials(selectedRoom.character?.name ?? selectedRoom.name)}
+                        </div>
+                      )}
+                      <span className="truncate text-xs text-base-content/70">
+                        {selectedRoom.character?.name ?? selectedRoom.name}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-base-content/50">No room selected.</span>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-xl border border-base-200 bg-base-100 px-3 py-2 text-xs">
+                <p className="text-[11px] uppercase text-base-content/50">Asset library</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-base-content/60">
+                    {libraryTotal > 0 ? `${libraryTotal} assets` : 'Browse assets'}
+                  </span>
+                  <Button size="xs" variant="outline" onClick={() => setIsLibraryOpen(true)} className="gap-2">
+                    <Search size={14} />
+                    Browse
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-base-200 bg-base-100 px-3 py-2 text-xs">
+                <p className="text-[11px] uppercase text-base-content/50">Room assets</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-base-content/60">
+                    {selectedRoom ? `${selectedRoomAssets.length} assets` : 'No room selected'}
+                  </span>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => setIsUploadOpen(true)}
+                    disabled={!selectedRoom || !canEditSelectedRoom}
+                    className="gap-2"
+                  >
+                    <ImagePlus size={14} />
+                    Upload
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <div
+            className="mt-4 gap-4"
+            style={
+              showSidePanel
+                ? { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 20rem', alignItems: 'start' }
+                : { display: 'flex', flexDirection: 'column' }
+            }
+          >
+            <div
+              className={cn('flex flex-col gap-2 flex-1 min-w-0', !showSidePanel && 'w-full')}
+              style={showSidePanel ? { gridColumn: '1 / 2' } : undefined}
+            >
+              <div className="relative w-full overflow-hidden rounded-xl border border-base-200 bg-neutral/70">
                 <div
                   ref={containerRef}
                   className="relative w-full aspect-square"
@@ -1562,11 +1634,11 @@ export default function Rooms({
                 <div className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-full border border-base-200 bg-base-100/90 px-2 py-1 text-xs shadow-sm">
                   <Button
                     size="xs"
-                    variant={showOverlays ? 'soft' : 'ghost'}
-                    color={showOverlays ? 'primary' : undefined}
+                    variant={showOverlays ? 'outline' : 'ghost'}
                     onClick={() => setShowOverlays((value) => !value)}
                     aria-pressed={showOverlays}
                   >
+                    {showOverlays ? <EyeOff size={12} /> : <Eye size={12} />}
                     {showOverlays ? 'Hide label' : 'Show label'}
                   </Button>
                   <span className="h-4 w-px bg-base-200/80" />
@@ -1580,8 +1652,21 @@ export default function Rooms({
                   <Button size="xs" variant="ghost" onClick={handleResetView}>
                     Reset
                   </Button>
+                  {!canManageRooms ? (
+                    <>
+                      <span className="h-4 w-px bg-base-200/80" />
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => setIsCanvasExpanded((value) => !value)}
+                      >
+                        {isCanvasExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                        {isCanvasExpanded ? 'Collapse' : 'Expand'}
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
-                <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 pointer-events-none z-20">
                   {assetBoxes.map(({ asset, room, left, top, width, height }) => {
                     const editable = canEditAssets(room)
                     const isSelected = selectedAssetId === asset.id
@@ -1668,7 +1753,48 @@ export default function Rooms({
                     )
                   })}
                 </div>
-                <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 pointer-events-none z-10">
+                  {roomBoxes.map(({ room, left, top, width, height }) => {
+                    const character = room.character ?? null
+                    const labelText = character?.name ?? room.name
+                    const isSelectedRoom = selectedRoomId === room.id
+                    const hasRoomSelection = selectedRoomId !== null
+                    const isClickable = canEditRoom(room)
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        className={cn(
+                          'pointer-events-auto absolute flex flex-col items-center justify-center gap-1 rounded-lg border text-[12px] shadow-md',
+                          (spacePressed || isPanning) && 'pointer-events-none',
+                          isSelectedRoom
+                            ? 'border-primary/80 ring-2 ring-primary/40'
+                            : isClickable
+                              ? 'border-primary/60 text-foreground'
+                              : 'border-border/40 text-muted-foreground/80',
+                          isClickable ? 'cursor-pointer' : 'cursor-not-allowed',
+                          'bg-transparent',
+                        )}
+                        aria-disabled={!isClickable}
+                        tabIndex={isClickable ? 0 : -1}
+                        style={{ left, top, width, height, zIndex: 1 }}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          if (!isClickable) return
+                          setSelectedRoomId(room.id)
+                          setSelectedAssetId(null)
+                          if (canManageRooms) {
+                            setEditingRoom(room)
+                            resetSelection()
+                          }
+                        }}
+                      >
+                        <span className="sr-only">{labelText}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="absolute inset-0 pointer-events-none z-30">
                   {roomBoxes.map(({ room, left, top, width, height }) => {
                     const character = room.character ?? null
                     const avatarSize = Math.max(20, Math.min(32, height * 0.6))
@@ -1685,34 +1811,14 @@ export default function Rooms({
                     const isAssigned = Boolean(character?.id)
                     const isSelectedRoom = selectedRoomId === room.id
                     const hasRoomSelection = selectedRoomId !== null
+                    if (!showLabel || isSelectedRoom) return null
+
                     return (
-                      <button
-                        key={room.id}
-                        type="button"
-                        className={cn(
-                          'pointer-events-auto absolute flex flex-col items-center justify-center gap-1 rounded-lg border text-[12px] text-base-content shadow-md',
-                          (spacePressed || isPanning) && 'pointer-events-none',
-                          isSelectedRoom
-                            ? 'border-primary/80 ring-2 ring-primary/40'
-                            : isAssigned
-                              ? 'border-primary/60'
-                              : 'border-base-200/60',
-                          'bg-transparent',
-                        )}
-                        style={{ left, top, width, height }}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          setSelectedRoomId(room.id)
-                          setSelectedAssetId(null)
-                          if (canManageRooms) {
-                            setEditingRoom(room)
-                            resetSelection()
-                          }
-                        }}
-                      >
+                      <div key={`label-${room.id}`} className="absolute" style={{ left, top, width, height }}>
                         <div
                           className={cn(
-                            'flex flex-col items-center justify-center gap-1',
+                            'flex flex-col items-center gap-1',
+                            'absolute inset-0 justify-center',
                             hasRoomSelection && !isSelectedRoom && 'opacity-60',
                           )}
                         >
@@ -1720,31 +1826,30 @@ export default function Rooms({
                             <img
                               src={avatarSrc}
                               alt={character.name}
-                              className="relative z-20 rounded-full border border-base-100 object-cover shadow-sm ring-1 ring-base-100/60"
+                              className="rounded-full border border-base-100 object-cover shadow-sm ring-1 ring-base-100/60"
                               style={{ width: avatarSize, height: avatarSize }}
                             />
                           ) : showOverlays && isAssigned ? (
                             <div
-                              className="relative z-20 rounded-full bg-base-200 text-[11px] font-semibold flex items-center justify-center shadow-sm ring-1 ring-base-100/60"
+                              className="rounded-full bg-base-200 text-[11px] font-semibold flex items-center justify-center shadow-sm ring-1 ring-base-100/60"
                               style={{ width: avatarSize, height: avatarSize }}
                             >
                               {getInitials(character?.name ?? room.name)}
                             </div>
                           ) : null}
-                          {showLabel ? (
-                            <span className="relative z-20 truncate max-w-full rounded-full bg-base-100/90 px-2 py-0.5 text-[11px] font-semibold text-base-content shadow-sm ring-1 ring-base-100/70">
-                              {labels[0]}
-                            </span>
-                          ) : null}
+                          <span className="truncate max-w-full rounded-full bg-base-100/90 px-2 py-0.5 text-[11px] font-semibold text-base-content shadow-sm ring-1 ring-base-100/70">
+                            {labels[0]}
+                          </span>
                         </div>
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
               </div>
             </div>
             </div>
-            <div className="w-full lg:w-80 shrink-0 space-y-3">
+            {showSidePanel ? (
+              <div className="w-80 shrink-0 space-y-3" style={{ gridColumn: '2 / 3' }}>
               {canManageRooms ? (
                 <div className="rounded-xl border border-base-200 p-4">
                   <h2 className="text-sm font-semibold">Assign rooms</h2>
@@ -1768,11 +1873,26 @@ export default function Rooms({
                       Select your room on the map to manage your assets.
                     </p>
                   </div>
-                  <div className="mt-auto min-h-[18px] truncate text-xs text-base-content/70">
+                  <div className="mt-auto flex items-center gap-2">
                     {selectedRoom ? (
-                      selectedRoom.character?.name ?? selectedRoom.name
+                      <>
+                        {selectedRoom.character?.avatar ? (
+                          <img
+                            src={resolveAvatarSrc(selectedRoom.character?.avatar)}
+                            alt={selectedRoom.character?.name ?? selectedRoom.name}
+                            className="h-6 w-6 rounded-full border border-base-200 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full border border-base-200 bg-base-100 text-[10px] font-semibold text-base-content/70">
+                            {getInitials(selectedRoom.character?.name ?? selectedRoom.name)}
+                          </div>
+                        )}
+                        <span className="min-h-[18px] truncate text-xs text-base-content/70">
+                          {selectedRoom.character?.name ?? selectedRoom.name}
+                        </span>
+                      </>
                     ) : (
-                      <span className="text-base-content/50">No room selected.</span>
+                      <span className="min-h-[18px] truncate text-xs text-base-content/50">No room selected.</span>
                     )}
                   </div>
                 </div>
@@ -1924,6 +2044,7 @@ export default function Rooms({
                 </div>
               ) : null}
             </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2069,6 +2190,18 @@ export default function Rooms({
                 </Button>
               </div>
             </div>
+            <p className="mt-3 text-xs text-base-content/60">
+              Assets by{' '}
+              <a
+                href="https://2minutetabletop.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                2-Minute Tabletop
+              </a>
+              .
+            </p>
           </ModalContent>
         </Modal>
       ) : null}
