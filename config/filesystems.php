@@ -38,6 +38,13 @@ return [
             'report' => false,
         ],
 
+        'room_library' => [
+            'driver' => 'local',
+            'root' => base_path('resources/assets'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

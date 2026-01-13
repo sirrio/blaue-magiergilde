@@ -28,6 +28,7 @@ interface AppLayoutProps {
 const menuLinks = [
   { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
   { name: 'Game Master Log', route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
+  { name: 'Rooms', route: 'rooms.index', method: 'get' as const, icon: Map },
   { name: 'Guild Handbook', route: 'handbook.index', method: 'get' as const, icon: BookOpen },
 ]
 
@@ -60,13 +61,13 @@ const adminSections = [
       { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
     ],
   },
-  {
-    label: 'Administration',
-    links: [
-      { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
-      { name: 'Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
-    ],
-  },
+      {
+        label: 'Administration',
+        links: [
+          { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
+          { name: 'Manage Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
+        ],
+      },
   {
     label: 'System',
     links: [
@@ -98,7 +99,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className={cn('bg-base-200 min-h-screen')}>
       <nav className="navbar bg-base-100 shadow-sm" role="navigation" aria-label="Main Navigation">
-        <div className="navbar-start">
+        <div className="navbar-start flex-none w-auto">
           <div className="dropdown">
             <button tabIndex={0} role="button" aria-label="Open mobile menu" className="btn btn-ghost lg:hidden">
               <Menu size={20} />
@@ -185,10 +186,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <img className={cn('h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
             Blaue Magiergilde
           </Link>
-        </div>
-
-        <div className="navbar-center hidden lg:flex">
-          <ul className="menu menu-horizontal space-x-1 px-1" role="menubar">
+          <ul className="menu menu-horizontal items-center space-x-1 px-1 hidden lg:flex ml-4" role="menubar">
             {menuLinks.map((menuLink) => (
               menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                 <li key={menuLink.route} role="none">
@@ -270,8 +268,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             )}
           </ul>
         </div>
-
-        <div className="navbar-end space-x-2">
+        <div className="navbar-end flex-1 w-auto justify-end gap-2">
           <div className="dropdown dropdown-end">
             <button tabIndex={0} aria-label="User menu" className="btn btn-ghost btn-circle avatar">
               <div className="w-10 rounded-full">

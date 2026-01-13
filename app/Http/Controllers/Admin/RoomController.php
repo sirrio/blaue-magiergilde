@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,27 +36,44 @@ class RoomController extends Controller
                 ->with([
                     'rooms' => fn ($query) => $query->orderBy('name'),
                     'rooms.character' => fn ($query) => $query->select('id', 'name', 'avatar', 'user_id'),
+                    'rooms.assets' => fn ($query) => $query->orderBy('z_index'),
                 ])
                 ->find($activeMapId)
             : null;
 
-        $characters = DB::table('characters')
-            ->leftJoin('users', 'users.id', '=', 'characters.user_id')
-            ->whereNull('characters.deleted_at')
-            ->orderBy('characters.name')
-            ->select([
-                'characters.id',
-                'characters.name',
-                'characters.avatar',
-                'characters.guild_status',
-                'users.name as user_name',
-            ])
-            ->get();
+        if ($roomMap && $user && ! $user->is_admin) {
+            $roomMap->setRelation(
+                'rooms',
+                $roomMap->rooms->map(function ($room) use ($user) {
+                    if ($room->character?->user_id !== $user->id) {
+                        $room->setRelation('assets', collect());
+                    }
+
+                    return $room;
+                }),
+            );
+        }
+
+        $characters = $user && $user->is_admin
+            ? DB::table('characters')
+                ->leftJoin('users', 'users.id', '=', 'characters.user_id')
+                ->whereNull('characters.deleted_at')
+                ->orderBy('characters.name')
+                ->select([
+                    'characters.id',
+                    'characters.name',
+                    'characters.avatar',
+                    'characters.guild_status',
+                    'users.name as user_name',
+                ])
+                ->get()
+            : collect();
 
         return Inertia::render('admin/rooms', [
             'roomMaps' => $roomMaps,
             'roomMap' => $roomMap,
             'characters' => $characters,
+            'adminMode' => true,
         ]);
     }
 
@@ -113,6 +131,27 @@ class RoomController extends Controller
         abort_unless($user && $user->is_admin, 403);
 
         $room->delete();
+
+        return redirect()->back();
+    }
+
+    public function destroyAssets(Request $request, Room $room): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $room->load('assets');
+
+        foreach ($room->assets as $asset) {
+            if ($asset->file_path) {
+                $relative = Str::after($asset->file_path, '/storage/');
+                if ($relative !== $asset->file_path) {
+                    Storage::disk('public')->delete($relative);
+                }
+            }
+        }
+
+        $room->assets()->delete();
 
         return redirect()->back();
     }

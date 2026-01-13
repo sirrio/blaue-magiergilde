@@ -297,6 +297,27 @@ export interface RoomMap {
   rooms?: Room[]
 }
 
+export interface RoomAsset {
+  id: number
+  room_id: number
+  user_id?: number | null
+  source?: 'upload' | 'library'
+  library_path?: string | null
+  file_path: string
+  original_name?: string | null
+  mime_type?: string | null
+  size?: number | null
+  width?: number | null
+  height?: number | null
+  pos_x: number
+  pos_y: number
+  scale: number
+  scale_x?: number | null
+  scale_y?: number | null
+  rotation: number
+  z_index?: number | null
+}
+
 export interface RoomCharacter {
   id: number
   name: string
@@ -314,6 +335,7 @@ export interface Room {
   grid_h: number
   character_id?: number | null
   character?: RoomCharacter | null
+  assets?: RoomAsset[]
 }
 
 export interface Ally {
