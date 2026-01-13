@@ -41,7 +41,7 @@ const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; child
     <Modal>
       <ModalTrigger>
         {children ?? (
-          <Button size="xs" modifier="square" variant="ghost">
+          <Button size="xs" modifier="square" variant="ghost" aria-label="Edit downtime" title="Edit downtime">
             <Settings size={14} />
           </Button>
         )}

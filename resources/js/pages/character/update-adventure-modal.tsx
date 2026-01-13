@@ -53,7 +53,7 @@ const UpdateAdventureModal = ({ adventure, children }: { adventure: Adventure; c
     <Modal>
       <ModalTrigger>
         {children ?? (
-          <Button size="xs" modifier="square" variant="ghost">
+          <Button size="xs" modifier="square" variant="ghost" aria-label="Edit adventure" title="Edit adventure">
             <Settings size={14} />
           </Button>
         )}
@@ -87,8 +87,14 @@ const UpdateAdventureModal = ({ adventure, children }: { adventure: Adventure; c
             {data.has_additional_bubble ? '+1' : ''})
           </div>
           {errors.duration && <p className="fieldset-label text-error flex items-center justify-center text-center">{errors.duration}</p>}
-          <Input placeholder="Dragons in Waterdeep" errors={errors.title} type="text" value={data.title} onChange={(e) => setData('title', e.target.value)}>
-            Game titel
+          <Input
+            placeholder="Dragons in Waterdeep"
+            errors={errors.title}
+            type="text"
+            value={data.title}
+            onChange={(e) => setData('title', e.target.value)}
+          >
+            Game title
           </Input>
           <Input placeholder="Matt Mercer" errors={errors.game_master} type="text" value={data.game_master} onChange={(e) => setData('game_master', e.target.value)}>
             Game master

@@ -10,10 +10,12 @@ import { format } from 'date-fns'
 import { Settings } from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
+import { useMemo, useState } from 'react'
 
 function CharacterPortrait({ character, className }: { character: Character; className?: string }) {
+  const srcList = character.avatar ? [`/storage/${character.avatar}`, '/images/no-avatar.svg'] : ['/images/no-avatar.svg']
   const { src } = useImage({
-    srcList: ['/storage/' + character.avatar, '/images/no-avatar.svg'],
+    srcList,
   })
   return <img className={cn('aspect-square rounded-full object-cover', className)} src={src} alt={character.name} />
 }
@@ -26,6 +28,41 @@ function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
 }
 
 export default function Show({ character }: { character: Character }) {
+  const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
+  const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
+
+  const adventureNotesMap = useMemo(() => {
+    const map = new Map<number, string>()
+    character.adventures.forEach((adv) => {
+      if (adv.notes) {
+        map.set(adv.id, adv.notes)
+      }
+    })
+    return map
+  }, [character.adventures])
+
+  const downtimeNotesMap = useMemo(() => {
+    const map = new Map<number, string>()
+    character.downtimes.forEach((dt) => {
+      if (dt.notes) {
+        map.set(dt.id, dt.notes)
+      }
+    })
+    return map
+  }, [character.downtimes])
+
+  const toggleAdventureNotes = (id: number) => {
+    setExpandedAdventures((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    )
+  }
+
+  const toggleDowntimeNotes = (id: number) => {
+    setExpandedDowntimes((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    )
+  }
+
   return (
     <AppLayout>
       <Head title={character.name + ' Details'} />
@@ -44,12 +81,32 @@ export default function Show({ character }: { character: Character }) {
           <h2 className="mb-4 text-xl font-semibold">Adventures</h2>
             {character.adventures.length > 0 ? (
               <List>
-                  {character.adventures.map((adv) => (
-                    <ListRow key={adv.id}>
+                  {character.adventures.map((adv) => {
+                    const notes = adventureNotesMap.get(adv.id) ?? ''
+                    const showToggle = notes.length > 140
+                    const isExpanded = expandedAdventures.includes(adv.id)
+                    return (
+                      <ListRow key={adv.id}>
                       <h3>{adv.title || 'Adventure'}</h3>
-                      <p className="text-base-content/50 truncate text-xs">
-                        {adv.notes || 'No notes'}
-                      </p>
+                      <div className="space-y-1">
+                        <p
+                          className={cn(
+                            'text-base-content/50 text-xs whitespace-pre-wrap',
+                            !isExpanded && 'line-clamp-2',
+                          )}
+                        >
+                          {notes || 'No notes'}
+                        </p>
+                        {showToggle ? (
+                          <button
+                            type="button"
+                            className="text-xs text-primary/70 hover:text-primary"
+                            onClick={() => toggleAdventureNotes(adv.id)}
+                          >
+                            {isExpanded ? 'Show less' : 'Show full notes'}
+                          </button>
+                        ) : null}
+                      </div>
                       <p className="text-xs">
                         {secondsToHourMinuteString(adv.duration)}
                       </p>
@@ -57,12 +114,13 @@ export default function Show({ character }: { character: Character }) {
                         {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                       </div>
                       <UpdateAdventureModal adventure={adv}>
-                        <Button size="xs" modifier="square" variant="ghost">
+                        <Button size="xs" modifier="square" variant="ghost" aria-label="Edit adventure" title="Edit adventure">
                           <Settings size={14} />
                         </Button>
                       </UpdateAdventureModal>
                     </ListRow>
-                  ))}
+                    )
+                  })}
                 </List>
               ) : (
                 <p className="text-center text-sm text-base-content/70">No adventures</p>
@@ -73,23 +131,44 @@ export default function Show({ character }: { character: Character }) {
           <h2 className="mb-4 text-xl font-semibold">Downtimes</h2>
             {character.downtimes.length > 0 ? (
               <List>
-                  {character.downtimes.map((dt) => (
-                    <ListRow key={dt.id}>
+                  {character.downtimes.map((dt) => {
+                    const notes = downtimeNotesMap.get(dt.id) ?? ''
+                    const showToggle = notes.length > 140
+                    const isExpanded = expandedDowntimes.includes(dt.id)
+                    return (
+                      <ListRow key={dt.id}>
                       <h3 className="capitalize">{dt.type}</h3>
-                      <p className="text-base-content/50 truncate text-xs">
-                        {dt.notes || 'No notes'}
-                      </p>
+                      <div className="space-y-1">
+                        <p
+                          className={cn(
+                            'text-base-content/50 text-xs whitespace-pre-wrap',
+                            !isExpanded && 'line-clamp-2',
+                          )}
+                        >
+                          {notes || 'No notes'}
+                        </p>
+                        {showToggle ? (
+                          <button
+                            type="button"
+                            className="text-xs text-primary/70 hover:text-primary"
+                            onClick={() => toggleDowntimeNotes(dt.id)}
+                          >
+                            {isExpanded ? 'Show less' : 'Show full notes'}
+                          </button>
+                        ) : null}
+                      </div>
                       <p className="text-xs">{secondsToHourMinuteString(dt.duration)}</p>
                       <div className="text-base-content/70 font-mono">
                         {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                       </div>
                       <UpdateDowntimeModal downtime={dt}>
-                        <Button size="xs" modifier="square" variant="ghost">
+                        <Button size="xs" modifier="square" variant="ghost" aria-label="Edit downtime" title="Edit downtime">
                           <Settings size={14} />
                         </Button>
                       </UpdateDowntimeModal>
                     </ListRow>
-                  ))}
+                    )
+                  })}
                 </List>
               ) : (
                 <p className="text-center text-sm text-base-content/70">No downtimes</p>

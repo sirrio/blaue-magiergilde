@@ -6,7 +6,7 @@ import { TextArea } from '@/components/ui/text-area'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, PlusCircle } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import type { RequestPayload } from '@inertiajs/core'
 
@@ -324,6 +324,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
 export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
+  const [search, setSearch] = useState('')
   const handleSave = (ally: Ally) => {
     const payload: RequestPayload = { ...ally }
     if (ally.id === 0) {
@@ -355,14 +356,24 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
       setEditingId(null)
     }
   }
+  const filteredAllies = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) {
+      return allies
+    }
+    return allies.filter((ally) => {
+      const haystack = [ally.name, ally.classes, ally.species].filter(Boolean).join(' ').toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [allies, search])
   const grouped = standingOrder.map((standing) => ({
     standing,
-    allies: allies.filter((ally) => ally.standing === standing),
+    allies: filteredAllies.filter((ally) => ally.standing === standing),
   }))
   return (
     <Modal wide>
       <ModalTrigger>
-        <Button size="sm" className="w-full">
+        <Button size="sm" className="w-full" aria-label="Manage allies" title="Manage allies">
           <BookHeart size={14} />
         </Button>
       </ModalTrigger>
@@ -374,6 +385,20 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
               <Button size="xs" onClick={() => setEditingId('new')}>
                 <PlusCircle size={16} className="mr-1" /> Add Ally
               </Button>
+            </div>
+            <div className="space-y-1">
+              <Input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search allies"
+                aria-label="Search allies"
+              >
+                Search allies
+              </Input>
+              {search.trim() !== '' && (
+                <p className="text-base-content/70 text-xs">{filteredAllies.length} matches</p>
+              )}
             </div>
             <div className="space-y-8">
               {grouped.map(({ standing, allies: group }) => (

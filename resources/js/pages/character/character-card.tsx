@@ -28,8 +28,9 @@ import React from 'react'
 import { useImage } from 'react-image'
 
 function CharacterImage({ character, className }: { character: Character; className?: string }) {
+  const srcList = character.avatar ? [`/storage/${character.avatar}`, '/images/no-avatar.svg'] : ['/images/no-avatar.svg']
   const { src } = useImage({
-    srcList: ['storage/' + character.avatar, '/images/no-avatar.svg'],
+    srcList,
   })
   return <img className={cn('aspect-square w-full rounded-full', className)} src={src} alt={character.name} />
 }
@@ -72,7 +73,15 @@ export function CharacterCard({ character }: { character: Character }) {
       <Card className={cn('group')}>
         <CardBody>
           <CardAction className={cn('absolute top-2 right-2 gap-1')}>
-            <Button className={'hidden group-hover:flex'} size="xs" modifier="square" {...attributes} {...listeners}>
+            <Button
+              className={'hidden group-hover:flex'}
+              size="xs"
+              modifier="square"
+              aria-label="Reorder character"
+              title="Reorder character"
+              {...attributes}
+              {...listeners}
+            >
               <Grip size={14} />
             </Button>
             <UpdateCharacterModal character={character} />
@@ -82,6 +91,8 @@ export function CharacterCard({ character }: { character: Character }) {
               href={route('characters.download', character.id)}
               modifier="square"
               size="xs"
+              aria-label="Download character"
+              title="Download character"
             >
               <Download size={14} />
             </Button>
@@ -175,7 +186,14 @@ export function CharacterCard({ character }: { character: Character }) {
               <StoreAdventureModal character={character}></StoreAdventureModal>
               <StoreDowntimeModal character={character}></StoreDowntimeModal>
               <AlliesModal character={character} />
-              <Button as="a" size="sm" href={character.external_link} target="_blank">
+              <Button
+                as="a"
+                size="sm"
+                href={character.external_link}
+                target="_blank"
+                aria-label="Open external link"
+                title="Open external link"
+              >
                 <ExternalLink size={14} />
               </Button>
             </div>

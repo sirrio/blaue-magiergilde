@@ -39,7 +39,13 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button size="sm" className={'w-full'} disabled={character.is_filler}>
+        <Button
+          size="sm"
+          className={'w-full'}
+          disabled={character.is_filler}
+          aria-label="Add downtime"
+          title="Add downtime"
+        >
           <FlameKindling size={14} />
         </Button>
       </ModalTrigger>

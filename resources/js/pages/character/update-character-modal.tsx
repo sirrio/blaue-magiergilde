@@ -38,7 +38,13 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button className={'hidden group-hover:flex'} size="xs" modifier="square">
+        <Button
+          className={'hidden group-hover:flex'}
+          size="xs"
+          modifier="square"
+          aria-label="Edit character"
+          title="Edit character"
+        >
           <Settings size={14} />
         </Button>
       </ModalTrigger>

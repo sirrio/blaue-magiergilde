@@ -12,7 +12,14 @@ const DestroyCharacterModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button className={'hidden group-hover:flex'} size="xs" modifier="square" color="error">
+        <Button
+          className={'hidden group-hover:flex'}
+          size="xs"
+          modifier="square"
+          color="error"
+          aria-label="Delete character"
+          title="Delete character"
+        >
           <Trash size={14} />
         </Button>
       </ModalTrigger>

@@ -95,6 +95,8 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false,
                 type="button"
                 className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
                 onClick={closeModal}
+                aria-label="Close modal"
+                title="Close"
               >
                 <XIcon size={18} />
               </button>

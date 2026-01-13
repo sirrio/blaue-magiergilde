@@ -52,7 +52,7 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button size="sm" className="w-full">
+        <Button size="sm" className="w-full" aria-label="Add adventure" title="Add adventure">
           <Swords size={14} />
         </Button>
       </ModalTrigger>
@@ -115,7 +115,7 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
             value={data.title}
             onChange={(e) => setData('title', e.target.value)}
           >
-            Game titel
+            Game title
           </Input>
           <Input
             placeholder="Matt Mercer"
