@@ -50,6 +50,7 @@ Logging defaults to a stack of channels with daily file logs and optional Slack 
 - PHP tests use Pest; feature tests cover authentication and profile management【F:tests/Feature/Auth/RegistrationTest.php†L1-L20】.
 - `npm run lint` executes ESLint, and TypeScript types can be checked via `npm run types`.
 - For UI changes, make extensive use of MCP tools (especially Playwright) to verify layout, interactions, and visual correctness before shipping fixes.
+- Prefer Playwright-driven UI checks over guesswork; iterate until the UI matches the requested behavior.
 
 ## 11. Performance & Scalability
 - Database-backed queues and caching may become bottlenecks under load. Consider Redis for higher throughput.

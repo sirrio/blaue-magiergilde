@@ -9,6 +9,7 @@ type ModalProps = {
   isOpen?: boolean;
   onClose?: () => void;
   wide?: boolean;
+  overflowVisible?: boolean;
 };
 type ModalTriggerProps = { children: ReactNode };
 type ModalContentProps = { children: ReactNode };
@@ -20,7 +21,7 @@ type ModalActionProps = {
   disabled?: boolean;
 };
 
-export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false }: ModalProps) => {
+export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false, overflowVisible = false }: ModalProps) => {
   const triggerElement = findChildByType(children, ModalTrigger);
   const titleElement = findChildByType(children, ModalTitle);
   const contentElement = findChildByType(children, ModalContent);
@@ -83,7 +84,13 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false 
               closeModal();
             }}
           >
-            <div className={cn('modal-box relative', wide ? '!max-w-4xl' : 'max-w-md')}>
+            <div
+              className={cn(
+                'modal-box relative',
+                wide ? '!max-w-4xl' : 'max-w-md',
+                overflowVisible && 'overflow-visible'
+              )}
+            >
               <button
                 type="button"
                 className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"

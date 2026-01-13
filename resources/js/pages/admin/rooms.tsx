@@ -122,6 +122,7 @@ const RoomFormModal = ({
   onClose,
   onSubmit,
   onDelete,
+  showGridInputs = true,
 }: {
   open: boolean
   title: string
@@ -132,6 +133,7 @@ const RoomFormModal = ({
   onClose: () => void
   onSubmit: (data: RoomFormData) => void
   onDelete?: () => void
+  showGridInputs?: boolean
 }) => {
   const { errors } = usePage<PageProps>().props
   const [characterSearch, setCharacterSearch] = useState('')
@@ -186,7 +188,7 @@ const RoomFormModal = ({
   }
 
   return (
-    <Modal isOpen={open} onClose={onClose}>
+    <Modal isOpen={open} onClose={onClose} overflowVisible>
       <ModalTitle>{title}</ModalTitle>
       <ModalContent>
         <Input
@@ -265,49 +267,53 @@ const RoomFormModal = ({
             </div>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            errors={errors.grid_x}
-            type="number"
-            min={0}
-            max={map.grid_columns - 1}
-            value={data.grid_x}
-            onChange={(e) => setData('grid_x', Number(e.target.value))}
-          >
-            Grid X
-          </Input>
-          <Input
-            errors={errors.grid_y}
-            type="number"
-            min={0}
-            max={map.grid_rows - 1}
-            value={data.grid_y}
-            onChange={(e) => setData('grid_y', Number(e.target.value))}
-          >
-            Grid Y
-          </Input>
-          <Input
-            errors={errors.grid_w}
-            type="number"
-            min={1}
-            max={map.grid_columns}
-            value={data.grid_w}
-            onChange={(e) => setData('grid_w', Number(e.target.value))}
-          >
-            Grid W
-          </Input>
-          <Input
-            errors={errors.grid_h}
-            type="number"
-            min={1}
-            max={map.grid_rows}
-            value={data.grid_h}
-            onChange={(e) => setData('grid_h', Number(e.target.value))}
-          >
-            Grid H
-          </Input>
-        </div>
-        <p className="text-xs text-base-content/60">Grid size: {map.grid_columns} x {map.grid_rows}</p>
+        {showGridInputs ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                errors={errors.grid_x}
+                type="number"
+                min={0}
+                max={map.grid_columns - 1}
+                value={data.grid_x}
+                onChange={(e) => setData('grid_x', Number(e.target.value))}
+              >
+                Grid X
+              </Input>
+              <Input
+                errors={errors.grid_y}
+                type="number"
+                min={0}
+                max={map.grid_rows - 1}
+                value={data.grid_y}
+                onChange={(e) => setData('grid_y', Number(e.target.value))}
+              >
+                Grid Y
+              </Input>
+              <Input
+                errors={errors.grid_w}
+                type="number"
+                min={1}
+                max={map.grid_columns}
+                value={data.grid_w}
+                onChange={(e) => setData('grid_w', Number(e.target.value))}
+              >
+                Grid W
+              </Input>
+              <Input
+                errors={errors.grid_h}
+                type="number"
+                min={1}
+                max={map.grid_rows}
+                value={data.grid_h}
+                onChange={(e) => setData('grid_h', Number(e.target.value))}
+              >
+                Grid H
+              </Input>
+            </div>
+            <p className="text-xs text-base-content/60">Grid size: {map.grid_columns} x {map.grid_rows}</p>
+          </>
+        ) : null}
         {onDelete ? (
           <div className="mt-4 flex justify-between">
             <Button variant="outline" color="error" onClick={onDelete} disabled={processing}>
@@ -459,6 +465,7 @@ export default function Rooms({
   const [libraryError, setLibraryError] = useState<string | null>(null)
   const [isLibraryOpen, setIsLibraryOpen] = useState(false)
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false)
+  const [isMoveMode, setIsMoveMode] = useState(false)
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
   const [mapModalMode, setMapModalMode] = useState<'create' | 'edit'>('create')
   const [mapModalTarget, setMapModalTarget] = useState<RoomMap | null>(null)
@@ -548,6 +555,7 @@ export default function Rooms({
     setZoom(1)
     setPan({ x: 0, y: 0 })
     setEditingRoom(null)
+    setIsMoveMode(false)
     setSelectedRoomId(null)
     setSelectedAssetId(null)
     setDraftSelection(null)
@@ -631,13 +639,38 @@ export default function Rooms({
     })
   }
 
-  const handleDeleteRoom = () => {
-    if (!editingRoom) return
+  const handleMoveRoomSelection = (room: Room, selection: RoomSelection) => {
+    router.patch(
+      route('admin.rooms.update', { room: room.id }),
+      {
+        room_map_id: room.room_map_id,
+        name: room.name,
+        grid_x: selection.grid_x,
+        grid_y: selection.grid_y,
+        grid_w: selection.grid_w,
+        grid_h: selection.grid_h,
+        character_id: room.character_id ?? null,
+      },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          setIsMoveMode(false)
+          resetSelection()
+        },
+      },
+    )
+  }
+
+  const handleAdminDeleteRoom = (room: Room | null) => {
+    if (!room) return
     if (!window.confirm('Delete this room assignment?')) return
-    router.delete(route('admin.rooms.destroy', { room: editingRoom.id }), {
+    router.delete(route('admin.rooms.destroy', { room: room.id }), {
       preserveScroll: true,
       onSuccess: () => {
-        setEditingRoom(null)
+        if (selectedRoomId === room.id) {
+          setSelectedRoomId(null)
+          setSelectedAssetId(null)
+        }
       },
     })
   }
@@ -705,6 +738,12 @@ export default function Rooms({
   useEffect(() => {
     autoSelectRoomRef.current = true
   }, [activeMap.id])
+
+  useEffect(() => {
+    if (!selectedRoomId && isMoveMode) {
+      setIsMoveMode(false)
+    }
+  }, [isMoveMode, selectedRoomId])
 
   const getTransform = useCallback(() => {
     if (!mapImage || canvasSize.width === 0 || canvasSize.height === 0) return null
@@ -892,13 +931,20 @@ export default function Rooms({
     const rect = canvas.getBoundingClientRect()
     const gridPosition = getGridFromScreen(event.clientX - rect.left, event.clientY - rect.top)
     if (!gridPosition) return
-    pointerStartRef.current = { x: event.clientX, y: event.clientY }
-    dragDistanceRef.current = 0
     pointerRoomIdRef.current = findRoomAt(gridPosition.x, gridPosition.y)?.id ?? null
     if (!canManageRooms) {
+      pointerStartRef.current = { x: event.clientX, y: event.clientY }
+      dragDistanceRef.current = 0
       canvas.setPointerCapture(event.pointerId)
       return
     }
+    if (isMoveMode && !selectedRoom) {
+      pointerStartRef.current = null
+      dragDistanceRef.current = 0
+      return
+    }
+    pointerStartRef.current = { x: event.clientX, y: event.clientY }
+    dragDistanceRef.current = 0
     setSelectionStart(gridPosition)
     setSelectionEnd(gridPosition)
     setDraftSelection(null)
@@ -977,11 +1023,20 @@ export default function Rooms({
     if (roomId && !dragged) {
       const room = roomList.find((entry) => entry.id === roomId)
       if (room) {
-        setEditingRoom(room)
+        autoSelectRoomRef.current = false
         setSelectedRoomId(room.id)
         setSelectedAssetId(null)
         resetSelection()
       }
+      return
+    }
+
+    if (isMoveMode && selectedRoom) {
+      if (!dragged || !currentSelection) {
+        resetSelection()
+        return
+      }
+      handleMoveRoomSelection(selectedRoom, currentSelection)
       return
     }
 
@@ -2004,7 +2059,6 @@ export default function Rooms({
                           setSelectedRoomId(room.id)
                           setSelectedAssetId(null)
                           if (canManageRooms) {
-                            setEditingRoom(room)
                             resetSelection()
                           }
                         }}
@@ -2072,18 +2126,79 @@ export default function Rooms({
               <div className="w-80 shrink-0 space-y-3" style={{ gridColumn: '2 / 3' }}>
               {canManageRooms ? (
                 <div className="rounded-xl border border-base-200 p-4">
-                  <h2 className="text-sm font-semibold">Assign rooms</h2>
+                  <h2 className="text-sm font-semibold">Selected room</h2>
                   <p className="mt-1 text-xs text-base-content/60">
-                    Drag across the grid to create a room. Click a room to edit or assign a character.
+                    {selectedRoom ? 'Manage the current room assignment.' : 'Select a room to manage it.'}
                   </p>
+                  {isMoveMode && selectedRoom ? (
+                    <p className="mt-2 text-xs text-base-content/60">
+                      Drag a new area on the map to reposition this room.
+                    </p>
+                  ) : null}
+                  <div className="mt-3 space-y-2 text-xs text-base-content/70">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-base-content/50">Room</span>
+                      <span className="truncate">{selectedRoom?.name ?? 'None selected'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-base-content/50">Assigned</span>
+                      <span className="truncate">{selectedRoom?.character?.name ?? 'Unassigned'}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      color={isMoveMode ? 'primary' : undefined}
+                      disabled={!selectedRoom}
+                      onClick={() => {
+                        if (!selectedRoom) return
+                        setIsMoveMode((value) => !value)
+                        resetSelection()
+                      }}
+                    >
+                      <MapPin size={14} />
+                      {isMoveMode ? 'Cancel move' : 'Move room'}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={!selectedRoom}
+                      onClick={() => {
+                        if (selectedRoom) {
+                          setIsMoveMode(false)
+                          setEditingRoom(selectedRoom)
+                          resetSelection()
+                        }
+                      }}
+                    >
+                      Edit room
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      color="error"
+                      disabled={!selectedRoom}
+                      onClick={() => handleAdminDeleteRoom(selectedRoom)}
+                    >
+                      Delete room
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      color="error"
+                      disabled={!selectedRoom || !selectedRoom.assets || selectedRoom.assets.length === 0}
+                      onClick={handleAdminClearAssets}
+                    >
+                      Clear assets
+                    </Button>
+                  </div>
                   {selection ? (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-base-content/70">
-                      <Check size={14} />
+                    <div className="mt-3 flex items-center gap-2 text-[11px] text-base-content/60">
+                      <Check size={12} />
                       Selected area: X{selection.grid_x} Y{selection.grid_y} x {selection.grid_w}x{selection.grid_h}
                     </div>
-                  ) : (
-                    <p className="mt-3 text-xs text-base-content/50">No selection yet.</p>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <div className="rounded-xl border border-base-200 p-4 h-[120px] flex flex-col">
@@ -2150,115 +2265,124 @@ export default function Rooms({
                   </div>
                 </div>
               ) : null}
-              <div className="rounded-xl border border-base-200 p-4 h-[420px] flex flex-col">
-                <div className="flex min-h-[32px] items-start justify-between gap-2">
-                  <div>
+              {canManageRooms ? (
+                <div className="rounded-xl border border-base-200 p-4">
+                  <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold">Room assets</h3>
-                    <p className="mt-1 text-xs text-base-content/60 line-clamp-1">
-                      {selectedRoom ? `Assets for ${selectedRoom.name}.` : 'Select a room to view assets.'}
-                    </p>
+                    <span className="text-xs text-base-content/50">
+                      {selectedRoom ? `${selectedRoom.assets?.length ?? 0} assets` : 'No room selected'}
+                    </span>
                   </div>
-                  <div className="flex min-h-[28px] items-center gap-2">
-                    <div className="w-24">
-                      {selectedRoom && canEditSelectedRoom ? (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() => setIsUploadOpen(true)}
-                          className="w-24 justify-center gap-2"
-                        >
-                          <ImagePlus size={14} />
-                          Upload
-                        </Button>
-                      ) : (
-                        <span className="inline-block h-7 w-24" />
-                      )}
+                  <p className="mt-2 text-xs text-base-content/60">
+                    {selectedRoom
+                      ? 'Assets are read-only here. Manage them in /rooms.'
+                      : 'Select a room to view its asset summary.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-base-200 p-4 h-[420px] flex flex-col">
+                  <div className="flex min-h-[32px] items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">Room assets</h3>
+                      <p className="mt-1 text-xs text-base-content/60 line-clamp-1">
+                        {selectedRoom ? `Assets for ${selectedRoom.name}.` : 'Select a room to view assets.'}
+                      </p>
                     </div>
-                    {canManageRooms ? (
-                      <div className="w-28">
-                        {selectedRoom ? (
+                    <div className="flex min-h-[28px] items-center gap-2">
+                      <div className="w-24">
+                        {selectedRoom && canEditSelectedRoom ? (
                           <Button
                             size="xs"
                             variant="outline"
-                            color="error"
-                            onClick={handleAdminClearAssets}
-                            disabled={!selectedRoom.assets || selectedRoom.assets.length === 0}
-                            className="w-28 justify-center gap-2"
+                            onClick={() => setIsUploadOpen(true)}
+                            className="w-24 justify-center gap-2"
                           >
-                            <Trash2 size={12} />
-                            Clear assets
+                            <ImagePlus size={14} />
+                            Upload
                           </Button>
                         ) : (
-                          <span className="inline-block h-7 w-28" />
+                          <span className="inline-block h-7 w-24" />
                         )}
                       </div>
-                    ) : null}
+                    </div>
+                  </div>
+                  <div
+                    className="mt-3 flex-1 overflow-y-scroll space-y-2 text-xs text-base-content/70"
+                    style={{ scrollbarGutter: 'stable' }}
+                  >
+                    {!selectedRoom ? (
+                      <p className="text-base-content/50">Select a room to view assets.</p>
+                    ) : !canViewRoomAssets(selectedRoom) ? (
+                      <p className="text-base-content/50">Assets are private to the room owner.</p>
+                    ) : selectedRoomAssets.length === 0 ? (
+                      <p className="text-base-content/50">No assets yet.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {selectedRoomAssets.map((asset) => (
+                          <button
+                            key={`asset-list-${asset.id}`}
+                            type="button"
+                            title={asset.original_name ?? `Asset #${asset.id}`}
+                            className={cn(
+                              'group relative aspect-square w-full overflow-hidden rounded-lg border border-base-200 bg-base-100',
+                              selectedAssetId === asset.id ? 'border-primary/60 ring-2 ring-primary/30' : '',
+                            )}
+                            onClick={() => setSelectedAssetId(asset.id)}
+                          >
+                            <img
+                              src={asset.file_path}
+                              alt={asset.original_name ?? `Asset #${asset.id}`}
+                              className="h-full w-full object-contain p-2"
+                              draggable={false}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 h-[18px] overflow-hidden border-t border-base-200 pt-3 text-xs text-base-content/60">
+                    {selectedAsset && selectedAssetRoom?.id === selectedRoom?.id ? (
+                      <span className="line-clamp-1">
+                        Use the on-map handles to rotate, resize, or delete the selected asset.
+                      </span>
+                    ) : (
+                      <span className="line-clamp-1 text-base-content/40">Select an asset to see controls.</span>
+                    )}
                   </div>
                 </div>
-                <div
-                  className="mt-3 flex-1 overflow-y-scroll space-y-2 text-xs text-base-content/70"
-                  style={{ scrollbarGutter: 'stable' }}
-                >
-                  {!selectedRoom ? (
-                    <p className="text-base-content/50">Select a room to view assets.</p>
-                  ) : !canViewRoomAssets(selectedRoom) ? (
-                    <p className="text-base-content/50">Assets are private to the room owner.</p>
-                  ) : canManageRooms ? (
-                    <p className="text-base-content/50">Assets are read-only here. Manage them in /rooms.</p>
-                  ) : selectedRoomAssets.length === 0 ? (
-                    <p className="text-base-content/50">No assets yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                      {selectedRoomAssets.map((asset) => (
-                        <button
-                          key={`asset-list-${asset.id}`}
-                          type="button"
-                          title={asset.original_name ?? `Asset #${asset.id}`}
-                          className={cn(
-                            'group relative aspect-square w-full overflow-hidden rounded-lg border border-base-200 bg-base-100',
-                            selectedAssetId === asset.id ? 'border-primary/60 ring-2 ring-primary/30' : '',
-                          )}
-                          onClick={() => setSelectedAssetId(asset.id)}
-                        >
-                          <img
-                            src={asset.file_path}
-                            alt={asset.original_name ?? `Asset #${asset.id}`}
-                            className="h-full w-full object-contain p-2"
-                            draggable={false}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 h-[18px] overflow-hidden border-t border-base-200 pt-3 text-xs text-base-content/60">
-                  {selectedAsset && selectedAssetRoom?.id === selectedRoom?.id ? (
-                    <span className="line-clamp-1">
-                      Use the on-map handles to rotate, resize, or delete the selected asset.
-                    </span>
-                  ) : (
-                    <span className="line-clamp-1 text-base-content/40">Select an asset to see controls.</span>
-                  )}
-                </div>
-              </div>
+              )}
               {canManageRooms ? (
                 <div className="rounded-xl border border-base-200 p-4">
                   <h3 className="text-sm font-semibold">Assigned characters</h3>
                   <p className="mt-1 text-xs text-base-content/60">
                     {roomList.filter((room) => room.character_id).length} of {roomList.length} rooms occupied.
                   </p>
-                  <div className="mt-3 space-y-2 text-xs text-base-content/70 max-h-64 overflow-y-auto">
+                  <div className="mt-3 space-y-1 text-xs text-base-content/70 max-h-64 overflow-y-auto">
                     {roomList.length === 0 ? (
                       <p className="text-base-content/50">No rooms created yet.</p>
                     ) : (
-                      roomList.map((room) => (
-                        <div key={`list-${room.id}`} className="flex items-center justify-between gap-2">
-                          <span className="truncate">{room.name}</span>
-                          <span className="truncate text-base-content/50">
-                            {room.character?.name ?? 'Unassigned'}
-                          </span>
-                        </div>
-                      ))
+                      roomList.map((room) => {
+                        const isSelected = selectedRoomId === room.id
+                        return (
+                          <button
+                            key={`list-${room.id}`}
+                            type="button"
+                            className={cn(
+                              'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left',
+                              isSelected ? 'bg-base-200/70 text-base-content' : 'hover:bg-base-200/50',
+                            )}
+                            onClick={() => {
+                              setSelectedRoomId(room.id)
+                              setSelectedAssetId(null)
+                            }}
+                          >
+                            <span className="truncate">{room.name}</span>
+                            <span className="truncate text-base-content/50">
+                              {room.character?.name ?? 'Unassigned'}
+                            </span>
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 </div>
@@ -2282,6 +2406,7 @@ export default function Rooms({
             resetSelection()
           }}
           onSubmit={handleCreateRoom}
+          showGridInputs={false}
         />
       ) : null}
 
@@ -2303,7 +2428,7 @@ export default function Rooms({
           }}
           onClose={() => setEditingRoom(null)}
           onSubmit={handleUpdateRoom}
-          onDelete={handleDeleteRoom}
+          showGridInputs={false}
         />
       ) : null}
 
