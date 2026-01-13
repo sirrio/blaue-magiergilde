@@ -166,7 +166,7 @@ export default function Show({ character }: { character: Character }) {
                               {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                             </div>
                             <div className="flex justify-end">
-                              <UpdateAdventureModal adventure={adv}>
+                              <UpdateAdventureModal adventure={adv} allies={character.allies}>
                                 <Button
                                   size="xs"
                                   modifier="square"

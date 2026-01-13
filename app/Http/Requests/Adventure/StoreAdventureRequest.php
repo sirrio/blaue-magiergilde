@@ -4,6 +4,7 @@ namespace App\Http\Requests\Adventure;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * @property int $duration
@@ -31,6 +32,8 @@ class StoreAdventureRequest extends FormRequest
      */
     public function rules(): array
     {
+        $characterId = $this->input('character_id');
+
         return [
             'duration' => 'required|integer|min:0',
             'character_id' => 'required|integer',
@@ -39,6 +42,11 @@ class StoreAdventureRequest extends FormRequest
             'notes' => 'nullable|string',
             'game_master' => 'nullable|string',
             'title' => 'nullable|string|max:255',
+            'ally_ids' => 'nullable|array',
+            'ally_ids.*' => [
+                'integer',
+                Rule::exists('allies', 'id')->where('character_id', $characterId),
+            ],
         ];
     }
 }

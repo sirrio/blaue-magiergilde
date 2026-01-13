@@ -359,6 +359,7 @@ export interface Adventure {
   notes: string
   game_master: string
   character_id: number
+  allies?: Ally[]
 }
 
 export interface Downtime {

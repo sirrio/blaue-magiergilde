@@ -3,6 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { TextArea } from '@/components/ui/text-area'
+import AdventureAllyPicker from '@/pages/character/adventure-ally-picker'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Droplets, Swords } from 'lucide-react'
@@ -22,6 +23,7 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
     notes: '',
     title: '',
     game_master: '',
+    ally_ids: [] as number[],
   }
 
   const { data, setData, post } = useForm(initialFormData)
@@ -139,6 +141,11 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
           <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
+          <AdventureAllyPicker
+            allies={character.allies ?? []}
+            selectedIds={data.ally_ids}
+            onChange={(ids) => setData('ally_ids', ids)}
+          />
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

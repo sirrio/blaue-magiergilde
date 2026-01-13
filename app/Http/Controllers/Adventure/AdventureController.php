@@ -39,6 +39,7 @@ class AdventureController extends Controller
         $adventure->has_additional_bubble = $request->has_additional_bubble;
         $adventure->notes = $request->notes;
         $adventure->save();
+        $adventure->allies()->sync($request->input('ally_ids', []));
 
         return redirect()->back();
     }
@@ -71,6 +72,7 @@ class AdventureController extends Controller
         $adventure->has_additional_bubble = $request->has_additional_bubble;
         $adventure->notes = $request->notes;
         $adventure->save();
+        $adventure->allies()->sync($request->input('ally_ids', []));
 
         return redirect()->back();
     }

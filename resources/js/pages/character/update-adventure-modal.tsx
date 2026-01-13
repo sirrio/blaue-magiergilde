@@ -3,7 +3,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { TextArea } from '@/components/ui/text-area'
-import { Adventure, PageProps } from '@/types'
+import AdventureAllyPicker from '@/pages/character/adventure-ally-picker'
+import { Adventure, Ally, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import React from 'react'
@@ -13,7 +14,15 @@ const MIN_DURATION = 0
 const FIFTEEN_MINUTES_DELTA = 900
 const ONE_HOUR_DELTA = 3600
 
-const UpdateAdventureModal = ({ adventure, children }: { adventure: Adventure; children?: React.ReactNode }) => {
+const UpdateAdventureModal = ({
+  adventure,
+  allies = [],
+  children,
+}: {
+  adventure: Adventure
+  allies?: Ally[]
+  children?: React.ReactNode
+}) => {
   const initialFormData = {
     duration: adventure.duration,
     character_id: adventure.character_id,
@@ -22,6 +31,7 @@ const UpdateAdventureModal = ({ adventure, children }: { adventure: Adventure; c
     notes: adventure.notes ?? '',
     title: adventure.title ?? '',
     game_master: adventure.game_master ?? '',
+    ally_ids: adventure.allies?.map((ally) => ally.id) ?? [],
   }
 
   const { data, setData, post } = useForm(initialFormData)
@@ -108,6 +118,11 @@ const UpdateAdventureModal = ({ adventure, children }: { adventure: Adventure; c
           <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
+          <AdventureAllyPicker
+            allies={allies}
+            selectedIds={data.ally_ids}
+            onChange={(ids) => setData('ally_ids', ids)}
+          />
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

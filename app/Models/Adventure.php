@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -22,4 +23,9 @@ class Adventure extends Model
     protected $casts = [
         'has_additional_bubble' => 'boolean',
     ];
+
+    public function allies(): BelongsToMany
+    {
+        return $this->belongsToMany(Ally::class);
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Adventure;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * @property mixed $notes
@@ -30,6 +31,9 @@ class UpdateAdventureRequest extends FormRequest
      */
     public function rules(): array
     {
+        $adventure = $this->route('adventure');
+        $characterId = $adventure?->character_id;
+
         return [
             'duration' => 'required|integer',
             'start_date' => 'required|date',
@@ -37,6 +41,11 @@ class UpdateAdventureRequest extends FormRequest
             'notes' => 'nullable|string',
             'game_master' => 'nullable|string',
             'title' => 'nullable|string|max:255',
+            'ally_ids' => 'nullable|array',
+            'ally_ids.*' => [
+                'integer',
+                Rule::exists('allies', 'id')->where('character_id', $characterId),
+            ],
         ];
     }
 }
