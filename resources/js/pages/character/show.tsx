@@ -4,6 +4,7 @@ import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
+import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import { Character, Ally } from '@/types'
 import { Head, Link } from '@inertiajs/react'
 import { format } from 'date-fns'
@@ -28,7 +29,7 @@ function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
         ? ['/storage/' + ally.avatar, '/images/no-avatar.svg']
         : ['/images/no-avatar.svg'],
   })
-  return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={ally.linked_character?.name ?? ally.name} />
+  return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={getAllyDisplayName(ally)} />
 }
 
 function RatingHearts({ rating }: { rating: number }) {
@@ -155,9 +156,9 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         const notes = adventureNotesMap.get(adv.id) ?? ''
                         const showToggle = notes.length > 140
                         const isExpanded = expandedAdventures.includes(adv.id)
-                        const participantSummary = formatParticipantSummary(
-                          (adv.allies ?? []).map((ally) => ally.linked_character?.name ?? ally.name),
-                        )
+                          const participantSummary = formatParticipantSummary(
+                            (adv.allies ?? []).map((ally) => getAllyDisplayName(ally)),
+                          )
                         return (
                           <ListRow
                             key={adv.id}
@@ -356,13 +357,20 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         >
                           <div className="flex min-w-0 items-center gap-3">
                             <AllyPortrait ally={ally} className="h-9 w-9" />
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="truncate text-sm font-medium">
-                              {ally.linked_character?.name ?? ally.name}
-                            </span>
-                            <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                              {ally.linked_character_id ? 'Linked' : 'Custom'}
-                            </span>
+                          <div className="flex min-w-0 flex-col gap-0.5">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate text-sm font-medium">
+                                {getAllyDisplayName(ally)}
+                              </span>
+                              <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
+                                {ally.linked_character_id ? 'Linked' : 'Custom'}
+                              </span>
+                            </div>
+                            {getAllyOwnerName(ally) ? (
+                              <span className="truncate text-xs text-base-content/50">
+                                Owner: {getAllyOwnerName(ally)}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                           <RatingHearts rating={ally.rating} />

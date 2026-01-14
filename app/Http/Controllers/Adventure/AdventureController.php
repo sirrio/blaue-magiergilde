@@ -115,10 +115,7 @@ class AdventureController extends Controller
 
         $characters = Character::query()
             ->whereIn('id', $guildCharacterIds)
-            ->where(function ($query) {
-                $query->whereNull('guild_status')
-                    ->orWhere('guild_status', '!=', 'declined');
-            })
+            ->where('guild_status', 'approved')
             ->get(['id', 'name']);
 
         $createdIds = [];

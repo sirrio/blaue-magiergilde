@@ -3,6 +3,7 @@ import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
+import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, Heart, Link2, PlusCircle, User } from 'lucide-react'
@@ -175,6 +176,8 @@ const AllyCard: React.FC<AllyCardProps> = ({
     })
   }, [guildCharacters, linkedCharacterIds, ally.character_id, ally.linked_character_id])
   if (!isEditing) {
+    const displayName = getAllyDisplayName(ally)
+    const ownerName = getAllyOwnerName(ally)
     return (
       <div
         className={`card bg-base-100 cursor-pointer border p-2 shadow-sm hover:shadow-md ${ally.notes && ally.notes.trim() !== '' ? 'tooltip tooltip-info' : ''}`}
@@ -185,8 +188,8 @@ const AllyCard: React.FC<AllyCardProps> = ({
           <div
             className={`bg-base-200 flex-shrink-0 overflow-hidden rounded-full ${large ? 'h-20 w-20' : 'h-10 w-10'}`}
           >
-          {avatarSrc ? (
-              <img src={avatarSrc} alt={`${ally.name}'s avatar`} className="h-full w-full object-cover" />
+            {avatarSrc ? (
+              <img src={avatarSrc} alt={`${displayName}'s avatar`} className="h-full w-full object-cover" />
             ) : (
               <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
             )}
@@ -194,7 +197,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h4 className="truncate font-bold">
-                {(ally.linked_character?.name ?? ally.name) || 'Unnamed Ally'}
+                {displayName}
               </h4>
               <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
                 {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
@@ -205,6 +208,9 @@ const AllyCard: React.FC<AllyCardProps> = ({
               {ally.classes && ally.classes.trim() !== '' ? ally.classes : 'No classes'} &bull;{' '}
               {ally.species && ally.species.trim() !== '' ? ally.species : 'No species'}
             </p>
+            {ownerName ? (
+              <p className="text-xs text-base-content/50">Owner: {ownerName}</p>
+            ) : null}
             <RatingHearts rating={ally.rating} />
           </div>
         </div>
@@ -349,6 +355,8 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
     }
     setAvatarSrc(avatar)
   }, [ally])
+  const displayName = getAllyDisplayName(ally)
+  const ownerName = getAllyOwnerName(ally)
 
   return (
     <button
@@ -361,19 +369,22 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
       <div className="flex min-w-0 items-center gap-3">
         <div className="bg-base-200 flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full">
           {avatarSrc ? (
-            <img src={avatarSrc} alt={`${ally.name}'s avatar`} className="h-full w-full object-cover" />
+            <img src={avatarSrc} alt={`${displayName}'s avatar`} className="h-full w-full object-cover" />
           ) : (
             <span className="text-xs text-base-content/60">N/A</span>
           )}
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">
-            {(ally.linked_character?.name ?? ally.name) || 'Unnamed Ally'}
+            {displayName}
           </p>
           <p className="truncate text-xs text-base-content/60">
             {ally.classes && ally.classes.trim() !== '' ? ally.classes : 'No classes'} •{' '}
             {ally.species && ally.species.trim() !== '' ? ally.species : 'No species'}
           </p>
+          {ownerName ? (
+            <p className="truncate text-xs text-base-content/50">Owner: {ownerName}</p>
+          ) : null}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1">
@@ -582,7 +593,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     setEditingId(null)
   }
   const handleRemove = (ally: Ally) => {
-    if (window.confirm(`Are you sure you want to remove ${ally.name}?`)) {
+    const label = getAllyDisplayName(ally)
+    if (window.confirm(`Are you sure you want to remove ${label}?`)) {
       router.delete(route('allies.destroy', ally.id), { preserveScroll: true })
       setAllies(allies.filter((a) => a.id !== ally.id))
       setEditingId(null)
@@ -593,7 +605,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     const filtered = query
       ? allies.filter((ally) => {
           const haystack = [
-            ally.linked_character?.name ?? ally.name,
+            getAllyDisplayName(ally),
+            ally.linked_character?.user?.name,
             ally.classes,
             ally.species,
           ]
@@ -604,7 +617,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
         })
       : allies
     return [...filtered].sort((a, b) =>
-      (a.linked_character?.name ?? a.name).localeCompare(b.linked_character?.name ?? b.name),
+      getAllyDisplayName(a).localeCompare(getAllyDisplayName(b)),
     )
   }, [allies, search])
 
@@ -673,7 +686,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
             <div className="flex min-h-[52px] items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase text-base-content/50">Ally details</p>
-                <h3 className="text-base font-semibold">{selectedAlly ? selectedAlly.name : 'Select an ally'}</h3>
+                <h3 className="text-base font-semibold">{selectedAlly ? getAllyDisplayName(selectedAlly) : 'Select an ally'}</h3>
               </div>
               <Button size="xs" onClick={() => setEditingId('new')}>
                 <PlusCircle size={16} className="mr-1" /> Add Ally

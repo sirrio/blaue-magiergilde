@@ -1,4 +1,5 @@
 import { Input } from '@/components/ui/input'
+import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import { cn } from '@/lib/utils'
 import { Ally, Character } from '@/types'
 import { User } from 'lucide-react'
@@ -28,7 +29,10 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
   )
 
   const selectedAllies = useMemo(
-    () => allies.filter((ally) => selectedAllyIds.includes(ally.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      allies
+        .filter((ally) => selectedAllyIds.includes(ally.id))
+        .sort((a, b) => getAllyDisplayName(a).localeCompare(getAllyDisplayName(b))),
     [allies, selectedAllyIds],
   )
   const selectedGuildCharacters = useMemo(
@@ -41,13 +45,21 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
 
   const filteredOptions = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const allyOptions = allies.map((ally) => ({
+    const allyOptions = allies.map((ally) => {
+      const ownerName = getAllyOwnerName(ally)
+      return {
       key: `ally-${ally.id}`,
       type: 'ally' as const,
       id: ally.id,
-      label: ally.linked_character ? ally.linked_character.name : ally.name,
-      sublabel: ally.linked_character ? 'Linked guild member' : 'Custom ally',
-    }))
+      label: getAllyDisplayName(ally),
+      sublabel: ally.linked_character
+        ? ownerName
+          ? `Linked • ${ownerName}`
+          : 'Linked guild member'
+        : 'Custom ally',
+      ownerName,
+    }
+    })
     const guildOptions = availableGuildCharacters.map((character) => ({
       key: `guild-${character.id}`,
       type: 'guild' as const,
@@ -58,7 +70,9 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
 
     const combined = [...allyOptions, ...guildOptions]
     const filtered = query
-      ? combined.filter((option) => option.label.toLowerCase().includes(query))
+      ? combined.filter((option) =>
+          [option.label, option.sublabel].filter(Boolean).join(' ').toLowerCase().includes(query),
+        )
       : combined
     return filtered.sort((a, b) => a.label.localeCompare(b.label))
   }, [allies, availableGuildCharacters, search])
@@ -111,9 +125,10 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
               key={`selected-ally-${ally.id}`}
               type="button"
               onClick={() => toggleOption('ally', ally.id)}
+              title={getAllyOwnerName(ally) ? `Owner: ${getAllyOwnerName(ally)}` : undefined}
               className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary transition hover:border-primary/60"
             >
-              {ally.linked_character ? ally.linked_character.name : ally.name}
+              {getAllyDisplayName(ally)}
             </button>
           ))}
           {selectedGuildCharacters.map((character) => (

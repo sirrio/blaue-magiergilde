@@ -28,6 +28,7 @@ class Ally extends Model
 
     public function linkedCharacter(): BelongsTo
     {
-        return $this->belongsTo(Character::class, 'linked_character_id');
+        return $this->belongsTo(Character::class, 'linked_character_id')
+            ->with('user:id,name');
     }
 }

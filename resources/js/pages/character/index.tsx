@@ -76,7 +76,12 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     })
   }
 
-  const activeCharacterCount = characters.filter((char) => !char.deleted_at && !(char.is_filler || calculateTier(char) === 'et')).length
+  const activeCharacterCount = characters.filter((char) => {
+    if (char.deleted_at) return false
+    if (char.guild_status !== 'approved') return false
+    if (char.is_filler) return false
+    return ['bt', 'lt', 'ht'].includes(calculateTier(char))
+  }).length
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

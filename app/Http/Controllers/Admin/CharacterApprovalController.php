@@ -43,7 +43,7 @@ class CharacterApprovalController extends Controller
             });
         }
 
-        if (in_array($status, ['pending', 'approved', 'declined'], true)) {
+        if (in_array($status, ['pending', 'approved', 'declined', 'retired'], true)) {
             $charactersQuery->where('guild_status', $status);
         }
 
@@ -94,6 +94,11 @@ class CharacterApprovalController extends Controller
         ]);
 
         if (array_key_exists('guild_status', $data)) {
+            if ($character->guild_status === 'retired') {
+                return redirect()->back()->withErrors([
+                    'guild_status' => 'Retired characters cannot change status.',
+                ]);
+            }
             $previousStatus = $character->guild_status;
             $character->guild_status = $data['guild_status'];
             AdminAuditLog::query()->create([
@@ -142,7 +147,9 @@ class CharacterApprovalController extends Controller
             $characters = Character::query()->where('user_id', $user->id);
             $characterCount = (clone $characters)->count();
 
-            $characters->update(['guild_status' => 'declined']);
+            $characters->update([
+                'guild_status' => DB::raw("case when guild_status = 'approved' then 'retired' else guild_status end"),
+            ]);
             $characters->delete();
 
             $user->delete();

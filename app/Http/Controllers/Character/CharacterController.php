@@ -30,10 +30,7 @@ class CharacterController extends Controller
             ->get();
         $guildCharacters = Character::query()
             ->whereNull('deleted_at')
-            ->where(function ($query) {
-                $query->whereNull('guild_status')
-                    ->orWhere('guild_status', '!=', 'declined');
-            })
+            ->where('guild_status', 'approved')
             ->orderBy('name')
             ->get(['id', 'name', 'avatar', 'guild_status']);
         $games = Game::query()
@@ -86,10 +83,7 @@ class CharacterController extends Controller
     {
         $guildCharacters = Character::query()
             ->whereNull('deleted_at')
-            ->where(function ($query) {
-                $query->whereNull('guild_status')
-                    ->orWhere('guild_status', '!=', 'declined');
-            })
+            ->where('guild_status', 'approved')
             ->orderBy('name')
             ->get(['id', 'name', 'avatar', 'guild_status']);
 
@@ -135,7 +129,9 @@ class CharacterController extends Controller
      */
     public function destroy(Character $character): RedirectResponse
     {
-        $character->guild_status = 'declined';
+        if ($character->guild_status === 'approved') {
+            $character->guild_status = 'retired';
+        }
         $character->save();
 
         Adventure::query()

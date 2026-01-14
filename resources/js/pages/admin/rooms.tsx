@@ -32,7 +32,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInitials } from '@/hooks/use-initials'
 
 type RoomCharacterEntry = RoomCharacter & {
-  guild_status?: 'pending' | 'approved' | 'declined'
+  guild_status?: 'pending' | 'approved' | 'declined' | 'retired'
   user_name?: string | null
 }
 

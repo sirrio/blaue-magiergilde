@@ -9,7 +9,7 @@ import { calculateTier } from '@/helper/calculateTier'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, StickyNote, UserX, XCircle } from 'lucide-react'
+import { Archive, CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 interface FilterOption {
@@ -45,6 +45,7 @@ type CharacterGroup = {
 const getStatusLabel = (status?: string | null) => {
   if (status === 'approved') return 'approved'
   if (status === 'declined') return 'declined'
+  if (status === 'retired') return 'retired'
   return 'pending'
 }
 
@@ -181,6 +182,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     { label: 'Pending', value: 'pending' },
     { label: 'Approved', value: 'approved' },
     { label: 'Declined', value: 'declined' },
+    { label: 'Retired', value: 'retired' },
   ]
 
   const tierFilters: FilterOption[] = [
@@ -257,6 +259,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     pending: 'Pending',
     approved: 'Approved',
     declined: 'Declined',
+    retired: 'Retired',
   }
   const tierLabelMap: Record<string, string> = {
     bt: 'BT',
@@ -415,11 +418,13 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                                 status === 'approved' && 'text-success',
                                 status === 'declined' && 'text-error',
                                 status === 'pending' && 'text-warning',
+                                status === 'retired' && 'text-base-content/50',
                               )}
                             >
                               {status === 'approved' && <CheckCircle2 size={12} />}
                               {status === 'declined' && <XCircle size={12} />}
                               {status === 'pending' && <Clock size={12} />}
+                              {status === 'retired' && <Archive size={12} />}
                               <span className="capitalize">{status}</span>
                             </span>
                           </div>
@@ -430,7 +435,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                               modifier="square"
                               variant="ghost"
                               color="warning"
-                              disabled={status === 'pending'}
+                              disabled={status === 'pending' || status === 'retired'}
                               onClick={() =>
                                 router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'pending',
@@ -444,7 +449,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                               modifier="square"
                               variant="ghost"
                               color="success"
-                              disabled={status === 'approved'}
+                              disabled={status === 'approved' || status === 'retired'}
                               onClick={() =>
                                 router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'approved',
@@ -458,7 +463,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                               modifier="square"
                               variant="ghost"
                               color="error"
-                              disabled={status === 'declined'}
+                              disabled={status === 'declined' || status === 'retired'}
                               onClick={() =>
                                 router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'declined',

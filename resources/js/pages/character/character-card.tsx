@@ -23,7 +23,7 @@ import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Swords, Download, XCircle } from 'lucide-react'
+import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Swords, Download, XCircle } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -46,17 +46,27 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
   const guildStatus = character.guild_status ?? 'pending'
   const hasRoom = (character.room_count ?? 0) > 0
-  const statusLabel = guildStatus === 'approved' ? 'Approved' : guildStatus === 'declined' ? 'Declined' : 'Pending'
+  const statusLabel = guildStatus === 'approved'
+    ? 'Approved'
+    : guildStatus === 'declined'
+      ? 'Declined'
+      : guildStatus === 'retired'
+        ? 'Retired'
+        : 'Pending'
   const statusIcon = guildStatus === 'approved'
     ? <CheckCircle2 size={14} />
     : guildStatus === 'declined'
       ? <XCircle size={14} />
-      : <Clock size={14} />
+      : guildStatus === 'retired'
+        ? <Archive size={14} />
+        : <Clock size={14} />
   const statusClass = guildStatus === 'approved'
     ? 'text-success'
     : guildStatus === 'declined'
       ? 'text-error'
-      : 'text-warning'
+      : guildStatus === 'retired'
+        ? 'text-base-content/50'
+        : 'text-warning'
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
