@@ -57,10 +57,10 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
     }))
 
     const combined = [...allyOptions, ...guildOptions]
-    if (!query) {
-      return combined
-    }
-    return combined.filter((option) => option.label.toLowerCase().includes(query))
+    const filtered = query
+      ? combined.filter((option) => option.label.toLowerCase().includes(query))
+      : combined
+    return filtered.sort((a, b) => a.label.localeCompare(b.label))
   }, [allies, availableGuildCharacters, search])
 
   const toggleOption = (type: 'ally' | 'guild', id: number) => {

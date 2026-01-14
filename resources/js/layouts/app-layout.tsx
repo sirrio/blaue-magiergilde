@@ -95,6 +95,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const handbookChannelList = handbookChannels ?? []
   const showHandbookDropdown = handbookChannelList.length > 0
   const handbookLabel = 'Guild Handbook'
+  const formatHandbookChannelLabel = (name: string) => {
+    const normalized = name.replace(/-/g, ' ')
+    if (!normalized) {
+      return normalized
+    }
+    const withEmojiSpacing = normalized.replace(
+      /^(\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\u200D\p{Extended_Pictographic})*)\s*(\S)/u,
+      (_match, emoji, next) => `${emoji} ${next}`,
+    )
+    return withEmojiSpacing.replace(/\p{L}/u, (char) => char.toUpperCase())
+  }
 
   return (
     <div className={cn('bg-base-200 min-h-screen')}>
@@ -124,7 +135,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                               )}
                               href={route('handbook.index', { channel: channel.id })}
                             >
-                              {channel.name}
+                              {formatHandbookChannelLabel(channel.name)}
                             </Link>
                           </li>
                         ))}
@@ -207,7 +218,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                               channel.id === activeChannelId ? 'menu-active' : ''
                             )}
                           >
-                            {channel.name}
+                            {formatHandbookChannelLabel(channel.name)}
                           </Link>
                         </li>
                       ))}

@@ -669,8 +669,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="flex min-h-[520px] flex-col space-y-4">
+            <div className="flex min-h-[52px] items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase text-base-content/50">Ally details</p>
                 <h3 className="text-base font-semibold">{selectedAlly ? selectedAlly.name : 'Select an ally'}</h3>
@@ -680,37 +680,41 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
               </Button>
             </div>
 
-            {editingId ? (
-              editingId === 'new' ? (
-                <NewAllyCard
-                  isEditing={true}
-                  guildCharacters={guildCharacters}
-                  ownerCharacterId={character.id}
-                  linkedCharacterIds={linkedCharacterIds}
-                  onSave={handleSave}
-                  onCancel={handleCancel}
-                />
-              ) : selectedAlly ? (
-                <AllyCard
-                  ally={selectedAlly}
-                  isEditing={true}
-                  large
-                  guildCharacters={guildCharacters}
-                  linkedCharacterIds={linkedCharacterIds}
-                  onEdit={() => setEditingId(editingId)}
-                  onSave={handleSave}
-                  onCancel={handleCancel}
-                  onRemove={handleRemove}
-                />
-              ) : null
-            ) : (
-              <div className="space-y-3">
-                <AllySkeletonCard />
-                <p className="text-center text-xs text-base-content/60">
-                  Select an ally on the left to edit, or add a new ally.
-                </p>
+            <div className="flex-1 overflow-y-auto">
+              <div className="min-h-[420px]">
+                {editingId ? (
+                  editingId === 'new' ? (
+                    <NewAllyCard
+                      isEditing={true}
+                      guildCharacters={guildCharacters}
+                      ownerCharacterId={character.id}
+                      linkedCharacterIds={linkedCharacterIds}
+                      onSave={handleSave}
+                      onCancel={handleCancel}
+                    />
+                  ) : selectedAlly ? (
+                    <AllyCard
+                      ally={selectedAlly}
+                      isEditing={true}
+                      large
+                      guildCharacters={guildCharacters}
+                      linkedCharacterIds={linkedCharacterIds}
+                      onEdit={() => setEditingId(editingId)}
+                      onSave={handleSave}
+                      onCancel={handleCancel}
+                      onRemove={handleRemove}
+                    />
+                  ) : null
+                ) : (
+                  <div className="space-y-3">
+                    <AllySkeletonCard />
+                    <p className="text-center text-xs text-base-content/60">
+                      Select an ally on the left to edit, or add a new ally.
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </ModalContent>
