@@ -85,6 +85,30 @@ const normalizeAlly = (ally: Ally): Ally => ({
   linked_character: ally.linked_character ?? null,
 })
 
+const AllySkeletonCard = () => {
+  return (
+    <div className="card bg-base-200 border p-4 shadow min-h-[420px]" aria-hidden="true">
+      <div className="flex items-center gap-3">
+        <div className="h-16 w-16 rounded-full bg-base-300/70" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-40 rounded bg-base-300/80" />
+          <div className="h-3 w-28 rounded bg-base-300/60" />
+        </div>
+      </div>
+      <div className="mt-4 space-y-3">
+        <div className="h-8 w-full rounded bg-base-300/60" />
+        <div className="h-24 w-full rounded bg-base-300/60" />
+        <div className="h-8 w-full rounded bg-base-300/60" />
+        <div className="h-8 w-1/2 rounded bg-base-300/60" />
+      </div>
+      <div className="mt-4 flex gap-2">
+        <div className="h-7 w-16 rounded bg-base-300/70" />
+        <div className="h-7 w-20 rounded bg-base-300/70" />
+      </div>
+    </div>
+  )
+}
+
 const AllyCard: React.FC<AllyCardProps> = ({
   ally,
   guildCharacters,
@@ -100,6 +124,9 @@ const AllyCard: React.FC<AllyCardProps> = ({
   const [avatarSrc, setAvatarSrc] = useState('')
   const [editAvatarSrc, setEditAvatarSrc] = useState('')
   const { classes } = usePage<PageProps>().props
+  const linkedCharacterLookup = useMemo(() => {
+    return new Map(guildCharacters.map((character) => [character.id, character]))
+  }, [guildCharacters])
   useEffect(() => {
     setEditData(normalizeAlly(ally))
   }, [ally])
@@ -112,9 +139,10 @@ const AllyCard: React.FC<AllyCardProps> = ({
     setAvatarSrc(avatar)
   }, [ally])
   useEffect(() => {
-    const linkedAvatar = editData.linked_character?.avatar
-      ? `/storage/${editData.linked_character.avatar}`
-      : ''
+    const linkedCharacter =
+      editData.linked_character ??
+      (editData.linked_character_id ? linkedCharacterLookup.get(editData.linked_character_id) ?? null : null)
+    const linkedAvatar = linkedCharacter?.avatar ? `/storage/${linkedCharacter.avatar}` : ''
     if (linkedAvatar) {
       setEditAvatarSrc(linkedAvatar)
       return
@@ -130,7 +158,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
     const url = URL.createObjectURL(editData.avatar)
     setEditAvatarSrc(url)
     return () => URL.revokeObjectURL(url)
-  }, [editData.avatar])
+  }, [editData.avatar, editData.linked_character, editData.linked_character_id, linkedCharacterLookup])
   const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
     setEditData((current) => ({ ...current, [key]: value }))
   }
@@ -676,8 +704,11 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                 />
               ) : null
             ) : (
-              <div className="rounded-lg border border-dashed border-base-200 bg-base-100 p-6 text-sm text-base-content/60">
-                Select an ally on the left to edit, or add a new ally.
+              <div className="space-y-3">
+                <AllySkeletonCard />
+                <p className="text-center text-xs text-base-content/60">
+                  Select an ally on the left to edit, or add a new ally.
+                </p>
               </div>
             )}
           </div>
