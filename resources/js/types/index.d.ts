@@ -342,8 +342,10 @@ export interface Room {
 export interface Ally {
   id: number
   name: string
-  standing: 'best' | 'good' | 'normal' | 'bad'
+  rating: number
   character_id: number
+  linked_character_id?: number | null
+  linked_character?: Character | null
   avatar: string | File
   notes: string
   classes: string

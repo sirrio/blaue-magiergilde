@@ -33,7 +33,7 @@ class AllyController extends Controller
     {
         $ally = new Ally;
         $ally->name = $request->name;
-        $ally->standing = $request->standing;
+        $ally->rating = $request->rating;
         $ally->character_id = $request->character_id;
         if ($request->file('avatar')) {
             $ally->avatar = $request->file('avatar')->store('avatars', 'public');
@@ -41,6 +41,7 @@ class AllyController extends Controller
         $ally->notes = $request->notes;
         $ally->species = $request->species;
         $ally->classes = $request->classes;
+        $ally->linked_character_id = $request->linked_character_id;
         $ally->save();
 
         return redirect()->back();
@@ -68,13 +69,14 @@ class AllyController extends Controller
     public function update(UpdateAllyRequest $request, Ally $ally): RedirectResponse
     {
         $ally->name = $request->name;
-        $ally->standing = $request->standing;
+        $ally->rating = $request->rating;
         if ($request->file('avatar')) {
             $ally->avatar = $request->file('avatar')->store('avatars', 'public');
         }
         $ally->notes = $request->notes;
         $ally->species = $request->species;
         $ally->classes = $request->classes;
+        $ally->linked_character_id = $request->linked_character_id;
         $ally->save();
 
         return redirect()->back();

@@ -5,19 +5,66 @@ import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
-import { BookHeart, ChevronDown, ChevronRight, PlusCircle } from 'lucide-react'
+import { BookHeart, Heart, Link2, PlusCircle, User } from 'lucide-react'
 import React, { useEffect, useMemo, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import type { RequestPayload } from '@inertiajs/core'
 
 interface AlliesModalProps {
   character: Character
+  guildCharacters?: Character[]
 }
 
-const standingOrder = ['best', 'good', 'normal', 'bad']
+const getAllyAvatarSrc = (ally: Ally) => {
+  if (ally.linked_character?.avatar) {
+    return `/storage/${ally.linked_character.avatar}`
+  }
+  if (ally.avatar && typeof ally.avatar === 'string') {
+    return `/storage/${ally.avatar}`
+  }
+  return ''
+}
+
+const RatingHearts = ({
+  rating,
+  onSelect,
+}: {
+  rating: number
+  onSelect?: (value: number) => void
+}) => {
+  const normalized = Math.max(1, Math.min(5, rating || 3))
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: 5 }, (_, index) => {
+        const value = index + 1
+        const icon = (
+          <Heart
+            size={16}
+            className={value <= normalized ? 'fill-current text-primary' : 'text-base-content/30'}
+          />
+        )
+        return onSelect ? (
+          <button
+            key={value}
+            type="button"
+            className="transition hover:scale-105"
+            onClick={() => onSelect(value)}
+            aria-label={`Set rating to ${value}`}
+          >
+            {icon}
+          </button>
+        ) : (
+          <span key={value}>{icon}</span>
+        )
+      })}
+    </div>
+  )
+}
 
 interface AllyCardProps {
   ally: Ally
+  guildCharacters: Character[]
+  linkedCharacterIds: number[]
   isEditing: boolean
   onEdit: () => void
   onSave: (ally: Ally) => void
@@ -26,28 +73,52 @@ interface AllyCardProps {
   large?: boolean
 }
 
-const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, onCancel, onRemove, large = false }) => {
-  const [editData, setEditData] = useState<Ally>({ ...ally })
+const normalizeAlly = (ally: Ally): Ally => ({
+  ...ally,
+  name: ally.name ?? '',
+  notes: ally.notes ?? '',
+  avatar: ally.avatar ?? '',
+  classes: ally.classes ?? '',
+  species: ally.species ?? '',
+  rating: ally.rating ?? 3,
+  linked_character_id: ally.linked_character_id ?? null,
+  linked_character: ally.linked_character ?? null,
+})
+
+const AllyCard: React.FC<AllyCardProps> = ({
+  ally,
+  guildCharacters,
+  linkedCharacterIds,
+  isEditing,
+  onEdit,
+  onSave,
+  onCancel,
+  onRemove,
+  large = false,
+}) => {
+  const [editData, setEditData] = useState<Ally>(() => normalizeAlly(ally))
   const [avatarSrc, setAvatarSrc] = useState('')
   const [editAvatarSrc, setEditAvatarSrc] = useState('')
   const { classes } = usePage<PageProps>().props
   useEffect(() => {
-    setEditData({ ...ally })
+    setEditData(normalizeAlly(ally))
   }, [ally])
   useEffect(() => {
-    if (!ally.avatar) {
+    const avatar = getAllyAvatarSrc(ally)
+    if (!avatar) {
       setAvatarSrc('')
       return
     }
-    if (typeof ally.avatar === 'string') {
-      setAvatarSrc(`/storage/${ally.avatar}`)
+    setAvatarSrc(avatar)
+  }, [ally])
+  useEffect(() => {
+    const linkedAvatar = editData.linked_character?.avatar
+      ? `/storage/${editData.linked_character.avatar}`
+      : ''
+    if (linkedAvatar) {
+      setEditAvatarSrc(linkedAvatar)
       return
     }
-    const url = URL.createObjectURL(ally.avatar)
-    setAvatarSrc(url)
-    return () => URL.revokeObjectURL(url)
-  }, [ally.avatar])
-  useEffect(() => {
     if (!editData.avatar) {
       setEditAvatarSrc('')
       return
@@ -61,8 +132,20 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
     return () => URL.revokeObjectURL(url)
   }, [editData.avatar])
   const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
-    setEditData({ ...editData, [key]: value })
+    setEditData((current) => ({ ...current, [key]: value }))
   }
+  const linkedOptions = useMemo(() => {
+    const linkedSet = new Set(linkedCharacterIds)
+    return guildCharacters.filter((character) => {
+      if (character.id === ally.character_id) {
+        return false
+      }
+      if (ally.linked_character_id === character.id) {
+        return true
+      }
+      return !linkedSet.has(character.id)
+    })
+  }, [guildCharacters, linkedCharacterIds, ally.character_id, ally.linked_character_id])
   if (!isEditing) {
     return (
       <div
@@ -81,11 +164,20 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
             )}
           </div>
           <div className="flex-1">
-            <h4 className="truncate font-bold">{ally.name || 'Unnamed Ally'}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="truncate font-bold">
+                {(ally.linked_character?.name ?? ally.name) || 'Unnamed Ally'}
+              </h4>
+              <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
+                {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
+                {ally.linked_character_id ? 'Linked' : 'Custom'}
+              </span>
+            </div>
             <p className="text-base-content text-xs">
               {ally.classes && ally.classes.trim() !== '' ? ally.classes : 'No classes'} &bull;{' '}
               {ally.species && ally.species.trim() !== '' ? ally.species : 'No species'}
             </p>
+            <RatingHearts rating={ally.rating} />
           </div>
         </div>
       </div>
@@ -105,13 +197,40 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
         </div>
         <Input
           type="text"
-          value={editData.name}
+          value={editData.name ?? ''}
           placeholder="Name"
           onChange={(e) => handleChange('name', e.target.value)}
           className="flex-1"
         >
           Name
         </Input>
+      </div>
+      <div className="mb-1">
+        <label className="label">Linked guild member</label>
+        <select
+          value={editData.linked_character_id ?? ''}
+          onChange={(e) => {
+            const value = e.target.value ? Number(e.target.value) : null
+            const linked = linkedOptions.find((entry) => entry.id === value) ?? null
+            setEditData((current) => ({
+              ...current,
+              linked_character_id: value as Ally['linked_character_id'],
+              linked_character: linked as Ally['linked_character'],
+              name:
+                linked && (!current.name || current.name.trim() === '')
+                  ? (linked.name as Ally['name'])
+                  : current.name,
+            }))
+          }}
+          className="input input-bordered input-xs mb-2 w-full"
+        >
+          <option value="">Custom ally (no link)</option>
+          {linkedOptions.map((character) => (
+            <option key={character.id} value={character.id}>
+              {character.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="mb-1">
         <label className="label">Classes</label>
@@ -148,7 +267,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       </div>
       <Input
         type="text"
-        value={editData.species}
+        value={editData.species ?? ''}
         placeholder="Species"
         onChange={(e) => handleChange('species', e.target.value)}
         className="mb-1"
@@ -157,7 +276,7 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       </Input>
       <div className="mb-1">
         <TextArea
-          value={editData.notes}
+          value={editData.notes ?? ''}
           placeholder="Notes"
           onChange={(e) => handleChange('notes', e.target.value)}
         >
@@ -167,18 +286,10 @@ const AllyCard: React.FC<AllyCardProps> = ({ ally, isEditing, onEdit, onSave, on
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
-      <label className="label">Standing</label>
-      <select
-        value={editData.standing}
-        onChange={(e) => handleChange('standing', e.target.value as Ally['standing'])}
-        className="input input-bordered input-xs mb-2 w-full"
-      >
-        {standingOrder.map((stand) => (
-          <option key={stand} value={stand}>
-            {stand.charAt(0).toUpperCase() + stand.slice(1)}
-          </option>
-        ))}
-      </select>
+      <div className="mb-2">
+        <label className="label">Rating</label>
+        <RatingHearts rating={editData.rating} onSelect={(value) => handleChange('rating', value as Ally['rating'])} />
+      </div>
       <div className="flex gap-2">
         <Button size="xs" onClick={() => onSave(editData)}>
           Save
@@ -203,18 +314,13 @@ interface AllyRowProps {
 const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
   const [avatarSrc, setAvatarSrc] = useState('')
   useEffect(() => {
-    if (!ally.avatar) {
+    const avatar = getAllyAvatarSrc(ally)
+    if (!avatar) {
       setAvatarSrc('')
       return
     }
-    if (typeof ally.avatar === 'string') {
-      setAvatarSrc(`/storage/${ally.avatar}`)
-      return
-    }
-    const url = URL.createObjectURL(ally.avatar)
-    setAvatarSrc(url)
-    return () => URL.revokeObjectURL(url)
-  }, [ally.avatar])
+    setAvatarSrc(avatar)
+  }, [ally])
 
   return (
     <button
@@ -233,20 +339,31 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{ally.name || 'Unnamed Ally'}</p>
+          <p className="truncate text-sm font-semibold">
+            {(ally.linked_character?.name ?? ally.name) || 'Unnamed Ally'}
+          </p>
           <p className="truncate text-xs text-base-content/60">
             {ally.classes && ally.classes.trim() !== '' ? ally.classes : 'No classes'} •{' '}
             {ally.species && ally.species.trim() !== '' ? ally.species : 'No species'}
           </p>
         </div>
       </div>
-      <span className="text-xs capitalize text-base-content/60">{ally.standing}</span>
+      <div className="flex flex-col items-end gap-1">
+        <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
+          {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
+          {ally.linked_character_id ? 'Linked' : 'Custom'}
+        </span>
+        <RatingHearts rating={ally.rating} />
+      </div>
     </button>
   )
 }
 
 interface NewAllyCardProps {
   isEditing: boolean
+  guildCharacters: Character[]
+  ownerCharacterId: number
+  linkedCharacterIds: number[]
   onSave: (ally: Ally) => void
   onCancel: () => void
   onEdit?: () => void
@@ -254,23 +371,35 @@ interface NewAllyCardProps {
 
 const NewAllyCard: React.FC<NewAllyCardProps> = ({
   isEditing,
+  guildCharacters,
+  ownerCharacterId,
+  linkedCharacterIds,
   onSave,
   onCancel,
   onEdit,
 }) => {
   const [editData, setEditData] = useState<Ally>({
-    character_id: 0,
+    character_id: ownerCharacterId,
     id: 0,
     name: '',
     notes: '',
-      avatar: '',
+    avatar: '',
     classes: '',
     species: '',
-    standing: 'normal',
+    rating: 3,
+    linked_character_id: null,
+    linked_character: null,
   })
   const { classes } = usePage<PageProps>().props
+  const linkedOptions = useMemo(
+    () => {
+      const linkedSet = new Set(linkedCharacterIds)
+      return guildCharacters.filter((entry) => entry.id !== ownerCharacterId && !linkedSet.has(entry.id))
+    },
+    [guildCharacters, linkedCharacterIds, ownerCharacterId],
+  )
   const handleChange = <K extends keyof Ally>(key: K, value: Ally[K]) => {
-    setEditData({ ...editData, [key]: value })
+    setEditData((current) => ({ ...current, [key]: value }))
   }
   if (!isEditing) {
     return (
@@ -287,13 +416,40 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
     <div className="card bg-base-200 border p-2 shadow">
       <Input
         type="text"
-        value={editData.name}
+        value={editData.name ?? ''}
         placeholder="Name"
         onChange={(e) => handleChange('name', e.target.value)}
         className="mb-1"
       >
         Name
       </Input>
+      <div className="mb-1">
+        <label className="label">Linked guild member</label>
+        <select
+          value={editData.linked_character_id ?? ''}
+          onChange={(e) => {
+            const value = e.target.value ? Number(e.target.value) : null
+            const linked = linkedOptions.find((entry) => entry.id === value) ?? null
+            setEditData((current) => ({
+              ...current,
+              linked_character_id: value as Ally['linked_character_id'],
+              linked_character: linked as Ally['linked_character'],
+              name:
+                linked && (!current.name || current.name.trim() === '')
+                  ? (linked.name as Ally['name'])
+                  : current.name,
+            }))
+          }}
+          className="input input-bordered input-xs mb-2 w-full"
+        >
+          <option value="">Custom ally (no link)</option>
+          {linkedOptions.map((character) => (
+            <option key={character.id} value={character.id}>
+              {character.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="mb-1">
         <label className="label">Classes</label>
         <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
@@ -329,7 +485,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       </div>
       <Input
         type="text"
-        value={editData.species}
+        value={editData.species ?? ''}
         placeholder="Species"
         onChange={(e) => handleChange('species', e.target.value)}
         className="mb-1"
@@ -338,7 +494,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       </Input>
       <div className="mb-1">
         <TextArea
-          value={editData.notes}
+          value={editData.notes ?? ''}
           placeholder="Notes"
           onChange={(e) => handleChange('notes', e.target.value)}
         >
@@ -348,18 +504,10 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
         Avatar
       </FileInput>
-      <label className="label">Standing</label>
-      <select
-        value={editData.standing}
-        onChange={(e) => handleChange('standing', e.target.value as Ally['standing'])}
-        className="input input-bordered input-xs mb-2 w-full"
-      >
-        {standingOrder.map((stand) => (
-          <option key={stand} value={stand}>
-            {stand.charAt(0).toUpperCase() + stand.slice(1)}
-          </option>
-        ))}
-      </select>
+      <div className="mb-2">
+        <label className="label">Rating</label>
+        <RatingHearts rating={editData.rating} onSelect={(value) => handleChange('rating', value as Ally['rating'])} />
+      </div>
       <div className="flex gap-2">
         <Button size="xs" onClick={() => onSave(editData)}>
           Save
@@ -372,17 +520,14 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
   )
 }
 
-export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
+export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharacters = [] }) => {
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [search, setSearch] = useState('')
-  const [standingFilter, setStandingFilter] = useState<'all' | Ally['standing']>('all')
-  const [openStandings, setOpenStandings] = useState<Record<Ally['standing'], boolean>>({
-    best: false,
-    good: false,
-    normal: false,
-    bad: false,
-  })
+  const linkedCharacterIds = useMemo(
+    () => allies.map((ally) => ally.linked_character_id).filter(Boolean) as number[],
+    [allies],
+  )
   const handleSave = (ally: Ally) => {
     const payload: RequestPayload = { ...ally }
     if (ally.id === 0) {
@@ -390,6 +535,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
     } else {
       payload._method = 'put'
     }
+    delete payload.linked_character
     if (!payload.avatar || typeof payload.avatar === 'string') {
       delete payload.avatar
     }
@@ -418,48 +564,21 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
     const query = search.trim().toLowerCase()
     const filtered = query
       ? allies.filter((ally) => {
-          const haystack = [ally.name, ally.classes, ally.species].filter(Boolean).join(' ').toLowerCase()
+          const haystack = [
+            ally.linked_character?.name ?? ally.name,
+            ally.classes,
+            ally.species,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
           return haystack.includes(query)
         })
       : allies
-    if (standingFilter === 'all') {
-      return filtered
-    }
-    return filtered.filter((ally) => ally.standing === standingFilter)
-  }, [allies, search, standingFilter])
-
-  useEffect(() => {
-    if (search.trim() !== '' || standingFilter !== 'all') {
-      setOpenStandings({
-        best: true,
-        good: true,
-        normal: true,
-        bad: true,
-      })
-    }
-  }, [search, standingFilter])
-
-  const grouped = standingOrder.map((standing) => ({
-    standing,
-    allies: filteredAllies.filter((ally) => ally.standing === standing),
-  }))
-  const visibleGroups =
-    standingFilter === 'all'
-      ? grouped
-      : grouped.filter((group) => group.standing === standingFilter)
-
-  const toggleStanding = (standing: Ally['standing']) => {
-    setOpenStandings((current) => ({ ...current, [standing]: !current[standing] }))
-  }
-
-  const setAllStandings = (isOpen: boolean) => {
-    setOpenStandings({
-      best: isOpen,
-      good: isOpen,
-      normal: isOpen,
-      bad: isOpen,
-    })
-  }
+    return [...filtered].sort((a, b) =>
+      (a.linked_character?.name ?? a.name).localeCompare(b.linked_character?.name ?? b.name),
+    )
+  }, [allies, search])
 
   const selectedAlly = useMemo(() => {
     if (editingId === null || editingId === 'new') {
@@ -487,14 +606,6 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
                 <p className="text-xs font-semibold uppercase text-base-content/50">Assigned allies</p>
                 <h3 className="text-base font-semibold">{allies.length} total</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <Button size="xs" variant="ghost" onClick={() => setAllStandings(true)}>
-                  Expand all
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => setAllStandings(false)}>
-                  Collapse all
-                </Button>
-              </div>
             </div>
 
             <div className="space-y-2">
@@ -508,68 +619,25 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
                 Search allies
               </Input>
               <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { label: 'All', value: 'all' as const },
-                  { label: 'Best', value: 'best' as const },
-                  { label: 'Good', value: 'good' as const },
-                  { label: 'Normal', value: 'normal' as const },
-                  { label: 'Bad', value: 'bad' as const },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`rounded-full border px-3 py-1 text-xs transition ${
-                      standingFilter === option.value
-                        ? 'border-primary/60 bg-primary/10 text-primary'
-                        : 'border-base-200 text-base-content/70 hover:border-primary/40 hover:text-primary'
-                    }`}
-                    onClick={() => setStandingFilter(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
                 <span className="text-xs text-base-content/60">
                   {search.trim() !== '' ? `${filteredAllies.length} matches` : `${filteredAllies.length} shown`}
                 </span>
               </div>
             </div>
 
-            <div className="max-h-[45vh] space-y-4 overflow-y-auto pr-1">
-              {visibleGroups.map(({ standing, allies: group }) => (
-                <div key={standing} className="rounded-lg border border-base-200 bg-base-100">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold capitalize"
-                    onClick={() => toggleStanding(standing as Ally['standing'])}
-                    aria-expanded={openStandings[standing as Ally['standing']]}
-                  >
-                    <span className="flex items-center gap-2">
-                      {openStandings[standing as Ally['standing']] ? (
-                        <ChevronDown size={14} />
-                      ) : (
-                        <ChevronRight size={14} />
-                      )}
-                      {standing} <span className="text-xs text-base-content/50">({group.length})</span>
-                    </span>
-                  </button>
-                  {openStandings[standing as Ally['standing']] ? (
-                    <div className="space-y-2 border-t border-base-200 px-3 pb-3 pt-2">
-                      {group.length > 0 ? (
-                        group.map((ally) => (
-                          <AllyRow
-                            key={ally.id}
-                            ally={ally}
-                            isSelected={editingId === ally.id}
-                            onSelect={() => handleSelectAlly(ally.id)}
-                          />
-                        ))
-                      ) : (
-                        <p className="text-xs text-base-content/60">No allies in this category.</p>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+            <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+              {filteredAllies.length > 0 ? (
+                filteredAllies.map((ally) => (
+                  <AllyRow
+                    key={ally.id}
+                    ally={ally}
+                    isSelected={editingId === ally.id}
+                    onSelect={() => handleSelectAlly(ally.id)}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-base-content/60">No allies found.</p>
+              )}
             </div>
           </div>
 
@@ -586,12 +654,21 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character }) => {
 
             {editingId ? (
               editingId === 'new' ? (
-                <NewAllyCard isEditing={true} onSave={handleSave} onCancel={handleCancel} />
+                <NewAllyCard
+                  isEditing={true}
+                  guildCharacters={guildCharacters}
+                  ownerCharacterId={character.id}
+                  linkedCharacterIds={linkedCharacterIds}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                />
               ) : selectedAlly ? (
                 <AllyCard
                   ally={selectedAlly}
                   isEditing={true}
                   large
+                  guildCharacters={guildCharacters}
+                  linkedCharacterIds={linkedCharacterIds}
                   onEdit={() => setEditingId(editingId)}
                   onSave={handleSave}
                   onCancel={handleCancel}

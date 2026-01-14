@@ -24,8 +24,12 @@ class UpdateAllyRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'standing' => 'required|string',
+            'rating' => 'required|integer|min:1|max:5',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
+            'notes' => 'nullable|string',
+            'species' => 'nullable|string|max:255',
+            'classes' => 'nullable|string|max:255',
+            'linked_character_id' => 'nullable|integer|exists:characters,id',
         ];
     }
 }

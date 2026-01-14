@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { TextArea } from '@/components/ui/text-area'
-import AdventureAllyPicker from '@/pages/character/adventure-ally-picker'
+import AdventureParticipantPicker from '@/pages/character/adventure-ally-picker'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Droplets, Swords } from 'lucide-react'
@@ -14,7 +14,7 @@ const MIN_DURATION = 0
 const FIFTEEN_MINUTES_DELTA = 900
 const ONE_HOUR_DELTA = 3600
 
-const StoreAdventureModal = ({ character }: { character: Character }) => {
+const StoreAdventureModal = ({ character, guildCharacters = [] }: { character: Character; guildCharacters?: Character[] }) => {
   const initialFormData = {
     duration: 10800,
     character_id: character.id,
@@ -24,6 +24,7 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
     title: '',
     game_master: '',
     ally_ids: [] as number[],
+    guild_character_ids: [] as number[],
   }
 
   const { data, setData, post } = useForm(initialFormData)
@@ -141,10 +142,15 @@ const StoreAdventureModal = ({ character }: { character: Character }) => {
           <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
-          <AdventureAllyPicker
+          <AdventureParticipantPicker
             allies={character.allies ?? []}
-            selectedIds={data.ally_ids}
-            onChange={(ids) => setData('ally_ids', ids)}
+            guildCharacters={guildCharacters.filter((entry) => entry.id !== character.id)}
+            selectedAllyIds={data.ally_ids}
+            selectedGuildCharacterIds={data.guild_character_ids}
+            onChange={({ allyIds, guildCharacterIds }) => {
+              setData('ally_ids', allyIds)
+              setData('guild_character_ids', guildCharacterIds)
+            }}
           />
         </form>
       </ModalContent>

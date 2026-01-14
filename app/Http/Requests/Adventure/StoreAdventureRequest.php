@@ -47,6 +47,11 @@ class StoreAdventureRequest extends FormRequest
                 'integer',
                 Rule::exists('allies', 'id')->where('character_id', $characterId),
             ],
+            'guild_character_ids' => 'nullable|array',
+            'guild_character_ids.*' => [
+                'integer',
+                Rule::exists('characters', 'id')->whereNull('deleted_at'),
+            ],
         ];
     }
 }

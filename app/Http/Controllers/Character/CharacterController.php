@@ -28,6 +28,14 @@ class CharacterController extends Controller
             ->with('adventures')
             ->orderBy('position')
             ->get();
+        $guildCharacters = Character::query()
+            ->whereNull('deleted_at')
+            ->where(function ($query) {
+                $query->whereNull('guild_status')
+                    ->orWhere('guild_status', '!=', 'declined');
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'avatar', 'guild_status']);
         $games = Game::query()
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->get();
@@ -35,6 +43,7 @@ class CharacterController extends Controller
         return Inertia::render('character/index', [
             'user' => Auth::user(),
             'characters' => $characters,
+            'guildCharacters' => $guildCharacters,
             'games' => $games,
         ]);
     }
@@ -75,8 +84,18 @@ class CharacterController extends Controller
      */
     public function show(Character $character): Response
     {
+        $guildCharacters = Character::query()
+            ->whereNull('deleted_at')
+            ->where(function ($query) {
+                $query->whereNull('guild_status')
+                    ->orWhere('guild_status', '!=', 'declined');
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'avatar', 'guild_status']);
+
         return Inertia::render('character/show', [
-            'character' => $character->load('adventures.allies'),
+            'character' => $character->load('adventures.allies.linkedCharacter'),
+            'guildCharacters' => $guildCharacters,
         ]);
     }
 

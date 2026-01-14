@@ -7,7 +7,7 @@ import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { Character, Ally } from '@/types'
 import { Head, Link } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, Settings } from 'lucide-react'
+import { ChevronDown, ChevronRight, Heart, Settings } from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
 import { useMemo, useState } from 'react'
@@ -22,12 +22,35 @@ function CharacterPortrait({ character, className }: { character: Character; cla
 
 function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
   const { src } = useImage({
-    srcList: ally.avatar ? ['/storage/' + ally.avatar, '/images/no-avatar.svg'] : ['/images/no-avatar.svg'],
+    srcList: ally.linked_character?.avatar
+      ? [`/storage/${ally.linked_character.avatar}`, '/images/no-avatar.svg']
+      : ally.avatar
+        ? ['/storage/' + ally.avatar, '/images/no-avatar.svg']
+        : ['/images/no-avatar.svg'],
   })
-  return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={ally.name} />
+  return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={ally.linked_character?.name ?? ally.name} />
 }
 
-export default function Show({ character }: { character: Character }) {
+function RatingHearts({ rating }: { rating: number }) {
+  const normalized = Math.max(1, Math.min(5, rating || 3))
+  return (
+    <div className="flex items-center gap-0.5 text-primary">
+      {Array.from({ length: 5 }, (_, index) => (
+        <Heart key={index} size={14} className={index < normalized ? 'fill-current' : 'text-base-content/30'} />
+      ))}
+    </div>
+  )
+}
+
+const formatParticipantSummary = (names: string[]) => {
+  const unique = Array.from(new Set(names.filter(Boolean)))
+  if (unique.length === 0) return ''
+  const visible = unique.slice(0, 3).join(', ')
+  const remaining = unique.length - 3
+  return remaining > 0 ? `${visible} +${remaining} more` : visible
+}
+
+export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
   const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
   const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
   const [adventuresOpen, setAdventuresOpen] = useState(
@@ -132,6 +155,9 @@ export default function Show({ character }: { character: Character }) {
                         const notes = adventureNotesMap.get(adv.id) ?? ''
                         const showToggle = notes.length > 140
                         const isExpanded = expandedAdventures.includes(adv.id)
+                        const participantSummary = formatParticipantSummary(
+                          (adv.allies ?? []).map((ally) => ally.linked_character?.name ?? ally.name),
+                        )
                         return (
                           <ListRow
                             key={adv.id}
@@ -139,6 +165,9 @@ export default function Show({ character }: { character: Character }) {
                           >
                             <div className="min-w-0">
                               <h3 className="truncate text-sm font-medium">{adv.title || 'Adventure'}</h3>
+                              {participantSummary ? (
+                                <p className="text-xs text-base-content/50">Played with: {participantSummary}</p>
+                              ) : null}
                             </div>
                             <div className="min-w-0 space-y-1">
                               <p
@@ -166,7 +195,7 @@ export default function Show({ character }: { character: Character }) {
                               {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                             </div>
                             <div className="flex justify-end">
-                              <UpdateAdventureModal adventure={adv} allies={character.allies}>
+                              <UpdateAdventureModal adventure={adv} allies={character.allies} guildCharacters={guildCharacters}>
                                 <Button
                                   size="xs"
                                   modifier="square"
@@ -327,9 +356,16 @@ export default function Show({ character }: { character: Character }) {
                         >
                           <div className="flex min-w-0 items-center gap-3">
                             <AllyPortrait ally={ally} className="h-9 w-9" />
-                            <span className="truncate text-sm font-medium">{ally.name}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-sm font-medium">
+                              {ally.linked_character?.name ?? ally.name}
+                            </span>
+                            <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
+                              {ally.linked_character_id ? 'Linked' : 'Custom'}
+                            </span>
                           </div>
-                          <span className="text-sm capitalize">{ally.standing}</span>
+                        </div>
+                          <RatingHearts rating={ally.rating} />
                           <span className="truncate text-sm text-base-content/70">{ally.classes || '-'}</span>
                         </ListRow>
                       ))}

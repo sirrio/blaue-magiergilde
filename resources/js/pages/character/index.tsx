@@ -15,7 +15,7 @@ import type { PageProps } from '@/types'
 import { BookUser, Copy, Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 
-export default function Index({ characters }: { characters: Character[] }) {
+export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const { features } = usePage<PageProps>().props
   const visibleCharacters = characters.filter((char) => !char.deleted_at)
   const [chars, setChars] = useState([...visibleCharacters])
@@ -164,7 +164,7 @@ export default function Index({ characters }: { characters: Character[] }) {
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
-                  <CharacterCard key={char.id} character={char} />
+                  <CharacterCard key={char.id} character={char} guildCharacters={guildCharacters} />
                 ))}
               </SortableContext>
             </DndContext>

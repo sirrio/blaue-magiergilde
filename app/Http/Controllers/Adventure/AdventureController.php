@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Adventure\StoreAdventureRequest;
 use App\Http\Requests\Adventure\UpdateAdventureRequest;
 use App\Models\Adventure;
+use App\Models\Ally;
+use App\Models\Character;
 
 class AdventureController extends Controller
 {
@@ -39,7 +41,13 @@ class AdventureController extends Controller
         $adventure->has_additional_bubble = $request->has_additional_bubble;
         $adventure->notes = $request->notes;
         $adventure->save();
-        $adventure->allies()->sync($request->input('ally_ids', []));
+        $allyIds = $request->input('ally_ids', []);
+        $guildCharacterIds = array_values(array_unique(array_filter(
+            $request->input('guild_character_ids', []),
+            fn ($id) => (int) $id !== (int) $adventure->character_id,
+        )));
+        $guildAllies = $this->resolveGuildAllies($adventure->character_id, $guildCharacterIds);
+        $adventure->allies()->sync(array_unique([...$allyIds, ...$guildAllies]));
 
         return redirect()->back();
     }
@@ -72,7 +80,13 @@ class AdventureController extends Controller
         $adventure->has_additional_bubble = $request->has_additional_bubble;
         $adventure->notes = $request->notes;
         $adventure->save();
-        $adventure->allies()->sync($request->input('ally_ids', []));
+        $allyIds = $request->input('ally_ids', []);
+        $guildCharacterIds = array_values(array_unique(array_filter(
+            $request->input('guild_character_ids', []),
+            fn ($id) => (int) $id !== (int) $adventure->character_id,
+        )));
+        $guildAllies = $this->resolveGuildAllies($adventure->character_id, $guildCharacterIds);
+        $adventure->allies()->sync(array_unique([...$allyIds, ...$guildAllies]));
 
         return redirect()->back();
     }
@@ -85,5 +99,43 @@ class AdventureController extends Controller
         $adventure->delete();
 
         return redirect()->back();
+    }
+
+    private function resolveGuildAllies(int $characterId, array $guildCharacterIds): array
+    {
+        if (count($guildCharacterIds) === 0) {
+            return [];
+        }
+
+        $existing = Ally::query()
+            ->where('character_id', $characterId)
+            ->whereIn('linked_character_id', $guildCharacterIds)
+            ->get()
+            ->keyBy('linked_character_id');
+
+        $characters = Character::query()
+            ->whereIn('id', $guildCharacterIds)
+            ->where(function ($query) {
+                $query->whereNull('guild_status')
+                    ->orWhere('guild_status', '!=', 'declined');
+            })
+            ->get(['id', 'name']);
+
+        $createdIds = [];
+
+        foreach ($characters as $character) {
+            $ally = $existing->get($character->id);
+            if (! $ally) {
+                $ally = new Ally;
+                $ally->character_id = $characterId;
+                $ally->linked_character_id = $character->id;
+                $ally->name = $character->name;
+                $ally->rating = 3;
+                $ally->save();
+            }
+            $createdIds[] = $ally->id;
+        }
+
+        return $createdIds;
     }
 }

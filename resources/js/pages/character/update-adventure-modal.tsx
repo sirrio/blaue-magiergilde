@@ -3,8 +3,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { TextArea } from '@/components/ui/text-area'
-import AdventureAllyPicker from '@/pages/character/adventure-ally-picker'
-import { Adventure, Ally, PageProps } from '@/types'
+import AdventureParticipantPicker from '@/pages/character/adventure-ally-picker'
+import { Adventure, Ally, Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import React from 'react'
@@ -17,10 +17,12 @@ const ONE_HOUR_DELTA = 3600
 const UpdateAdventureModal = ({
   adventure,
   allies = [],
+  guildCharacters = [],
   children,
 }: {
   adventure: Adventure
   allies?: Ally[]
+  guildCharacters?: Character[]
   children?: React.ReactNode
 }) => {
   const initialFormData = {
@@ -32,6 +34,7 @@ const UpdateAdventureModal = ({
     title: adventure.title ?? '',
     game_master: adventure.game_master ?? '',
     ally_ids: adventure.allies?.map((ally) => ally.id) ?? [],
+    guild_character_ids: [] as number[],
   }
 
   const { data, setData, post } = useForm(initialFormData)
@@ -118,10 +121,15 @@ const UpdateAdventureModal = ({
           <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
-          <AdventureAllyPicker
+          <AdventureParticipantPicker
             allies={allies}
-            selectedIds={data.ally_ids}
-            onChange={(ids) => setData('ally_ids', ids)}
+            guildCharacters={guildCharacters.filter((entry) => entry.id !== adventure.character_id)}
+            selectedAllyIds={data.ally_ids}
+            selectedGuildCharacterIds={data.guild_character_ids}
+            onChange={({ allyIds, guildCharacterIds }) => {
+              setData('ally_ids', allyIds)
+              setData('guild_character_ids', guildCharacterIds)
+            }}
           />
         </form>
       </ModalContent>

@@ -35,7 +35,7 @@ function CharacterImage({ character, className }: { character: Character; classN
   return <img className={cn('aspect-square w-full rounded-full', className)} src={src} alt={character.name} />
 }
 
-export function CharacterCard({ character }: { character: Character }) {
+export function CharacterCard({ character, guildCharacters = [] }: { character: Character; guildCharacters?: Character[] }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
 
@@ -183,9 +183,9 @@ export function CharacterCard({ character }: { character: Character }) {
                 <BookOpen size={14} />
                 Details
               </Button>
-              <StoreAdventureModal character={character}></StoreAdventureModal>
+              <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
               <StoreDowntimeModal character={character}></StoreDowntimeModal>
-              <AlliesModal character={character} />
+              <AlliesModal character={character} guildCharacters={guildCharacters} />
               <Button
                 as="a"
                 size="sm"

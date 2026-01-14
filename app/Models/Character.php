@@ -34,7 +34,7 @@ class Character extends Model
      *
      * @var array
      */
-    protected $with = ['allies', 'downtimes', 'characterClasses'];
+    protected $with = ['allies.linkedCharacter', 'downtimes', 'characterClasses'];
 
     protected $casts = [
         'is_filler' => 'boolean',

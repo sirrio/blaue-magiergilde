@@ -22,7 +22,7 @@ class CharacterDownloadResource extends JsonResource
             'classes' => $this->whenLoaded('characterClasses')->pluck('name'),
             'allies' => $this->whenLoaded('allies')->map(fn($ally) => [
                 'name' => $ally->name,
-                'standing' => $ally->standing,
+                'rating' => $ally->rating,
             ]),
             'adventures' => $this->whenLoaded('adventures')->map(fn($adv) => [
                 'title' => $adv->title,

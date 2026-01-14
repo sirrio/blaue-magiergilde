@@ -1,45 +1,88 @@
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { Ally } from '@/types'
+import { Ally, Character } from '@/types'
+import { User } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
-interface AdventureAllyPickerProps {
+interface AdventureParticipantPickerProps {
   allies: Ally[]
-  selectedIds: number[]
-  onChange: (ids: number[]) => void
+  guildCharacters: Character[]
+  selectedAllyIds: number[]
+  selectedGuildCharacterIds: number[]
+  onChange: (payload: { allyIds: number[]; guildCharacterIds: number[] }) => void
 }
 
-const AdventureAllyPicker: React.FC<AdventureAllyPickerProps> = ({ allies, selectedIds, onChange }) => {
+const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
+  allies,
+  guildCharacters,
+  selectedAllyIds,
+  selectedGuildCharacterIds,
+  onChange,
+}) => {
   const [search, setSearch] = useState('')
 
-  const selectedAllies = useMemo(
-    () => allies.filter((ally) => selectedIds.includes(ally.id)).sort((a, b) => a.name.localeCompare(b.name)),
-    [allies, selectedIds],
+  const linkedIds = useMemo(() => new Set(allies.map((ally) => ally.linked_character_id).filter(Boolean)), [allies])
+  const availableGuildCharacters = useMemo(
+    () => guildCharacters.filter((character) => !linkedIds.has(character.id)),
+    [guildCharacters, linkedIds],
   )
 
-  const filteredAllies = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) {
-      return allies
-    }
-    return allies.filter((ally) => {
-      const haystack = [ally.name, ally.classes, ally.species].filter(Boolean).join(' ').toLowerCase()
-      return haystack.includes(query)
-    })
-  }, [allies, search])
+  const selectedAllies = useMemo(
+    () => allies.filter((ally) => selectedAllyIds.includes(ally.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    [allies, selectedAllyIds],
+  )
+  const selectedGuildCharacters = useMemo(
+    () =>
+      availableGuildCharacters
+        .filter((character) => selectedGuildCharacterIds.includes(character.id))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [availableGuildCharacters, selectedGuildCharacterIds],
+  )
 
-  const toggleAlly = (allyId: number) => {
-    if (selectedIds.includes(allyId)) {
-      onChange(selectedIds.filter((id) => id !== allyId))
+  const filteredOptions = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const allyOptions = allies.map((ally) => ({
+      key: `ally-${ally.id}`,
+      type: 'ally' as const,
+      id: ally.id,
+      label: ally.linked_character ? ally.linked_character.name : ally.name,
+      sublabel: ally.linked_character ? 'Linked guild member' : 'Custom ally',
+    }))
+    const guildOptions = availableGuildCharacters.map((character) => ({
+      key: `guild-${character.id}`,
+      type: 'guild' as const,
+      id: character.id,
+      label: character.name,
+      sublabel: 'Guild member',
+    }))
+
+    const combined = [...allyOptions, ...guildOptions]
+    if (!query) {
+      return combined
+    }
+    return combined.filter((option) => option.label.toLowerCase().includes(query))
+  }, [allies, availableGuildCharacters, search])
+
+  const toggleOption = (type: 'ally' | 'guild', id: number) => {
+    if (type === 'ally') {
+      if (selectedAllyIds.includes(id)) {
+        onChange({ allyIds: selectedAllyIds.filter((entry) => entry !== id), guildCharacterIds: selectedGuildCharacterIds })
+        return
+      }
+      onChange({ allyIds: [...selectedAllyIds, id], guildCharacterIds: selectedGuildCharacterIds })
       return
     }
-    onChange([...selectedIds, allyId])
+    if (selectedGuildCharacterIds.includes(id)) {
+      onChange({ allyIds: selectedAllyIds, guildCharacterIds: selectedGuildCharacterIds.filter((entry) => entry !== id) })
+      return
+    }
+    onChange({ allyIds: selectedAllyIds, guildCharacterIds: [...selectedGuildCharacterIds, id] })
   }
 
-  if (allies.length === 0) {
+  if (allies.length === 0 && guildCharacters.length === 0) {
     return (
       <div className="rounded-lg border border-base-200 bg-base-100 p-3 text-sm text-base-content/60">
-        No allies available yet.
+        No allies or guild members available yet.
       </div>
     )
   }
@@ -47,57 +90,74 @@ const AdventureAllyPicker: React.FC<AdventureAllyPickerProps> = ({ allies, selec
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-semibold">Played with</label>
-        <span className="text-xs text-base-content/60">{selectedIds.length} selected</span>
+        <label className="text-sm font-semibold">Participants</label>
+        <span className="text-xs text-base-content/60">
+          {selectedAllyIds.length + selectedGuildCharacterIds.length} selected
+        </span>
       </div>
       <Input
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search allies"
-        aria-label="Search allies"
+        placeholder="Search allies or guild members"
+        aria-label="Search participants"
       >
-        Search allies
+        Search participants
       </Input>
-      {selectedAllies.length > 0 ? (
+      {selectedAllies.length > 0 || selectedGuildCharacters.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {selectedAllies.map((ally) => (
             <button
-              key={ally.id}
+              key={`selected-ally-${ally.id}`}
               type="button"
-              onClick={() => toggleAlly(ally.id)}
+              onClick={() => toggleOption('ally', ally.id)}
               className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary transition hover:border-primary/60"
             >
-              {ally.name}
+              {ally.linked_character ? ally.linked_character.name : ally.name}
+            </button>
+          ))}
+          {selectedGuildCharacters.map((character) => (
+            <button
+              key={`selected-guild-${character.id}`}
+              type="button"
+              onClick={() => toggleOption('guild', character.id)}
+              className="rounded-full border border-secondary/30 bg-secondary/10 px-2 py-1 text-xs text-secondary transition hover:border-secondary/60"
+            >
+              {character.name}
             </button>
           ))}
         </div>
       ) : null}
-      <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-base-200 bg-base-100 p-2">
-        {filteredAllies.length > 0 ? (
-          filteredAllies.map((ally) => {
-            const selected = selectedIds.includes(ally.id)
+      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-base-200 bg-base-100 p-2">
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((option) => {
+            const isSelected = option.type === 'ally'
+              ? selectedAllyIds.includes(option.id)
+              : selectedGuildCharacterIds.includes(option.id)
             return (
               <button
-                key={ally.id}
+                key={option.key}
                 type="button"
-                onClick={() => toggleAlly(ally.id)}
+                onClick={() => toggleOption(option.type, option.id)}
                 className={cn(
                   'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-sm transition',
-                  selected ? 'bg-primary/10 text-primary' : 'hover:bg-base-200/70',
+                  isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-base-200/70',
                 )}
               >
-                <span className="min-w-0 truncate">{ally.name}</span>
-                <span className="text-xs text-base-content/60 capitalize">{ally.standing}</span>
+                <span className="min-w-0 truncate">{option.label}</span>
+                <span className="flex items-center gap-2 text-xs text-base-content/60">
+                  {option.type === 'guild' ? <User size={12} /> : null}
+                  {option.sublabel}
+                </span>
               </button>
             )
           })
         ) : (
-          <p className="text-xs text-base-content/60">No allies found.</p>
+          <p className="text-xs text-base-content/60">No participants found.</p>
         )}
       </div>
     </div>
   )
 }
 
-export default AdventureAllyPicker
+export default AdventureParticipantPicker
