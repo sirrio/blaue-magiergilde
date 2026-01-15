@@ -48,13 +48,19 @@ class GameController extends Controller
      */
     public function store(StoreGameRequest $request): \Illuminate\Http\RedirectResponse
     {
+        $userId = $request->user()?->getAuthIdentifier();
+        if (!$userId) {
+            abort(403);
+        }
+
         $game = new Game;
         $game->duration = $request->duration;
         $game->title = $request->title;
         $game->tier = $request->tier;
-        $game->user_id = Auth::user()->getAuthIdentifier();
+        $game->user_id = $userId;
         $game->start_date = $request->start_date;
         $game->has_additional_bubble = $request->has_additional_bubble;
+        $game->tier_of_month_reward = $request->tier_of_month_reward ?: null;
         $game->sessions = $request->sessions;
         $game->notes = $request->notes;
         $game->save();
@@ -88,6 +94,7 @@ class GameController extends Controller
         $game->title = $request->title;
         $game->tier = $request->tier;
         $game->has_additional_bubble = $request->has_additional_bubble;
+        $game->tier_of_month_reward = $request->tier_of_month_reward ?: null;
         $game->sessions = $request->sessions;
         $game->notes = $request->notes;
         $game->save();

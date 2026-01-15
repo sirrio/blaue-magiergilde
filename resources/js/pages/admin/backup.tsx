@@ -62,6 +62,12 @@ export default function Backup({
           return
         }
 
+        const configured = payload?.configured
+        if (configured === false) {
+          setBackupStatus(null)
+          return
+        }
+
         const status = payload?.status ?? null
         if (!status || typeof status !== 'object') {
           setBackupStatus(null)

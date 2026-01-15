@@ -9,6 +9,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * @property mixed $duration
  * @property mixed $start_date
  * @property mixed $has_additional_bubble
+ * @property mixed $tier_of_month_reward
  * @property mixed $sessions
  * @property mixed $title
  * @property mixed $tier
@@ -35,6 +36,7 @@ class UpdateGameRequest extends FormRequest
             'duration' => 'required|integer',
             'start_date' => 'required|date',
             'has_additional_bubble' => 'required|boolean',
+            'tier_of_month_reward' => 'nullable|in:bubble,coin',
             'sessions' => 'required|integer|min:0',
             'tier' => 'required|string',
             'notes' => 'nullable|string',

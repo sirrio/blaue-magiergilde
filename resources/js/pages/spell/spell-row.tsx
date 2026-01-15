@@ -183,21 +183,37 @@ export default function SpellRow({ spell }: { spell: Spell }) {
         <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
       </Modal>
       {spell.legacy_url ? (
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => copyToClipboard(`:PHB14: [${spell.name}](<${spell.legacy_url}>)`)}>
-          L<Copy size={14} />
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          title="Copy legacy link"
+          aria-label="Copy legacy link"
+          onClick={() => copyToClipboard(`:PHB14: [${spell.name}](<${spell.legacy_url}>)`)}
+        >
+          <Copy size={14} />
         </Button>
       ) : (
-        <Button disabled size="xs" variant="ghost" modifier="square" className="text-error">
-          L<XCircle size={14} />
+        <Button disabled size="xs" variant="ghost" modifier="square" className="text-error" title="No legacy link" aria-label="No legacy link">
+          <XCircle size={14} />
         </Button>
       )}
       {spell.legacy_url ? (
-        <Button as="a" href={spell.legacy_url} target="_blank" size="xs" variant="ghost" modifier="square">
-          L<ExternalLink size={14} />
+        <Button
+          as="a"
+          href={spell.legacy_url}
+          target="_blank"
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          title="Open legacy link"
+          aria-label="Open legacy link"
+        >
+          <ExternalLink size={14} />
         </Button>
       ) : (
-        <Button disabled size="xs" variant="ghost" modifier="square" className="text-error">
-          L<XCircle size={14} />
+        <Button disabled size="xs" variant="ghost" modifier="square" className="text-error" title="No legacy link" aria-label="No legacy link">
+          <XCircle size={14} />
         </Button>
       )}
       {spell.url ? (

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property mixed $user_id
  * @property mixed $start_date
  * @property mixed $has_additional_bubble
+ * @property mixed $tier_of_month_reward
  * @property mixed $sessions
  * @property mixed $notes
  * @property mixed $tier
@@ -19,6 +20,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Game extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::creating(function (Game $game): void {
+            if (!$game->user_id && auth()->check()) {
+                $game->user_id = auth()->id();
+            }
+        });
+    }
 
     protected $casts = [
         'has_additional_bubble' => 'boolean',

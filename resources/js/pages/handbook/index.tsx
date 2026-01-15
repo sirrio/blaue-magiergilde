@@ -32,6 +32,18 @@ const extractDiscordChannelId = (url: string) => {
 
 const stripLeadingSymbols = (value: string) => value.replace(/^[^\p{L}\p{N}]+/u, '')
 
+const formatChannelLabel = (value: string) => {
+  const normalized = value.replace(/-/g, ' ').trim()
+  if (!normalized) {
+    return normalized
+  }
+  const withEmojiSpacing = normalized.replace(
+    /^(\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\u200D\p{Extended_Pictographic})*)\s*(\S)/u,
+    (_match, emoji, next) => `${emoji} ${next}`,
+  )
+  return withEmojiSpacing.replace(/\p{L}/u, (char) => char.toUpperCase())
+}
+
 const extractUrlCandidate = (value: string) => {
   const match = value.match(/https?:\/\/[^\s"'<>]+/i)
   if (!match) return null
@@ -217,19 +229,28 @@ const buildDiscordHtml = (
   })
 
   text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-
-  text = text.replace(
-    /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>(.*?)<\/a>/gi,
-    (_, url, label) => `[${label}](${url})`,
-  )
-  text = text.replace(
-    /<a\s+[^>]*href='(https?:\/\/[^']+)'[^>]*>(.*?)<\/a>/gi,
-    (_, url, label) => `[${label}](${url})`,
-  )
-  text = text.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>/gi, (_, url) => `${url} `)
-  text = text.replace(/<a\s+[^>]*href='([^']+)'[^>]*>/gi, (_, url) => `${url} `)
-  text = text.replace(/<a\s+[^>]*href="([^"]+)"/gi, (_, url) => `${url} `)
-  text = text.replace(/<a\s+[^>]*href='([^']+)'/gi, (_, url) => `${url} `)
+  text = text.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gis, (_, href, label) => {
+    const normalizedLink = normalizeLinkParts(String(label), String(href))
+    if (!normalizedLink.url) {
+      return normalizedLink.label
+    }
+    return `[${normalizedLink.label}](${normalizedLink.url})`
+  })
+  text = text.replace(/<a\s+[^>]*href='([^']+)'[^>]*>(.*?)<\/a>/gis, (_, href, label) => {
+    const normalizedLink = normalizeLinkParts(String(label), String(href))
+    if (!normalizedLink.url) {
+      return normalizedLink.label
+    }
+    return `[${normalizedLink.label}](${normalizedLink.url})`
+  })
+  text = text.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>/gi, (_, href) => {
+    const normalizedLink = normalizeLinkParts(String(href), String(href))
+    return normalizedLink.url ? `[${normalizedLink.label}](${normalizedLink.url})` : normalizedLink.label
+  })
+  text = text.replace(/<a\s+[^>]*href='([^']+)'[^>]*>/gi, (_, href) => {
+    const normalizedLink = normalizeLinkParts(String(href), String(href))
+    return normalizedLink.url ? `[${normalizedLink.label}](${normalizedLink.url})` : normalizedLink.label
+  })
   text = text.replace(/<\/?a\b[^>]*>/gi, '')
   text = replaceBrokenDiscordLinks(text, threadLinkMap, channelLinkMap)
 
@@ -371,6 +392,7 @@ export default function HandbookIndex({ channels, activeChannelId, messages, thr
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
   )
+  const activeChannelLabel = activeChannel ? formatChannelLabel(activeChannel.name) : null
   const channelLinkMap = useMemo(() => {
     const map = new Map<string, string>()
     channels.forEach((channel) => {
@@ -415,12 +437,12 @@ export default function HandbookIndex({ channels, activeChannelId, messages, thr
             Browse saved guild texts and linked threads in one place.
           </p>
           {activeChannel ? (
-            <p className="text-xs text-base-content/60">Current channel: {activeChannel.name}</p>
+            <p className="text-xs text-base-content/60">Current channel: {activeChannelLabel}</p>
           ) : null}
         </section>
         <Card className="card-xs">
           <CardBody>
-            <CardTitle>{activeChannel ? activeChannel.name : 'Guild Handbook'}</CardTitle>
+            <CardTitle>{activeChannel ? activeChannelLabel : 'Guild Handbook'}</CardTitle>
             <CardContent>
               {activeChannel ? (
                 <div className="space-y-6">
@@ -443,7 +465,7 @@ export default function HandbookIndex({ channels, activeChannelId, messages, thr
                           onToggle={handleThreadToggle}
                         >
                           <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold">
-                            <span className="truncate">{thread.channel.name}</span>
+                            <span className="truncate">{formatChannelLabel(thread.channel.name)}</span>
                             <span className="text-xs font-normal text-base-content/60">
                               {thread.messages.length} Messages
                             </span>

@@ -93,8 +93,9 @@ class DiscordBackupController extends Controller
 
         if ($botUrl === '' || $botToken === '') {
             return response()->json([
-                'error' => 'Bot HTTP is not configured.',
-            ], 422);
+                'configured' => false,
+                'status' => null,
+            ]);
         }
 
         $timeout = max(1, (int) config('services.bot.http_timeout', 10));
@@ -126,6 +127,7 @@ class DiscordBackupController extends Controller
 
         return response()->json([
             'status' => $status,
+            'configured' => true,
         ]);
     }
 

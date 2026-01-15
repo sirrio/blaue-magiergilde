@@ -15,11 +15,14 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
     start_date: new Date().toISOString().slice(0, 10),
     sessions: 1,
     has_additional_bubble: false,
+    tier_of_month_reward: '',
     notes: '',
   }
 
   const { data, setData, post } = useForm(initialFormData)
   const { tiers, errors } = usePage<PageProps>().props
+  const durationHours = Math.floor(data.duration / 3600)
+  const durationMinutes = Math.floor((data.duration % 3600) / 60)
 
   const handleFormSubmit = () => {
     post(route('game-master-log.store'), {
@@ -47,15 +50,31 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
               ))}
             </SelectOptions>
           </Select>
-          <Input
-            placeholder="Duration"
-            errors={errors.duration}
-            type="number"
-            value={data.duration}
-            onChange={(e) => setData('duration', Number(e.target.value))}
-          >
-            Duration
-          </Input>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              placeholder="Hours"
+              errors={errors.duration}
+              type="number"
+              min={0}
+              value={durationHours}
+              onChange={(e) => {
+                const hours = Math.max(0, Number(e.target.value) || 0)
+                setData('duration', hours * 3600 + durationMinutes * 60)
+              }}
+            >
+              Duration (hours)
+            </Input>
+            <Select value={String(durationMinutes)} onChange={(e) => setData('duration', durationHours * 3600 + Number(e.target.value) * 60)}>
+              <SelectLabel>Duration (minutes)</SelectLabel>
+              <SelectOptions>
+                {[0, 15, 30, 45].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes}
+                  </option>
+                ))}
+              </SelectOptions>
+            </Select>
+          </div>
           <Input
             placeholder="Sessions"
             errors={errors.sessions}
@@ -79,8 +98,28 @@ const StoreGameModal = ({ children }: React.PropsWithChildren) => {
             checked={data.has_additional_bubble}
             onChange={(e) => setData('has_additional_bubble', e.target.checked)}
           >
-            Additional Bubble
+            Character quest reward (+1 bubble, -1 coin)
           </Checkbox>
+          <Checkbox
+            errors={errors.tier_of_month_reward}
+            checked={data.tier_of_month_reward !== ''}
+            onChange={(e) => setData('tier_of_month_reward', e.target.checked ? 'bubble' : '')}
+          >
+            Tier of the Month Reward
+          </Checkbox>
+          {data.tier_of_month_reward !== '' ? (
+            <Select
+              errors={errors.tier_of_month_reward}
+              value={data.tier_of_month_reward}
+              onChange={(e) => setData('tier_of_month_reward', e.target.value)}
+            >
+              <SelectLabel>Tier of the Month Reward</SelectLabel>
+              <SelectOptions>
+                <option value="bubble">Bubble (+1)</option>
+                <option value="coin">Coin (+1)</option>
+              </SelectOptions>
+            </Select>
+          ) : null}
           <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>

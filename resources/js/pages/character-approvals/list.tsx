@@ -43,10 +43,10 @@ type CharacterGroup = {
 }
 
 const getStatusLabel = (status?: string | null) => {
-  if (status === 'approved') return 'approved'
-  if (status === 'declined') return 'declined'
-  if (status === 'retired') return 'retired'
-  return 'pending'
+  if (status === 'approved') return 'Approved'
+  if (status === 'declined') return 'Declined'
+  if (status === 'retired') return 'Retired'
+  return 'Pending'
 }
 
 const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
@@ -372,7 +372,8 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                 </div>
                 <List>
                   {group.characters.map((character) => {
-                    const status = getStatusLabel(character.guild_status)
+                    const status = character.guild_status ?? 'pending'
+                    const statusLabel = getStatusLabel(status)
                     const currentTier = calculateTier(character)
                     const characterNotes = character.notes?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
@@ -425,7 +426,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                               {status === 'declined' && <XCircle size={12} />}
                               {status === 'pending' && <Clock size={12} />}
                               {status === 'retired' && <Archive size={12} />}
-                              <span className="capitalize">{status}</span>
+                              <span>{statusLabel}</span>
                             </span>
                           </div>
                           <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-base-200/60 pt-3 md:w-auto md:border-t-0 md:border-l-2 md:border-base-300/70 md:pt-0 md:pl-4">
