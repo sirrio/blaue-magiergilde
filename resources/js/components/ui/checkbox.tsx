@@ -29,17 +29,19 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   }
 
   return (
-    <div>
-      <label className={'label'} htmlFor={inputId}>{children}</label>
-      <input className={cn('checkbox', sizeClasses[size])}
-             id={inputId}
-             type={'checkbox'}
-             checked={checked}
-             value={checked ? '1' : '0'}
-             onChange={onChange}
-      />
+    <div className="first:mt-2">
+      <label className={cn('label cursor-pointer justify-start gap-3 py-2', 'items-center')} htmlFor={inputId}>
+        <input
+          className={cn('checkbox', sizeClasses[size])}
+          id={inputId}
+          type={'checkbox'}
+          checked={checked}
+          value={checked ? '1' : '0'}
+          onChange={onChange}
+        />
+        <span className="label-text text-sm leading-5">{children}</span>
+      </label>
       {errors && <p className={'fieldset-label text-error'}>{errors}</p>}
     </div>
   )
 }
-

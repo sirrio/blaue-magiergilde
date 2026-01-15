@@ -33,6 +33,7 @@ const UpdateGameModal = ({
   const { tiers, errors } = usePage<PageProps>().props
   const durationHours = Math.floor(data.duration / 3600)
   const durationMinutes = Math.floor((data.duration % 3600) / 60)
+  const bubbleCount = Math.trunc(data.duration / 10800)
 
   const handleFormSubmit = () => {
     post(route('game-master-log.update', { game_master_log: game.id, _method: 'put' }), {
@@ -47,7 +48,7 @@ const UpdateGameModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       {children ? <ModalTrigger>{children}</ModalTrigger> : null}
-      <ModalTitle>Update Game</ModalTitle>
+      <ModalTitle>Edit Game</ModalTitle>
       <ModalContent>
         <form>
           <Input placeholder="Game Title" errors={errors.title} type="text" value={data.title} onChange={(e) => setData('title', e.target.value)}>
@@ -77,17 +78,25 @@ const UpdateGameModal = ({
             >
               Duration (hours)
             </Input>
-            <Select value={String(durationMinutes)} onChange={(e) => setData('duration', durationHours * 3600 + Number(e.target.value) * 60)}>
-              <SelectLabel>Duration (minutes)</SelectLabel>
-              <SelectOptions>
-                {[0, 15, 30, 45].map((minutes) => (
-                  <option key={minutes} value={minutes}>
-                    {minutes}
-                  </option>
-                ))}
-              </SelectOptions>
-            </Select>
+            <Input
+              placeholder="Minutes"
+              errors={errors.duration}
+              type="number"
+              min={0}
+              max={59}
+              value={durationMinutes}
+              onChange={(e) => {
+                const minutes = Math.min(59, Math.max(0, Number(e.target.value) || 0))
+                setData('duration', durationHours * 3600 + minutes * 60)
+              }}
+            >
+              Duration (minutes)
+            </Input>
           </div>
+          <p className="text-base-content/50 text-xs">
+            Reward: {bubbleCount}
+            {data.has_additional_bubble ? '+1' : ''} bubbles
+          </p>
           <Input
             placeholder="Sessions"
             errors={errors.sessions}
@@ -104,38 +113,40 @@ const UpdateGameModal = ({
             value={data.start_date}
             onChange={(e) => setData('start_date', e.target.value)}
           >
-            Start Date
+            Date
           </Input>
-          <Checkbox
-            errors={errors.has_additional_bubble}
-            checked={data.has_additional_bubble}
-            onChange={(e) => setData('has_additional_bubble', e.target.checked)}
-          >
-            Character quest reward (+1 bubble, -1 coin)
-          </Checkbox>
-          <Checkbox
-            errors={errors.tier_of_month_reward}
-            checked={data.tier_of_month_reward !== ''}
-            onChange={(e) => setData('tier_of_month_reward', e.target.checked ? 'bubble' : '')}
-          >
-            Tier of the Month Reward
-          </Checkbox>
-          {data.tier_of_month_reward !== '' ? (
-            <Select
-              errors={errors.tier_of_month_reward}
-              value={data.tier_of_month_reward}
-              onChange={(e) => setData('tier_of_month_reward', e.target.value)}
-            >
-              <SelectLabel>Tier of the Month Reward</SelectLabel>
-              <SelectOptions>
-                <option value="bubble">Bubble (+1)</option>
-                <option value="coin">Coin (+1)</option>
-              </SelectOptions>
-            </Select>
-          ) : null}
           <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
+          <div className="space-y-2">
+            <Checkbox
+              errors={errors.has_additional_bubble}
+              checked={data.has_additional_bubble}
+              onChange={(e) => setData('has_additional_bubble', e.target.checked)}
+            >
+              Character quest reward (+1 bubble, -1 coin)
+            </Checkbox>
+            <Checkbox
+              errors={errors.tier_of_month_reward}
+              checked={data.tier_of_month_reward !== ''}
+              onChange={(e) => setData('tier_of_month_reward', e.target.checked ? 'bubble' : '')}
+            >
+              Tier of the Month Reward
+            </Checkbox>
+            {data.tier_of_month_reward !== '' ? (
+              <Select
+                errors={errors.tier_of_month_reward}
+                value={data.tier_of_month_reward}
+                onChange={(e) => setData('tier_of_month_reward', e.target.value)}
+              >
+                <SelectLabel>Tier of the Month Reward</SelectLabel>
+                <SelectOptions>
+                  <option value="bubble">Bubble (+1)</option>
+                  <option value="coin">Coin (+1)</option>
+                </SelectOptions>
+              </Select>
+            ) : null}
+          </div>
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

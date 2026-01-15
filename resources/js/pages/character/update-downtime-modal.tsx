@@ -46,15 +46,15 @@ const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; child
           </Button>
         )}
       </ModalTrigger>
-      <ModalTitle>Update downtime</ModalTitle>
+      <ModalTitle>Edit Downtime</ModalTitle>
       <ModalContent>
         <form>
           <div className={'grid grid-cols-2 gap-2'}>
             <Input value={data.hours} type={'number'} min={0} step={1} onChange={(e) => setData('hours', Number(e.target.value))}>
-              Hours
+              Duration (hours)
             </Input>
             <Input value={data.minutes} type={'number'} min={0} max={59} step={1} onChange={(e) => setData('minutes', Number(e.target.value))}>
-              Minutes
+              Duration (minutes)
             </Input>
           </div>
           {errors.duration && <p className={'fieldset-label text-error'}>{errors.duration}</p>}
@@ -68,7 +68,7 @@ const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; child
           <Input errors={errors.start_date} type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)}>
             Date
           </Input>
-          <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+          <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>
         </form>

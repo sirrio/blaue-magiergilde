@@ -7,12 +7,7 @@ import AdventureParticipantPicker from '@/pages/character/adventure-ally-picker'
 import { Adventure, Ally, Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
-import React from 'react'
-
-const MAX_DURATION = 99 * 3600
-const MIN_DURATION = 0
-const FIFTEEN_MINUTES_DELTA = 900
-const ONE_HOUR_DELTA = 3600
+import React, { useState } from 'react'
 
 const UpdateAdventureModal = ({
   adventure,
@@ -39,6 +34,9 @@ const UpdateAdventureModal = ({
 
   const { data, setData, post } = useForm(initialFormData)
   const { errors } = usePage<PageProps>().props
+  const durationHours = Math.floor(data.duration / 3600)
+  const durationMinutes = Math.floor((data.duration % 3600) / 60)
+  const [activeTab, setActiveTab] = useState<'details' | 'participants'>('details')
 
   const handleFormSubmit = () => {
     post(route('adventures.update', { adventure, _method: 'put' }), {
@@ -47,19 +45,6 @@ const UpdateAdventureModal = ({
     })
   }
 
-  const adjustDuration = (delta: number, event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    const newDuration = Math.max(MIN_DURATION, Math.min(data.duration + delta, MAX_DURATION))
-    setData('duration', newDuration)
-  }
-
-  const getFormattedDuration = (duration: number): [string, string] => {
-    const hours = String(Math.trunc(duration / 3600)).padStart(2, '0')
-    const minutes = String(Math.trunc((duration % 3600) / 60)).padStart(2, '0')
-    return [hours, minutes]
-  }
-
-  const [hours, minutes] = getFormattedDuration(data.duration)
   const bubbleCount = Math.trunc(data.duration / 10800)
 
   return (
@@ -71,66 +56,102 @@ const UpdateAdventureModal = ({
           </Button>
         )}
       </ModalTrigger>
-      <ModalTitle>Update adventure</ModalTitle>
+      <ModalTitle>Edit Adventure</ModalTitle>
       <ModalContent>
         <form>
-          <div className="text flex items-center justify-center font-mono text-5xl font-bold sm:text-7xl">
-            <div className="mr-5 flex flex-col gap-1 sm:flex-row">
-              <Button onClick={(e) => adjustDuration(-FIFTEEN_MINUTES_DELTA, e)} size="xs" variant="outline" color="error">
-                -15m
-              </Button>
-              <Button onClick={(e) => adjustDuration(-ONE_HOUR_DELTA, e)} size="xs" variant="outline" color="error">
-                -1h
-              </Button>
-            </div>
-            <div>{hours}</div>
-            <div>:</div>
-            <div>{minutes}</div>
-            <div className="ml-5 flex flex-col gap-1 sm:flex-row">
-              <Button onClick={(e) => adjustDuration(FIFTEEN_MINUTES_DELTA, e)} size="xs" variant="outline" color="success">
-                +15m
-              </Button>
-              <Button onClick={(e) => adjustDuration(ONE_HOUR_DELTA, e)} size="xs" variant="outline" color="success">
-                +1h
-              </Button>
-            </div>
+          <div role="tablist" className="tabs tabs-border mb-2">
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${activeTab === 'details' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('details')}
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${activeTab === 'participants' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('participants')}
+            >
+              Participants
+            </button>
           </div>
-          <div className="text-base-content/50 flex items-center justify-center font-mono whitespace-pre-wrap">
-            (Reward {bubbleCount}
-            {data.has_additional_bubble ? '+1' : ''})
-          </div>
-          {errors.duration && <p className="fieldset-label text-error flex items-center justify-center text-center">{errors.duration}</p>}
-          <Input
-            placeholder="Dragons in Waterdeep"
-            errors={errors.title}
-            type="text"
-            value={data.title}
-            onChange={(e) => setData('title', e.target.value)}
-          >
-            Game title
-          </Input>
-          <Input placeholder="Matt Mercer" errors={errors.game_master} type="text" value={data.game_master} onChange={(e) => setData('game_master', e.target.value)}>
-            Game master
-          </Input>
-          <Input errors={errors.start_date} type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)}>
-            Date
-          </Input>
-          <Checkbox errors={errors.has_additional_bubble} checked={data.has_additional_bubble} onChange={(e) => setData('has_additional_bubble', e.target.checked)}>
-            Additional bubble (ex. Char Quest, Event Quest, ...)
-          </Checkbox>
-          <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
-            Notes
-          </TextArea>
-          <AdventureParticipantPicker
-            allies={allies}
-            guildCharacters={guildCharacters.filter((entry) => entry.id !== adventure.character_id)}
-            selectedAllyIds={data.ally_ids}
-            selectedGuildCharacterIds={data.guild_character_ids}
-            onChange={({ allyIds, guildCharacterIds }) => {
-              setData('ally_ids', allyIds)
-              setData('guild_character_ids', guildCharacterIds)
-            }}
-          />
+          {activeTab === 'details' ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    placeholder="Hours"
+                    errors={errors.duration}
+                    type="number"
+                    min={0}
+                    value={durationHours}
+                    onChange={(e) => {
+                      const hours = Math.max(0, Number(e.target.value) || 0)
+                      setData('duration', hours * 3600 + durationMinutes * 60)
+                    }}
+                  >
+                    Duration (hours)
+                  </Input>
+                  <Input
+                    placeholder="Minutes"
+                    errors={errors.duration}
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={durationMinutes}
+                    onChange={(e) => {
+                      const minutes = Math.min(59, Math.max(0, Number(e.target.value) || 0))
+                      setData('duration', durationHours * 3600 + minutes * 60)
+                    }}
+                  >
+                    Duration (minutes)
+                  </Input>
+                </div>
+                <p className="text-base-content/50 text-xs">
+                  Reward: {bubbleCount}
+                  {data.has_additional_bubble ? '+1' : ''} bubbles
+                </p>
+                {errors.duration && <p className="fieldset-label text-error">{errors.duration}</p>}
+                <Input
+                  placeholder="Dragons in Waterdeep"
+                  errors={errors.title}
+                  type="text"
+                  value={data.title}
+                  onChange={(e) => setData('title', e.target.value)}
+                >
+                  Title
+                </Input>
+                <Input placeholder="Matt Mercer" errors={errors.game_master} type="text" value={data.game_master} onChange={(e) => setData('game_master', e.target.value)}>
+                  Game master
+                </Input>
+                <Input errors={errors.start_date} type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)}>
+                  Date
+                </Input>
+                <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+                  Notes
+                </TextArea>
+                <Checkbox errors={errors.has_additional_bubble} checked={data.has_additional_bubble} onChange={(e) => setData('has_additional_bubble', e.target.checked)}>
+                  Character quest reward (+1 bubble)
+                </Checkbox>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <AdventureParticipantPicker
+                allies={allies}
+                guildCharacters={guildCharacters.filter((entry) => entry.id !== adventure.character_id)}
+                selectedAllyIds={data.ally_ids}
+                selectedGuildCharacterIds={data.guild_character_ids}
+                onChange={({ allyIds, guildCharacterIds }) => {
+                  setData('ally_ids', allyIds)
+                  setData('guild_character_ids', guildCharacterIds)
+                }}
+              />
+              <div className="text-right text-xs text-base-content/60">
+                {data.ally_ids.length + data.guild_character_ids.length} selected
+              </div>
+            </div>
+          )}
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

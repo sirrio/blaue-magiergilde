@@ -103,12 +103,6 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-semibold">Participants</label>
-        <span className="text-xs text-base-content/60">
-          {selectedAllyIds.length + selectedGuildCharacterIds.length} selected
-        </span>
-      </div>
       <Input
         type="text"
         value={search}
@@ -143,30 +137,32 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
           ))}
         </div>
       ) : null}
-      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-base-200 bg-base-100 p-2">
+      <div className="max-h-60 overflow-y-auto rounded-lg border border-base-200 bg-base-100 p-2">
         {filteredOptions.length > 0 ? (
-          filteredOptions.map((option) => {
-            const isSelected = option.type === 'ally'
-              ? selectedAllyIds.includes(option.id)
-              : selectedGuildCharacterIds.includes(option.id)
+          <div className="space-y-1">
+            {filteredOptions.map((option) => {
+              const isSelected = option.type === 'ally'
+                ? selectedAllyIds.includes(option.id)
+                : selectedGuildCharacterIds.includes(option.id)
             return (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => toggleOption(option.type, option.id)}
-                className={cn(
-                  'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-sm transition',
-                  isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-base-200/70',
-                )}
-              >
-                <span className="min-w-0 truncate">{option.label}</span>
-                <span className="flex items-center gap-2 text-xs text-base-content/60">
-                  {option.type === 'guild' ? <User size={12} /> : null}
-                  {option.sublabel}
-                </span>
-              </button>
-            )
-          })
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => toggleOption(option.type, option.id)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-sm transition',
+                    isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-base-200/70',
+                  )}
+                >
+                  <span className="min-w-0 truncate">{option.label}</span>
+                  <span className="flex items-center gap-2 text-xs text-base-content/60">
+                    {option.type === 'guild' ? <User size={12} /> : null}
+                    {option.sublabel}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         ) : (
           <p className="text-xs text-base-content/60">No participants found.</p>
         )}
