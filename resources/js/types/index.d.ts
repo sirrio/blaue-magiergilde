@@ -182,6 +182,10 @@ export interface DiscordBackupStatus {
   } | null
 }
 
+export interface DiscordBotSettings {
+  owner_ids: string[]
+}
+
 export interface DiscordBackupAttachment {
   id: number
   filename: string

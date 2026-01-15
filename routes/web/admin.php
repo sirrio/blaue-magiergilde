@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\BackupController;
+use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use App\Http\Controllers\Admin\DiscordBackupController;
 use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -28,5 +29,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::patch('/admin/backup/discord/channels', [DiscordBackupSettingsController::class, 'update'])
         ->name('admin.backup.channels.update');
+
+    Route::patch('/admin/backup/discord/owners', [DiscordBotSettingsController::class, 'update'])
+        ->name('admin.backup.owners.update');
 
 });

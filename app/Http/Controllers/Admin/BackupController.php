@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DiscordBackupSetting;
+use App\Models\DiscordBotSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
@@ -55,6 +56,9 @@ class BackupController extends Controller
                         ->map(fn ($channels) => $channels->values())
                         ->toArray();
                 })(),
+            ],
+            'discordBotSettings' => [
+                'owner_ids' => DiscordBotSetting::current()->owner_ids ?? [],
             ],
         ]);
     }

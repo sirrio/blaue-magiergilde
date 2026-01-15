@@ -1,4 +1,5 @@
-const { commandPrefix, ownerIds } = require('./config');
+const { commandPrefix } = require('./config');
+const { ownerIdSet } = require('./ownerIdsStore');
 
 function normalizePrefix(input) {
     const prefix = String(input || '').trim().toLowerCase();
@@ -20,10 +21,6 @@ function commandName(suffix) {
         throw new Error(`Slash command name too long (${name.length}/32): ${name}`);
     }
     return name;
-}
-
-function ownerIdSet() {
-    return new Set((ownerIds || []).map(String));
 }
 
 function isOwner(userId) {

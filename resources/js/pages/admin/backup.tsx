@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
+import { TextArea } from '@/components/ui/text-area'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
-import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, PageProps } from '@/types'
+import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, DiscordBotSettings, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,14 +19,19 @@ const getCsrfToken = () => {
 
 export default function Backup({
   discordBackup,
+  discordBotSettings,
 }: {
   discordBackup: DiscordBackupStats
+  discordBotSettings: DiscordBotSettings
 }) {
   const { errors: pageErrors } = usePage<PageProps>().props
   const backupForm = useForm({})
   const deleteForm = useForm({})
   const selectionForm = useForm({
     guilds: [] as { guild_id: string; channel_ids: string[] }[],
+  })
+  const ownerIdsForm = useForm({
+    owner_ids: (discordBotSettings.owner_ids ?? []).join(', '),
   })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
@@ -359,6 +365,18 @@ export default function Backup({
   }, [mergedChannelGroups, selectedByGuild])
   const hasBackupSelection = selectedChannelsFlat.length > 0
 
+  const handleOwnerIdsSave = () => {
+    ownerIdsForm.patch(route('admin.backup.owners.update'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Bot owner list saved.', 'info')
+      },
+      onError: () => {
+        toast.show('Bot owner list could not be saved.', 'error')
+      },
+    })
+  }
+
   return (
     <AppLayout>
       <Head title="Backup" />
@@ -503,6 +521,31 @@ export default function Backup({
               Select at least one channel before starting a backup.
             </div>
           ) : null}
+        </div>
+        <div className="rounded-box bg-base-100 shadow-md p-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold">Bot access</h2>
+              <p className="text-xs text-base-content/60">
+                Add Discord user IDs allowed to use owner-only bot commands.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 space-y-3">
+            <TextArea
+              value={ownerIdsForm.data.owner_ids}
+              onChange={(event) => ownerIdsForm.setData('owner_ids', event.target.value)}
+              placeholder="137565166001848320, 1087006381212700682"
+              errors={ownerIdsForm.errors.owner_ids}
+            >
+              Owner IDs (comma separated)
+            </TextArea>
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>
+                Save owner list
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </AppLayout>

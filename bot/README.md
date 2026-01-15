@@ -51,7 +51,7 @@ Setze folgende Variablen in der Root-`.env`:
 - `DISCORD_CLIENT_ID` - Discord Application ID (wird auch für OAuth in der App genutzt)
 - `DISCORD_GUILD_IDS` - kommaseparierte Liste (für Guild-Commands, meist sofort sichtbar)
 - `DISCORD_COMMAND_PREFIX` - z.B. `mg`
-- `DISCORD_OWNER_IDS` - kommaseparierte Discord User IDs (Owner-only Commands)
+- `DISCORD_OWNER_IDS` - fallback list of Discord user IDs (owner-only commands). The app can override this list.
 - `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
 
 - `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (voice sync + shop/auction posting + backup).
