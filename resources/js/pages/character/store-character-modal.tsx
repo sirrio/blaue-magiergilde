@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
+import React, { useState } from 'react'
 
 const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
   const initialFormData = {
@@ -27,6 +28,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
 
   const { data, setData, post } = useForm(initialFormData)
   const { classes, factions, versions, tiers, errors } = usePage<PageProps>().props
+  const [activeTab, setActiveTab] = useState<'basics' | 'details'>('basics')
 
   const handleFormSubmit = () => {
     post(route('characters.store'), {
@@ -41,74 +43,99 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
       <ModalTitle>Add character</ModalTitle>
       <ModalContent>
         <form>
-          <Input placeholder="Mordenkainen" errors={errors.name} type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-            Name
-          </Input>
-          <CharacterClassToggle classes={classes} data={data} errors={errors} setData={setData}></CharacterClassToggle>
-          <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
-            Filler
-          </Checkbox>
-          <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
-            <SelectLabel>Start tier</SelectLabel>
-            <SelectOptions>
-              {Object.entries(tiers).map(([key, value]: [string, string]) => (
-                <option key={key} value={key}>
-                  {value}
-                </option>
-              ))}
-            </SelectOptions>
-          </Select>
-          <Select errors={errors.faction} value={data.faction} onChange={(e) => setData('faction', e.target.value)}>
-            <SelectLabel>Factions</SelectLabel>
-            <SelectOptions>
-              {Object.entries(factions).map(([key, value]: [string, string]) => (
-                <option key={key} value={key}>
-                  {value}
-                </option>
-              ))}
-            </SelectOptions>
-          </Select>
-          <Select errors={errors.version} value={data.version} onChange={(e) => setData('version', e.target.value)}>
-            <SelectLabel>Versions</SelectLabel>
-            <SelectOptions>
-              {versions.map((version) => (
-                <option key={version} value={version}>
-                  {version}
-                </option>
-              ))}
-            </SelectOptions>
-          </Select>
-          <div className={cn('grid grid-cols-2 gap-2')}>
-            <Input errors={errors.dm_bubbles} type="number" value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-              DM Bubbles
-            </Input>
-            <Input errors={errors.dm_coins} type="number" value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-              DM Coins
-            </Input>
+          <div role="tablist" className="tabs tabs-border mb-2">
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${activeTab === 'basics' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('basics')}
+            >
+              Basics
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${activeTab === 'details' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('details')}
+            >
+              Details
+            </button>
           </div>
-          <Input
-            errors={errors.bubble_shop_spend}
-            type="number"
-            value={data.bubble_shop_spend}
-            onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-          >
-            Bubble Shop Spend
-          </Input>
-          <Input
-            placeholder="https://..."
-            errors={errors.external_link}
-            type="url"
-            value={data.external_link}
-            onChange={(e) => setData('external_link', e.target.value)}
-          >
-            External Link
-          </Input>
-          <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
-            Avatar
-          </FileInput>
-          <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-            Notes
-          </TextArea>
+          {activeTab === 'basics' ? (
+            <div className="space-y-3">
+              <Input placeholder="Mordenkainen" errors={errors.name} type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+                Name
+              </Input>
+              <CharacterClassToggle classes={classes} data={data} errors={errors} setData={setData}></CharacterClassToggle>
+              <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
+                <SelectLabel>Start tier</SelectLabel>
+                <SelectOptions>
+                  {Object.entries(tiers).map(([key, value]: [string, string]) => (
+                    <option key={key} value={key}>
+                      {value}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+              <Select errors={errors.faction} value={data.faction} onChange={(e) => setData('faction', e.target.value)}>
+                <SelectLabel>Factions</SelectLabel>
+                <SelectOptions>
+                  {Object.entries(factions).map(([key, value]: [string, string]) => (
+                    <option key={key} value={key}>
+                      {value}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+              <Select errors={errors.version} value={data.version} onChange={(e) => setData('version', e.target.value)}>
+                <SelectLabel>Versions</SelectLabel>
+                <SelectOptions>
+                  {versions.map((version) => (
+                    <option key={version} value={version}>
+                      {version}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+              <Input
+                placeholder="https://..."
+                errors={errors.external_link}
+                type="url"
+                value={data.external_link}
+                onChange={(e) => setData('external_link', e.target.value)}
+              >
+                External Link
+              </Input>
+              <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
+                Avatar
+              </FileInput>
+              <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
+                Filler
+              </Checkbox>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className={cn('grid grid-cols-2 gap-2')}>
+                <Input errors={errors.dm_bubbles} type="number" value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
+                  DM Bubbles
+                </Input>
+                <Input errors={errors.dm_coins} type="number" value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
+                  DM Coins
+                </Input>
+              </div>
+              <Input
+                errors={errors.bubble_shop_spend}
+                type="number"
+                value={data.bubble_shop_spend}
+                onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
+              >
+                Bubble Shop Spend
+              </Input>
+              <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+                Notes
+              </TextArea>
+            </div>
+          )}
         </form>
       </ModalContent>
       <ModalAction onClick={handleFormSubmit}>Save</ModalAction>

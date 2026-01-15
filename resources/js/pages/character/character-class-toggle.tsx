@@ -19,7 +19,9 @@ const CharacterClassToggle: React.FC<CharacterClassToggleProps> = ({ classes, da
 
   return (
     <>
-      <label className={'label'}>Classes</label>
+      <label className={'label'}>
+        <span className="label-text">Classes</span>
+      </label>
       <div className={'grid grid-cols-4 gap-1 rounded border p-1 text-xs'}>
         {classes.map((cc: CharacterClass) => {
           const id = createRandomString(24)
@@ -33,7 +35,7 @@ const CharacterClassToggle: React.FC<CharacterClassToggleProps> = ({ classes, da
                 checked={data.class.includes(cc.id)}
                 onChange={toggleCharacterClass(cc.id)}
               />
-              <label htmlFor={id} className={'label cursor-pointer'}>
+              <label htmlFor={id} className={'cursor-pointer'}>
                 {cc.name}
               </label>
             </div>
