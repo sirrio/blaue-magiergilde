@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
+import DurationInputStack from '@/components/duration-input-stack'
 import { Downtime, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
@@ -10,27 +11,17 @@ import React from 'react'
 
 const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; children?: React.ReactNode }) => {
   const initialFormData = {
-    hours: Math.trunc(downtime.duration / 3600),
-    minutes: Math.trunc((downtime.duration % 3600) / 60),
+    duration: downtime.duration,
     start_date: downtime.start_date,
     notes: downtime.notes ?? '',
     type: downtime.type,
     character_id: downtime.character_id,
   }
 
-  const { data, setData, post, transform } = useForm(initialFormData)
+  const { data, setData, post } = useForm(initialFormData)
   const { errors } = usePage<PageProps>().props
 
   const handleFormSubmit = () => {
-    transform((data) => {
-      return {
-        duration: data.hours * 60 * 60 + data.minutes * 60,
-        start_date: data.start_date,
-        type: data.type,
-        notes: data.notes,
-        character_id: data.character_id,
-      }
-    })
     post(route('downtimes.update', { downtime, _method: 'put' }), {
       preserveState: 'errors',
       preserveScroll: true,
@@ -49,15 +40,12 @@ const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; child
       <ModalTitle>Edit Downtime</ModalTitle>
       <ModalContent>
         <form>
-          <div className={'grid grid-cols-2 gap-2'}>
-            <Input value={data.hours} type={'number'} min={0} step={1} onChange={(e) => setData('hours', Number(e.target.value))}>
-              Duration (hours)
-            </Input>
-            <Input value={data.minutes} type={'number'} min={0} max={59} step={1} onChange={(e) => setData('minutes', Number(e.target.value))}>
-              Duration (minutes)
-            </Input>
-          </div>
-          {errors.duration && <p className={'fieldset-label text-error'}>{errors.duration}</p>}
+          <DurationInputStack
+            mode="downtime"
+            value={data.duration}
+            onChange={(next) => setData('duration', next)}
+            errors={errors.duration}
+          />
           <Select value={data.type} onChange={(e) => setData('type', e.target.value as Downtime['type'])}>
             <SelectLabel>Type</SelectLabel>
             <SelectOptions>

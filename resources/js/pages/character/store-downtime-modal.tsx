@@ -3,33 +3,24 @@ import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
+import DurationInputStack from '@/components/duration-input-stack'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { FlameKindling } from 'lucide-react'
 
 const StoreDowntimeModal = ({ character }: { character: Character }) => {
   const initialFormData = {
-    hours: 0,
-    minutes: 0,
+    duration: 0,
     character_id: character.id,
     start_date: new Date().toISOString().slice(0, 10),
     notes: '',
     type: 'faction',
   }
 
-  const { data, setData, post, transform } = useForm(initialFormData)
+  const { data, setData, post } = useForm(initialFormData)
   const { errors } = usePage<PageProps>().props
 
   const handleFormSubmit = () => {
-    transform((data) => {
-      return {
-        duration: data.hours * 60 * 60 + data.minutes * 60,
-        start_date: data.start_date,
-        type: data.type,
-        notes: data.notes,
-        character_id: data.character_id,
-      }
-    })
     post(route('downtimes.store'), {
       preserveState: 'errors',
       preserveScroll: true,
@@ -52,15 +43,12 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
       <ModalTitle>Add Downtime</ModalTitle>
       <ModalContent>
         <form>
-          <div className={'grid grid-cols-2 gap-2'}>
-            <Input value={data.hours} type={'number'} min={0} step={1} onChange={(e) => setData('hours', Number(e.target.value))}>
-              Duration (hours)
-            </Input>
-            <Input value={data.minutes} type={'number'} min={0} max={59} step={1} onChange={(e) => setData('minutes', Number(e.target.value))}>
-              Duration (minutes)
-            </Input>
-          </div>
-          {errors.duration && <p className={'fieldset-label text-error'}>{errors.duration}</p>}
+          <DurationInputStack
+            mode="downtime"
+            value={data.duration}
+            onChange={(next) => setData('duration', next)}
+            errors={errors.duration}
+          />
           <Select value={data.type} onChange={(e) => setData('type', e.target.value)}>
             <SelectLabel>Type</SelectLabel>
             <SelectOptions>

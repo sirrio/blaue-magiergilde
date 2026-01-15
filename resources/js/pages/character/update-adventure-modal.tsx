@@ -3,6 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { TextArea } from '@/components/ui/text-area'
+import DurationInputStack from '@/components/duration-input-stack'
 import AdventureParticipantPicker from '@/pages/character/adventure-ally-picker'
 import { Adventure, Ally, Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
@@ -34,8 +35,6 @@ const UpdateAdventureModal = ({
 
   const { data, setData, post } = useForm(initialFormData)
   const { errors } = usePage<PageProps>().props
-  const durationHours = Math.floor(data.duration / 3600)
-  const durationMinutes = Math.floor((data.duration % 3600) / 60)
   const [activeTab, setActiveTab] = useState<'details' | 'participants'>('details')
 
   const handleFormSubmit = () => {
@@ -79,40 +78,16 @@ const UpdateAdventureModal = ({
           </div>
           {activeTab === 'details' ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    placeholder="Hours"
-                    errors={errors.duration}
-                    type="number"
-                    min={0}
-                    value={durationHours}
-                    onChange={(e) => {
-                      const hours = Math.max(0, Number(e.target.value) || 0)
-                      setData('duration', hours * 3600 + durationMinutes * 60)
-                    }}
-                  >
-                    Duration (hours)
-                  </Input>
-                  <Input
-                    placeholder="Minutes"
-                    errors={errors.duration}
-                    type="number"
-                    min={0}
-                    max={59}
-                    value={durationMinutes}
-                    onChange={(e) => {
-                      const minutes = Math.min(59, Math.max(0, Number(e.target.value) || 0))
-                      setData('duration', durationHours * 3600 + minutes * 60)
-                    }}
-                  >
-                    Duration (minutes)
-                  </Input>
-                </div>
+                <DurationInputStack
+                  mode="session"
+                  value={data.duration}
+                  onChange={(next) => setData('duration', next)}
+                  errors={errors.duration}
+                />
                 <p className="text-base-content/50 text-xs">
                   Reward: {bubbleCount}
                   {data.has_additional_bubble ? '+1' : ''} bubbles
                 </p>
-                {errors.duration && <p className="fieldset-label text-error">{errors.duration}</p>}
                 <Input
                   placeholder="Dragons in Waterdeep"
                   errors={errors.title}

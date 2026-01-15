@@ -7,6 +7,9 @@ type InputProps = {
   type?: 'text' | 'number' | 'date' | 'time' | 'url' | 'email' | 'search' | 'password',
   value: string | number,
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void,
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void,
+  onClick?: (e: React.MouseEvent<HTMLInputElement>) => void,
   placeholder?: string,
   errors?: ReactNode,
   min?: number,
@@ -23,6 +26,9 @@ export const Input: React.FC<InputProps> = ({
                                               value,
                                               placeholder,
                                               onChange,
+                                              onBlur,
+                                              onFocus,
+                                              onClick,
                                               errors = '',
                                               min,
                                               max,
@@ -49,6 +55,9 @@ export const Input: React.FC<InputProps> = ({
              type={type}
              value={value}
              onChange={onChange}
+             onBlur={onBlur}
+             onFocus={onFocus}
+             onClick={onClick}
              placeholder={placeholder}
              min={min}
              max={max}
@@ -68,4 +77,3 @@ export const Input: React.FC<InputProps> = ({
     </div>
   )
 }
-
