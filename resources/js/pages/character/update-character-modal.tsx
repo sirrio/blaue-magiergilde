@@ -121,7 +121,7 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
                 </Input>
               </div>
               <Input
-                errors={errors.bubble_shops_spend}
+            errors={errors.bubble_shop_spend}
                 type="number"
                 value={data.bubble_shop_spend}
                 onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}

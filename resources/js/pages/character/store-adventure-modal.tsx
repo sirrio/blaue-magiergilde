@@ -6,7 +6,7 @@ import { TextArea } from '@/components/ui/text-area'
 import AdventureParticipantPicker from '@/pages/character/adventure-ally-picker'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Droplets, Swords } from 'lucide-react'
+import { Swords } from 'lucide-react'
 import React, { useState } from 'react'
 
 const StoreAdventureModal = ({ character, guildCharacters = [] }: { character: Character; guildCharacters?: Character[] }) => {

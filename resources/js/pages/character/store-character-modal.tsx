@@ -6,6 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
+import LogoFiller from '@/components/logo-filler'
 import { PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import React, { useState } from 'react'
@@ -109,9 +110,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
                 Avatar
               </FileInput>
-              <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
-                Filler
-              </Checkbox>
             </div>
           ) : (
             <div className="space-y-3">
@@ -134,6 +132,12 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
                 Notes
               </TextArea>
+              <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
+                <span className="flex items-center gap-2">
+                  <LogoFiller width={14} />
+                  This character is a filler character.
+                </span>
+              </Checkbox>
             </div>
           )}
         </form>
