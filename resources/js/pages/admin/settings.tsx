@@ -15,7 +15,7 @@ import {
   PageProps,
 } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { Settings } from 'lucide-react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const getCsrfToken = () => {
@@ -475,7 +475,7 @@ export default function Settings({
               <Modal>
                 <ModalTrigger>
                   <Button size="sm" variant="outline" modifier="square" aria-label="Configure backup">
-                    <Settings size={16} />
+                    <SettingsIcon size={16} />
                   </Button>
                 </ModalTrigger>
                 <ModalTitle>Backup settings</ModalTitle>
