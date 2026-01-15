@@ -17,8 +17,8 @@ import UpdateGameModal from '@/pages/game/update-game-modal'
 import type { Character, Game, User } from '@/types'
 import { Head, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { AlertCircle, ArrowDownUp, Coins, Droplets, PartyPopper, Pencil, Plus, Swords } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { AlertCircle, ChevronDown, ChevronUp, Coins, Droplets, LoaderCircle, PartyPopper, Pencil, Plus, Swords } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
 
 interface Props {
   games: Game[]
@@ -66,6 +66,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [expandedNotes, setExpandedNotes] = useState<Set<number>>(() => new Set())
   const [breakdownModalKey, setBreakdownModalKey] = useState<BreakdownModalKey | null>(null)
+  const [isSortPending, startSortTransition] = useTransition()
   const { errors } = usePage().props as { errors: Record<string, string> }
   const { data: breakdownData, setData: setBreakdownData, put: putBreakdown, processing: breakdownProcessing } =
     useForm<BreakdownForm>({
@@ -82,6 +83,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
       other_bubbles: Number(user.other_bubbles ?? 0),
       other_coins: Number(user.other_coins ?? 0),
     })
+
 
   const filteredGames = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -146,7 +148,9 @@ export default function MasteredGames({ games, user, characters }: Props) {
   )
 
   const toggleSortOrder = () => {
-    setSortOrder((current) => (current === 'newest' ? 'oldest' : 'newest'))
+    startSortTransition(() => {
+      setSortOrder((current) => (current === 'newest' ? 'oldest' : 'newest'))
+    })
   }
 
   const handleBreakdownSubmit = (shouldClose = false) => {
@@ -709,7 +713,8 @@ export default function MasteredGames({ games, user, characters }: Props) {
                     className="inline-flex items-center justify-end gap-1 text-xs uppercase text-base-content/50 hover:text-base-content"
                   >
                     Date
-                    <ArrowDownUp size={12} className={sortOrder === 'newest' ? 'rotate-180' : ''} />
+                    {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
+                    {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                   </button>
                 </span>
                 <span className="text-right">Actions</span>

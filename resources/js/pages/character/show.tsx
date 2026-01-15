@@ -8,10 +8,10 @@ import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import { Character, Ally } from '@/types'
 import { Head, Link } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, Heart, Settings } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Settings } from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 
 function CharacterPortrait({ character, className }: { character: Character; className?: string }) {
   const srcList = character.avatar ? [`/storage/${character.avatar}`, '/images/no-avatar.svg'] : ['/images/no-avatar.svg']
@@ -54,6 +54,11 @@ const formatParticipantSummary = (names: string[]) => {
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
   const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
   const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
+  const [adventureSortDir, setAdventureSortDir] = useState<'desc' | 'asc'>('desc')
+  const [downtimeSortDir, setDowntimeSortDir] = useState<'desc' | 'asc'>('desc')
+  const [isAdventuresPending, startAdventuresTransition] = useTransition()
+  const [isDowntimesPending, startDowntimesTransition] = useTransition()
+  const [isAlliesPending, startAlliesTransition] = useTransition()
   const [adventuresOpen, setAdventuresOpen] = useState(
     character.adventures.length > 0 && character.adventures.length <= 6,
   )
@@ -81,6 +86,37 @@ export default function Show({ character, guildCharacters }: { character: Charac
     })
     return map
   }, [character.downtimes])
+
+  const sortedAdventures = useMemo(() => {
+    const direction = adventureSortDir === 'desc' ? -1 : 1
+    return [...character.adventures].sort((a, b) => {
+      const aDate = new Date(a.start_date).getTime()
+      const bDate = new Date(b.start_date).getTime()
+      return (aDate - bDate) * direction
+    })
+  }, [character.adventures, adventureSortDir])
+
+  const sortedDowntimes = useMemo(() => {
+    const direction = downtimeSortDir === 'desc' ? -1 : 1
+    return [...character.downtimes].sort((a, b) => {
+      const aDate = new Date(a.start_date).getTime()
+      const bDate = new Date(b.start_date).getTime()
+      return (aDate - bDate) * direction
+    })
+  }, [character.downtimes, downtimeSortDir])
+
+  const adventureParticipantMap = useMemo(() => {
+    const map = new Map<number, string>()
+    sortedAdventures.forEach((adv) => {
+      const summary = formatParticipantSummary(
+        (adv.allies ?? []).map((ally) => getAllyDisplayName(ally)),
+      )
+      if (summary) {
+        map.set(adv.id, summary)
+      }
+    })
+    return map
+  }, [sortedAdventures])
 
   const adventureTotalDuration = useMemo(
     () => character.adventures.reduce((total, adv) => total + adv.duration, 0),
@@ -122,12 +158,15 @@ export default function Show({ character, guildCharacters }: { character: Charac
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() => setAdventuresOpen((current) => !current)}
+              onClick={() =>
+                startAdventuresTransition(() => setAdventuresOpen((current) => !current))
+              }
               aria-expanded={adventuresOpen}
               disabled={character.adventures.length === 0}
             >
               <div className="flex items-center gap-2">
                 {adventuresOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                {isAdventuresPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                 <div>
                   <h2 className="text-base font-semibold">Adventures</h2>
                   <p className="text-xs text-base-content/60">
@@ -148,17 +187,24 @@ export default function Show({ character, guildCharacters }: { character: Charac
                       <span>Adventure</span>
                       <span>Notes</span>
                       <span className="text-right">Time</span>
-                      <span className="text-right">Date</span>
+                      <button
+                        type="button"
+                        className="flex items-center justify-end gap-1 text-right"
+                        onClick={() =>
+                          setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                        }
+                      >
+                        Date
+                        {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                      </button>
                       <span className="text-right">Edit</span>
                     </div>
                     <List className="shadow-none">
-                      {character.adventures.map((adv) => {
+                      {sortedAdventures.map((adv) => {
                         const notes = adventureNotesMap.get(adv.id) ?? ''
                         const showToggle = notes.length > 140
                         const isExpanded = expandedAdventures.includes(adv.id)
-                          const participantSummary = formatParticipantSummary(
-                            (adv.allies ?? []).map((ally) => getAllyDisplayName(ally)),
-                          )
+                        const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                         return (
                           <ListRow
                             key={adv.id}
@@ -226,12 +272,15 @@ export default function Show({ character, guildCharacters }: { character: Charac
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() => setDowntimesOpen((current) => !current)}
+              onClick={() =>
+                startDowntimesTransition(() => setDowntimesOpen((current) => !current))
+              }
               aria-expanded={downtimesOpen}
               disabled={character.downtimes.length === 0}
             >
               <div className="flex items-center gap-2">
                 {downtimesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                {isDowntimesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                 <div>
                   <h2 className="text-base font-semibold">Downtimes</h2>
                   <p className="text-xs text-base-content/60">
@@ -252,11 +301,20 @@ export default function Show({ character, guildCharacters }: { character: Charac
                       <span>Type</span>
                       <span>Notes</span>
                       <span className="text-right">Time</span>
-                      <span className="text-right">Date</span>
+                      <button
+                        type="button"
+                        className="flex items-center justify-end gap-1 text-right"
+                        onClick={() =>
+                          setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                        }
+                      >
+                        Date
+                        {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                      </button>
                       <span className="text-right">Edit</span>
                     </div>
                     <List className="shadow-none">
-                      {character.downtimes.map((dt) => {
+                      {sortedDowntimes.map((dt) => {
                         const notes = downtimeNotesMap.get(dt.id) ?? ''
                         const showToggle = notes.length > 140
                         const isExpanded = expandedDowntimes.includes(dt.id)
@@ -324,12 +382,15 @@ export default function Show({ character, guildCharacters }: { character: Charac
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() => setAlliesOpen((current) => !current)}
+              onClick={() =>
+                startAlliesTransition(() => setAlliesOpen((current) => !current))
+              }
               aria-expanded={alliesOpen}
               disabled={character.allies.length === 0}
             >
               <div className="flex items-center gap-2">
                 {alliesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                {isAlliesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                 <div>
                   <h2 className="text-base font-semibold">Allies</h2>
                   <p className="text-xs text-base-content/60">
