@@ -6,7 +6,14 @@ import { toast } from '@/components/ui/toast'
 import { TextArea } from '@/components/ui/text-area'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
-import { DiscordBackupChannel, DiscordBackupStats, DiscordBackupStatus, DiscordBotSettings, PageProps } from '@/types'
+import {
+  DiscordBackupChannel,
+  DiscordBackupStats,
+  DiscordBackupStatus,
+  DiscordBotOwnersStatus,
+  DiscordBotSettings,
+  PageProps,
+} from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -17,7 +24,7 @@ const getCsrfToken = () => {
   return meta?.content ?? ''
 }
 
-export default function Backup({
+export default function Settings({
   discordBackup,
   discordBotSettings,
 }: {
@@ -39,6 +46,9 @@ export default function Backup({
   const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
+  const [ownerStatus, setOwnerStatus] = useState<DiscordBotOwnersStatus | null>(null)
+  const [ownerStatusLoading, setOwnerStatusLoading] = useState(false)
+  const [ownerStatusError, setOwnerStatusError] = useState<string | null>(null)
 
   const fetchBackupStatus = useCallback(
     async (showToast: boolean) => {
@@ -49,7 +59,7 @@ export default function Backup({
       }
 
       try {
-        const response = await fetch(route('admin.backup.status'), {
+        const response = await fetch(route('admin.settings.backup.status'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -127,6 +137,29 @@ export default function Backup({
     }
   }, [backupStatus?.running, fetchBackupStatus])
 
+  const fetchOwnerStatus = useCallback(async () => {
+    setOwnerStatusLoading(true)
+    setOwnerStatusError(null)
+    try {
+      const response = await fetch(route('admin.settings.bot.owners.status'), {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setOwnerStatus(null)
+        setOwnerStatusError(String(payload?.error ?? 'Owner status could not be loaded.'))
+        return
+      }
+      setOwnerStatus(payload as DiscordBotOwnersStatus)
+    } catch (error) {
+      setOwnerStatus(null)
+      setOwnerStatusError('Owner status could not be loaded.')
+    } finally {
+      setOwnerStatusLoading(false)
+    }
+  }, [])
+
   const selectedChannelDetails = useMemo(
     () => discordBackup.selected_channels_details ?? {},
     [discordBackup.selected_channels_details]
@@ -186,7 +219,7 @@ export default function Backup({
     }))
 
     selectionForm.transform(() => ({ guilds }))
-    selectionForm.patch(route('admin.backup.channels.update'), {
+    selectionForm.patch(route('admin.settings.backup.channels.update'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Backup channels saved.', 'info')
@@ -226,7 +259,7 @@ export default function Backup({
   )
 
   const handleBackupStart = () => {
-    backupForm.post(route('admin.backup.store'), {
+    backupForm.post(route('admin.settings.backup.store'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Discord backup started.', 'info')
@@ -251,7 +284,7 @@ export default function Backup({
       return
     }
 
-    deleteForm.delete(route('admin.backup.destroy'), {
+    deleteForm.delete(route('admin.settings.backup.destroy'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Discord backup deleted.', 'info')
@@ -301,7 +334,7 @@ export default function Backup({
       setSyncingChannelId(channel.id)
 
       try {
-        const response = await fetch(route('admin.backup.channels.sync', channel.id), {
+        const response = await fetch(route('admin.settings.backup.channels.sync', channel.id), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -366,10 +399,11 @@ export default function Backup({
   const hasBackupSelection = selectedChannelsFlat.length > 0
 
   const handleOwnerIdsSave = () => {
-    ownerIdsForm.patch(route('admin.backup.owners.update'), {
+    ownerIdsForm.patch(route('admin.settings.bot.owners.update'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Bot owner list saved.', 'info')
+        void fetchOwnerStatus()
       },
       onError: () => {
         toast.show('Bot owner list could not be saved.', 'error')
@@ -377,14 +411,26 @@ export default function Backup({
     })
   }
 
+  useEffect(() => {
+    void fetchOwnerStatus()
+  }, [fetchOwnerStatus])
+
+  const ownerCacheLabel = ownerStatusLoading
+    ? 'Loading...'
+    : ownerStatus?.updated_at
+      ? new Date(ownerStatus.updated_at).toLocaleString()
+      : 'Not yet cached'
+  const ownerEntries = ownerStatus?.owners ?? []
+  const ownerIdsFallback = ownerStatus?.owner_ids ?? discordBotSettings.owner_ids ?? []
+
   return (
     <AppLayout>
-      <Head title="Backup" />
+      <Head title="Settings" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-2xl font-bold">Backup</h1>
+          <h1 className="text-2xl font-bold">Settings</h1>
           <p className="text-sm text-base-content/70">
-            Manage Discord backup preferences for the guild.
+            Manage Discord settings for the guild.
           </p>
         </section>
         <div className="rounded-box bg-base-100 shadow-md p-3">
@@ -441,7 +487,7 @@ export default function Backup({
                         title="Add backup channels"
                         description="Select the text channels to include in backups. Threads are captured automatically."
                         confirmLabel="Add channels"
-                        channelsRouteName="admin.backup.channels.refresh"
+                        channelsRouteName="admin.settings.backup.channels.refresh"
                         excludedByGuild={selectedByGuild}
                         onConfirm={handleAddChannels}
                       >
@@ -530,6 +576,7 @@ export default function Backup({
                 Add Discord user IDs allowed to use owner-only bot commands.
               </p>
             </div>
+            <div className="text-xs text-base-content/60">Bot cache: {ownerCacheLabel}</div>
           </div>
           <div className="mt-3 space-y-3">
             <TextArea
@@ -540,6 +587,38 @@ export default function Backup({
             >
               Owner IDs (comma separated)
             </TextArea>
+            {ownerStatusError ? (
+              <p className="text-xs text-error">{ownerStatusError}</p>
+            ) : ownerEntries.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {ownerEntries.map((owner) => (
+                  <div
+                    key={owner.id}
+                    className="flex items-center gap-2 rounded-full border border-base-200 px-2 py-1 text-xs"
+                  >
+                    {owner.avatar_url ? (
+                      <img
+                        src={owner.avatar_url}
+                        alt=""
+                        className="h-6 w-6 rounded-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-base-200" />
+                    )}
+                    <span className="max-w-[160px] truncate">
+                      {owner.display_name || owner.name || owner.id}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : ownerIdsFallback.length > 0 ? (
+              <p className="text-xs text-base-content/60">
+                Cached IDs: {ownerIdsFallback.join(', ')}
+              </p>
+            ) : (
+              <p className="text-xs text-base-content/60">No owners cached yet.</p>
+            )}
             <div className="flex justify-end">
               <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>
                 Save owner list

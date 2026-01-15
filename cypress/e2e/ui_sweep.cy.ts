@@ -17,7 +17,7 @@ describe('UI sweep', () => {
       { path: '/characters', heading: 'Characters', name: 'characters' },
       { path: '/game-master-log', heading: 'Game Master Log', name: 'game-master-log' },
       { path: '/handbook', heading: 'Guild Handbook', name: 'guild-handbook' },
-      { path: '/admin/backup', heading: 'Backup', name: 'admin-backup' },
+      { path: '/admin/settings', heading: 'Settings', name: 'admin-settings' },
       { path: '/admin/items', heading: 'Items', name: 'items' },
       { path: '/admin/spells', heading: 'Spells', name: 'spells' },
       { path: '/admin/shops', heading: 'Shop', name: 'shop' },

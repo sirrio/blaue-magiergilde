@@ -186,6 +186,19 @@ export interface DiscordBotSettings {
   owner_ids: string[]
 }
 
+export interface DiscordBotOwner {
+  id: string
+  name?: string
+  display_name?: string | null
+  avatar_url?: string | null
+}
+
+export interface DiscordBotOwnersStatus {
+  owner_ids: string[]
+  updated_at?: string | null
+  owners?: DiscordBotOwner[]
+}
+
 export interface DiscordBackupAttachment {
   id: number
   filename: string

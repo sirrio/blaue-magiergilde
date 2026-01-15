@@ -71,7 +71,7 @@ const adminSections = [
   {
     label: 'System',
     links: [
-      { name: 'Backup', route: 'admin.backup', method: 'get' as const, icon: Settings },
+      { name: 'Settings', route: 'admin.settings', method: 'get' as const, icon: Settings },
     ],
   },
 ]

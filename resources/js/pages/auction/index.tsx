@@ -1265,8 +1265,8 @@ export default function Index({
                             title="Select posting channel"
                             description="Choose where the auction should be posted."
                             confirmLabel="Save channel"
-                            channelsRouteName="admin.backup.channels.refresh"
-                            threadsRouteName="admin.backup.threads.refresh"
+                            channelsRouteName="admin.settings.backup.channels.refresh"
+                            threadsRouteName="admin.settings.backup.threads.refresh"
                             includeThreads={false}
                             enableThreadLoader
                             threadLoadIncludeArchived
@@ -1292,7 +1292,7 @@ export default function Index({
                             title="Select voice channel"
                             description="Choose the voice channel used for live candidates."
                             confirmLabel="Save channel"
-                            channelsRouteName="admin.backup.channels.refresh"
+                            channelsRouteName="admin.settings.backup.channels.refresh"
                             includeThreads={false}
                             mode="single"
                             allowedChannelTypes={['GuildVoice', 'GuildStageVoice']}

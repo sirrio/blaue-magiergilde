@@ -5,6 +5,7 @@ const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
+const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
 const MAX_BODY_SIZE = 10 * 1024;
@@ -108,18 +109,35 @@ function startHttpServer(client) {
         const isDiscordThreads = path === '/discord-threads';
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
+        const isDiscordOwnersStatus = path === '/discord-owners/status';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isBackstockPost = path === '/backstock-post';
         const isAuctionPost = path === '/auction-post';
         const isAuctionVoiceBid = path === '/auction-voice-bid';
 
-        if (req.method !== 'POST' || (!isVoiceSync && !isDiscordBackup && !isDiscordChannels && !isDiscordThreads && !isDiscordBackupStatus && !isDiscordBackupChannel && !isShopPost && !isShopUpdate && !isBackstockPost && !isAuctionPost && !isAuctionVoiceBid)) {
+        const allowedPost =
+            isVoiceSync ||
+            isDiscordBackup ||
+            isDiscordChannels ||
+            isDiscordThreads ||
+            isDiscordBackupStatus ||
+            isDiscordBackupChannel ||
+            isShopPost ||
+            isShopUpdate ||
+            isBackstockPost ||
+            isAuctionPost ||
+            isAuctionVoiceBid;
+
+        if (
+            (req.method !== 'POST' && !(req.method === 'GET' && isDiscordOwnersStatus)) ||
+            (!allowedPost && !(req.method === 'GET' && isDiscordOwnersStatus))
+        ) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
 
-        if (!isDiscordBackupStatus) {
+        if (!isDiscordBackupStatus && !isDiscordOwnersStatus) {
             const limitStatus = getRateLimitStatus(req);
             if (limitStatus.limited) {
                 logReject(req, 'rate limited');
@@ -138,23 +156,50 @@ function startHttpServer(client) {
             return;
         }
 
-        let payload;
-        try {
-            payload = await readJson(req);
-        } catch (error) {
-            if (error instanceof Error && error.message === 'Payload too large.') {
-                logReject(req, 'payload too large');
-                respondJson(res, 413, { error: 'Payload too large.' });
+        let payload = {};
+        if (req.method === 'POST') {
+            try {
+                payload = await readJson(req);
+            } catch (error) {
+                if (error instanceof Error && error.message === 'Payload too large.') {
+                    logReject(req, 'payload too large');
+                    respondJson(res, 413, { error: 'Payload too large.' });
+                    return;
+                }
+
+                logReject(req, 'invalid JSON');
+                respondJson(res, 400, { error: 'Invalid JSON.' });
                 return;
             }
-
-            logReject(req, 'invalid JSON');
-            respondJson(res, 400, { error: 'Invalid JSON.' });
-            return;
         }
 
         if (isDiscordBackupStatus) {
             respondJson(res, 200, { status: getBackupStatus() });
+            return;
+        }
+
+        if (isDiscordOwnersStatus) {
+            const ownerIds = ownerIdsList();
+            const owners = [];
+            for (const id of ownerIds) {
+                try {
+                    const user = await client.users.fetch(id);
+                    owners.push({
+                        id: String(id),
+                        name: user.username,
+                        display_name: user.globalName || null,
+                        avatar_url: user.displayAvatarURL({ size: 96 }),
+                    });
+                } catch (error) {
+                    owners.push({ id: String(id) });
+                }
+            }
+
+            respondJson(res, 200, {
+                owner_ids: ownerIds,
+                updated_at: ownerIdsUpdatedAt() ? ownerIdsUpdatedAt().toISOString() : null,
+                owners,
+            });
             return;
         }
 

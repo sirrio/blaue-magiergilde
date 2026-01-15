@@ -14,7 +14,7 @@ use Inertia\Response;
 class BackupController extends Controller
 {
     /**
-     * Display the admin backup page.
+     * Display the admin settings page.
      */
     public function index(): Response
     {
@@ -22,7 +22,7 @@ class BackupController extends Controller
 
         abort_unless($user && $user->is_admin, 403);
 
-        return Inertia::render('admin/backup', [
+        return Inertia::render('admin/settings', [
             'discordBackup' => [
                 'channels' => DiscordChannel::query()->count(),
                 'messages' => DiscordMessage::query()->count(),

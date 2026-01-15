@@ -7,30 +7,34 @@ use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/admin/backup', [BackupController::class, 'index'])->name('admin.backup');
+    Route::redirect('/admin/backup', '/admin/settings');
+    Route::get('/admin/settings', [BackupController::class, 'index'])->name('admin.settings');
 
-    Route::post('/admin/backup/discord', [DiscordBackupController::class, 'store'])
-        ->name('admin.backup.store');
+    Route::post('/admin/settings/discord/backup', [DiscordBackupController::class, 'store'])
+        ->name('admin.settings.backup.store');
 
-    Route::post('/admin/backup/discord/status', [DiscordBackupController::class, 'status'])
-        ->name('admin.backup.status');
+    Route::post('/admin/settings/discord/backup/status', [DiscordBackupController::class, 'status'])
+        ->name('admin.settings.backup.status');
 
-    Route::post('/admin/backup/discord/channels/{discordChannel}/sync', [DiscordBackupController::class, 'syncChannel'])
-        ->name('admin.backup.channels.sync');
+    Route::post('/admin/settings/discord/backup/channels/{discordChannel}/sync', [DiscordBackupController::class, 'syncChannel'])
+        ->name('admin.settings.backup.channels.sync');
 
-    Route::delete('/admin/backup/discord', [DiscordBackupController::class, 'destroy'])
-        ->name('admin.backup.destroy');
+    Route::delete('/admin/settings/discord/backup', [DiscordBackupController::class, 'destroy'])
+        ->name('admin.settings.backup.destroy');
 
-    Route::post('/admin/backup/discord/channels', [DiscordBackupSettingsController::class, 'refresh'])
-        ->name('admin.backup.channels.refresh');
+    Route::post('/admin/settings/discord/backup/channels', [DiscordBackupSettingsController::class, 'refresh'])
+        ->name('admin.settings.backup.channels.refresh');
 
-    Route::post('/admin/backup/discord/threads', [DiscordBackupSettingsController::class, 'threads'])
-        ->name('admin.backup.threads.refresh');
+    Route::post('/admin/settings/discord/backup/threads', [DiscordBackupSettingsController::class, 'threads'])
+        ->name('admin.settings.backup.threads.refresh');
 
-    Route::patch('/admin/backup/discord/channels', [DiscordBackupSettingsController::class, 'update'])
-        ->name('admin.backup.channels.update');
+    Route::patch('/admin/settings/discord/backup/channels', [DiscordBackupSettingsController::class, 'update'])
+        ->name('admin.settings.backup.channels.update');
 
-    Route::patch('/admin/backup/discord/owners', [DiscordBotSettingsController::class, 'update'])
-        ->name('admin.backup.owners.update');
+    Route::patch('/admin/settings/discord/bot/owners', [DiscordBotSettingsController::class, 'update'])
+        ->name('admin.settings.bot.owners.update');
+
+    Route::get('/admin/settings/discord/bot/owners/status', [DiscordBotSettingsController::class, 'status'])
+        ->name('admin.settings.bot.owners.status');
 
 });

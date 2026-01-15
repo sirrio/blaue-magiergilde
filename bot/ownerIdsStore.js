@@ -50,8 +50,13 @@ function ownerIdsUpdatedAt() {
     return lastUpdatedAt;
 }
 
+function ownerIdsList() {
+    return Array.from(cachedOwnerIds);
+}
+
 module.exports = {
     ownerIdSet,
     ownerIdsUpdatedAt,
+    ownerIdsList,
     refreshOwnerIds,
 };

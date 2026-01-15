@@ -387,8 +387,8 @@ export default function BackstockIndex({
                     title="Select posting channel"
                     description="Choose where the backstock should be posted."
                     confirmLabel="Save channel"
-                    channelsRouteName="admin.backup.channels.refresh"
-                    threadsRouteName="admin.backup.threads.refresh"
+                    channelsRouteName="admin.settings.backup.channels.refresh"
+                    threadsRouteName="admin.settings.backup.threads.refresh"
                     includeThreads={false}
                     enableThreadLoader
                     threadLoadIncludeArchived

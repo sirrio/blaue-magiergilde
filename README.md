@@ -67,4 +67,4 @@ Auctions are managed in-app (items, bids, hidden bids, auto rollover). The bot h
 
 ## Discord backup
 
-Admins can trigger manual backups for selected text channels + threads (including attachments) from `/admin/backup`.
+Admins can trigger manual backups for selected text channels + threads (including attachments) from `/admin/settings`.
