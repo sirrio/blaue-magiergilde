@@ -114,19 +114,21 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
           ) : (
             <div className="space-y-3">
               <div className={cn('grid grid-cols-2 gap-2')}>
-                <Input errors={errors.dm_bubbles} type="number" value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-                  DM Bubbles
-                </Input>
-                <Input errors={errors.dm_coins} type="number" value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-                  DM Coins
-                </Input>
-              </div>
-              <Input
-                errors={errors.bubble_shop_spend}
-                type="number"
-                value={data.bubble_shop_spend}
-                onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-              >
+            <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
+              DM Bubbles
+            </Input>
+            <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
+              DM Coins
+            </Input>
+          </div>
+          <Input
+            errors={errors.bubble_shop_spend}
+            type="number"
+            min={0}
+            max={1024}
+            value={data.bubble_shop_spend}
+            onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
+          >
                 Bubble Shop Spend
               </Input>
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>

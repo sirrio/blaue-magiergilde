@@ -38,10 +38,10 @@ class UpdateCharacterRequest extends FormRequest
             'class' => 'required|exists:character_classes,id',
             'external_link' => 'required|url',
             'version' => 'required|string',
-            'dm_bubbles' => 'required|integer|min:0',
-            'dm_coins' => 'required|integer|min:0',
+            'dm_bubbles' => 'required|integer|min:0|max:1024',
+            'dm_coins' => 'required|integer|min:0|max:1024',
             'is_filler' => 'required|boolean',
-            'bubble_shop_spend' => 'required|integer|min:0',
+            'bubble_shop_spend' => 'required|integer|min:0|max:1024',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
         ];
     }

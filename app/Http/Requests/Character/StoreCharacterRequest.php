@@ -41,10 +41,10 @@ class StoreCharacterRequest extends FormRequest
             'external_link' => 'required|url',
             'start_tier' => 'required|string',
             'version' => 'required|string',
-            'dm_bubbles' => 'required|integer|min:0',
-            'dm_coins' => 'required|integer|min:0',
+            'dm_bubbles' => 'required|integer|min:0|max:1024',
+            'dm_coins' => 'required|integer|min:0|max:1024',
             'is_filler' => 'required|boolean',
-            'bubble_shop_spend' => 'required|integer|min:0',
+            'bubble_shop_spend' => 'required|integer|min:0|max:1024',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
         ];
     }
