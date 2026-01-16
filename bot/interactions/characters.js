@@ -1565,7 +1565,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
     ];
 }
 
-function buildAdventureListRow({ characterId, ownerDiscordId, adventures }) {
+function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advSelect_${characterId}_${ownerDiscordId}`)
         .setPlaceholder('Select adventure...')
@@ -1579,7 +1579,15 @@ function buildAdventureListRow({ characterId, ownerDiscordId, adventures }) {
                     .setValue(String(a.id));
             }),
         );
-    return new ActionRowBuilder().addComponents(select);
+    return [
+        new ActionRowBuilder().addComponents(select),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advListBack_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back to character')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
 function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
@@ -3561,7 +3569,7 @@ async function handle(interaction) {
             }
             await interaction.reply({
                 embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
-                components: [buildAdventureListRow({ characterId, ownerDiscordId, adventures })],
+                components: buildAdventureListRows({ characterId, ownerDiscordId, adventures }),
                 flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
@@ -4190,7 +4198,40 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
-            components: [buildAdventureListRow({ characterId, ownerDiscordId, adventures })],
+            components: buildAdventureListRows({ characterId, ownerDiscordId, adventures }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advListBack_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let character;
+        try {
+            character = await findCharacterForDiscord(interaction.user, characterId);
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await replyNotLinked(interaction);
+                return true;
+            }
+            throw error;
+        }
+
+        if (!character) {
+            await interaction.update({ content: 'Character not found.', embeds: [], components: [] });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterCardPayload({ character, ownerDiscordId }),
             content: '',
         });
         return true;
