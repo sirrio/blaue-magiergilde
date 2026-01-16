@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Bot\DiscordBackupController;
+use App\Http\Controllers\Bot\CharacterAvatarController;
 use App\Http\Controllers\Bot\DiscordBotSettingsController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,9 @@ use Illuminate\Support\Facades\Route;
 
         Route::post('discord-backups/attachments', [DiscordBackupController::class, 'storeAttachment'])
             ->name('bot.discord-backups.attachments.store');
+
+        Route::post('character-avatars', [CharacterAvatarController::class, 'store'])
+            ->name('bot.characters.avatar');
 
         Route::get('discord-owners', [DiscordBotSettingsController::class, 'ownerIds'])
             ->name('bot.discord-owners');

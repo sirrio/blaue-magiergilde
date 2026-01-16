@@ -10,6 +10,7 @@ const {
     StringSelectMenuOptionBuilder,
     EmbedBuilder,
 } = require('discord.js');
+const { Agent } = require('undici');
 
 const {
     DiscordNotLinkedError,
@@ -49,6 +50,15 @@ const { pendingCharacterCreations } = require('../state');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
+}
+
+async function updateCharacterListMessage(interaction, ownerDiscordId) {
+    const characters = await listCharactersForDiscord(interaction.user);
+    const listView = buildCharacterListView({ ownerDiscordId, characters });
+    await interaction.update({
+        ...listView,
+        content: '',
+    });
 }
 
 async function editNotLinked(interaction) {
@@ -538,6 +548,112 @@ async function updateCreationMessage(state, payload) {
     return false;
 }
 
+function resolveAppUrl() {
+    const direct = String(process.env.BOT_PUBLIC_APP_URL || process.env.APP_URL || '').trim();
+    if (!direct) return '';
+    try {
+        return new URL(direct).toString().replace(/\/$/, '');
+    } catch {
+        return direct.replace(/\/$/, '');
+    }
+}
+
+const insecureAgent = new Agent({
+    connect: {
+        rejectUnauthorized: false,
+    },
+});
+
+let insecureTlsEnabled = false;
+
+function shouldAllowInsecure(urlString) {
+    try {
+        const url = new URL(urlString);
+        const host = url.hostname.toLowerCase();
+        return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.test');
+    } catch {
+        return false;
+    }
+}
+
+function enableInsecureTlsIfNeeded(urlString) {
+    if (!shouldAllowInsecure(urlString) || insecureTlsEnabled) return;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    insecureTlsEnabled = true;
+    console.warn('[bot] Local TLS verification disabled for bot HTTP requests.');
+}
+
+async function storeCharacterAvatar(characterId, avatarUrl) {
+    const appUrl = resolveAppUrl();
+    const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    if (!appUrl || !token) {
+        console.warn('[bot] Avatar upload skipped: BOT_PUBLIC_APP_URL/APP_URL or BOT_HTTP_TOKEN missing.');
+        return false;
+    }
+
+    try {
+        const endpoint = `${appUrl}/bot/character-avatars`;
+        enableInsecureTlsIfNeeded(endpoint);
+        const requestOptions = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Bot-Token': token,
+            },
+            body: JSON.stringify({
+                character_id: characterId,
+                avatar_url: avatarUrl,
+            }),
+            dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
+            redirect: 'manual',
+        };
+
+        let response = await fetch(endpoint, requestOptions);
+        if ([301, 302, 307, 308].includes(response.status)) {
+            const location = response.headers.get('location');
+            if (location) {
+                const redirected = new URL(location, endpoint).toString();
+                enableInsecureTlsIfNeeded(redirected);
+                response = await fetch(redirected, {
+                    ...requestOptions,
+                    dispatcher: shouldAllowInsecure(redirected) ? insecureAgent : requestOptions.dispatcher,
+                });
+            }
+        }
+
+        const contentType = String(response.headers.get('content-type') || '');
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            const preview = text.length > 300 ? `${text.slice(0, 300)}…` : text;
+            console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentType} body=${preview}`);
+            return false;
+        }
+
+        if (!contentType.includes('application/json')) {
+            const text = await response.text().catch(() => '');
+            const preview = text.length > 300 ? `${text.slice(0, 300)}…` : text;
+            console.warn(`[bot] Avatar upload unexpected response. content-type=${contentType} body=${preview}`);
+            return false;
+        }
+
+        const payload = await response.json().catch(() => null);
+        if (payload?.avatar_path) {
+            return payload.avatar_path;
+        }
+        return true;
+    } catch (error) {
+        const code = error?.cause?.code || error?.code;
+        if (code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+            console.warn('[bot] Avatar upload TLS error. Endpoint:', `${appUrl}/bot/character-avatars`);
+        }
+
+        console.warn('[bot] Avatar upload error.', error);
+        return false;
+    }
+}
+
 async function showCreationError(interaction, state, ownerDiscordId, message) {
     state.step = 'basic';
     const payload = {
@@ -582,6 +698,13 @@ async function finalizeCharacterCreation(state) {
             components: [],
         });
         return;
+    }
+
+    if (result.id && data.avatar && isHttpUrl(data.avatar)) {
+        const storedAvatar = await storeCharacterAvatar(result.id, data.avatar);
+        if (storedAvatar && typeof storedAvatar === 'string') {
+            data.avatar = storedAvatar;
+        }
     }
 
     const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
@@ -1599,7 +1722,8 @@ async function handle(interaction) {
         }
 
         const dm = await interaction.user.createDM();
-        await dm.send('Bitte sende mir hier dein Avatar-Bild. Ich speichere es nur f\u00fcr diesen Charakter.');
+        const sourceLink = state?.promptMessage?.url ? `\nZur\u00fcck zum Charakter-Dialog: ${state.promptMessage.url}` : '';
+        await dm.send(`Bitte sende mir hier dein Avatar-Bild. Ich speichere es nur f\u00fcr diesen Charakter.${sourceLink}`);
 
         await interaction.deferUpdate();
         await updateCreationMessage(state, {
@@ -2099,7 +2223,15 @@ async function handle(interaction) {
             return true;
         }
         if (action === 'deleteCharacterCancel') {
-            await interaction.update({ content: 'Abgebrochen.', components: [] });
+            try {
+                await updateCharacterListMessage(interaction, ownerDiscordId);
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await interaction.update({ content: notLinkedContent(), components: [] });
+                    return true;
+                }
+                throw error;
+            }
             return true;
         }
         if (action !== 'deleteCharacterConfirm') return false;
@@ -2110,7 +2242,7 @@ async function handle(interaction) {
                 await interaction.update({ content: 'Charakter nicht gefunden oder bereits gel\u00f6scht.', components: [] });
                 return true;
             }
-            await interaction.update({ content: 'Charakter wurde gel\u00f6scht.', components: [] });
+            await updateCharacterListMessage(interaction, ownerDiscordId);
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error(error);
@@ -3162,5 +3294,3 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage };
-
-

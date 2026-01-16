@@ -14,7 +14,10 @@ import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
 
 function CharacterPortrait({ character, className }: { character: Character; className?: string }) {
-  const srcList = character.avatar ? [`/storage/${character.avatar}`, '/images/no-avatar.svg'] : ['/images/no-avatar.svg']
+  const avatarValue = String(character.avatar || '').trim()
+  const srcList = avatarValue
+    ? [avatarValue.startsWith('http') ? avatarValue : `/storage/${avatarValue}`, '/images/no-avatar.svg']
+    : ['/images/no-avatar.svg']
   const { src } = useImage({
     srcList,
   })
@@ -22,11 +25,13 @@ function CharacterPortrait({ character, className }: { character: Character; cla
 }
 
 function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
+  const linkedAvatar = String(ally.linked_character?.avatar || '').trim()
+  const allyAvatar = String(ally.avatar || '').trim()
   const { src } = useImage({
-    srcList: ally.linked_character?.avatar
-      ? [`/storage/${ally.linked_character.avatar}`, '/images/no-avatar.svg']
-      : ally.avatar
-        ? ['/storage/' + ally.avatar, '/images/no-avatar.svg']
+    srcList: linkedAvatar
+      ? [linkedAvatar.startsWith('http') ? linkedAvatar : `/storage/${linkedAvatar}`, '/images/no-avatar.svg']
+      : allyAvatar
+        ? [allyAvatar.startsWith('http') ? allyAvatar : `/storage/${allyAvatar}`, '/images/no-avatar.svg']
         : ['/images/no-avatar.svg'],
   })
   return <img className={cn('h-10 w-10 rounded-full object-cover', className)} src={src} alt={getAllyDisplayName(ally)} />
