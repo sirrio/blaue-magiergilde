@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, MessageFlags } = require('discord.js');
 
 const { isOwner } = require('../commandConfig');
 
@@ -20,7 +20,7 @@ module.exports = {
             if (!command) return;
 
             if (command.ownerOnly && !isOwner(interaction.user.id)) {
-                await interaction.reply({ content: 'Du bist nicht berechtigt, diesen Befehl zu nutzen.', ephemeral: true });
+                await interaction.reply({ content: 'Du bist nicht berechtigt, diesen Befehl zu nutzen.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -30,7 +30,7 @@ module.exports = {
             console.error(error);
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
 
-            const payload = { content: 'Es ist ein Fehler aufgetreten.', ephemeral: true };
+            const payload = { content: 'Es ist ein Fehler aufgetreten.', flags: MessageFlags.Ephemeral };
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp(payload);
             } else {

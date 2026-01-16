@@ -143,7 +143,7 @@ function parseDurationToSeconds(input) {
     return null;
 }
 
-const allowedStartTiers = new Set(['bt', 'lt', 'ht', 'et']);
+const allowedStartTiers = new Set(['bt', 'lt', 'ht']);
 const allowedVersions = new Set(['2014', '2024']);
 const allowedFactions = new Set([
     'none',
@@ -245,6 +245,13 @@ function clearCreationState(userId) {
     pendingCharacterCreations.delete(creationStateKey(userId));
 }
 
+function ensurePromptMessage(state, interaction) {
+    if (!state || state.promptMessage) return;
+    if (interaction?.message) {
+        state.promptMessage = interaction.message;
+    }
+}
+
 function buildCreationCancelRow(ownerDiscordId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -293,7 +300,6 @@ function buildStartTierRow(ownerDiscordId, selectedValue) {
             { label: 'BT', value: 'bt' },
             { label: 'LT', value: 'lt' },
             { label: 'HT', value: 'ht' },
-            { label: 'ET', value: 'et' },
             { label: 'Filler', value: 'filler' },
         ].map(option =>
             new StringSelectMenuOptionBuilder()
@@ -303,6 +309,13 @@ function buildStartTierRow(ownerDiscordId, selectedValue) {
         ));
 
     return new ActionRowBuilder().addComponents(select);
+}
+
+function getStartTierSelection(state) {
+    if (state?.data?.isFiller) {
+        return 'filler';
+    }
+    return state?.data?.startTier;
 }
 
 function buildFactionRow(ownerDiscordId, selectedValue) {
@@ -356,12 +369,25 @@ function buildVersionRow(ownerDiscordId, selectedValue) {
     return new ActionRowBuilder().addComponents(select);
 }
 
-function buildNotesSkipRow(ownerDiscordId) {
+function buildCreationConfirmRow(ownerDiscordId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`charactersCreate_skipNotes_${ownerDiscordId}`)
-            .setLabel('Notizen \u00fcberspringen')
+            .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
+            .setLabel('Zur\u00fcck')
             .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_confirm_${ownerDiscordId}`)
+            .setLabel('Charakter erstellen')
+            .setStyle(ButtonStyle.Primary),
+    );
+}
+
+function buildCreationBasicsRow(ownerDiscordId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_basicopen_${ownerDiscordId}`)
+            .setLabel('Angaben bearbeiten')
+            .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
             .setLabel('Abbrechen')
@@ -369,15 +395,148 @@ function buildNotesSkipRow(ownerDiscordId) {
     );
 }
 
+function buildCreationStepActionsRow(ownerDiscordId, stepKey) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
+            .setLabel('Zur\u00fcck')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_next_${stepKey}_${ownerDiscordId}`)
+            .setLabel('Weiter')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
+            .setLabel('Abbrechen')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+function buildCreationBasicsEmbed(state, message) {
+    const embed = buildCreationEmbed(1, 'Charakter erstellen', message || 'Bearbeite die Basisangaben.');
+    embed.addFields(
+        { name: 'Name', value: state?.data?.name || '-', inline: false },
+        { name: 'External Link', value: state?.data?.externalLink || '-', inline: false },
+        { name: 'Avatar', value: state?.data?.avatar || 'Kein Avatar', inline: false },
+        { name: 'Notizen', value: state?.data?.notes || '-', inline: false },
+    );
+    return embed;
+}
+
+async function buildCreationSummaryEmbed(state) {
+    const classes = await listCharacterClassesForDiscord();
+    const classById = new Map(classes.map(entry => [Number(entry.id), entry.name]));
+    const classNames = (state.data.classIds || [])
+        .map(id => classById.get(Number(id)))
+        .filter(Boolean);
+
+    const tierLabel = state.data.isFiller ? 'Filler' : String(state.data.startTier || '').toUpperCase();
+    const embed = new EmbedBuilder()
+        .setTitle('Zusammenfassung')
+        .setColor(0x4f46e5)
+        .addFields(
+            { name: 'Name', value: state.data.name || '-', inline: false },
+            { name: 'External Link', value: state.data.externalLink || '-', inline: false },
+            { name: 'Avatar', value: state.data.avatar || 'Kein Avatar', inline: false },
+            { name: 'Klassen', value: classNames.length > 0 ? classNames.join(', ') : '-', inline: false },
+            { name: 'Start-Tier', value: tierLabel || '-', inline: true },
+            { name: 'Fraktion', value: state.data.faction || 'none', inline: true },
+            { name: 'Version', value: state.data.version || '2024', inline: true },
+            { name: 'Notizen', value: state.data.notes ? state.data.notes : '—', inline: false },
+        );
+
+    return embed;
+}
+
+function buildCreationBasicModal(ownerDiscordId, state) {
+    const modal = new ModalBuilder()
+        .setCustomId(`charactersCreate_basic_${ownerDiscordId}`)
+        .setTitle('Charakter erstellen');
+
+    const nameInput = new TextInputBuilder()
+        .setCustomId('createName')
+        .setLabel('Charaktername')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(safeModalValue(state?.data?.name));
+
+    const linkInput = new TextInputBuilder()
+        .setCustomId('createLink')
+        .setLabel('External Link (URL)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(safeModalValue(state?.data?.externalLink));
+
+    const avatarInput = new TextInputBuilder()
+        .setCustomId('createAvatar')
+        .setLabel('Avatar (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setValue(safeModalValue(state?.data?.avatar));
+
+    const notesInput = new TextInputBuilder()
+        .setCustomId('createNotes')
+        .setLabel('Notizen (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setValue(safeModalValue(state?.data?.notes));
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(nameInput),
+        new ActionRowBuilder().addComponents(linkInput),
+        new ActionRowBuilder().addComponents(avatarInput),
+        new ActionRowBuilder().addComponents(notesInput),
+    );
+
+    return modal;
+}
+
 async function updateCreationReply(state, payload) {
-    if (!state?.promptInteraction) return;
-    await state.promptInteraction.editReply(payload);
+    const interaction = state?.promptInteraction;
+    if (!interaction || !interaction.isRepliable?.()) return;
+
+    if (interaction.replied || interaction.deferred) {
+        await interaction.editReply(payload);
+        return;
+    }
+
+    const replyPayload = {
+        ...payload,
+        flags: payload?.flags ?? MessageFlags.Ephemeral,
+    };
+
+    await interaction.reply(replyPayload);
+}
+
+async function updateCreationMessage(state, payload) {
+    if (state?.promptMessage?.editable) {
+        try {
+            await state.promptMessage.edit(payload);
+            return true;
+        } catch {
+            // fall through to interaction-based update
+        }
+    }
+
+    await updateCreationReply(state, payload);
+    return false;
+}
+
+async function showCreationError(interaction, state, ownerDiscordId, message) {
+    state.step = 'basic';
+    const payload = {
+        embeds: [buildCreationBasicsEmbed(state, message)],
+        components: [buildCreationBasicsRow(ownerDiscordId)],
+    };
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await updateCreationMessage(state, payload);
+    await interaction.deleteReply().catch(() => {});
 }
 
 async function finalizeCharacterCreation(state) {
     const { data, ownerDiscordId } = state;
     if (!data.name || !data.externalLink || !data.startTier || !data.version || !Array.isArray(data.classIds) || data.classIds.length === 0) {
-        await updateCreationReply(state, {
+        await updateCreationMessage(state, {
             content: 'Charakterdaten unvollst\u00e4ndig. Bitte erneut starten.',
             embeds: [],
             components: [],
@@ -401,7 +560,7 @@ async function finalizeCharacterCreation(state) {
     clearCreationState(state.userId);
 
     if (!result.ok) {
-        await updateCreationReply(state, {
+        await updateCreationMessage(state, {
             content: 'Charakter konnte nicht erstellt werden.',
             embeds: [],
             components: [],
@@ -411,7 +570,7 @@ async function finalizeCharacterCreation(state) {
 
     const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
     if (!character) {
-        await updateCreationReply(state, {
+        await updateCreationMessage(state, {
             content: 'Charakter erstellt.',
             embeds: [],
             components: [],
@@ -419,75 +578,12 @@ async function finalizeCharacterCreation(state) {
         return;
     }
 
-    await updateCreationReply(state, {
+    await updateCreationMessage(state, {
         ...buildCharacterCardPayload({ character, ownerDiscordId }),
         content: '',
     });
 }
 
-async function handleCreationMessage(message) {
-    if (!message || message.author.bot) return false;
-    const state = getCreationState(message.author.id);
-    if (!state) return false;
-    if (String(message.channelId) !== String(state.channelId)) return false;
-    if (!state.promptInteraction) return false;
-
-    if (state.step === 'basic') {
-        const raw = message.content.trim();
-        const splitByPipe = raw.split('|').map(part => part.trim()).filter(Boolean);
-        let name = '';
-        let externalLink = '';
-        let avatar = '';
-
-        if (splitByPipe.length >= 2) {
-            [name, externalLink, avatar] = splitByPipe;
-        } else {
-            const lines = raw.split('\n').map(line => line.trim()).filter(Boolean);
-            if (lines.length >= 2) {
-                [name, externalLink, avatar] = lines;
-            }
-        }
-
-        if (!name || !externalLink) {
-            await message.reply('Bitte sende **Name**, **External Link** und optional **Avatar** (z.B. `Name | https://link | https://avatar`).');
-            return true;
-        }
-
-        if (!isHttpUrl(externalLink)) {
-            await message.reply('Der External Link muss eine http/https URL sein.');
-            return true;
-        }
-
-        state.data.name = name;
-        state.data.externalLink = externalLink;
-        state.data.avatar = avatar || '';
-        state.step = 'classes';
-
-        const classes = await listCharacterClassesForDiscord();
-        await updateCreationReply(state, {
-            embeds: [
-                buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
-            ],
-            components: [
-                buildClassesRow({ ownerDiscordId: state.ownerDiscordId, classes, selectedIds: [] }),
-                buildCreationCancelRow(state.ownerDiscordId),
-            ],
-        });
-
-        await message.delete().catch(() => {});
-        return true;
-    }
-
-    if (state.step === 'notes') {
-        const raw = message.content.trim();
-        state.data.notes = ['-', 'skip', 'keine', 'none'].includes(raw.toLowerCase()) ? '' : raw;
-        await message.delete().catch(() => {});
-        await finalizeCharacterCreation(state);
-        return true;
-    }
-
-    return false;
-}
 
 async function buildCharacterClassesView({ interaction, character, ownerDiscordId }) {
     const classes = await listCharacterClassesForDiscord();
@@ -834,7 +930,18 @@ async function handle(interaction) {
             return true;
         }
 
-        if (getCreationState(ownerDiscordId)) {
+        const existingState = getCreationState(ownerDiscordId);
+        if (existingState) {
+            if (existingState.step === 'basic' && !existingState.promptInteraction) {
+                await interaction.showModal(buildCreationBasicModal(ownerDiscordId, existingState));
+                return true;
+            }
+
+            if (existingState.promptInteraction) {
+                await interaction.deferUpdate();
+                return true;
+            }
+
             await interaction.reply({
                 embeds: [buildCreationEmbed(1, 'Charakter erstellen', 'Du hast bereits eine offene Erstellung. Bitte beende sie oder klicke **Abbrechen**.')],
                 components: [buildCreationCancelRow(ownerDiscordId)],
@@ -853,19 +960,14 @@ async function handle(interaction) {
                 isFiller: false,
             },
             promptInteraction: interaction,
+            promptMessage: interaction.message ?? null,
         };
         setCreationState(ownerDiscordId, state);
 
-        await interaction.reply({
-            embeds: [
-                buildCreationEmbed(
-                    1,
-                    'Charakter erstellen',
-                    'Sende eine Nachricht mit **Name**, **External Link** und optional **Avatar**.\nBeispiel: `Name | https://link | https://avatar`',
-                ),
-            ],
-            components: [buildCreationCancelRow(ownerDiscordId)],
-            flags: MessageFlags.Ephemeral,
+        await interaction.update({
+            embeds: [buildCreationBasicsEmbed(state, 'Starte mit den Basisangaben.')],
+            components: [buildCreationBasicsRow(ownerDiscordId)],
+            content: '',
         });
         return true;
     }
@@ -906,20 +1008,8 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_cancel_')) {
-        const ownerDiscordId = interaction.customId.replace('charactersCreate_cancel_', '');
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        clearCreationState(ownerDiscordId);
-        await interaction.update({ content: 'Erstellung abgebrochen.', embeds: [], components: [] });
-        return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_skipNotes_')) {
-        const ownerDiscordId = interaction.customId.replace('charactersCreate_skipNotes_', '');
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('charactersCreate_basic_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_basic_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
             return true;
@@ -931,9 +1021,75 @@ async function handle(interaction) {
             return true;
         }
 
-        state.promptInteraction = interaction;
-        state.data.notes = '';
-        await finalizeCharacterCreation(state);
+        const name = interaction.fields.getTextInputValue('createName').trim();
+        const externalLink = interaction.fields.getTextInputValue('createLink').trim();
+        const avatar = interaction.fields.getTextInputValue('createAvatar').trim();
+        const notes = interaction.fields.getTextInputValue('createNotes').trim();
+
+        if (!name) {
+            await showCreationError(interaction, state, ownerDiscordId, 'Name fehlt.');
+            return true;
+        }
+        if (!isHttpUrl(externalLink)) {
+            await showCreationError(interaction, state, ownerDiscordId, 'Der External Link muss eine http/https URL sein.');
+            return true;
+        }
+
+        const hadPrompt = Boolean(state.promptInteraction);
+        state.data.name = name;
+        state.data.externalLink = externalLink;
+        state.data.avatar = avatar;
+        state.data.notes = notes;
+        state.step = 'classes';
+        if (!hadPrompt) {
+            state.promptInteraction = interaction;
+        }
+
+        const classes = await listCharacterClassesForDiscord();
+        const payload = {
+            embeds: [
+                buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+            ],
+            components: [
+                buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
+                buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+            ],
+        };
+
+        if (hadPrompt) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            await updateCreationMessage(state, payload);
+            await interaction.deleteReply().catch(() => {});
+            return true;
+        }
+
+        await updateCreationMessage(state, payload);
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_cancel_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_cancel_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        clearCreationState(ownerDiscordId);
+        try {
+            const characters = await listCharactersForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            await interaction.update({ ...listView, content: '' });
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await interaction.update({
+                    content: notLinkedContent(),
+                    embeds: [],
+                    components: [buildNotLinkedButtons(ownerDiscordId)],
+                });
+                return true;
+            }
+            throw error;
+        }
         return true;
     }
 
@@ -950,17 +1106,17 @@ async function handle(interaction) {
             return true;
         }
 
-        state.promptInteraction = interaction;
+        ensurePromptMessage(state, interaction);
         state.data.classIds = interaction.values.map(value => Number(value)).filter(value => Number.isFinite(value));
-        state.step = 'tier';
+        const classes = await listCharacterClassesForDiscord();
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
             ],
             components: [
-                buildStartTierRow(ownerDiscordId, state.data.startTier),
-                buildCreationCancelRow(ownerDiscordId),
+                buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
+                buildCreationStepActionsRow(ownerDiscordId, 'classes'),
             ],
             content: '',
         });
@@ -980,7 +1136,7 @@ async function handle(interaction) {
             return true;
         }
 
-        state.promptInteraction = interaction;
+        ensurePromptMessage(state, interaction);
         const value = interaction.values[0];
         if (value === 'filler') {
             state.data.isFiller = true;
@@ -990,30 +1146,13 @@ async function handle(interaction) {
             state.data.startTier = value;
         }
 
-        if (state.data.startTier === 'bt' || state.data.isFiller) {
-            state.data.faction = 'none';
-            state.step = 'version';
-            await interaction.update({
-                embeds: [
-                    buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
-                ],
-                components: [
-                    buildVersionRow(ownerDiscordId, state.data.version),
-                    buildCreationCancelRow(ownerDiscordId),
-                ],
-                content: '',
-            });
-            return true;
-        }
-
-        state.step = 'faction';
         await interaction.update({
             embeds: [
-                buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
             ],
             components: [
-                buildFactionRow(ownerDiscordId, state.data.faction),
-                buildCreationCancelRow(ownerDiscordId),
+                buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
+                buildCreationStepActionsRow(ownerDiscordId, 'tier'),
             ],
             content: '',
         });
@@ -1033,17 +1172,16 @@ async function handle(interaction) {
             return true;
         }
 
-        state.promptInteraction = interaction;
+        ensurePromptMessage(state, interaction);
         state.data.faction = interaction.values[0];
-        state.step = 'version';
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
             ],
             components: [
-                buildVersionRow(ownerDiscordId, state.data.version),
-                buildCreationCancelRow(ownerDiscordId),
+                buildFactionRow(ownerDiscordId, state.data.faction),
+                buildCreationStepActionsRow(ownerDiscordId, 'faction'),
             ],
             content: '',
         });
@@ -1063,19 +1201,317 @@ async function handle(interaction) {
             return true;
         }
 
-        state.promptInteraction = interaction;
+        ensurePromptMessage(state, interaction);
         state.data.version = interaction.values[0];
-        state.step = 'notes';
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(6, 'Notizen', 'Sende eine Nachricht mit den Notizen oder `-` zum \u00dcberspringen.'),
+                buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
             ],
             components: [
-                buildNotesSkipRow(ownerDiscordId),
+                buildVersionRow(ownerDiscordId, state.data.version),
+                buildCreationStepActionsRow(ownerDiscordId, 'version'),
             ],
             content: '',
         });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_confirm_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_confirm_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        ensurePromptMessage(state, interaction);
+        state.promptInteraction = interaction;
+        await interaction.deferUpdate();
+        await finalizeCharacterCreation(state);
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_back_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_back_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        ensurePromptMessage(state, interaction);
+        state.promptInteraction = interaction;
+
+        if (state.step === 'finalize') {
+            state.step = 'version';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                ],
+                components: [
+                    buildVersionRow(ownerDiscordId, state.data.version),
+                    buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (state.step === 'version') {
+            if (state.data.isFiller || state.data.startTier === 'bt') {
+                state.step = 'tier';
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                    ],
+                    components: [
+                        buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
+                        buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
+            state.step = 'faction';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                ],
+                components: [
+                    buildFactionRow(ownerDiscordId, state.data.faction),
+                    buildCreationStepActionsRow(ownerDiscordId, 'faction'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (state.step === 'faction') {
+            state.step = 'tier';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                ],
+                components: [
+                    buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
+                    buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (state.step === 'tier') {
+            const classes = await listCharacterClassesForDiscord();
+            state.step = 'classes';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                ],
+                components: [
+                    buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
+                    buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (state.step === 'classes' || state.step === 'basic') {
+            state.step = 'basic';
+            await interaction.update({
+                embeds: [buildCreationBasicsEmbed(state)],
+                components: [buildCreationBasicsRow(ownerDiscordId)],
+                content: '',
+            });
+            return true;
+        }
+
+        await interaction.reply({ content: 'Kein vorheriger Schritt verf\u00fcgbar.', flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_next_')) {
+        const suffix = interaction.customId.replace('charactersCreate_next_', '');
+        const [stepKey, ownerDiscordId] = suffix.split('_');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        ensurePromptMessage(state, interaction);
+        if (stepKey === 'classes') {
+            const classes = await listCharacterClassesForDiscord();
+            if (!Array.isArray(state.data.classIds) || state.data.classIds.length === 0) {
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'Bitte w\u00e4hle mindestens eine Klasse.'),
+                    ],
+                    components: [
+                        buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
+                        buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
+            state.step = 'tier';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                ],
+                components: [
+                    buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
+                    buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (stepKey === 'tier') {
+            if (!state.data.startTier) {
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'Bitte w\u00e4hle ein Start-Tier oder **Filler**.'),
+                    ],
+                    components: [
+                        buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
+                        buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
+            if (state.data.startTier === 'bt' || state.data.isFiller) {
+                state.data.faction = 'none';
+                state.step = 'version';
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                    ],
+                    components: [
+                        buildVersionRow(ownerDiscordId, state.data.version),
+                        buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
+            state.step = 'faction';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                ],
+                components: [
+                    buildFactionRow(ownerDiscordId, state.data.faction),
+                    buildCreationStepActionsRow(ownerDiscordId, 'faction'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (stepKey === 'faction') {
+            if (!state.data.faction) {
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'Bitte w\u00e4hle eine Fraktion.'),
+                    ],
+                    components: [
+                        buildFactionRow(ownerDiscordId, state.data.faction),
+                        buildCreationStepActionsRow(ownerDiscordId, 'faction'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
+            state.step = 'version';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                ],
+                components: [
+                    buildVersionRow(ownerDiscordId, state.data.version),
+                    buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (stepKey === 'version') {
+            if (!state.data.version) {
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(5, 'Version w\u00e4hlen', 'Bitte w\u00e4hle eine Regelversion.'),
+                    ],
+                    components: [
+                        buildVersionRow(ownerDiscordId, state.data.version),
+                        buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
+            state.step = 'finalize';
+            const summary = await buildCreationSummaryEmbed(state);
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(6, 'Finalisieren', 'Bitte best\u00e4tige die Angaben.'),
+                    summary,
+                ],
+                components: [
+                    buildCreationConfirmRow(ownerDiscordId),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        await interaction.reply({ content: 'Unbekannter Schritt.', flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_basicopen_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_basicopen_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        state.step = 'basic';
+        ensurePromptMessage(state, interaction);
+        await interaction.showModal(buildCreationBasicModal(ownerDiscordId, state));
         return true;
     }
 
@@ -2627,8 +3063,6 @@ async function handle(interaction) {
     return false;
 }
 
-async function handleMessage(message) {
-    return handleCreationMessage(message);
-}
+module.exports = { handle };
 
-module.exports = { handle, handleMessage };
+
