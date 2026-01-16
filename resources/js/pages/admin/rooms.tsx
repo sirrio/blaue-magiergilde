@@ -1908,6 +1908,7 @@ export default function Rooms({
                     const isSelected = selectedAssetId === asset.id
                     const isLocked = asset.locked ?? false
                     const showHandles = editable && isSelected && !isLocked
+                    const showBoundingBox = editable && isSelected
                     const showActions = editable && isSelected
                     return (
                       <div
@@ -1947,33 +1948,37 @@ export default function Rooms({
                             className="h-full w-full object-fill"
                             draggable={false}
                           />
-                          {showHandles ? (
+                          {showBoundingBox ? (
                             <>
                               <div className="absolute inset-0 border border-primary/60 pointer-events-none" />
-                              <button
-                                type="button"
-                                className="absolute left-1/2 -top-7 z-20 h-3.5 w-3.5 rounded-full border border-primary/70 bg-base-100 shadow-sm cursor-grab"
-                                style={{ transform: `translateX(-50%) rotate(${-asset.rotation}deg)` }}
-                                onPointerDown={(event) => handleRotatePointerDown(event, asset, room)}
-                                onPointerMove={(event) => handleRotatePointerMove(event, asset, room)}
-                                onPointerUp={(event) => handleRotatePointerUp(event, asset)}
-                                aria-label="Rotate asset"
-                              />
-                              {resizeHandlePositions.map((handle) => (
-                                <button
-                                  key={`${asset.id}-${handle.key}`}
-                                  type="button"
-                                  className={cn(
-                                    'absolute h-3.5 w-3.5 rounded-sm border border-primary/70 bg-base-100 shadow-sm',
-                                    resizeHandleCursor[handle.key],
-                                    handle.className,
-                                  )}
-                                  onPointerDown={(event) => handleResizePointerDown(event, asset, room, handle.key)}
-                                  onPointerMove={(event) => handleResizePointerMove(event, asset, room)}
-                                  onPointerUp={(event) => handleResizePointerUp(event, asset)}
-                                  aria-label="Resize asset"
-                                />
-                              ))}
+                              {showHandles ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="absolute left-1/2 -top-7 z-20 h-3.5 w-3.5 rounded-full border border-primary/70 bg-base-100 shadow-sm cursor-grab"
+                                    style={{ transform: `translateX(-50%) rotate(${-asset.rotation}deg)` }}
+                                    onPointerDown={(event) => handleRotatePointerDown(event, asset, room)}
+                                    onPointerMove={(event) => handleRotatePointerMove(event, asset, room)}
+                                    onPointerUp={(event) => handleRotatePointerUp(event, asset)}
+                                    aria-label="Rotate asset"
+                                  />
+                                  {resizeHandlePositions.map((handle) => (
+                                    <button
+                                      key={`${asset.id}-${handle.key}`}
+                                      type="button"
+                                      className={cn(
+                                        'absolute h-3.5 w-3.5 rounded-sm border border-primary/70 bg-base-100 shadow-sm',
+                                        resizeHandleCursor[handle.key],
+                                        handle.className,
+                                      )}
+                                      onPointerDown={(event) => handleResizePointerDown(event, asset, room, handle.key)}
+                                      onPointerMove={(event) => handleResizePointerMove(event, asset, room)}
+                                      onPointerUp={(event) => handleResizePointerUp(event, asset)}
+                                      aria-label="Resize asset"
+                                    />
+                                  ))}
+                                </>
+                              ) : null}
                             </>
                           ) : null}
                         </div>
@@ -2043,10 +2048,10 @@ export default function Rooms({
                           'pointer-events-auto absolute flex flex-col items-center justify-center gap-1 rounded-lg border text-[12px] shadow-md',
                           (spacePressed || isPanning) && 'pointer-events-none',
                           isSelectedRoom
-                            ? 'border-primary/80 ring-2 ring-primary/40'
+                            ? 'border-2 border-white shadow-[0_0_0_4px_rgba(255,255,255,0.35),0_0_12px_rgba(255,255,255,0.2),0_0_22px_rgba(255,255,255,0.12)]'
                             : isClickable
-                              ? 'border-primary/60 text-foreground'
-                              : 'border-border/40 text-muted-foreground/80',
+                              ? 'border border-primary/40 text-foreground'
+                              : 'border border-base-200/40 text-muted-foreground/80',
                           isClickable ? 'cursor-pointer' : 'cursor-not-allowed',
                           'bg-transparent',
                         )}
@@ -2063,6 +2068,28 @@ export default function Rooms({
                           }
                         }}
                       >
+                        {isSelectedRoom ? (
+                          <>
+                            <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-base-content shadow-md">
+                              <span className="flex items-center gap-1">
+                                {room.character?.avatar ? (
+                                  <img
+                                    src={resolveAvatarSrc(room.character?.avatar)}
+                                    alt=""
+                                    className="h-4 w-4 rounded-full border border-white/70 object-cover"
+                                  />
+                                ) : (
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full border border-white/70 bg-white/90 text-[9px] font-semibold text-primary">
+                                    {getInitials(room.character?.name ?? room.name)}
+                                  </span>
+                                )}
+                                <span className="max-w-[120px] truncate">
+                                  {room.character?.name ?? room.name}
+                                </span>
+                              </span>
+                            </span>
+                          </>
+                        ) : null}
                         <span className="sr-only">{labelText}</span>
                       </button>
                     )
