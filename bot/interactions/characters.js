@@ -414,6 +414,12 @@ function getAdventurePreviousStep(stepKey) {
     return adventureCreationSteps[index - 1];
 }
 
+function getAdventureNextStep(stepKey) {
+    const index = adventureCreationSteps.indexOf(stepKey);
+    if (index < 0 || index >= adventureCreationSteps.length - 1) return 'confirm';
+    return adventureCreationSteps[index + 1];
+}
+
 function getDowntimeStepNumber(stepKey) {
     const index = downtimeCreationSteps.indexOf(stepKey);
     return index >= 0 ? index + 1 : 1;
@@ -429,6 +435,38 @@ function getDowntimeNextStep(stepKey) {
     const index = downtimeCreationSteps.indexOf(stepKey);
     if (index < 0 || index >= downtimeCreationSteps.length - 1) return 'confirm';
     return downtimeCreationSteps[index + 1];
+}
+
+function buildStepperNavRows({
+    backId,
+    nextId,
+    cancelId,
+    nextLabel = 'Next',
+    nextStyle = ButtonStyle.Primary,
+    disableNext = false,
+    disableBack = false,
+    cancelLabel = 'Cancel',
+}) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(backId)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disableBack),
+            new ButtonBuilder()
+                .setCustomId(nextId)
+                .setLabel(nextLabel)
+                .setStyle(nextStyle)
+                .setDisabled(disableNext),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(cancelId)
+                .setLabel(cancelLabel)
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
 function truncateText(value, max = 200) {
@@ -480,7 +518,8 @@ function buildAdventureStepEmbed(stepKey, state, description, participantsLabel)
 
 function buildAdventureDurationRows(state) {
     const { characterId, ownerDiscordId } = state;
-    return [
+    const hasDuration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined;
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_10800_${characterId}_${ownerDiscordId}`)
@@ -490,82 +529,69 @@ function buildAdventureDurationRows(state) {
                 .setCustomId(`advCreate_duration_21600_${characterId}_${ownerDiscordId}`)
                 .setLabel('2 Bubble (6h)')
                 .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
-            .setLabel('3 Bubble (9h)')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
-            .setLabel('Custom duration')
-            .setStyle(ButtonStyle.Primary),
-        ),
-        new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
+                .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
+                .setLabel('3 Bubble (9h)')
+                .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
+                .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
+                .setLabel('Custom duration')
+                .setStyle(ButtonStyle.Primary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+        disableNext: !hasDuration,
+    }));
 }
 
 function buildAdventureDateRows(state) {
     const { characterId, ownerDiscordId } = state;
-    return [
-        new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`advCreate_date_today_${characterId}_${ownerDiscordId}`)
-            .setLabel('Today')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`advCreate_date_yesterday_${characterId}_${ownerDiscordId}`)
-            .setLabel('Yesterday')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`advCreate_date_custom_${characterId}_${ownerDiscordId}`)
-            .setLabel('Custom date')
-            .setStyle(ButtonStyle.Primary),
-        ),
+    const hasDate = Boolean(state?.data?.startDate);
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
+                .setCustomId(`advCreate_date_today_${characterId}_${ownerDiscordId}`)
+                .setLabel('Today')
+                .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
+                .setCustomId(`advCreate_date_yesterday_${characterId}_${ownerDiscordId}`)
+                .setLabel('Yesterday')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_date_custom_${characterId}_${ownerDiscordId}`)
+                .setLabel('Custom date')
+                .setStyle(ButtonStyle.Primary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+        disableNext: !hasDate,
+    }));
 }
 
 function buildAdventureTitleRows(state) {
     const { characterId, ownerDiscordId } = state;
-    return [
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_title_edit_${characterId}_${ownerDiscordId}`)
                 .setLabel('Edit title & GM')
                 .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_title_skip_${characterId}_${ownerDiscordId}`)
-                .setLabel('Skip')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+    }));
 }
 
 function buildAdventureQuestRows(state) {
@@ -588,49 +614,30 @@ function buildAdventureQuestRows(state) {
                 .setDefault(selected === false),
         );
 
-    return [
-        new ActionRowBuilder().addComponents(select),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_next_quest_${characterId}_${ownerDiscordId}`)
-                .setLabel('Weiter')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-    ];
+    return [new ActionRowBuilder().addComponents(select)].concat(buildStepperNavRows({
+        backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+        disableNext: selected === null || selected === undefined,
+    }));
 }
 
 function buildAdventureNotesRows(state) {
     const { characterId, ownerDiscordId } = state;
-    return [
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_notes_edit_${characterId}_${ownerDiscordId}`)
                 .setLabel('Edit notes')
                 .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_notes_skip_${characterId}_${ownerDiscordId}`)
-                .setLabel('Skip')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+    }));
 }
 
 function buildAdventureParticipantsRows(state, options) {
@@ -665,28 +672,17 @@ function buildAdventureParticipantsRows(state, options) {
         ));
     }
 
-    components.push(new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_next_participants_${characterId}_${ownerDiscordId}`)
-                .setLabel('Weiter')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-    );
-
-    return components;
+    return components.concat(buildStepperNavRows({
+        backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+    }));
 }
 
 function buildAdventureConfirmRows(state) {
     const { characterId, ownerDiscordId } = state;
     const confirmLabel = state?.mode === 'edit' ? 'Save adventure' : 'Create adventure';
+    const confirmStyle = state?.mode === 'edit' ? ButtonStyle.Primary : ButtonStyle.Success;
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -696,7 +692,7 @@ function buildAdventureConfirmRows(state) {
             new ButtonBuilder()
                 .setCustomId(`advCreate_confirm_${characterId}_${ownerDiscordId}`)
                 .setLabel(confirmLabel)
-                .setStyle(ButtonStyle.Success),
+                .setStyle(confirmStyle),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -1703,67 +1699,41 @@ function buildDowntimeStepEmbed(stepKey, state, description) {
 function buildDowntimeDurationRows(state) {
     const { characterId, ownerDiscordId } = state;
     const hasDuration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined;
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`dtCreate_duration_custom_${characterId}_${ownerDiscordId}`)
-            .setLabel('Set duration')
-            .setStyle(ButtonStyle.Primary),
-    );
-    if (hasDuration) {
-        row.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_duration_next_${characterId}_${ownerDiscordId}`)
-                .setLabel('Next')
-                .setStyle(ButtonStyle.Primary),
-        );
-    }
-
-    return [
-        row,
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
+                .setCustomId(`dtCreate_duration_custom_${characterId}_${ownerDiscordId}`)
+                .setLabel('Set duration')
+                .setStyle(ButtonStyle.Primary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+        disableNext: !hasDuration,
+    }));
 }
 
 function buildDowntimeDateRows(state) {
     const { characterId, ownerDiscordId } = state;
     const hasDate = Boolean(state?.data?.startDate);
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`dtCreate_date_custom_${characterId}_${ownerDiscordId}`)
-            .setLabel('Set date')
-            .setStyle(ButtonStyle.Primary),
-    );
-    if (hasDate) {
-        row.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_date_next_${characterId}_${ownerDiscordId}`)
-                .setLabel('Next')
-                .setStyle(ButtonStyle.Primary),
-        );
-    }
-
-    return [
-        row,
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
+                .setCustomId(`dtCreate_date_custom_${characterId}_${ownerDiscordId}`)
+                .setLabel('Set date')
+                .setStyle(ButtonStyle.Primary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+        disableNext: !hasDate,
+    }));
 }
 
 function buildDowntimeTypeRows(state) {
@@ -1786,50 +1756,35 @@ function buildDowntimeTypeRows(state) {
                 .setDefault(selected === 'other'),
         );
 
-    return [
-        new ActionRowBuilder().addComponents(select),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-    ];
+    return [new ActionRowBuilder().addComponents(select)].concat(buildStepperNavRows({
+        backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+    }));
 }
 
 function buildDowntimeNotesRows(state) {
     const { characterId, ownerDiscordId } = state;
-    return [
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_notes_edit_${characterId}_${ownerDiscordId}`)
                 .setLabel('Edit notes')
                 .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_notes_skip_${characterId}_${ownerDiscordId}`)
-                .setLabel('Skip')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
-                .setStyle(ButtonStyle.Secondary),
         ),
     ];
+
+    return rows.concat(buildStepperNavRows({
+        backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
+        nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
+        cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+    }));
 }
 
 function buildDowntimeConfirmRows(state) {
     const { characterId, ownerDiscordId } = state;
     const confirmLabel = state?.mode === 'edit' ? 'Save downtime' : 'Create downtime';
+    const confirmStyle = state?.mode === 'edit' ? ButtonStyle.Primary : ButtonStyle.Success;
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -1839,7 +1794,7 @@ function buildDowntimeConfirmRows(state) {
             new ButtonBuilder()
                 .setCustomId(`dtCreate_confirm_${characterId}_${ownerDiscordId}`)
                 .setLabel(confirmLabel)
-                .setStyle(ButtonStyle.Success),
+                .setStyle(confirmStyle),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -3398,7 +3353,7 @@ async function handle(interaction) {
         const payload = await buildAdventureStepPayload({
             interaction,
             state,
-            message: 'Starte mit der Duration.',
+            message: 'Choose the adventure duration.',
         });
         await updateAdventureMessage(state, payload);
         return true;
@@ -3449,6 +3404,57 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_next_')) {
+        const match = interaction.customId.match(/^advCreate_next_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        const step = state.step;
+        if (step === 'duration' && (state.data.durationSeconds === null || state.data.durationSeconds === undefined)) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Choose a duration before continuing.',
+            }));
+            return true;
+        }
+
+        if (step === 'date' && !state.data.startDate) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Choose a date before continuing.',
+            }));
+            return true;
+        }
+
+        if (step === 'quest' && state.data.hasAdditionalBubble === null) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Select whether this was a character quest.',
+            }));
+            return true;
+        }
+
+        state.step = getAdventureNextStep(step);
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('advCreate_duration_')) {
         const parts = interaction.customId.split('_');
         if (parts.length < 5) return false;
@@ -3485,7 +3491,6 @@ async function handle(interaction) {
         }
 
         state.data.durationSeconds = durationSeconds;
-        state.step = 'date';
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -3520,7 +3525,6 @@ async function handle(interaction) {
         }
 
         state.data.durationSeconds = duration;
-        state.step = 'date';
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -3555,7 +3559,6 @@ async function handle(interaction) {
             date.setDate(date.getDate() - 1);
         }
         state.data.startDate = date.toISOString().slice(0, 10);
-        state.step = 'title';
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -3590,7 +3593,6 @@ async function handle(interaction) {
         }
 
         state.data.startDate = startDate;
-        state.step = 'title';
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -3617,29 +3619,6 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('advCreate_title_skip_')) {
-        const match = interaction.customId.match(/^advCreate_title_skip_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        let state = getAdventureCreationState(ownerDiscordId);
-        if (!state) {
-            state = createAdventureState({ ownerDiscordId, characterId });
-            setAdventureCreationState(ownerDiscordId, state);
-        }
-
-        ensurePromptMessage(state, interaction);
-        state.step = 'quest';
-        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
-        return true;
-    }
-
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_titleModal_')) {
         const parts = interaction.customId.split('_');
         const characterIdRaw = parts[2];
@@ -3663,39 +3642,6 @@ async function handle(interaction) {
         const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
         state.data.title = title;
         state.data.gameMaster = gameMaster;
-        state.step = 'quest';
-        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
-        return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('advCreate_next_quest_')) {
-        const match = interaction.customId.match(/^advCreate_next_quest_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        let state = getAdventureCreationState(ownerDiscordId);
-        if (!state) {
-            state = createAdventureState({ ownerDiscordId, characterId });
-            setAdventureCreationState(ownerDiscordId, state);
-        }
-
-        ensurePromptMessage(state, interaction);
-        if (state.data.hasAdditionalBubble === null) {
-            await updateAdventureMessage(state, await buildAdventureStepPayload({
-                interaction,
-                state,
-                message: 'Please choose whether this was a character quest.',
-            }));
-            return true;
-        }
-
-        state.step = 'notes';
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -3722,30 +3668,6 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('advCreate_notes_skip_')) {
-        const match = interaction.customId.match(/^advCreate_notes_skip_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        let state = getAdventureCreationState(ownerDiscordId);
-        if (!state) {
-            state = createAdventureState({ ownerDiscordId, characterId });
-            setAdventureCreationState(ownerDiscordId, state);
-        }
-
-        ensurePromptMessage(state, interaction);
-        state.data.notes = '';
-        state.step = 'participants';
-        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
-        return true;
-    }
-
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_notesModal_')) {
         const parts = interaction.customId.split('_');
         const characterIdRaw = parts[2];
@@ -3767,30 +3689,6 @@ async function handle(interaction) {
         ensurePromptMessage(state, interaction);
         const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
         state.data.notes = notes;
-        state.step = 'participants';
-        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
-        return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('advCreate_next_participants_')) {
-        const match = interaction.customId.match(/^advCreate_next_participants_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        let state = getAdventureCreationState(ownerDiscordId);
-        if (!state) {
-            state = createAdventureState({ ownerDiscordId, characterId });
-            setAdventureCreationState(ownerDiscordId, state);
-        }
-
-        ensurePromptMessage(state, interaction);
-        state.step = 'confirm';
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -4037,35 +3935,6 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_duration_next_')) {
-        const match = interaction.customId.match(/^dtCreate_duration_next_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const state = getDowntimeCreationState(ownerDiscordId);
-        if (!state) return false;
-
-        if (state.data.durationSeconds === null || state.data.durationSeconds === undefined) {
-            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
-                interaction,
-                state,
-                message: 'Please set a duration before continuing.',
-            }));
-            return true;
-        }
-
-        state.step = getDowntimeNextStep('duration');
-        ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
-        return true;
-    }
-
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_durationModal_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -4091,7 +3960,6 @@ async function handle(interaction) {
         }
 
         state.data.durationSeconds = duration;
-        state.step = getDowntimeNextStep('duration');
         ensurePromptMessage(state, interaction);
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
         return true;
@@ -4116,35 +3984,6 @@ async function handle(interaction) {
 
         ensurePromptMessage(state, interaction);
         await interaction.showModal(buildDowntimeDateModal(state));
-        return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_date_next_')) {
-        const match = interaction.customId.match(/^dtCreate_date_next_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const state = getDowntimeCreationState(ownerDiscordId);
-        if (!state) return false;
-
-        if (!state.data.startDate) {
-            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
-                interaction,
-                state,
-                message: 'Please set a date before continuing.',
-            }));
-            return true;
-        }
-
-        state.step = getDowntimeNextStep('date');
-        ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
         return true;
     }
 
@@ -4173,7 +4012,6 @@ async function handle(interaction) {
         }
 
         state.data.startDate = startDate;
-        state.step = getDowntimeNextStep('date');
         ensurePromptMessage(state, interaction);
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
         return true;
@@ -4193,7 +4031,6 @@ async function handle(interaction) {
         if (!state) return false;
 
         state.data.type = interaction.values?.[0] === 'faction' ? 'faction' : 'other';
-        state.step = getDowntimeNextStep('type');
         ensurePromptMessage(state, interaction);
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
         return true;
@@ -4218,27 +4055,6 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_notes_skip_')) {
-        const match = interaction.customId.match(/^dtCreate_notes_skip_(\d+)_(\d+)$/);
-        if (!match) return false;
-        const characterId = Number(match[1]);
-        const ownerDiscordId = match[2];
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const state = getDowntimeCreationState(ownerDiscordId);
-        if (!state) return false;
-
-        state.data.notes = '';
-        state.step = getDowntimeNextStep('notes');
-        ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
-        return true;
-    }
-
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_notesModal_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -4253,7 +4069,6 @@ async function handle(interaction) {
         if (!state) return false;
 
         state.data.notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
-        state.step = getDowntimeNextStep('notes');
         ensurePromptMessage(state, interaction);
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
         return true;
@@ -4272,6 +4087,12 @@ async function handle(interaction) {
 
         const state = getDowntimeCreationState(ownerDiscordId);
         if (!state) return false;
+
+        if (state.step === 'duration') {
+            clearDowntimeCreationState(ownerDiscordId);
+            await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId)] });
+            return true;
+        }
 
         state.step = getDowntimePreviousStep(state.step);
         ensurePromptMessage(state, interaction);
@@ -4292,6 +4113,44 @@ async function handle(interaction) {
 
         clearDowntimeCreationState(ownerDiscordId);
         await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId)] });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_next_')) {
+        const match = interaction.customId.match(/^dtCreate_next_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        if (state.step === 'duration' && (state.data.durationSeconds === null || state.data.durationSeconds === undefined)) {
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Please set a duration before continuing.',
+            }));
+            return true;
+        }
+
+        if (state.step === 'date' && !state.data.startDate) {
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Please set a date before continuing.',
+            }));
+            return true;
+        }
+
+        state.step = getDowntimeNextStep(state.step);
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
         return true;
     }
 
