@@ -13,7 +13,7 @@ async function handle(interaction) {
     const [action, ownerDiscordId] = interaction.customId.split('_');
 
     if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-        await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -22,7 +22,7 @@ async function handle(interaction) {
             content: [
                 notLinkedContent(),
                 '',
-                'Wenn du die App bereits nutzt: bitte verbinde Discord in deinem Profil (Connect Discord).',
+                'If you already use the app: please connect Discord in your profile (Connect Discord).',
             ].join('\n'),
             components: [],
         });
@@ -32,11 +32,11 @@ async function handle(interaction) {
     if (action === 'appJoinStart') {
         await interaction.update({
             content: [
-                '**Neuen App-Account erstellen?**',
+                '**Create a new app account?**',
                 '',
-                'Das erstellt einen neuen Benutzer-Account, der an deine Discord-ID gebunden ist.',
+                'This creates a new user account linked to your Discord ID.',
                 '',
-                '**Nicht machen**, wenn du bereits einen App-Account hast (sonst hast du danach zwei Accounts).',
+                '**Do not do this** if you already have an app account (otherwise you will end up with two accounts).',
             ].join('\n'),
             components: [buildJoinConfirmButtons(ownerDiscordId)],
         });
@@ -44,7 +44,7 @@ async function handle(interaction) {
     }
 
     if (action === 'appJoinCancel') {
-        await interaction.update({ content: 'Abgebrochen.', components: [] });
+        await interaction.update({ content: 'Canceled.', components: [] });
         return true;
     }
 
@@ -53,19 +53,19 @@ async function handle(interaction) {
             const result = await createUserForDiscord(interaction.user);
             await interaction.update({
                 content: result.created
-                    ? 'Account erstellt und mit Discord verbunden. Du kannst den Command jetzt erneut ausf\u00fchren.'
-                    : 'Dein Discord ist bereits mit einem Account verbunden. Du kannst den Command jetzt erneut ausf\u00fchren.',
+                    ? 'Account created and linked to Discord. You can run the command again now.'
+                    : 'Your Discord is already linked to an account. You can run the command again now.',
                 components: [],
             });
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error(error);
-            await interaction.update({ content: `Fehler beim Erstellen: ${error.message}`, components: [] });
+            await interaction.update({ content: `Failed to create: ${error.message}`, components: [] });
         }
         return true;
     }
 
-    await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: 'Unknown action.', flags: MessageFlags.Ephemeral });
     return true;
 }
 

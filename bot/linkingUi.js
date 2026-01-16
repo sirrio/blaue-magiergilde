@@ -2,13 +2,13 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('
 
 function notLinkedContent() {
     return [
-        '**Dein Discord ist noch nicht mit der Blaue Magiergilde App verbunden.**',
+        '**Your Discord is not connected to the Blaue Magiergilde app yet.**',
         '',
-        'Damit der Bot *deine bestehenden Charaktere* verwalten kann, musst du Discord einmalig mit deinem App-Account verbinden.',
+        'To let the bot manage *your existing characters*, you need to connect Discord to your app account once.',
         '',
-        'Wenn du **noch keinen** Account hast, kannst du hier einen neuen App-Account erstellen (mit deiner Discord-ID).',
+        'If you **do not have** an account yet, you can create a new app account here (linked to your Discord ID).',
         '',
-        '**Wichtig:** Wenn du die App bereits nutzt, *erstelle keinen neuen Account*, sondern verbinde Discord in deinem Profil.',
+        '**Important:** If you already use the app, *do not create a new account*; connect Discord in your profile instead.',
     ].join('\n');
 }
 
@@ -16,11 +16,11 @@ function buildNotLinkedButtons(discordUserId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`appJoinStart_${discordUserId}`)
-            .setLabel('Account erstellen (Join)')
+            .setLabel('Create account')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`appLinkInfo_${discordUserId}`)
-            .setLabel('Ich habe schon einen Account')
+            .setLabel('I already have an account')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -29,11 +29,11 @@ function buildJoinConfirmButtons(discordUserId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`appJoinConfirm_${discordUserId}`)
-            .setLabel('Ja, Account erstellen')
+            .setLabel('Yes, create account')
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`appJoinCancel_${discordUserId}`)
-            .setLabel('Abbrechen')
+            .setLabel('Cancel')
             .setStyle(ButtonStyle.Secondary),
     );
 }

@@ -106,7 +106,7 @@ function calculateBubblesInCurrentLevel(character, level) {
 }
 
 function buildProgressBar(current, total, width = 10) {
-    if (total <= 0) return '\u2014';
+    if (total <= 0) return '-';
     const ratio = Math.max(0, Math.min(1, current / total));
     const filled = Math.round(ratio * width);
     const empty = Math.max(0, width - filled);
@@ -129,15 +129,15 @@ function calculateFactionLevel(character, level, tier) {
 
 function humanFactionName(faction) {
     const map = {
-        none: 'Keine',
-        heiler: 'Heiler',
-        handwerker: 'Handwerker',
-        feldforscher: 'Feldforscher',
-        bibliothekare: 'Bibliothekare',
-        diplomaten: 'Diplomaten',
-        gardisten: 'Gardisten',
-        unterhalter: 'Unterhalter',
-        logistiker: 'Logistiker',
+        none: 'None',
+        heiler: 'Healer',
+        handwerker: 'Crafter',
+        feldforscher: 'Field Researcher',
+        bibliothekare: 'Librarians',
+        diplomaten: 'Diplomats',
+        gardisten: 'Guards',
+        unterhalter: 'Entertainers',
+        logistiker: 'Logisticians',
         'flora & fauna': 'Flora & Fauna',
     };
     const key = String(faction || 'none');
@@ -214,7 +214,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const factionName = humanFactionName(character.faction);
 
     const titleParts = [
-        String(character.name || `Charakter ${character.id}`),
+        String(character.name || `Character ${character.id}`),
         tier,
         `Level ${level}`,
         classNames,
@@ -222,14 +222,14 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
 
     const embed = new EmbedBuilder()
         .setColor(0x4f46e5)
-        .setTitle(titleParts.join(' \u00b7 '))
+        .setTitle(titleParts.join(' - '))
         .addFields(
             { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
-            { name: 'Fortschritt', value: `${buildProgressBar(inCurrent, toNextTotal)}\nNoch: **${toNext}** Bubble(s)`, inline: false },
+            { name: 'Progress', value: `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`, inline: false },
             { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
             { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },
-            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} \u00b7 Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
+            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );
@@ -237,7 +237,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const link = String(character.external_link || '').trim();
     if (isHttpUrl(link)) {
         embed.setURL(link);
-        embed.setDescription(`[Sheet \u00f6ffnen](${link})`);
+        embed.setDescription(`[Open sheet](${link})`);
     }
 
     if (thumbnailUrlOrAttachment) {
@@ -253,8 +253,8 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
         .setColor(0x4f46e5)
         .setDescription(
             characters.length > 0
-                ? `**${characters.length}** aktiv. W\u00e4hle einen Charakter oder erstelle einen neuen.`
-                : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.',
+                ? `**${characters.length}** active. Choose a character or create a new one.`
+                : 'No characters yet. Create your first with **New**.',
         );
 
     const components = [];
@@ -262,11 +262,11 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
     if (selection.length > 0) {
         const select = new StringSelectMenuBuilder()
             .setCustomId(`charactersSelect_${ownerDiscordId}`)
-            .setPlaceholder('Charakter ausw\u00e4hlen\u2026')
+            .setPlaceholder('Select character...')
             .addOptions(
                 selection.map(character => {
                     const option = new StringSelectMenuOptionBuilder()
-                        .setLabel(String(character.name || `Charakter ${character.id}`).slice(0, 100))
+                        .setLabel(String(character.name || `Character ${character.id}`).slice(0, 100))
                         .setValue(String(character.id));
                     const tier = String(character.start_tier || '').trim();
                     if (tier) {
@@ -279,14 +279,14 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
         components.push(new ActionRowBuilder().addComponents(select));
 
         if (characters.length > selection.length) {
-            summary.setFooter({ text: `Zeige ${selection.length} von ${characters.length}.` });
+            summary.setFooter({ text: `Showing ${selection.length} of ${characters.length}.` });
         }
     }
 
     components.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
-            .setLabel('Neu')
+            .setLabel('New')
             .setStyle(ButtonStyle.Success),
     ));
 
@@ -296,10 +296,10 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription('Deine Charaktere (Dashboard) inkl. Bearbeiten/L\u00f6schen/Neu.'),
+        .setDescription('Your characters (dashboard) with Edit/Delete/New.'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
-            await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return;
         }
 

@@ -20,7 +20,7 @@ module.exports = {
             if (!command) return;
 
             if (command.ownerOnly && !isOwner(interaction.user.id)) {
-                await interaction.reply({ content: 'Du bist nicht berechtigt, diesen Befehl zu nutzen.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'You are not allowed to use this command.', flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -30,7 +30,7 @@ module.exports = {
             console.error(error);
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
 
-            const payload = { content: 'Es ist ein Fehler aufgetreten.', flags: MessageFlags.Ephemeral };
+            const payload = { content: 'An error occurred.', flags: MessageFlags.Ephemeral };
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp(payload);
             } else {

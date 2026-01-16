@@ -46,7 +46,7 @@ const {
 } = require('../commands/game/characters');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
-const { pendingCharacterCreations, pendingCharacterAvatarUpdates } = require('../state');
+const { pendingCharacterCreations, pendingCharacterAvatarUpdates, pendingAdventureCreations } = require('../state');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -139,7 +139,7 @@ function formatParticipantName(participant) {
 }
 
 function formatParticipantList(participants) {
-    if (!participants || participants.length === 0) return 'Keine Teilnehmer';
+    if (!participants || participants.length === 0) return 'No participants';
     const names = participants.map(formatParticipantName);
     const joined = names.join(', ');
     if (joined.length <= 1024) return joined;
@@ -182,7 +182,7 @@ const allowedFactions = new Set([
 
 function formatFactionLabel(value) {
     const text = String(value || '').trim();
-    if (!text || text === 'none') return 'Keine';
+    if (!text || text === 'none') return 'None';
     return text
         .split(' ')
         .map(word => word ? word[0].toUpperCase() + word.slice(1) : word)
@@ -199,7 +199,7 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_basic_${characterId}_${ownerDiscordId}`)
-                .setLabel('Name/Link/Notizen')
+                .setLabel('Name/Link/Notes')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_avatar_${characterId}_${ownerDiscordId}`)
@@ -207,11 +207,11 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_classes_${characterId}_${ownerDiscordId}`)
-                .setLabel('Klassen')
+                .setLabel('Classes')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_faction_${characterId}_${ownerDiscordId}`)
-                .setLabel('Fraktion')
+                .setLabel('Faction')
                 .setStyle(ButtonStyle.Secondary),
         ),
         new ActionRowBuilder().addComponents(
@@ -231,14 +231,14 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
+                .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
 function buildCharacterManageView(character, { ownerDiscordId }) {
-    const name = String(character.name || `Charakter ${character.id}`);
+    const name = String(character.name || `Character ${character.id}`);
     const classNames = String(character.class_names || '').trim() || '-';
     const isFiller = Boolean(character.is_filler);
     const startTierRaw = String(character.start_tier || '').trim();
@@ -248,10 +248,10 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const notesRaw = String(character.notes || '').trim();
     const notes = notesRaw ? notesRaw.slice(0, 1000) : '-';
     const avatarRaw = String(character.avatar || '').trim();
-    const avatar = avatarRaw ? 'Vorhanden' : 'Kein Avatar';
+    const avatar = avatarRaw ? 'Present' : 'No avatar';
     const externalLink = String(character.external_link || character.externalLink || '').trim();
     const linkValue = externalLink
-        ? (isHttpUrl(externalLink) ? `[Link öffnen](${externalLink})` : externalLink.slice(0, 1000))
+        ? (isHttpUrl(externalLink) ? `[Open link](${externalLink})` : externalLink.slice(0, 1000))
         : '-';
     const dmBubbles = String(safeInt(character.dm_bubbles));
     const dmCoins = String(safeInt(character.dm_coins));
@@ -263,17 +263,17 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('Charakter verwalten')
+        .setTitle('Manage character')
         .setColor(0x4f46e5)
-        .setDescription(descriptionParts.join(' \u00b7 '))
+        .setDescription(descriptionParts.join(' - '))
         .addFields(
-            { name: 'Klassen', value: classNames, inline: false },
-            { name: 'Fraktion', value: faction, inline: true },
+            { name: 'Classes', value: classNames, inline: false },
+            { name: 'Faction', value: faction, inline: true },
             { name: 'Version', value: version, inline: true },
-            { name: 'Start-Tier', value: startTier, inline: true },
+            { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
             { name: 'External Link', value: linkValue, inline: false },
-            { name: 'Notizen', value: notes, inline: false },
+            { name: 'Notes', value: notes, inline: false },
             { name: 'DM Bubbles', value: dmBubbles, inline: true },
             { name: 'DM Coins', value: dmCoins, inline: true },
             { name: 'Bubble Shop', value: bubbleSpend, inline: true },
@@ -323,12 +323,561 @@ function clearCreationState(userId) {
     pendingCharacterCreations.delete(creationStateKey(userId));
 }
 
+function adventureCreationKey(userId) {
+    return String(userId);
+}
+
+function getAdventureCreationState(userId) {
+    return pendingAdventureCreations.get(adventureCreationKey(userId)) || null;
+}
+
+function setAdventureCreationState(userId, state) {
+    pendingAdventureCreations.set(adventureCreationKey(userId), state);
+}
+
+function clearAdventureCreationState(userId) {
+    pendingAdventureCreations.delete(adventureCreationKey(userId));
+}
+
+function createAdventureState({ ownerDiscordId, characterId }) {
+    return {
+        ownerDiscordId: String(ownerDiscordId),
+        characterId: Number(characterId),
+        step: 'duration',
+        data: {
+            durationSeconds: null,
+            startDate: '',
+            title: '',
+            gameMaster: '',
+            hasAdditionalBubble: null,
+            notes: '',
+            guildCharacterIds: [],
+        },
+        promptMessage: null,
+        promptInteraction: null,
+    };
+}
+
+const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
+
+function getAdventureStepNumber(stepKey) {
+    const index = adventureCreationSteps.indexOf(stepKey);
+    return index >= 0 ? index + 1 : 1;
+}
+
+function getAdventurePreviousStep(stepKey) {
+    const index = adventureCreationSteps.indexOf(stepKey);
+    if (index <= 0) return 'duration';
+    return adventureCreationSteps[index - 1];
+}
+
+function truncateText(value, max = 200) {
+    const text = String(value || '').trim();
+    if (!text) return '-';
+    if (text.length <= max) return text;
+    return `${text.slice(0, max - 1)}...`;
+}
+
+function formatAdventureSummaryFields(state, participantsLabel) {
+    const duration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
+        ? formatDuration(state.data.durationSeconds)
+        : '-';
+    const date = state?.data?.startDate || '-';
+    const title = state?.data?.title ? truncateText(state.data.title, 120) : '-';
+    const gameMaster = state?.data?.gameMaster ? truncateText(state.data.gameMaster, 120) : '-';
+    const quest = state?.data?.hasAdditionalBubble === true
+        ? 'Ja (+1 Bubble)'
+        : state?.data?.hasAdditionalBubble === false
+            ? 'Nein'
+            : '-';
+    const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
+    const participants = participantsLabel || (state?.data?.guildCharacterIds?.length ? `${state.data.guildCharacterIds.length} selected` : '-');
+
+    return [
+        { name: 'Duration', value: duration, inline: true },
+        { name: 'Date', value: date, inline: true },
+        { name: 'Characterquest', value: quest, inline: true },
+        { name: 'Title', value: title, inline: false },
+        { name: 'Game Master', value: gameMaster, inline: false },
+        { name: 'Notes', value: notes, inline: false },
+        { name: 'Participants', value: participants, inline: false },
+    ];
+}
+
+function buildAdventureStepEmbed(stepKey, state, description, participantsLabel) {
+    const stepNumber = getAdventureStepNumber(stepKey);
+    const embed = new EmbedBuilder()
+        .setTitle('Create adventure')
+        .setColor(0x4f46e5)
+        .setDescription(description)
+        .setFooter({ text: `Step ${stepNumber}/7` });
+
+    const fields = formatAdventureSummaryFields(state, participantsLabel);
+    embed.addFields(fields);
+    return embed;
+}
+
+function buildAdventureDurationRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_duration_10800_${characterId}_${ownerDiscordId}`)
+                .setLabel('1 Bubble (3h)')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_duration_21600_${characterId}_${ownerDiscordId}`)
+                .setLabel('2 Bubble (6h)')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
+                .setLabel('3 Bubble (9h)')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
+                .setLabel('Eigene Duration')
+                .setStyle(ButtonStyle.Primary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildAdventureDateRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_date_today_${characterId}_${ownerDiscordId}`)
+                .setLabel('Heute')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_date_yesterday_${characterId}_${ownerDiscordId}`)
+                .setLabel('Gestern')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_date_custom_${characterId}_${ownerDiscordId}`)
+                .setLabel('Eigenes Date')
+                .setStyle(ButtonStyle.Primary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildAdventureTitleRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_title_edit_${characterId}_${ownerDiscordId}`)
+                .setLabel('Edit title & GM')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_title_skip_${characterId}_${ownerDiscordId}`)
+                .setLabel('Skip')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildAdventureQuestRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    const selected = state?.data?.hasAdditionalBubble;
+
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`advCreate_quest_${characterId}_${ownerDiscordId}`)
+        .setPlaceholder('Select character quest...')
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel('Ja, Characterquest (+1 Bubble)')
+                .setValue('yes')
+                .setDefault(selected === true),
+            new StringSelectMenuOptionBuilder()
+                .setLabel('Nein')
+                .setValue('no')
+                .setDefault(selected === false),
+        );
+
+    return [
+        new ActionRowBuilder().addComponents(select),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_next_quest_${characterId}_${ownerDiscordId}`)
+                .setLabel('Weiter')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildAdventureNotesRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_notes_edit_${characterId}_${ownerDiscordId}`)
+                .setLabel('Edit notes')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_notes_skip_${characterId}_${ownerDiscordId}`)
+                .setLabel('Skip')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildAdventureParticipantsRows(state, options) {
+    const { characterId, ownerDiscordId } = state;
+    const selectedIds = new Set((state?.data?.guildCharacterIds || []).map(String));
+    const components = [];
+
+    if (options.length > 0) {
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`advCreate_participants_${characterId}_${ownerDiscordId}`)
+            .setPlaceholder('Select participants...')
+            .setMinValues(0)
+            .setMaxValues(Math.min(25, options.length));
+
+        options.slice(0, 25).forEach(option => {
+            select.addOptions(
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(String(option.name).slice(0, 100))
+                    .setValue(String(option.id))
+                    .setDefault(selectedIds.has(String(option.id))),
+            );
+        });
+
+        components.push(new ActionRowBuilder().addComponents(select));
+    } else {
+        components.push(new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_participants_empty_${characterId}_${ownerDiscordId}`)
+                .setLabel('No participants available')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true),
+        ));
+    }
+
+    components.push(new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_next_participants_${characterId}_${ownerDiscordId}`)
+                .setLabel('Weiter')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    );
+
+    return components;
+}
+
+function buildAdventureConfirmRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_confirm_${characterId}_${ownerDiscordId}`)
+                .setLabel('Create adventure')
+                .setStyle(ButtonStyle.Success),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildAdventureMenuRow(character, ownerDiscordId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`advAdd_${character.id}_${ownerDiscordId}`)
+            .setLabel('New adventure')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`advList_${character.id}_${ownerDiscordId}`)
+            .setLabel('List')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
+            .setLabel('Back')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+function formatSelectedParticipantNames(options, selectedIds, maxLength = 900) {
+    if (!selectedIds || selectedIds.length === 0) return '-';
+    const selectedSet = new Set(selectedIds.map(String));
+    const names = options
+        .filter(entry => selectedSet.has(String(entry.id)))
+        .map(entry => String(entry.name || '').trim())
+        .filter(Boolean);
+    if (names.length === 0) return '-';
+    const joined = names.join(', ');
+    if (joined.length <= maxLength) return joined;
+    const trimmed = names.slice(0, 10).join(', ');
+    const remaining = Math.max(0, names.length - 10);
+    return `${trimmed}${remaining > 0 ? ` (+${remaining} weitere)` : ''}`;
+}
+
+async function buildAdventureStepPayload({ interaction, state, message }) {
+    const step = state.step;
+    const { characterId } = state;
+    let participantsLabel = undefined;
+    let participantOptions = [];
+
+    if (step === 'participants' || step === 'confirm') {
+        participantOptions = await listGuildCharactersForDiscord(interaction.user, characterId);
+        participantsLabel = formatSelectedParticipantNames(participantOptions, state.data.guildCharacterIds);
+    }
+
+    if (step === 'duration') {
+        return {
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Choose the adventure duration.', participantsLabel)],
+            components: buildAdventureDurationRows(state),
+        };
+    }
+
+    if (step === 'date') {
+        return {
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Choose the date.', participantsLabel)],
+            components: buildAdventureDateRows(state),
+        };
+    }
+
+    if (step === 'title') {
+        return {
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Optional: add title and Game Master.', participantsLabel)],
+            components: buildAdventureTitleRows(state),
+        };
+    }
+
+    if (step === 'quest') {
+        return {
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Was this a character quest (+1 bubble)?', participantsLabel)],
+            components: buildAdventureQuestRows(state),
+        };
+    }
+
+    if (step === 'notes') {
+        return {
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Add optional notes.', participantsLabel)],
+            components: buildAdventureNotesRows(state),
+        };
+    }
+
+    if (step === 'participants') {
+        const components = buildAdventureParticipantsRows(state, participantOptions);
+        return {
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Choose participants (approved characters).', participantsLabel)],
+            components,
+        };
+    }
+
+    return {
+        embeds: [buildAdventureStepEmbed(step, state, message || 'Please confirm the details.', participantsLabel)],
+        components: buildAdventureConfirmRows(state),
+    };
+}
+
+async function updateAdventureMessage(state, payload) {
+    const activeInteraction = state?.activeInteraction;
+
+    if (state?.promptMessage?.editable) {
+        try {
+            await state.promptMessage.edit(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (!state?.promptMessage && state?.promptMessageId && state?.promptChannelId && state?.promptInteraction?.client) {
+        try {
+            const channel = await state.promptInteraction.client.channels.fetch(state.promptChannelId);
+            if (channel?.isTextBased?.()) {
+                const message = await channel.messages.fetch(state.promptMessageId);
+                if (message) {
+                    state.promptMessage = message;
+                    await message.edit(payload);
+                    return true;
+                }
+            }
+        } catch {
+            // fall through
+        }
+    }
+
+    if (activeInteraction?.isMessageComponent?.() || activeInteraction?.isModalSubmit?.()) {
+        try {
+            await activeInteraction.update(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (state?.promptInteraction?.isMessageComponent?.()) {
+        try {
+            await state.promptInteraction.update(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    return false;
+}
+
+function buildAdventureDurationModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`advCreate_durationModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Enter duration');
+
+    const durationValue = state?.data?.durationSeconds
+        ? formatDuration(state.data.durationSeconds)
+        : '';
+
+    const durationInput = new TextInputBuilder()
+        .setCustomId('advDuration')
+        .setLabel('Duration (HH:MM or minutes)')
+        .setPlaceholder('03:00')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(safeModalValue(durationValue));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(durationInput));
+    return modal;
+}
+
+function buildAdventureDateModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`advCreate_dateModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Enter date');
+
+    const dateInput = new TextInputBuilder()
+        .setCustomId('advDate')
+        .setLabel('Date (YYYY-MM-DD)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(safeModalValue(state?.data?.startDate || new Date().toISOString().slice(0, 10), 10));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
+    return modal;
+}
+
+function buildAdventureTitleModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`advCreate_titleModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Title & GM');
+
+    const titleInput = new TextInputBuilder()
+        .setCustomId('advTitle')
+        .setLabel('Title (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setValue(safeModalValue(state?.data?.title));
+
+    const gmInput = new TextInputBuilder()
+        .setCustomId('advGm')
+        .setLabel('Game Master (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setValue(safeModalValue(state?.data?.gameMaster));
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(titleInput),
+        new ActionRowBuilder().addComponents(gmInput),
+    );
+    return modal;
+}
+
+function buildAdventureNotesModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`advCreate_notesModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Notes');
+
+    const notesInput = new TextInputBuilder()
+        .setCustomId('advNotes')
+        .setLabel('Notes (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setValue(safeModalValue(state?.data?.notes));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(notesInput));
+    return modal;
+}
+
 function ensurePromptMessage(state, interaction) {
     if (!state) return;
+    state.activeInteraction = interaction;
     if (!state.promptMessage && interaction?.message) {
         state.promptMessage = interaction.message;
+        state.promptMessageId = interaction.message.id;
+        state.promptChannelId = interaction.message.channelId;
     }
-    if (interaction?.isRepliable?.()) {
+    if (!state.promptInteraction && interaction?.isRepliable?.()) {
         state.promptInteraction = interaction;
     }
 }
@@ -337,7 +886,7 @@ function buildCreationCancelRow(ownerDiscordId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-            .setLabel('Abbrechen')
+            .setLabel('Cancel')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -347,13 +896,13 @@ function buildCreationEmbed(step, title, description) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
-        .setFooter({ text: `Schritt ${step}/7` });
+        .setFooter({ text: `Step ${step}/7` });
 }
 
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_classes_${ownerDiscordId}`)
-        .setPlaceholder('Klassen ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select classes...')
         .setMinValues(1)
         .setMaxValues(Math.min(25, classes.length));
 
@@ -374,7 +923,7 @@ function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
 function buildStartTierRow(ownerDiscordId, selectedValue) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_tier_${ownerDiscordId}`)
-        .setPlaceholder('Start-Tier ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select starting tier...')
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions([
@@ -401,7 +950,7 @@ function getStartTierSelection(state) {
 
 function buildFactionRow(ownerDiscordId, selectedValue) {
     const options = [
-        { label: 'Keine', value: 'none' },
+        { label: 'None', value: 'none' },
         { label: 'Heiler', value: 'heiler' },
         { label: 'Handwerker', value: 'handwerker' },
         { label: 'Feldforscher', value: 'feldforscher' },
@@ -415,7 +964,7 @@ function buildFactionRow(ownerDiscordId, selectedValue) {
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_faction_${ownerDiscordId}`)
-        .setPlaceholder('Fraktion ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select faction...')
         .setMinValues(1)
         .setMaxValues(1);
 
@@ -434,7 +983,7 @@ function buildFactionRow(ownerDiscordId, selectedValue) {
 function buildVersionRow(ownerDiscordId, selectedValue) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_version_${ownerDiscordId}`)
-        .setPlaceholder('Version ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select version...')
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions([
@@ -455,17 +1004,17 @@ function buildCreationConfirmRows(ownerDiscordId) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
+                .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_confirm_${ownerDiscordId}`)
-                .setLabel('Charakter erstellen')
+                .setLabel('Create character')
                 .setStyle(ButtonStyle.Success),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-                .setLabel('Abbrechen')
+                .setLabel('Cancel')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -482,7 +1031,7 @@ function buildCreationBasicsRows(ownerDiscordId) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-                .setLabel('Abbrechen')
+                .setLabel('Cancel')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -493,7 +1042,7 @@ function buildCreationStepActionRows(ownerDiscordId, stepKey) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
+                .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_next_${stepKey}_${ownerDiscordId}`)
@@ -503,7 +1052,7 @@ function buildCreationStepActionRows(ownerDiscordId, stepKey) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-                .setLabel('Abbrechen')
+                .setLabel('Cancel')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -513,29 +1062,29 @@ function buildAvatarUploadRow(ownerDiscordId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersCreate_avatar_dm_${ownerDiscordId}`)
-            .setLabel('Avatar in DM hochladen')
+            .setLabel('Upload avatar in DM')
             .setStyle(ButtonStyle.Primary),
     );
 }
 
 function buildCreationBasicsEmbed(state, message) {
-    const embed = buildCreationEmbed(1, 'Charakter erstellen', message || 'Bearbeite die Basisangaben.');
+    const embed = buildCreationEmbed(1, 'Create character', message || 'Bearbeite die Basisangaben.');
     embed.addFields(
         { name: 'Name', value: state?.data?.name || '-', inline: false },
         { name: 'External Link', value: state?.data?.externalLink || '-', inline: false },
-        { name: 'Avatar', value: state?.data?.avatar || 'Kein Avatar', inline: false },
-        { name: 'Notizen', value: state?.data?.notes || '-', inline: false },
+        { name: 'Avatar', value: state?.data?.avatar || 'No avatar', inline: false },
+        { name: 'Notes', value: state?.data?.notes || '-', inline: false },
     );
     return embed;
 }
 
 function buildAvatarStepEmbed(state, message) {
     const description = message
-        || 'Lade ein Avatar-Bild hoch (optional). Nutze **Avatar in DM hochladen** und klicke dann **Weiter**.';
-    const embed = buildCreationEmbed(2, 'Avatar hochladen', description);
+        || 'Upload an avatar image (optional). Use **Upload avatar in DM** and click **Next**.';
+    const embed = buildCreationEmbed(2, 'Upload avatar', description);
     embed.addFields({
         name: 'Avatar',
-        value: state?.data?.avatar ? 'Hochgeladen' : 'Kein Avatar',
+        value: state?.data?.avatar ? 'Uploaded' : 'No avatar',
         inline: false,
     });
     return embed;
@@ -555,12 +1104,12 @@ async function buildCreationSummaryEmbed(state) {
         .addFields(
             { name: 'Name', value: state.data.name || '-', inline: false },
             { name: 'External Link', value: state.data.externalLink || '-', inline: false },
-            { name: 'Avatar', value: state.data.avatar || 'Kein Avatar', inline: false },
-            { name: 'Klassen', value: classNames.length > 0 ? classNames.join(', ') : '-', inline: false },
-            { name: 'Start-Tier', value: tierLabel || '-', inline: true },
-            { name: 'Fraktion', value: state.data.faction || 'none', inline: true },
+            { name: 'Avatar', value: state.data.avatar || 'No avatar', inline: false },
+            { name: 'Classes', value: classNames.length > 0 ? classNames.join(', ') : '-', inline: false },
+            { name: 'Starting tier', value: tierLabel || '-', inline: true },
+            { name: 'Faction', value: state.data.faction || 'none', inline: true },
             { name: 'Version', value: state.data.version || '2024', inline: true },
-            { name: 'Notizen', value: state.data.notes ? state.data.notes : '—', inline: false },
+            { name: 'Notes', value: state.data.notes ? state.data.notes : '-', inline: false },
         );
 
     return embed;
@@ -569,11 +1118,11 @@ async function buildCreationSummaryEmbed(state) {
 function buildCreationBasicModal(ownerDiscordId, state) {
     const modal = new ModalBuilder()
         .setCustomId(`charactersCreate_basic_${ownerDiscordId}`)
-        .setTitle('Charakter erstellen');
+        .setTitle('Create character');
 
     const nameInput = new TextInputBuilder()
         .setCustomId('createName')
-        .setLabel('Charaktername')
+        .setLabel('Character name')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(state?.data?.name));
@@ -587,7 +1136,7 @@ function buildCreationBasicModal(ownerDiscordId, state) {
 
     const notesInput = new TextInputBuilder()
         .setCustomId('createNotes')
-        .setLabel('Notizen (optional)')
+        .setLabel('Notes (optional)')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setValue(safeModalValue(state?.data?.notes));
@@ -681,7 +1230,7 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
         const requestOptions = {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Typee': 'application/json',
                 'Accept': 'application/json',
                 'X-Bot-Token': token,
             },
@@ -706,19 +1255,19 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
             }
         }
 
-        const contentType = String(response.headers.get('content-type') || '');
+        const contentTypee = String(response.headers.get('content-type') || '');
 
         if (!response.ok) {
             const text = await response.text().catch(() => '');
-            const preview = text.length > 300 ? `${text.slice(0, 300)}…` : text;
-            console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentType} body=${preview}`);
+            const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+            console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentTypee} body=${preview}`);
             return false;
         }
 
-        if (!contentType.includes('application/json')) {
+        if (!contentTypee.includes('application/json')) {
             const text = await response.text().catch(() => '');
-            const preview = text.length > 300 ? `${text.slice(0, 300)}…` : text;
-            console.warn(`[bot] Avatar upload unexpected response. content-type=${contentType} body=${preview}`);
+            const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+            console.warn(`[bot] Avatar upload unexpected response. content-type=${contentTypee} body=${preview}`);
             return false;
         }
 
@@ -753,7 +1302,7 @@ async function finalizeCharacterCreation(state) {
     const { data, ownerDiscordId } = state;
     if (!data.name || !data.externalLink || !data.startTier || !data.version || !Array.isArray(data.classIds) || data.classIds.length === 0) {
         await updateCreationMessage(state, {
-            content: 'Charakterdaten unvollst\u00e4ndig. Bitte erneut starten.',
+            content: 'Character data incomplete. Please start again.',
             embeds: [],
             components: [],
         });
@@ -777,7 +1326,7 @@ async function finalizeCharacterCreation(state) {
 
     if (!result.ok) {
         await updateCreationMessage(state, {
-            content: 'Charakter konnte nicht erstellt werden.',
+            content: 'Character could not be created.',
             embeds: [],
             components: [],
         });
@@ -794,7 +1343,7 @@ async function finalizeCharacterCreation(state) {
     const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
     if (!character) {
         await updateCreationMessage(state, {
-            content: 'Charakter erstellt.',
+            content: 'Character created.',
             embeds: [],
             components: [],
         });
@@ -815,14 +1364,14 @@ async function handleCreationAvatarMessage(message) {
     if (message.guildId) return false;
 
     const attachments = [...message.attachments.values()];
-    const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
+    const attachment = attachments.find(item => String(item.contentTypee || '').startsWith('image/')) || attachments[0];
     if (!attachment?.url) return false;
 
     state.data.avatar = attachment.url;
     await message.delete().catch(() => {});
 
     const payload = {
-        embeds: [buildAvatarStepEmbed(state, 'Avatar gespeichert. Du kannst fortfahren.')],
+        embeds: [buildAvatarStepEmbed(state, 'Avatar saved. You can continue.')],
         components: [
             buildAvatarUploadRow(ownerDiscordId),
             ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
@@ -842,7 +1391,7 @@ async function handleAvatarUpdateMessage(message) {
     if (!state) return false;
 
     const attachments = [...message.attachments.values()];
-    const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
+    const attachment = attachments.find(item => String(item.contentTypee || '').startsWith('image/')) || attachments[0];
     if (!attachment?.url) return false;
 
     await message.delete().catch(() => {});
@@ -856,14 +1405,14 @@ async function handleAvatarUpdateMessage(message) {
 
     if (!storedAvatar) {
         await state.promptMessage.edit({
-            content: 'Avatar konnte nicht gespeichert werden.',
+            content: 'Avatar could not be saved.',
         }).catch(() => {});
         return true;
     }
 
     const character = await findCharacterForDiscord(message.author, state.characterId);
     if (!character) {
-        await state.promptMessage.edit({ content: 'Charakter nicht gefunden.' }).catch(() => {});
+        await state.promptMessage.edit({ content: 'Character not found.' }).catch(() => {});
         return true;
     }
 
@@ -882,7 +1431,7 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`characterClassesSelect_${character.id}_${ownerDiscordId}`)
-        .setPlaceholder('Klassen ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select classes...')
         .setMinValues(0)
         .setMaxValues(Math.min(25, classes.length));
 
@@ -896,16 +1445,16 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
     });
 
     const embed = new EmbedBuilder()
-        .setTitle('Klassen')
+        .setTitle('Classes')
         .setColor(0x4f46e5)
-        .setDescription(`Ausgew\u00e4hlt f\u00fcr ${character.name}.`);
+        .setDescription(`Selected for ${character.name}.`);
 
     const components = [
         new ActionRowBuilder().addComponents(select),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
+                .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -916,7 +1465,7 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
 function buildCharacterFactionView({ character, ownerDiscordId }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`characterFactionSelect_${character.id}_${ownerDiscordId}`)
-        .setPlaceholder('Fraktion ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select faction...')
         .setMinValues(1)
         .setMaxValues(1);
 
@@ -930,16 +1479,16 @@ function buildCharacterFactionView({ character, ownerDiscordId }) {
     });
 
     const embed = new EmbedBuilder()
-        .setTitle('Fraktion')
+        .setTitle('Faction')
         .setColor(0x4f46e5)
-        .setDescription(`Ausgew\u00e4hlt f\u00fcr ${character.name}.`);
+        .setDescription(`Selected for ${character.name}.`);
 
     const components = [
         new ActionRowBuilder().addComponents(select),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
+                .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -951,11 +1500,11 @@ function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`deleteCharacterConfirm_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
+            .setLabel('Delete')
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`deleteCharacterCancel_${characterId}_${ownerDiscordId}`)
-            .setLabel('Abbrechen')
+            .setLabel('Cancel')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -964,11 +1513,11 @@ function buildAdventureDeleteConfirmRow({ adventureId, characterId, ownerDiscord
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`deleteAdventureConfirm_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
+            .setLabel('Delete')
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`deleteAdventureCancel_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Abbrechen')
+            .setLabel('Cancel')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -977,11 +1526,11 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`deleteDowntimeConfirm_${downtimeId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
+            .setLabel('Delete')
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`deleteDowntimeCancel_${downtimeId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Abbrechen')
+            .setLabel('Cancel')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -991,7 +1540,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
-                .setLabel('Abenteuer')
+                .setLabel('Adventure')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
@@ -1000,17 +1549,17 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
                 .setDisabled(Boolean(isFiller)),
             new ButtonBuilder()
                 .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
-                .setLabel('Verwalten')
+                .setLabel('Manage')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-                .setLabel('L\u00f6schen')
+                .setLabel('Delete')
                 .setStyle(ButtonStyle.Danger),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
-                .setLabel('Zur Liste')
+                .setLabel('Back to list')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -1019,13 +1568,13 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
 function buildAdventureListRow({ characterId, ownerDiscordId, adventures }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advSelect_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Abenteuer ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select adventure...')
         .addOptions(
             adventures.slice(0, 25).map(a => {
-                const title = String(a.title || '').trim() || '(ohne Titel)';
+                const title = String(a.title || '').trim() || '(ohne Title)';
                 const extra = a.has_additional_bubble ? ' +1' : '';
                 return new StringSelectMenuOptionBuilder()
-                    .setLabel(`${a.start_date} \u00b7 ${title}`.slice(0, 100))
+                    .setLabel(`${a.start_date} - ${title}`.slice(0, 100))
                     .setDescription(`${formatDuration(a.duration)}${extra}`)
                     .setValue(String(a.id));
             }),
@@ -1037,19 +1586,19 @@ function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
+            .setLabel('Edit')
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`advParticipantsOpen_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Teilnehmer')
+            .setLabel('Participants')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
+            .setLabel('Delete')
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-            .setLabel('Zur\u00fcck')
+            .setLabel('Back')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -1057,11 +1606,11 @@ function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
 function buildDowntimeListRow({ characterId, ownerDiscordId, downtimes }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`dtSelect_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Downtime ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select downtime...')
         .addOptions(
             downtimes.slice(0, 25).map(d =>
                 new StringSelectMenuOptionBuilder()
-                    .setLabel(`${d.start_date} \u00b7 ${String(d.type || 'other')}`.slice(0, 100))
+                    .setLabel(`${d.start_date} - ${String(d.type || 'other')}`.slice(0, 100))
                     .setDescription(formatDuration(d.duration))
                     .setValue(String(d.id)),
             ),
@@ -1075,18 +1624,18 @@ function buildAdventureEmbed(adventure, title, participants = []) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Datum', value: String(adventure.start_date), inline: true },
-            { name: 'Dauer', value: `${formatDuration(adventure.duration)}${extra}`, inline: true },
+            { name: 'Date', value: String(adventure.start_date), inline: true },
+            { name: 'Duration', value: `${formatDuration(adventure.duration)}${extra}`, inline: true },
             { name: 'ID', value: String(adventure.id), inline: true },
         );
 
     if (participants.length > 0) {
-        embed.addFields({ name: 'Teilnehmer', value: formatParticipantList(participants), inline: false });
+        embed.addFields({ name: 'Participants', value: formatParticipantList(participants), inline: false });
     }
 
-    if (adventure.title) embed.addFields({ name: 'Titel', value: String(adventure.title).slice(0, 1024), inline: false });
+    if (adventure.title) embed.addFields({ name: 'Title', value: String(adventure.title).slice(0, 1024), inline: false });
     if (adventure.game_master) embed.addFields({ name: 'GM', value: String(adventure.game_master).slice(0, 1024), inline: false });
-    if (adventure.notes) embed.addFields({ name: 'Notizen', value: String(adventure.notes).slice(0, 1024), inline: false });
+    if (adventure.notes) embed.addFields({ name: 'Notes', value: String(adventure.notes).slice(0, 1024), inline: false });
     return embed;
 }
 
@@ -1095,13 +1644,13 @@ function buildDowntimeEmbed(downtime, title) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Datum', value: String(downtime.start_date), inline: true },
-            { name: 'Dauer', value: formatDuration(downtime.duration), inline: true },
-            { name: 'Typ', value: String(downtime.type || 'other'), inline: true },
+            { name: 'Date', value: String(downtime.start_date), inline: true },
+            { name: 'Duration', value: formatDuration(downtime.duration), inline: true },
+            { name: 'Type', value: String(downtime.type || 'other'), inline: true },
             { name: 'ID', value: String(downtime.id), inline: true },
         );
 
-    if (downtime.notes) embed.addFields({ name: 'Notizen', value: String(downtime.notes).slice(0, 1024), inline: false });
+    if (downtime.notes) embed.addFields({ name: 'Notes', value: String(downtime.notes).slice(0, 1024), inline: false });
     return embed;
 }
 
@@ -1150,7 +1699,7 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
 function buildAdventureParticipantsSelect({ adventureId, characterId, ownerDiscordId, options }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advParticipantsSelect_${adventureId}_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Teilnehmer ausw\u00e4hlen\u2026')
+        .setPlaceholder('Select participants...')
         .setMinValues(0)
         .setMaxValues(Math.min(25, options.length));
 
@@ -1179,7 +1728,7 @@ function buildAdventureParticipantsActions({ adventureId, characterId, ownerDisc
             .setDisabled(!hasParticipants),
         new ButtonBuilder()
             .setCustomId(`advParticipantsBack_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Zur\u00fcck')
+            .setLabel('Back')
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -1203,9 +1752,9 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
 
     const limitedOptions = options.slice(0, 25);
     const embed = new EmbedBuilder()
-        .setTitle('Teilnehmer bearbeiten')
+        .setTitle('Edit participants')
         .setColor(0x4f46e5)
-        .setDescription(`${adventure.start_date} \u00b7 ${String(adventure.title || '(ohne Titel)')}`)
+        .setDescription(`${adventure.start_date} - ${String(adventure.title || '(ohne Title)')}`)
         .addFields({ name: 'Aktuell', value: formatParticipantList(participants), inline: false });
 
     if (search) {
@@ -1249,12 +1798,12 @@ async function handle(interaction) {
         const ownerDiscordId = interaction.customId.replace('charactersAction_new_', '');
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!interaction.inGuild()) {
-            await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1271,7 +1820,7 @@ async function handle(interaction) {
             }
 
             await interaction.reply({
-                embeds: [buildCreationEmbed(1, 'Charakter erstellen', 'Du hast bereits eine offene Erstellung. Bitte beende sie oder klicke **Abbrechen**.')],
+                embeds: [buildCreationEmbed(1, 'Create character', 'You already have an open creation. Please finish it or click **Cancel**.')],
                 components: [buildCreationCancelRow(ownerDiscordId)],
                 flags: MessageFlags.Ephemeral,
             });
@@ -1293,7 +1842,7 @@ async function handle(interaction) {
         setCreationState(ownerDiscordId, state);
 
         await interaction.update({
-            embeds: [buildCreationBasicsEmbed(state, 'Starte mit den Basisangaben.')],
+            embeds: [buildCreationBasicsEmbed(state, 'Start with the basic details.')],
             components: buildCreationBasicsRows(ownerDiscordId),
             content: '',
         });
@@ -1303,13 +1852,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
         const ownerDiscordId = interaction.customId.replace('charactersSelect_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const selectedId = Number(interaction.values[0]);
         if (!Number.isFinite(selectedId) || selectedId < 1) {
-            await interaction.reply({ content: 'Ung\u00fcltige Auswahl.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid selection.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1325,7 +1874,7 @@ async function handle(interaction) {
         }
 
         if (!character) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1339,13 +1888,13 @@ async function handle(interaction) {
     if (interaction.isModalSubmit() && interaction.customId.startsWith('charactersCreate_basic_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_basic_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1395,7 +1944,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_cancel_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_cancel_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1421,13 +1970,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_classes_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_classes_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1438,7 +1987,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
             ],
             components: [
                 buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1452,13 +2001,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_tier_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_tier_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1475,7 +2024,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
             ],
             components: [
                 buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1489,13 +2038,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_faction_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_faction_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1505,7 +2054,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1519,13 +2068,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_version_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_version_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1535,7 +2084,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
             ],
             components: [
                 buildVersionRow(ownerDiscordId, state.data.version),
@@ -1549,13 +2098,13 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_confirm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_confirm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1569,13 +2118,13 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_back_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_back_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1586,7 +2135,7 @@ async function handle(interaction) {
             state.step = 'version';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                    buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
                 ],
                 components: [
                     buildVersionRow(ownerDiscordId, state.data.version),
@@ -1602,7 +2151,7 @@ async function handle(interaction) {
                 state.step = 'tier';
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                        buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
                     ],
                     components: [
                         buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1616,7 +2165,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1631,7 +2180,7 @@ async function handle(interaction) {
             state.step = 'tier';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                    buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
                 ],
                 components: [
                     buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1647,7 +2196,7 @@ async function handle(interaction) {
             state.step = 'classes';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                    buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
                 ],
                 components: [
                     buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1678,7 +2227,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Kein vorheriger Schritt verf\u00fcgbar.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'No previous step available.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -1686,13 +2235,13 @@ async function handle(interaction) {
         const suffix = interaction.customId.replace('charactersCreate_next_', '');
         const [stepKey, ownerDiscordId] = suffix.split('_');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1702,7 +2251,7 @@ async function handle(interaction) {
             const classes = await listCharacterClassesForDiscord();
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                    buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
                 ],
                 components: [
                     buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1718,7 +2267,7 @@ async function handle(interaction) {
             if (!Array.isArray(state.data.classIds) || state.data.classIds.length === 0) {
                 await interaction.update({
                     embeds: [
-                    buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'Bitte w\u00e4hle mindestens eine Klasse.'),
+                    buildCreationEmbed(3, 'Choose classes', 'Please choose at least one class.'),
                     ],
                     components: [
                         buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1732,7 +2281,7 @@ async function handle(interaction) {
             state.step = 'tier';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                    buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
                 ],
                 components: [
                     buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1747,7 +2296,7 @@ async function handle(interaction) {
             if (!state.data.startTier) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'Bitte w\u00e4hle ein Start-Tier oder **Filler**.'),
+                        buildCreationEmbed(4, 'Choose starting tier', 'Please choose a starting tier or **Filler**.'),
                     ],
                     components: [
                         buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1763,7 +2312,7 @@ async function handle(interaction) {
                 state.step = 'version';
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                        buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
                     ],
                     components: [
                         buildVersionRow(ownerDiscordId, state.data.version),
@@ -1777,7 +2326,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1792,7 +2341,7 @@ async function handle(interaction) {
             if (!state.data.faction) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'Bitte w\u00e4hle eine Fraktion.'),
+                        buildCreationEmbed(5, 'Choose faction', 'Please choose a faction.'),
                     ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1806,7 +2355,7 @@ async function handle(interaction) {
             state.step = 'version';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                    buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
                 ],
                 components: [
                     buildVersionRow(ownerDiscordId, state.data.version),
@@ -1821,7 +2370,7 @@ async function handle(interaction) {
             if (!state.data.version) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(6, 'Version w\u00e4hlen', 'Bitte w\u00e4hle eine Regelversion.'),
+                        buildCreationEmbed(6, 'Choose version', 'Please choose a ruleset version.'),
                     ],
                     components: [
                         buildVersionRow(ownerDiscordId, state.data.version),
@@ -1836,7 +2385,7 @@ async function handle(interaction) {
             const summary = await buildCreationSummaryEmbed(state);
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(7, 'Finalisieren', 'Bitte best\u00e4tige die Angaben.'),
+                    buildCreationEmbed(7, 'Finalize', 'Please confirm the details.'),
                     summary,
                 ],
                 components: buildCreationConfirmRows(ownerDiscordId),
@@ -1845,20 +2394,20 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Unbekannter Schritt.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'Unknown step.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_basicopen_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_basicopen_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1871,23 +2420,23 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_avatar_dm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_avatar_dm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const dm = await interaction.user.createDM();
-        const sourceLink = state?.promptMessage?.url ? `\nZur\u00fcck zum Charakter-Dialog: ${state.promptMessage.url}` : '';
-        await dm.send(`Bitte sende mir hier dein Avatar-Bild. Ich speichere es nur f\u00fcr diesen Charakter.${sourceLink}`);
+        const sourceLink = state?.promptMessage?.url ? `\nBack to character dialog: ${state.promptMessage.url}` : '';
+        await dm.send(`Please send your avatar image here. I only store it for this character.${sourceLink}`);
 
         await interaction.deferUpdate();
         await updateCreationMessage(state, {
-            embeds: [buildAvatarStepEmbed(state, 'Ich habe dir eine DM geschickt. Lade dort dein Avatar-Bild hoch.')],
+            embeds: [buildAvatarStepEmbed(state, 'I sent you a DM. Upload your avatar image there.')],
             components: [
                 buildAvatarUploadRow(ownerDiscordId),
                 ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
@@ -1903,7 +2452,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1911,13 +2460,13 @@ async function handle(interaction) {
         try {
             const result = await syncCharacterClassesForDiscord(interaction.user, characterId, classIds);
             if (!result.ok) {
-                await interaction.reply({ content: 'Klassen konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Classes konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const character = await findCharacterForDiscord(interaction.user, characterId);
             if (!character) {
-                await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
@@ -1941,25 +2490,25 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const faction = String(interaction.values[0] || '').trim().toLowerCase();
         if (!allowedFactions.has(faction)) {
-            await interaction.reply({ content: 'Ung\u00fcltige Fraktion.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid faction.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateCharacterForDiscord(interaction.user, characterId, { faction });
         if (!result.ok) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1976,7 +2525,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1989,7 +2538,7 @@ async function handle(interaction) {
             return true;
         }
         if (!isHttpUrl(url)) {
-            await interaction.reply({ content: 'Ung\u00fcltige URL (nur http/https).', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid URL (http/https only).', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2000,13 +2549,13 @@ async function handle(interaction) {
         });
 
         if (!result.ok) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2023,20 +2572,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const dmBubbles = interaction.fields.getTextInputValue('dmBubbles');
         const result = await updateCharacterForDiscord(interaction.user, characterId, { dmBubbles });
         if (!result.ok) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2053,20 +2602,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const dmCoins = interaction.fields.getTextInputValue('dmCoins');
         const result = await updateCharacterForDiscord(interaction.user, characterId, { dmCoins });
         if (!result.ok) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2083,20 +2632,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const bubbleShopSpend = interaction.fields.getTextInputValue('bubbleSpend');
         const result = await updateCharacterForDiscord(interaction.user, characterId, { bubbleShopSpend });
         if (!result.ok) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2112,12 +2661,12 @@ async function handle(interaction) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await interaction.reply({ content: 'Ung\u00fcltige Charakter-ID.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2132,7 +2681,7 @@ async function handle(interaction) {
             throw error;
         }
         if (!character) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2146,27 +2695,14 @@ async function handle(interaction) {
 
         if (action === 'del') {
             await interaction.update({
-                content: 'Charakter wirklich l\u00f6schen?',
+                content: 'Delete character?',
                 components: [buildDeleteConfirmRow({ characterId: character.id, ownerDiscordId })],
             });
             return true;
         }
 
         if (action === 'adv') {
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`advAdd_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Neues Abenteuer')
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId(`advList_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Liste')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
-                    .setStyle(ButtonStyle.Secondary),
-            );
+            const row = buildAdventureMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
             return true;
         }
@@ -2175,17 +2711,17 @@ async function handle(interaction) {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtAdd_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Downtime hinzuf\u00fcgen')
+                    .setLabel('Add downtime')
                     .setStyle(ButtonStyle.Success)
                     .setDisabled(Boolean(character.is_filler)),
                 new ButtonBuilder()
                     .setCustomId(`dtList_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Liste')
+                    .setLabel('List')
                     .setStyle(ButtonStyle.Primary)
                     .setDisabled(Boolean(character.is_filler)),
                 new ButtonBuilder()
                     .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
+                    .setLabel('Back')
                     .setStyle(ButtonStyle.Secondary),
             );
             await interaction.update({ components: [row], content: '' });
@@ -2222,7 +2758,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'Unknown action.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -2234,18 +2770,18 @@ async function handle(interaction) {
         const action = parts.join('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await interaction.reply({ content: 'Ung\u00fcltige Charakter-ID.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2260,7 +2796,7 @@ async function handle(interaction) {
         if (action === 'basic') {
             const modal = new ModalBuilder()
                 .setCustomId(`characterBasicsModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Charakterdaten');
+                .setTitle('Character details');
 
             const nameInput = new TextInputBuilder()
                 .setCustomId('basicName')
@@ -2278,7 +2814,7 @@ async function handle(interaction) {
 
             const notesInput = new TextInputBuilder()
                 .setCustomId('basicNotes')
-                .setLabel('Notizen (optional)')
+                .setLabel('Notes (optional)')
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(false)
                 .setValue(safeModalValue(character.notes));
@@ -2295,8 +2831,8 @@ async function handle(interaction) {
 
         if (action === 'avatar') {
             const dm = await interaction.user.createDM();
-            const sourceLink = interaction.message?.url ? `\nZur\u00fcck zum Charakter-Dialog: ${interaction.message.url}` : '';
-            await dm.send(`Bitte sende mir hier dein Avatar-Bild. Ich speichere es nur f\u00fcr diesen Charakter.${sourceLink}`);
+            const sourceLink = interaction.message?.url ? `\nBack to character dialog: ${interaction.message.url}` : '';
+            await dm.send(`Please send your avatar image here. I only store it for this character.${sourceLink}`);
 
             clearAvatarUpdateState(ownerDiscordId);
             setAvatarUpdateState(ownerDiscordId, {
@@ -2390,7 +2926,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'Unknown action.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -2398,11 +2934,11 @@ async function handle(interaction) {
         const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(idRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await interaction.reply({ content: 'Ung\u00fcltige Charakter-ID.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (action === 'deleteCharacterCancel') {
@@ -2422,7 +2958,7 @@ async function handle(interaction) {
         try {
             const result = await softDeleteCharacterForDiscord(interaction.user, characterId);
             if (!result.ok) {
-                await interaction.update({ content: 'Charakter nicht gefunden oder bereits gel\u00f6scht.', components: [] });
+                await interaction.update({ content: 'Character not found or already deleted.', components: [] });
                 return true;
             }
             await updateCharacterListMessage(interaction, ownerDiscordId);
@@ -2433,7 +2969,7 @@ async function handle(interaction) {
                 await interaction.update({ content: notLinkedContent(), components: [] });
                 return true;
             }
-            await interaction.update({ content: `Fehler beim L\u00f6schen: ${error.message}`, components: [] });
+            await interaction.update({ content: `Delete failed: ${error.message}`, components: [] });
         }
         return true;
     }
@@ -2445,126 +2981,565 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        const modal = new ModalBuilder()
-            .setCustomId(`advCreateModal_${characterId}_${ownerDiscordId}`)
-            .setTitle('Abenteuer hinzuf\u00fcgen');
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (state && Number(state.characterId) !== characterId) {
+            ensurePromptMessage(state, interaction);
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'You already have an open creation. Please finish it or click **Cancel**.',
+            }));
+            return true;
+        }
 
-        const durationInput = new TextInputBuilder()
-            .setCustomId('advDuration')
-            .setLabel('Dauer (HH:MM oder Minuten)')
-            .setPlaceholder('03:00')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
 
-        const dateInput = new TextInputBuilder()
-            .setCustomId('advDate')
-            .setLabel('Datum (YYYY-MM-DD)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(new Date().toISOString().slice(0, 10));
-
-        const titleInput = new TextInputBuilder()
-            .setCustomId('advTitle')
-            .setLabel('Titel (optional)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false);
-
-        const gmInput = new TextInputBuilder()
-            .setCustomId('advGm')
-            .setLabel('Game Master (optional)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false);
-
-        const bonusInput = new TextInputBuilder()
-            .setCustomId('advBonus')
-            .setLabel('Bonus Bubble (+1)?')
-            .setPlaceholder('nein | ja')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue('nein');
-
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(durationInput),
-            new ActionRowBuilder().addComponents(dateInput),
-            new ActionRowBuilder().addComponents(titleInput),
-            new ActionRowBuilder().addComponents(gmInput),
-            new ActionRowBuilder().addComponents(bonusInput),
-        );
-
-        await interaction.showModal(modal);
+        ensurePromptMessage(state, interaction);
+        const payload = await buildAdventureStepPayload({
+            interaction,
+            state,
+            message: 'Starte mit der Duration.',
+        });
+        await updateAdventureMessage(state, payload);
         return true;
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreateModal_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_back_')) {
+        const match = interaction.customId.match(/^advCreate_back_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.update({ content: '', embeds: [], components: [buildAdventureMenuRow({ id: characterId }, ownerDiscordId)] });
+            return true;
+        }
+
+        if (state.step === 'duration') {
+            clearAdventureCreationState(ownerDiscordId);
+            await interaction.update({ content: '', embeds: [], components: [buildAdventureMenuRow({ id: characterId }, ownerDiscordId)] });
+            return true;
+        }
+
+        state.step = getAdventurePreviousStep(state.step);
+        ensurePromptMessage(state, interaction);
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_cancel_')) {
+        const match = interaction.customId.match(/^advCreate_cancel_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        clearAdventureCreationState(ownerDiscordId);
+        await interaction.update({ content: '', embeds: [], components: [buildAdventureMenuRow({ id: characterId }, ownerDiscordId)] });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_duration_')) {
+        const parts = interaction.customId.split('_');
+        if (parts.length < 5) return false;
+        const value = parts[2];
+        const characterId = Number(parts[3]);
+        const ownerDiscordId = parts[4];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+
+        if (value === 'custom') {
+            await interaction.showModal(buildAdventureDurationModal(state));
+            return true;
+        }
+
+        const durationSeconds = Number(value);
+        if (!Number.isFinite(durationSeconds)) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Invalid selection. Please choose a duration.',
+            }));
+            return true;
+        }
+
+        state.data.durationSeconds = durationSeconds;
+        state.step = 'date';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_durationModal_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[2];
+        const ownerDiscordId = parts[3];
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('advDuration'));
+        if (duration === null) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.',
+            }));
+            return true;
+        }
+
+        state.data.durationSeconds = duration;
+        state.step = 'date';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_date_')) {
+        const parts = interaction.customId.split('_');
+        if (parts.length < 5) return false;
+        const value = parts[2];
+        const characterId = Number(parts[3]);
+        const ownerDiscordId = parts[4];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+
+        if (value === 'custom') {
+            await interaction.showModal(buildAdventureDateModal(state));
+            return true;
+        }
+
+        const date = new Date();
+        if (value === 'yesterday') {
+            date.setDate(date.getDate() - 1);
+        }
+        state.data.startDate = date.toISOString().slice(0, 10);
+        state.step = 'title';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_dateModal_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[2];
+        const ownerDiscordId = parts[3];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('advDate'));
+        if (!startDate) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Invalid date. Use YYYY-MM-DD.',
+            }));
+            return true;
+        }
+
+        state.data.startDate = startDate;
+        state.step = 'title';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_title_edit_')) {
+        const match = interaction.customId.match(/^advCreate_title_edit_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        await interaction.showModal(buildAdventureTitleModal(state));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_title_skip_')) {
+        const match = interaction.customId.match(/^advCreate_title_skip_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        state.step = 'quest';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_titleModal_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[2];
+        const ownerDiscordId = parts[3];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
         const title = (interaction.fields.getTextInputValue('advTitle') || '').trim();
         const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
-        const bonusRaw = String(interaction.fields.getTextInputValue('advBonus') || '').trim().toLowerCase();
+        state.data.title = title;
+        state.data.gameMaster = gameMaster;
+        state.step = 'quest';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
 
-        const hasAdditionalBubble = ['1', 'true', 'ja', 'j', 'yes', 'y', '+1'].includes(bonusRaw);
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_next_quest_')) {
+        const match = interaction.customId.match(/^advCreate_next_quest_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
 
-        if (duration === null) {
-            await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
-        if (!startDate) {
-            await interaction.reply({ content: 'Ung\u00fcltiges Datum. Nutze YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        if (state.data.hasAdditionalBubble === null) {
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Please choose whether this was a character quest.',
+            }));
+            return true;
+        }
+
+        state.step = 'notes';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_notes_edit_')) {
+        const match = interaction.customId.match(/^advCreate_notes_edit_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        await interaction.showModal(buildAdventureNotesModal(state));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_notes_skip_')) {
+        const match = interaction.customId.match(/^advCreate_notes_skip_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        state.data.notes = '';
+        state.step = 'participants';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_notesModal_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[2];
+        const ownerDiscordId = parts[3];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
+        state.data.notes = notes;
+        state.step = 'participants';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_next_participants_')) {
+        const match = interaction.customId.match(/^advCreate_next_participants_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        state.step = 'confirm';
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_confirm_')) {
+        const match = interaction.customId.match(/^advCreate_confirm_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+
+        if (state.data.durationSeconds === null || !state.data.startDate || state.data.hasAdditionalBubble === null) {
+            if (state.data.durationSeconds === null) {
+                state.step = 'duration';
+            } else if (!state.data.startDate) {
+                state.step = 'date';
+            } else {
+                state.step = 'quest';
+            }
+            await updateAdventureMessage(state, await buildAdventureStepPayload({
+                interaction,
+                state,
+                message: 'Please fill in the missing details.',
+            }));
             return true;
         }
 
         try {
             const result = await createAdventureForDiscord(interaction.user, {
                 characterId,
-                duration,
-                startDate,
-                hasAdditionalBubble,
-                notes: '',
-                title,
-                gameMaster,
+                duration: state.data.durationSeconds,
+                startDate: state.data.startDate,
+                hasAdditionalBubble: state.data.hasAdditionalBubble === true,
+                title: state.data.title,
+                gameMaster: state.data.gameMaster,
+                notes: state.data.notes,
+                guildCharacterIds: state.data.guildCharacterIds,
             });
 
             if (!result.ok) {
-                await interaction.reply({ content: 'Abenteuer konnte nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+                await updateAdventureMessage(state, {
+                    embeds: [buildAdventureStepEmbed('confirm', state, 'Adventure could not be saved.')],
+                    components: buildAdventureConfirmRows(state),
+                });
                 return true;
             }
 
+            clearAdventureCreationState(ownerDiscordId);
+
             const adventure = await findAdventureForDiscord(interaction.user, result.id);
             if (!adventure) {
-                await interaction.reply({ content: 'Abenteuer gespeichert.', flags: MessageFlags.Ephemeral });
+                await interaction.update({ content: 'Adventure saved.', embeds: [], components: [] });
                 return true;
             }
 
             const participants = await listAdventureParticipantsForDiscord(interaction.user, adventure.id);
             const row = buildAdventureActionRow({ adventureId: adventure.id, characterId, ownerDiscordId });
-
-            await interaction.reply({
-                embeds: [buildAdventureEmbed(adventure, 'Abenteuer gespeichert', participants)],
+            await interaction.update({
+                embeds: [buildAdventureEmbed(adventure, 'Adventure saved', participants)],
                 components: [row],
-                flags: MessageFlags.Ephemeral,
+                content: '',
             });
         } catch (error) {
-            // eslint-disable-next-line no-console
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
-                await replyNotLinked(interaction);
+                await updateAdventureMessage(state, { content: notLinkedContent(), embeds: [], components: [] });
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Speichern des Abenteuers.', flags: MessageFlags.Ephemeral });
+            await updateAdventureMessage(state, {
+                embeds: [buildAdventureStepEmbed('confirm', state, 'Failed to save adventure.')],
+                components: buildAdventureConfirmRows(state),
+            });
         }
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('advCreate_quest_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[2];
+        const ownerDiscordId = parts[3];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        const value = String(interaction.values?.[0] || '').toLowerCase();
+        if (value === 'yes') state.data.hasAdditionalBubble = true;
+        if (value === 'no') state.data.hasAdditionalBubble = false;
+
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('advCreate_participants_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[2];
+        const ownerDiscordId = parts[3];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        const selectedIds = Array.from(
+            new Set((interaction.values || [])
+                .map(value => Number(value))
+                .filter(value => Number.isFinite(value) && value > 0)),
+        );
+        state.data.guildCharacterIds = selectedIds;
+
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
 
@@ -2574,18 +3549,18 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         try {
             const adventures = await listAdventuresForDiscord(interaction.user, characterId, 25);
             if (adventures.length === 0) {
-                await interaction.reply({ content: 'Keine Abenteuer gefunden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'No adventures found.', flags: MessageFlags.Ephemeral });
                 return true;
             }
             await interaction.reply({
-                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Abenteuer').setDescription('W\u00e4hle ein Abenteuer.')],
+                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
                 components: [buildAdventureListRow({ characterId, ownerDiscordId, adventures })],
                 flags: MessageFlags.Ephemeral,
             });
@@ -2596,7 +3571,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Laden der Abenteuer.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Failed to load adventures.', flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -2609,17 +3584,17 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const modal = new ModalBuilder()
             .setCustomId(`dtCreateModal_${characterId}_${ownerDiscordId}`)
-            .setTitle('Downtime hinzuf\u00fcgen');
+            .setTitle('Add downtime');
 
         const typeInput = new TextInputBuilder()
-            .setCustomId('dtType')
-            .setLabel('Typ')
+            .setCustomId('dtTypee')
+            .setLabel('Type')
             .setPlaceholder('faction | other')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
@@ -2627,21 +3602,21 @@ async function handle(interaction) {
 
         const durationInput = new TextInputBuilder()
             .setCustomId('dtDuration')
-            .setLabel('Dauer (HH:MM oder Minuten)')
+            .setLabel('Duration (HH:MM or minutes)')
             .setPlaceholder('03:00')
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
         const dateInput = new TextInputBuilder()
             .setCustomId('dtDate')
-            .setLabel('Datum (YYYY-MM-DD)')
+            .setLabel('Date (YYYY-MM-DD)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(new Date().toISOString().slice(0, 10));
 
         const notesInput = new TextInputBuilder()
             .setCustomId('dtNotes')
-            .setLabel('Notizen (optional)')
+            .setLabel('Notes (optional)')
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(false);
 
@@ -2662,18 +3637,18 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        const typeRaw = String(interaction.fields.getTextInputValue('dtType') || '').trim().toLowerCase();
-        const normalizedType = (() => {
+        const typeRaw = String(interaction.fields.getTextInputValue('dtTypee') || '').trim().toLowerCase();
+        const normalizedTypee = (() => {
             if (['faction', 'f', '1'].includes(typeRaw)) return 'faction';
             if (['other', 'o', '2'].includes(typeRaw)) return 'other';
             return null;
         })();
-        if (!normalizedType) {
-            await interaction.reply({ content: 'Ung\u00fcltiger Typ. Nutze `faction` oder `other`.', flags: MessageFlags.Ephemeral });
+        if (!normalizedTypee) {
+            await interaction.reply({ content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2682,11 +3657,11 @@ async function handle(interaction) {
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
         if (duration === null) {
-            await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
-            await interaction.reply({ content: 'Ung\u00fcltiges Datum. Nutze YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2695,38 +3670,38 @@ async function handle(interaction) {
                 characterId,
                 duration,
                 startDate,
-                type: normalizedType,
+                type: normalizedTypee,
                 notes,
             });
 
             if (!result.ok) {
-                await interaction.reply({ content: 'Downtime konnte nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Downtime could not be saved.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const downtime = await findDowntimeForDiscord(interaction.user, result.id);
             if (!downtime) {
-                await interaction.reply({ content: 'Downtime gespeichert.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Downtime saved.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtEdit_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Bearbeiten')
+                    .setLabel('Edit')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`dtDelete_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('L\u00f6schen')
+                    .setLabel('Delete')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
+                    .setLabel('Back')
                     .setStyle(ButtonStyle.Secondary),
             );
 
             await interaction.reply({
-                embeds: [buildDowntimeEmbed(downtime, 'Downtime gespeichert')],
+                embeds: [buildDowntimeEmbed(downtime, 'Downtime saved')],
                 components: [row],
                 flags: MessageFlags.Ephemeral,
             });
@@ -2737,7 +3712,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Speichern der Downtime.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Failed to save downtime.', flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -2748,18 +3723,18 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         try {
             const downtimes = await listDowntimesForDiscord(interaction.user, characterId, 25);
             if (downtimes.length === 0) {
-                await interaction.reply({ content: 'Keine Downtimes gefunden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'No downtimes found.', flags: MessageFlags.Ephemeral });
                 return true;
             }
             await interaction.reply({
-                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('W\u00e4hle eine Downtime.')],
+                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
                 components: [buildDowntimeListRow({ characterId, ownerDiscordId, downtimes })],
                 flags: MessageFlags.Ephemeral,
             });
@@ -2770,7 +3745,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Laden der Downtimes.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Failed to load downtimes.', flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -2782,20 +3757,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1 || !Number.isFinite(adventureId) || adventureId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
             return true;
         }
 
         const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
 
         await interaction.update({
-            embeds: [buildAdventureEmbed(adventure, 'Abenteuer', participants)],
+            embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)],
             components: [row],
             content: '',
         });
@@ -2809,13 +3784,13 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
-            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
             return true;
         }
 
@@ -2830,13 +3805,13 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const modal = new ModalBuilder()
             .setCustomId(`advParticipantsSearchModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setTitle('Teilnehmer suchen');
+            .setTitle('Search participants');
 
         const searchInput = new TextInputBuilder()
             .setCustomId('participantSearch')
@@ -2857,14 +3832,14 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         setParticipantSearch(adventureId, ownerDiscordId, interaction.fields.getTextInputValue('participantSearch'));
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
-            await interaction.reply({ content: 'Abenteuer nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2879,7 +3854,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2900,13 +3875,13 @@ async function handle(interaction) {
         });
 
         if (!result.ok) {
-            await interaction.reply({ content: 'Teilnehmer konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Participants could not be saved.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
-            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
             return true;
         }
 
@@ -2921,7 +3896,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2933,7 +3908,7 @@ async function handle(interaction) {
 
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
-            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
             return true;
         }
 
@@ -2948,18 +3923,18 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
             return true;
         }
 
         const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
-        await interaction.update({ content: '', embeds: [buildAdventureEmbed(adventure, 'Abenteuer', participants)], components: [row] });
+        await interaction.update({ content: '', embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)], components: [row] });
         return true;
     }
 
@@ -2970,28 +3945,28 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1 || !Number.isFinite(downtimeId) || downtimeId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.update({ content: 'Downtime nicht gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'Downtime not found.', embeds: [], components: [] });
             return true;
         }
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtEdit_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Bearbeiten')
+                .setLabel('Edit')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('L\u00f6schen')
+                .setLabel('Delete')
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
                 .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
+                .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
         );
 
@@ -3006,37 +3981,37 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await findAdventureForDiscord(interaction.user, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Abenteuer nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const modal = new ModalBuilder()
             .setCustomId(`advUpdateModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setTitle('Abenteuer bearbeiten');
+            .setTitle('Edit adventure');
 
         const durationInput = new TextInputBuilder()
             .setCustomId('advDuration')
-            .setLabel('Dauer (HH:MM oder Minuten)')
+            .setLabel('Duration (HH:MM or minutes)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(formatDuration(adventure.duration));
 
         const dateInput = new TextInputBuilder()
             .setCustomId('advDate')
-            .setLabel('Datum (YYYY-MM-DD)')
+            .setLabel('Date (YYYY-MM-DD)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(safeModalValue(adventure.start_date, 10));
 
         const titleInput = new TextInputBuilder()
             .setCustomId('advTitle')
-            .setLabel('Titel (optional)')
+            .setLabel('Title (optional)')
             .setStyle(TextInputStyle.Short)
             .setRequired(false)
             .setValue(safeModalValue(adventure.title));
@@ -3066,7 +4041,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3076,11 +4051,11 @@ async function handle(interaction) {
         const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
 
         if (duration === null) {
-            await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
-            await interaction.reply({ content: 'Ung\u00fcltiges Datum. Nutze YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3094,20 +4069,20 @@ async function handle(interaction) {
             });
 
             if (!result.ok) {
-                await interaction.reply({ content: 'Abenteuer nicht gefunden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
             if (!adventure) {
-                await interaction.reply({ content: 'Abenteuer aktualisiert.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Adventure updated.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
 
             await interaction.reply({
-                embeds: [buildAdventureEmbed(adventure, 'Abenteuer aktualisiert', participants)],
+                embeds: [buildAdventureEmbed(adventure, 'Adventure updated', participants)],
                 components: [row],
                 flags: MessageFlags.Ephemeral,
             });
@@ -3118,7 +4093,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Speichern des Abenteuers.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Failed to save adventure.', flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -3130,12 +4105,12 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         await interaction.update({
-            content: 'Abenteuer wirklich l\u00f6schen?',
+            content: 'Delete adventure?',
             components: [buildAdventureDeleteConfirmRow({ adventureId, characterId, ownerDiscordId })],
         });
         return true;
@@ -3148,14 +4123,14 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (action === 'deleteAdventureCancel') {
             const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
             if (!adventure || Number(adventure.character_id) !== characterId) {
-                await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+                await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
                 return true;
             }
 
@@ -3163,7 +4138,7 @@ async function handle(interaction) {
 
             await interaction.update({
                 content: '',
-                embeds: [buildAdventureEmbed(adventure, 'Abenteuer', participants)],
+                embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)],
                 components: [row],
             });
             return true;
@@ -3174,17 +4149,17 @@ async function handle(interaction) {
         try {
             const result = await softDeleteAdventureForDiscord(interaction.user, adventureId);
             if (!result.ok) {
-                await interaction.update({ content: 'Abenteuer nicht gefunden oder bereits gel\u00f6scht.', embeds: [], components: [] });
+                await interaction.update({ content: 'Adventure not found or already deleted.', embeds: [], components: [] });
                 return true;
             }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck zur Liste')
+                    .setLabel('Back to list')
                     .setStyle(ButtonStyle.Secondary),
             );
-            await interaction.update({ content: 'Abenteuer wurde gel\u00f6scht.', embeds: [], components: [row] });
+            await interaction.update({ content: 'Adventure deleted.', embeds: [], components: [row] });
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error(error);
@@ -3192,7 +4167,7 @@ async function handle(interaction) {
                 await interaction.update({ content: notLinkedContent(), embeds: [], components: [] });
                 return true;
             }
-            await interaction.update({ content: `Fehler beim L\u00f6schen: ${error.message}`, embeds: [], components: [] });
+            await interaction.update({ content: `Delete failed: ${error.message}`, embeds: [], components: [] });
         }
         return true;
     }
@@ -3203,18 +4178,18 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventures = await listAdventuresForDiscord(interaction.user, characterId, 25);
         if (adventures.length === 0) {
-            await interaction.update({ content: 'Keine Abenteuer gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'No adventures found.', embeds: [], components: [] });
             return true;
         }
 
         await interaction.update({
-            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Abenteuer').setDescription('W\u00e4hle ein Abenteuer.')],
+            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
             components: [buildAdventureListRow({ characterId, ownerDiscordId, adventures })],
             content: '',
         });
@@ -3228,23 +4203,23 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.reply({ content: 'Downtime nicht gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const modal = new ModalBuilder()
             .setCustomId(`dtUpdateModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
-            .setTitle('Downtime bearbeiten');
+            .setTitle('Edit downtime');
 
         const typeInput = new TextInputBuilder()
-            .setCustomId('dtType')
-            .setLabel('Typ')
+            .setCustomId('dtTypee')
+            .setLabel('Type')
             .setPlaceholder('faction | other')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
@@ -3252,21 +4227,21 @@ async function handle(interaction) {
 
         const durationInput = new TextInputBuilder()
             .setCustomId('dtDuration')
-            .setLabel('Dauer (HH:MM oder Minuten)')
+            .setLabel('Duration (HH:MM or minutes)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(formatDuration(downtime.duration));
 
         const dateInput = new TextInputBuilder()
             .setCustomId('dtDate')
-            .setLabel('Datum (YYYY-MM-DD)')
+            .setLabel('Date (YYYY-MM-DD)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(safeModalValue(downtime.start_date, 10));
 
         const notesInput = new TextInputBuilder()
             .setCustomId('dtNotes')
-            .setLabel('Notizen (optional)')
+            .setLabel('Notes (optional)')
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(false)
             .setValue(safeModalValue(downtime.notes));
@@ -3289,13 +4264,13 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
-        const typeRaw = String(interaction.fields.getTextInputValue('dtType') || '').trim().toLowerCase();
-        const normalizedType = (() => {
+        const typeRaw = String(interaction.fields.getTextInputValue('dtTypee') || '').trim().toLowerCase();
+        const normalizedTypee = (() => {
             if (['faction', 'f', '1'].includes(typeRaw)) return 'faction';
             if (['other', 'o', '2'].includes(typeRaw)) return 'other';
             return null;
@@ -3303,16 +4278,16 @@ async function handle(interaction) {
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('dtDate'));
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
-        if (!normalizedType) {
-            await interaction.reply({ content: 'Ung\u00fcltiger Typ. Nutze `faction` oder `other`.', flags: MessageFlags.Ephemeral });
+        if (!normalizedTypee) {
+            await interaction.reply({ content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (duration === null) {
-            await interaction.reply({ content: 'Ung\u00fcltige Dauer. Nutze HH:MM (z.B. 03:00) oder Minuten.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
-            await interaction.reply({ content: 'Ung\u00fcltiges Datum. Nutze YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3320,37 +4295,37 @@ async function handle(interaction) {
             const result = await updateDowntimeForDiscord(interaction.user, downtimeId, {
                 duration,
                 startDate,
-                type: normalizedType,
+                type: normalizedTypee,
                 notes,
             });
             if (!result.ok) {
-                await interaction.reply({ content: 'Downtime nicht gefunden.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
             if (!downtime) {
-                await interaction.reply({ content: 'Downtime aktualisiert.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: 'Downtime updated.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtEdit_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Bearbeiten')
+                    .setLabel('Edit')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('L\u00f6schen')
+                    .setLabel('Delete')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
+                    .setLabel('Back')
                     .setStyle(ButtonStyle.Secondary),
             );
 
             await interaction.reply({
-                embeds: [buildDowntimeEmbed(downtime, 'Downtime aktualisiert')],
+                embeds: [buildDowntimeEmbed(downtime, 'Downtime updated')],
                 components: [row],
                 flags: MessageFlags.Ephemeral,
             });
@@ -3361,7 +4336,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Speichern der Downtime.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Failed to save downtime.', flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -3373,12 +4348,12 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         await interaction.update({
-            content: 'Downtime wirklich l\u00f6schen?',
+            content: 'Delete downtime?',
             components: [buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId })],
         });
         return true;
@@ -3391,29 +4366,29 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (action === 'deleteDowntimeCancel') {
             const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
             if (!downtime || Number(downtime.character_id) !== characterId) {
-                await interaction.update({ content: 'Downtime nicht gefunden.', embeds: [], components: [] });
+                await interaction.update({ content: 'Downtime not found.', embeds: [], components: [] });
                 return true;
             }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtEdit_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Bearbeiten')
+                    .setLabel('Edit')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('L\u00f6schen')
+                    .setLabel('Delete')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
+                    .setLabel('Back')
                     .setStyle(ButtonStyle.Secondary),
             );
 
@@ -3426,17 +4401,17 @@ async function handle(interaction) {
         try {
             const result = await softDeleteDowntimeForDiscord(interaction.user, downtimeId);
             if (!result.ok) {
-                await interaction.update({ content: 'Downtime nicht gefunden oder bereits gel\u00f6scht.', embeds: [], components: [] });
+                await interaction.update({ content: 'Downtime not found or already deleted.', embeds: [], components: [] });
                 return true;
             }
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck zur Liste')
+                    .setLabel('Back to list')
                     .setStyle(ButtonStyle.Secondary),
             );
-            await interaction.update({ content: 'Downtime wurde gel\u00f6scht.', embeds: [], components: [row] });
+            await interaction.update({ content: 'Downtime deleted.', embeds: [], components: [row] });
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error(error);
@@ -3444,7 +4419,7 @@ async function handle(interaction) {
                 await interaction.update({ content: notLinkedContent(), embeds: [], components: [] });
                 return true;
             }
-            await interaction.update({ content: `Fehler beim L\u00f6schen: ${error.message}`, embeds: [], components: [] });
+            await interaction.update({ content: `Delete failed: ${error.message}`, embeds: [], components: [] });
         }
         return true;
     }
@@ -3455,18 +4430,18 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtimes = await listDowntimesForDiscord(interaction.user, characterId, 25);
         if (downtimes.length === 0) {
-            await interaction.update({ content: 'Keine Downtimes gefunden.', embeds: [], components: [] });
+            await interaction.update({ content: 'No downtimes found.', embeds: [], components: [] });
             return true;
         }
 
         await interaction.update({
-            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('W\u00e4hle eine Downtime.')],
+            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
             components: [buildDowntimeListRow({ characterId, ownerDiscordId, downtimes })],
             content: '',
         });
@@ -3477,3 +4452,7 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
+
+
+
+

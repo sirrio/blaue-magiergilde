@@ -7,18 +7,18 @@ const {
     TextInputBuilder,
     TextInputStyle,
 } = require('discord.js');
-const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
+const { attachRateLimitListner, waitForDiscordRateLimit } = require('../discordRateLimit');
 const { pendingGames } = require('../state');
 
 async function handle(interaction) {
-    attachRateLimitListener(interaction?.client);
+    attachRateLimitListner(interaction?.client);
 
     if (interaction.isButton() && interaction.customId.startsWith('tier_')) {
         const [, id, tier] = interaction.customId.split('_');
         const data = pendingGames.get(id);
 
         if (!data) {
-            await interaction.reply({ content: 'Keine Daten gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -37,7 +37,7 @@ async function handle(interaction) {
         const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`details_${id}`)
-                .setLabel('Weiter')
+                .setLabel('Next')
                 .setStyle(ButtonStyle.Primary),
         );
 
@@ -50,7 +50,7 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await interaction.reply({ content: 'Keine Daten gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -63,18 +63,18 @@ async function handle(interaction) {
 
         const modal = new ModalBuilder()
             .setCustomId(`detailsModal_${id}`)
-            .setTitle('Spieldetails');
+            .setTitle('Game details');
 
         const dateInput = new TextInputBuilder()
             .setCustomId('gameDate')
-            .setLabel('Datum (YYYY-MM-DD)')
+            .setLabel('Date (YYYY-MM-DD)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(defaultDate);
 
         const timeInput = new TextInputBuilder()
             .setCustomId('gameTime')
-            .setLabel('Uhrzeit (HH:mm)')
+            .setLabel('Time (HH:mm)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(defaultTime);
@@ -100,7 +100,7 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await interaction.reply({ content: 'Keine Daten gefunden.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -129,19 +129,19 @@ async function handle(interaction) {
         }).join(' ');
 
         const date = new Date(time);
-        const formattedDate = `${date.toLocaleString('de-DE', { day: '2-digit' })}. ${date.toLocaleString('de-DE', { month: 'long' })} ${date.toLocaleString('de-DE', { year: 'numeric' })} ${date.toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+        const formattedDate = `${date.toLocaleString('en-GB', { day: '2-digit' })}. ${date.toLocaleString('en-GB', { month: 'long' })} ${date.toLocaleString('en-GB', { year: 'numeric' })} ${date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
 
-        const announcement = `${tiers} - ${formattedDate} - von <@${data.userId}> - ${mention} - ${text}`;
+        const announcement = `${tiers} - ${formattedDate} - by <@${data.userId}> - ${mention} - ${text}`;
         await waitForDiscordRateLimit(interaction.client);
         const msg = await interaction.channel.send(announcement);
         await waitForDiscordRateLimit(interaction.client);
-        await msg.startThread({ name: 'Spiel-Thread', autoArchiveDuration: 1440 });
+        await msg.startThread({ name: 'Game thread', autoArchiveDuration: 1440 });
 
         if (data.commandInteraction) {
             await data.commandInteraction.deleteReply().catch(() => {});
         }
 
-        await interaction.reply({ content: 'Ank\u00fcndigung erstellt.', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'Announcement created.', flags: MessageFlags.Ephemeral });
         setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
         return true;
     }
