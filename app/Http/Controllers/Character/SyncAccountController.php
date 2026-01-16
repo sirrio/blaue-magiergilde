@@ -25,9 +25,32 @@ class SyncAccountController extends Controller
 
         if ($foundUser && Hash::check($password, $foundUser->password)) {
             $currentUser = Auth::user();
+            if (! $currentUser || ! $currentUser->discord_id) {
+                return redirect()->back()->with('error', 'Your Discord account is not connected yet.');
+            }
+
+            $alreadyLinked = User::query()
+                ->where('discord_id', $currentUser->discord_id)
+                ->where('id', '!=', $foundUser->id)
+                ->exists();
+
+            if ($alreadyLinked) {
+                return redirect()->back()->with(
+                    'error',
+                    'A user is already linked to your Discord. Please contact an administrator.'
+                );
+            }
+
             $foundUser->discord_id = $currentUser->discord_id;
             $foundUser->avatar = $currentUser->avatar;
-            $foundUser->save();
+            try {
+                $foundUser->save();
+            } catch (\Throwable $error) {
+                return redirect()->back()->with(
+                    'error',
+                    'A user is already linked to your Discord. Please contact an administrator.'
+                );
+            }
 
             Auth::logout();
             Auth::login($foundUser);
