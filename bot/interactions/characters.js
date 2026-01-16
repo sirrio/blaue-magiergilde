@@ -46,10 +46,22 @@ const {
 } = require('../commands/game/characters');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
-const { pendingCharacterCreations } = require('../state');
+const { pendingCharacterCreations, pendingCharacterAvatarUpdates } = require('../state');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
+}
+
+function getAvatarUpdateState(userId) {
+    return pendingCharacterAvatarUpdates.get(String(userId)) || null;
+}
+
+function setAvatarUpdateState(userId, state) {
+    pendingCharacterAvatarUpdates.set(String(userId), state);
+}
+
+function clearAvatarUpdateState(userId) {
+    pendingCharacterAvatarUpdates.delete(String(userId));
 }
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
@@ -168,36 +180,54 @@ const allowedFactions = new Set([
     'flora & fauna',
 ]);
 
-function parseBooleanInput(value) {
-    const text = String(value || '').trim().toLowerCase();
-    if (['1', 'true', 'yes', 'y', 'ja', 'j'].includes(text)) return true;
-    if (['0', 'false', 'no', 'n', 'nein'].includes(text)) return false;
-    return null;
+function formatFactionLabel(value) {
+    const text = String(value || '').trim();
+    if (!text || text === 'none') return 'Keine';
+    return text
+        .split(' ')
+        .map(word => word ? word[0].toUpperCase() + word.slice(1) : word)
+        .join(' ');
 }
 
-function buildCharacterManageRow({ characterId, ownerDiscordId }) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`characterManage_details_${characterId}_${ownerDiscordId}`)
-            .setLabel('Details')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterManage_notes_${characterId}_${ownerDiscordId}`)
-            .setLabel('Notizen')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterManage_progress_${characterId}_${ownerDiscordId}`)
-            .setLabel('Fortschritt')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterManage_classes_${characterId}_${ownerDiscordId}`)
-            .setLabel('Klassen')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
-            .setLabel('Zur\u00fcck')
-            .setStyle(ButtonStyle.Secondary),
-    );
+function buildCharacterManageRows({ characterId, ownerDiscordId }) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_basic_${characterId}_${ownerDiscordId}`)
+                .setLabel('Name/Link/Notizen')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_avatar_${characterId}_${ownerDiscordId}`)
+                .setLabel('Avatar')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_classes_${characterId}_${ownerDiscordId}`)
+                .setLabel('Klassen')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_faction_${characterId}_${ownerDiscordId}`)
+                .setLabel('Fraktion')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Zur\u00fcck')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_dm_bubbles_${characterId}_${ownerDiscordId}`)
+                .setLabel('DM Bubbles')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_dm_coins_${characterId}_${ownerDiscordId}`)
+                .setLabel('DM Coins')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
+                .setLabel('Bubble Shop')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
 function buildCharacterManageView(character, { ownerDiscordId }) {
@@ -213,7 +243,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 
     return {
         embeds: [embed],
-        components: [buildCharacterManageRow({ characterId: character.id, ownerDiscordId })],
+        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId }),
     };
 }
 
@@ -750,6 +780,46 @@ async function handleCreationAvatarMessage(message) {
     return true;
 }
 
+async function handleAvatarUpdateMessage(message) {
+    if (!message || message.author?.bot) return false;
+    if (message.guildId) return false;
+
+    const state = getAvatarUpdateState(message.author.id);
+    if (!state) return false;
+
+    const attachments = [...message.attachments.values()];
+    const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
+    if (!attachment?.url) return false;
+
+    await message.delete().catch(() => {});
+
+    const storedAvatar = await storeCharacterAvatar(state.characterId, attachment.url);
+    clearAvatarUpdateState(message.author.id);
+
+    if (!state.promptMessage?.editable) {
+        return true;
+    }
+
+    if (!storedAvatar) {
+        await state.promptMessage.edit({
+            content: 'Avatar konnte nicht gespeichert werden.',
+        }).catch(() => {});
+        return true;
+    }
+
+    const character = await findCharacterForDiscord(message.author, state.characterId);
+    if (!character) {
+        await state.promptMessage.edit({ content: 'Charakter nicht gefunden.' }).catch(() => {});
+        return true;
+    }
+
+    await state.promptMessage.edit({
+        ...buildCharacterManageView(character, { ownerDiscordId: state.ownerDiscordId }),
+        content: '',
+    }).catch(() => {});
+    return true;
+}
+
 
 async function buildCharacterClassesView({ interaction, character, ownerDiscordId }) {
     const classes = await listCharacterClassesForDiscord();
@@ -773,6 +843,40 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
 
     const embed = new EmbedBuilder()
         .setTitle('Klassen')
+        .setColor(0x4f46e5)
+        .setDescription(`Ausgew\u00e4hlt f\u00fcr ${character.name}.`);
+
+    const components = [
+        new ActionRowBuilder().addComponents(select),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
+                .setLabel('Zur\u00fcck')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embed, components };
+}
+
+function buildCharacterFactionView({ character, ownerDiscordId }) {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`characterFactionSelect_${character.id}_${ownerDiscordId}`)
+        .setPlaceholder('Fraktion ausw\u00e4hlen\u2026')
+        .setMinValues(1)
+        .setMaxValues(1);
+
+    Array.from(allowedFactions).forEach(faction => {
+        select.addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel(formatFactionLabel(faction))
+                .setValue(String(faction))
+                .setDefault(String(character.faction || 'none') === String(faction)),
+        );
+    });
+
+    const embed = new EmbedBuilder()
+        .setTitle('Fraktion')
         .setColor(0x4f46e5)
         .setDescription(`Ausgew\u00e4hlt f\u00fcr ${character.name}.`);
 
@@ -1775,7 +1879,7 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterDetailsModal_')) {
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterFactionSelect_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) return false;
@@ -1785,76 +1889,60 @@ async function handle(interaction) {
             return true;
         }
 
-        const name = interaction.fields.getTextInputValue('detailsName').trim();
-        const tier = interaction.fields.getTextInputValue('detailsTier').trim().toLowerCase();
-        const url = interaction.fields.getTextInputValue('detailsUrl').trim();
-        const faction = interaction.fields.getTextInputValue('detailsFaction').trim().toLowerCase();
-        const version = interaction.fields.getTextInputValue('detailsVersion').trim();
+        const faction = String(interaction.values[0] || '').trim().toLowerCase();
+        if (!allowedFactions.has(faction)) {
+            await interaction.reply({ content: 'Ung\u00fcltige Fraktion.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await updateCharacterForDiscord(interaction.user, characterId, { faction });
+        if (!result.ok) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterBasicsModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const name = interaction.fields.getTextInputValue('basicName').trim();
+        const url = interaction.fields.getTextInputValue('basicUrl').trim();
+        const notes = interaction.fields.getTextInputValue('basicNotes') || '';
 
         if (!name) {
             await interaction.reply({ content: 'Name fehlt.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-        if (!allowedStartTiers.has(tier)) {
-            await interaction.reply({ content: 'Tier muss bt, lt, ht oder et sein.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!isHttpUrl(url)) {
             await interaction.reply({ content: 'Ung\u00fcltige URL (nur http/https).', flags: MessageFlags.Ephemeral });
             return true;
         }
-        if (!allowedFactions.has(faction)) {
-            await interaction.reply({ content: 'Ung\u00fcltige Fraktion.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-        if (!allowedVersions.has(version)) {
-            await interaction.reply({ content: 'Version muss 2014 oder 2024 sein.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
 
         const result = await updateCharacterForDiscord(interaction.user, characterId, {
             name,
-            startTier: tier,
             externalLink: url,
-            faction,
-            version,
-        });
-
-        if (!result.ok) {
-            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const character = await findCharacterForDiscord(interaction.user, characterId);
-        if (!character) {
-            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        await interaction.reply({
-            ...buildCharacterManageView(character, { ownerDiscordId }),
-            flags: MessageFlags.Ephemeral,
-        });
-        return true;
-    }
-
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterNotesModal_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(characterId) || characterId < 1) return false;
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const avatar = interaction.fields.getTextInputValue('notesAvatar').trim();
-        const notes = interaction.fields.getTextInputValue('notesText') || '';
-
-        const result = await updateCharacterForDiscord(interaction.user, characterId, {
-            avatar,
             notes,
         });
+
         if (!result.ok) {
             await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
             return true;
@@ -1873,7 +1961,7 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterProgressModal_')) {
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterDmBubblesModal_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) return false;
@@ -1883,24 +1971,68 @@ async function handle(interaction) {
             return true;
         }
 
-        const dmBubbles = interaction.fields.getTextInputValue('progressBubbles');
-        const dmCoins = interaction.fields.getTextInputValue('progressCoins');
-        const bubbleSpend = interaction.fields.getTextInputValue('progressSpend');
-        const fillerRaw = interaction.fields.getTextInputValue('progressFiller');
-        const filler = parseBooleanInput(fillerRaw);
-
-        if (filler === null) {
-            await interaction.reply({ content: 'Filler muss ja oder nein sein.', flags: MessageFlags.Ephemeral });
+        const dmBubbles = interaction.fields.getTextInputValue('dmBubbles');
+        const result = await updateCharacterForDiscord(interaction.user, characterId, { dmBubbles });
+        if (!result.ok) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        const result = await updateCharacterForDiscord(interaction.user, characterId, {
-            dmBubbles,
-            dmCoins,
-            bubbleShopSpend: bubbleSpend,
-            isFiller: filler,
-        });
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
 
+        await interaction.reply({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterDmCoinsModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const dmCoins = interaction.fields.getTextInputValue('dmCoins');
+        const result = await updateCharacterForDiscord(interaction.user, characterId, { dmCoins });
+        if (!result.ok) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.reply({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterBubbleSpendModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const bubbleShopSpend = interaction.fields.getTextInputValue('bubbleSpend');
+        const result = await updateCharacterForDiscord(interaction.user, characterId, { bubbleShopSpend });
         if (!result.ok) {
             await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
             return true;
@@ -2039,7 +2171,11 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('characterManage_')) {
-        const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const raw = interaction.customId.replace('characterManage_', '');
+        const parts = raw.split('_');
+        const ownerDiscordId = parts.pop();
+        const characterIdRaw = parts.pop();
+        const action = parts.join('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
             await interaction.reply({ content: 'Ung\u00fcltige Charakter-ID.', flags: MessageFlags.Ephemeral });
@@ -2065,79 +2201,35 @@ async function handle(interaction) {
             return true;
         }
 
-        if (action === 'details') {
+        if (action === 'basic') {
             const modal = new ModalBuilder()
-                .setCustomId(`characterDetailsModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Charakterdetails');
+                .setCustomId(`characterBasicsModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Charakterdaten');
 
             const nameInput = new TextInputBuilder()
-                .setCustomId('detailsName')
+                .setCustomId('basicName')
                 .setLabel('Name')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setValue(safeModalValue(character.name));
 
-            const tierInput = new TextInputBuilder()
-                .setCustomId('detailsTier')
-                .setLabel('Start tier (bt/lt/ht/et)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.start_tier || 'bt')));
-
             const urlInput = new TextInputBuilder()
-                .setCustomId('detailsUrl')
+                .setCustomId('basicUrl')
                 .setLabel('External Link (URL)')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setValue(safeModalValue(character.external_link));
 
-            const factionInput = new TextInputBuilder()
-                .setCustomId('detailsFaction')
-                .setLabel('Fraktion')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.faction || 'none')));
-
-            const versionInput = new TextInputBuilder()
-                .setCustomId('detailsVersion')
-                .setLabel('Version (2014/2024)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.version || '2024')));
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(nameInput),
-                new ActionRowBuilder().addComponents(tierInput),
-                new ActionRowBuilder().addComponents(urlInput),
-                new ActionRowBuilder().addComponents(factionInput),
-                new ActionRowBuilder().addComponents(versionInput),
-            );
-
-            await interaction.showModal(modal);
-            return true;
-        }
-
-        if (action === 'notes') {
-            const modal = new ModalBuilder()
-                .setCustomId(`characterNotesModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Notizen');
-
-            const avatarInput = new TextInputBuilder()
-                .setCustomId('notesAvatar')
-                .setLabel('Avatar (optional)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(false)
-                .setValue(safeModalValue(character.avatar));
-
             const notesInput = new TextInputBuilder()
-                .setCustomId('notesText')
+                .setCustomId('basicNotes')
                 .setLabel('Notizen (optional)')
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(false)
                 .setValue(safeModalValue(character.notes));
 
             modal.addComponents(
-                new ActionRowBuilder().addComponents(avatarInput),
+                new ActionRowBuilder().addComponents(nameInput),
+                new ActionRowBuilder().addComponents(urlInput),
                 new ActionRowBuilder().addComponents(notesInput),
             );
 
@@ -2145,47 +2237,22 @@ async function handle(interaction) {
             return true;
         }
 
-        if (action === 'progress') {
-            const modal = new ModalBuilder()
-                .setCustomId(`characterProgressModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Fortschritt');
+        if (action === 'avatar') {
+            const dm = await interaction.user.createDM();
+            const sourceLink = interaction.message?.url ? `\nZur\u00fcck zum Charakter-Dialog: ${interaction.message.url}` : '';
+            await dm.send(`Bitte sende mir hier dein Avatar-Bild. Ich speichere es nur f\u00fcr diesen Charakter.${sourceLink}`);
 
-            const bubbleInput = new TextInputBuilder()
-                .setCustomId('progressBubbles')
-                .setLabel('DM Bubbles')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.dm_bubbles ?? 0)));
+            clearAvatarUpdateState(ownerDiscordId);
+            setAvatarUpdateState(ownerDiscordId, {
+                ownerDiscordId,
+                characterId: character.id,
+                promptMessage: interaction.message ?? null,
+            });
 
-            const coinInput = new TextInputBuilder()
-                .setCustomId('progressCoins')
-                .setLabel('DM Coins')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.dm_coins ?? 0)));
-
-            const spendInput = new TextInputBuilder()
-                .setCustomId('progressSpend')
-                .setLabel('Bubble-Shop (Spend)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.bubble_shop_spend ?? 0)));
-
-            const fillerInput = new TextInputBuilder()
-                .setCustomId('progressFiller')
-                .setLabel('Filler (ja/nein)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(character.is_filler ? 'ja' : 'nein');
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(bubbleInput),
-                new ActionRowBuilder().addComponents(coinInput),
-                new ActionRowBuilder().addComponents(spendInput),
-                new ActionRowBuilder().addComponents(fillerInput),
-            );
-
-            await interaction.showModal(modal);
+            await interaction.update({
+                ...buildCharacterManageView(character, { ownerDiscordId }),
+                content: '',
+            });
             return true;
         }
 
@@ -2204,6 +2271,66 @@ async function handle(interaction) {
                 }
                 throw error;
             }
+            return true;
+        }
+
+        if (action === 'faction') {
+            const factionView = buildCharacterFactionView({ character, ownerDiscordId });
+            await interaction.update({
+                embeds: [factionView.embed],
+                components: factionView.components,
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'dm_bubbles') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterDmBubblesModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('DM Bubbles');
+
+            const bubbleInput = new TextInputBuilder()
+                .setCustomId('dmBubbles')
+                .setLabel('DM Bubbles')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.dm_bubbles ?? 0)));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(bubbleInput));
+            await interaction.showModal(modal);
+            return true;
+        }
+        if (action === 'dm_coins') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterDmCoinsModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('DM Coins');
+
+            const coinInput = new TextInputBuilder()
+                .setCustomId('dmCoins')
+                .setLabel('DM Coins')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.dm_coins ?? 0)));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(coinInput));
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        if (action === 'bubble_spend') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterBubbleSpendModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Bubble Shop Spend');
+
+            const spendInput = new TextInputBuilder()
+                .setCustomId('bubbleSpend')
+                .setLabel('Bubble Shop Spend')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.bubble_shop_spend ?? 0)));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(spendInput));
+            await interaction.showModal(modal);
             return true;
         }
 
@@ -3293,4 +3420,4 @@ async function handle(interaction) {
     return false;
 }
 
-module.exports = { handle, handleCreationAvatarMessage };
+module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
