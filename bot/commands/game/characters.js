@@ -7,6 +7,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
@@ -245,35 +247,50 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildSummaryRow(ownerDiscordId) {
-    return new ActionRowBuilder().addComponents(
+function buildCharacterListView({ ownerDiscordId, characters }) {
+    const summary = new EmbedBuilder()
+        .setTitle('Your Characters')
+        .setColor(0x4f46e5)
+        .setDescription(
+            characters.length > 0
+                ? `**${characters.length}** aktiv. W\u00e4hle einen Charakter oder erstelle einen neuen.`
+                : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.',
+        );
+
+    const components = [];
+    const selection = characters.slice(0, 25);
+    if (selection.length > 0) {
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`charactersSelect_${ownerDiscordId}`)
+            .setPlaceholder('Charakter ausw\u00e4hlen\u2026')
+            .addOptions(
+                selection.map(character => {
+                    const option = new StringSelectMenuOptionBuilder()
+                        .setLabel(String(character.name || `Charakter ${character.id}`).slice(0, 100))
+                        .setValue(String(character.id));
+                    const tier = String(character.start_tier || '').trim();
+                    if (tier) {
+                        option.setDescription(tier.toUpperCase());
+                    }
+                    return option;
+                }),
+            );
+
+        components.push(new ActionRowBuilder().addComponents(select));
+
+        if (characters.length > selection.length) {
+            summary.setFooter({ text: `Zeige ${selection.length} von ${characters.length}.` });
+        }
+    }
+
+    components.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
             .setLabel('Neu')
             .setStyle(ButtonStyle.Primary),
-    );
-}
+    ));
 
-function buildCharacterCardRow({ ownerDiscordId, characterId, isFiller }) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
-            .setLabel('Abenteuer')
-            .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
-            .setLabel('Downtime')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(Boolean(isFiller)),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
-            .setStyle(ButtonStyle.Danger),
-    );
+    return { embeds: [summary], components };
 }
 
 module.exports = {
@@ -297,39 +314,18 @@ module.exports = {
             throw error;
         }
 
-        const summary = new EmbedBuilder()
-            .setTitle('Your Characters')
-            .setColor(0x4f46e5)
-            .setDescription(characters.length > 0 ? `**${characters.length}** aktiv` : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.');
-
-        await interaction.reply({
-            embeds: [summary],
-            components: [buildSummaryRow(interaction.user.id)],
-            flags: MessageFlags.Ephemeral,
+        const listView = buildCharacterListView({
+            ownerDiscordId: interaction.user.id,
+            characters,
         });
 
-        for (const character of characters.slice(0, 8)) {
-            const attachment = tryBuildLocalAvatarAttachment(character);
-            const url = resolvePublicAvatarUrl(character.avatar);
-
-            const files = [];
-            let thumbnail = url;
-            if (attachment) {
-                files.push({ attachment: attachment.filePath, name: attachment.fileName });
-                thumbnail = `attachment://${attachment.fileName}`;
-            }
-
-            // eslint-disable-next-line no-await-in-loop
-            await interaction.followUp({
-                embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail })],
-                components: [buildCharacterCardRow({
-                    ownerDiscordId: interaction.user.id,
-                    characterId: character.id,
-                    isFiller: character.is_filler,
-                })],
-                files,
-                flags: MessageFlags.Ephemeral,
-            });
-        }
+        await interaction.reply({
+            ...listView,
+            flags: MessageFlags.Ephemeral,
+        });
     },
+    buildCharacterEmbed,
+    resolvePublicAvatarUrl,
+    tryBuildLocalAvatarAttachment,
+    buildCharacterListView,
 };

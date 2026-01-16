@@ -16,18 +16,32 @@ const {
     createCharacterForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
+    listCharacterClassesForDiscord,
+    listCharacterClassIdsForDiscord,
+    syncCharacterClassesForDiscord,
     softDeleteCharacterForDiscord,
     listAdventuresForDiscord,
     findAdventureForDiscord,
     createAdventureForDiscord,
     updateAdventureForDiscord,
     softDeleteAdventureForDiscord,
+    listAlliesForDiscord,
+    listGuildCharactersForDiscord,
+    listAdventureParticipantsForDiscord,
+    syncAdventureParticipantsForDiscord,
     listDowntimesForDiscord,
     findDowntimeForDiscord,
     createDowntimeForDiscord,
     updateDowntimeForDiscord,
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
+
+const {
+    buildCharacterEmbed,
+    resolvePublicAvatarUrl,
+    tryBuildLocalAvatarAttachment,
+    buildCharacterListView,
+} = require('../commands/game/characters');
 
 const { replyNotLinked, notLinkedContent } = require('../linkingUi');
 
@@ -56,11 +70,51 @@ function parseIsoDate(value) {
     return raw;
 }
 
+const adventureParticipantSearch = new Map();
+
+function participantSearchKey(adventureId, ownerDiscordId) {
+    return `${adventureId}:${ownerDiscordId}`;
+}
+
+function setParticipantSearch(adventureId, ownerDiscordId, query) {
+    const key = participantSearchKey(adventureId, ownerDiscordId);
+    const text = String(query || '').trim();
+    if (!text) {
+        adventureParticipantSearch.delete(key);
+        return '';
+    }
+    adventureParticipantSearch.set(key, text);
+    return text;
+}
+
+function getParticipantSearch(adventureId, ownerDiscordId) {
+    return adventureParticipantSearch.get(participantSearchKey(adventureId, ownerDiscordId)) || '';
+}
+
 function formatDuration(seconds) {
     const total = Math.max(0, Number(seconds) || 0);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function formatParticipantName(participant) {
+    const rawName = String(participant?.name || '').trim();
+    const linkedName = String(participant?.linked_name || '').trim();
+    if (linkedName && rawName && linkedName.toLowerCase() !== rawName.toLowerCase()) {
+        return `${linkedName} (${rawName})`;
+    }
+    return linkedName || rawName || 'Unbekannt';
+}
+
+function formatParticipantList(participants) {
+    if (!participants || participants.length === 0) return 'Keine Teilnehmer';
+    const names = participants.map(formatParticipantName);
+    const joined = names.join(', ');
+    if (joined.length <= 1024) return joined;
+    const trimmed = names.slice(0, 10).join(', ');
+    const remaining = Math.max(0, names.length - 10);
+    return `${trimmed}${remaining > 0 ? ` (+${remaining} weitere)` : ''}`;
 }
 
 function parseDurationToSeconds(input) {
@@ -78,6 +132,130 @@ function parseDurationToSeconds(input) {
     const minutes = Number(raw);
     if (Number.isFinite(minutes) && minutes >= 0) return Math.floor(minutes) * 60;
     return null;
+}
+
+const allowedStartTiers = new Set(['bt', 'lt', 'ht', 'et']);
+const allowedVersions = new Set(['2014', '2024']);
+const allowedFactions = new Set([
+    'none',
+    'heiler',
+    'handwerker',
+    'feldforscher',
+    'bibliothekare',
+    'diplomaten',
+    'gardisten',
+    'unterhalter',
+    'logistiker',
+    'flora & fauna',
+]);
+
+function parseBooleanInput(value) {
+    const text = String(value || '').trim().toLowerCase();
+    if (['1', 'true', 'yes', 'y', 'ja', 'j'].includes(text)) return true;
+    if (['0', 'false', 'no', 'n', 'nein'].includes(text)) return false;
+    return null;
+}
+
+function buildCharacterManageRow({ characterId, ownerDiscordId }) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterManage_details_${characterId}_${ownerDiscordId}`)
+            .setLabel('Details')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_notes_${characterId}_${ownerDiscordId}`)
+            .setLabel('Notizen')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_progress_${characterId}_${ownerDiscordId}`)
+            .setLabel('Fortschritt')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_classes_${characterId}_${ownerDiscordId}`)
+            .setLabel('Klassen')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
+            .setLabel('Zur\u00fcck')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+function buildCharacterManageView(character, { ownerDiscordId }) {
+    const embed = new EmbedBuilder()
+        .setTitle('Charakter verwalten')
+        .setColor(0x4f46e5)
+        .setDescription(`${character.name} \u00b7 ${String(character.start_tier || '').toUpperCase()}`)
+        .addFields(
+            { name: 'Version', value: String(character.version || '2024'), inline: true },
+            { name: 'Fraktion', value: String(character.faction || 'none'), inline: true },
+            { name: 'Filler', value: character.is_filler ? 'Ja' : 'Nein', inline: true },
+        );
+
+    return {
+        embeds: [embed],
+        components: [buildCharacterManageRow({ characterId: character.id, ownerDiscordId })],
+    };
+}
+
+function buildCharacterCardPayload({ character, ownerDiscordId }) {
+    const attachment = tryBuildLocalAvatarAttachment(character);
+    const url = resolvePublicAvatarUrl(character.avatar);
+
+    const files = [];
+    let thumbnail = url;
+    if (attachment) {
+        files.push({ attachment: attachment.filePath, name: attachment.fileName });
+        thumbnail = `attachment://${attachment.fileName}`;
+    }
+
+    return {
+        embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail })],
+        components: [buildCharacterCardRow({
+            ownerDiscordId,
+            characterId: character.id,
+            isFiller: character.is_filler,
+        })],
+        files,
+    };
+}
+
+async function buildCharacterClassesView({ interaction, character, ownerDiscordId }) {
+    const classes = await listCharacterClassesForDiscord();
+    const selectedIds = await listCharacterClassIdsForDiscord(interaction.user, character.id);
+    const selectedSet = new Set(selectedIds.map(String));
+
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`characterClassesSelect_${character.id}_${ownerDiscordId}`)
+        .setPlaceholder('Klassen ausw\u00e4hlen\u2026')
+        .setMinValues(0)
+        .setMaxValues(Math.min(25, classes.length));
+
+    classes.slice(0, 25).forEach(entry => {
+        select.addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel(String(entry.name).slice(0, 100))
+                .setValue(String(entry.id))
+                .setDefault(selectedSet.has(String(entry.id))),
+        );
+    });
+
+    const embed = new EmbedBuilder()
+        .setTitle('Klassen')
+        .setColor(0x4f46e5)
+        .setDescription(`Ausgew\u00e4hlt f\u00fcr ${character.name}.`);
+
+    const components = [
+        new ActionRowBuilder().addComponents(select),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
+                .setLabel('Zur\u00fcck')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embed, components };
 }
 
 function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
@@ -131,13 +309,17 @@ function buildCharacterCardRow({ characterId, ownerDiscordId, isFiller }) {
             .setStyle(ButtonStyle.Success)
             .setDisabled(Boolean(isFiller)),
         new ButtonBuilder()
-            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
+            .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
+            .setLabel('Verwalten')
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
             .setLabel('L\u00f6schen')
             .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
+            .setLabel('Zur Liste')
+            .setStyle(ButtonStyle.Secondary),
     );
 }
 
@@ -158,6 +340,27 @@ function buildAdventureListRow({ characterId, ownerDiscordId, adventures }) {
     return new ActionRowBuilder().addComponents(select);
 }
 
+function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setLabel('Bearbeiten')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`advParticipantsOpen_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setLabel('Teilnehmer')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setLabel('L\u00f6schen')
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
+            .setLabel('Zur\u00fcck')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
 function buildDowntimeListRow({ characterId, ownerDiscordId, downtimes }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`dtSelect_${characterId}_${ownerDiscordId}`)
@@ -173,7 +376,7 @@ function buildDowntimeListRow({ characterId, ownerDiscordId, downtimes }) {
     return new ActionRowBuilder().addComponents(select);
 }
 
-function buildAdventureEmbed(adventure, title) {
+function buildAdventureEmbed(adventure, title, participants = []) {
     const extra = adventure.has_additional_bubble ? ' +1' : '';
     const embed = new EmbedBuilder()
         .setTitle(title)
@@ -183,6 +386,10 @@ function buildAdventureEmbed(adventure, title) {
             { name: 'Dauer', value: `${formatDuration(adventure.duration)}${extra}`, inline: true },
             { name: 'ID', value: String(adventure.id), inline: true },
         );
+
+    if (participants.length > 0) {
+        embed.addFields({ name: 'Teilnehmer', value: formatParticipantList(participants), inline: false });
+    }
 
     if (adventure.title) embed.addFields({ name: 'Titel', value: String(adventure.title).slice(0, 1024), inline: false });
     if (adventure.game_master) embed.addFields({ name: 'GM', value: String(adventure.game_master).slice(0, 1024), inline: false });
@@ -203,6 +410,145 @@ function buildDowntimeEmbed(downtime, title) {
 
     if (downtime.notes) embed.addFields({ name: 'Notizen', value: String(downtime.notes).slice(0, 1024), inline: false });
     return embed;
+}
+
+function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, selectedGuildCharacterIds, search }) {
+    const linkedIds = new Set(allies.map(ally => ally.linked_character_id).filter(Boolean).map(String));
+    const availableGuildCharacters = guildCharacters.filter(character => !linkedIds.has(String(character.id)));
+    const guildNameById = new Map(guildCharacters.map(character => [String(character.id), character.name]));
+    const query = String(search || '').trim().toLowerCase();
+
+    const allyOptions = allies.map(ally => {
+        const linkedName = ally.linked_character_id ? guildNameById.get(String(ally.linked_character_id)) : '';
+        const label = linkedName && linkedName.toLowerCase() !== String(ally.name).toLowerCase()
+            ? `${linkedName} (${ally.name})`
+            : String(ally.name);
+        const description = ally.linked_character_id
+            ? linkedName ? `Linked - ${linkedName}` : 'Linked guild member'
+            : 'Custom ally';
+        return {
+            key: `ally_${ally.id}`,
+            type: 'ally',
+            id: Number(ally.id),
+            label,
+            description,
+            selected: selectedAllyIds.includes(Number(ally.id)),
+        };
+    });
+
+    const guildOptions = availableGuildCharacters.map(character => ({
+        key: `guild_${character.id}`,
+        type: 'guild',
+        id: Number(character.id),
+        label: String(character.name),
+        description: 'Guild member',
+        selected: selectedGuildCharacterIds.includes(Number(character.id)),
+    }));
+
+    const combined = [...allyOptions, ...guildOptions].filter(option => {
+        if (!query) return true;
+        return `${option.label} ${option.description}`.toLowerCase().includes(query);
+    });
+
+    combined.sort((a, b) => a.label.localeCompare(b.label));
+    return combined;
+}
+
+function buildAdventureParticipantsSelect({ adventureId, characterId, ownerDiscordId, options }) {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`advParticipantsSelect_${adventureId}_${characterId}_${ownerDiscordId}`)
+        .setPlaceholder('Teilnehmer ausw\u00e4hlen\u2026')
+        .setMinValues(0)
+        .setMaxValues(Math.min(25, options.length));
+
+    options.forEach(option => {
+        const builder = new StringSelectMenuOptionBuilder()
+            .setLabel(option.label.slice(0, 100))
+            .setDescription(option.description.slice(0, 100))
+            .setValue(`${option.type}:${option.id}`)
+            .setDefault(Boolean(option.selected));
+        select.addOptions(builder);
+    });
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+function buildAdventureParticipantsActions({ adventureId, characterId, ownerDiscordId, hasParticipants }) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`advParticipantsSearch_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setLabel('Suchen')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`advParticipantsClear_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setLabel('Alle entfernen')
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(!hasParticipants),
+        new ButtonBuilder()
+            .setCustomId(`advParticipantsBack_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setLabel('Zur\u00fcck')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+async function buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId }) {
+    const adventure = await findAdventureForDiscord(interaction.user, adventureId);
+    if (!adventure) return { error: 'not_found' };
+
+    const participants = await listAdventureParticipantsForDiscord(interaction.user, adventureId);
+    const allies = await listAlliesForDiscord(interaction.user, characterId);
+    const guildCharacters = await listGuildCharactersForDiscord(interaction.user, characterId);
+    const search = getParticipantSearch(adventureId, ownerDiscordId);
+
+    const options = buildParticipantOptions({
+        allies,
+        guildCharacters,
+        selectedAllyIds: participants.map(entry => Number(entry.id)),
+        selectedGuildCharacterIds: [],
+        search,
+    });
+
+    const limitedOptions = options.slice(0, 25);
+    const embed = new EmbedBuilder()
+        .setTitle('Teilnehmer bearbeiten')
+        .setColor(0x4f46e5)
+        .setDescription(`${adventure.start_date} \u00b7 ${String(adventure.title || '(ohne Titel)')}`)
+        .addFields({ name: 'Aktuell', value: formatParticipantList(participants), inline: false });
+
+    if (search) {
+        embed.setFooter({ text: `Filter: ${search} (${limitedOptions.length}/${options.length})` });
+    } else if (options.length > limitedOptions.length) {
+        embed.setFooter({ text: `Zeige ${limitedOptions.length} von ${options.length}. Nutze Suche.` });
+    }
+
+    const components = [];
+    if (limitedOptions.length > 0) {
+        components.push(
+            buildAdventureParticipantsSelect({
+                adventureId,
+                characterId,
+                ownerDiscordId,
+                options: limitedOptions,
+            }),
+        );
+    }
+    components.push(
+        buildAdventureParticipantsActions({
+            adventureId,
+            characterId,
+            ownerDiscordId,
+            hasParticipants: participants.length > 0,
+        }),
+    );
+
+    return { embed, components, adventure, participants };
+}
+
+async function getAdventureWithParticipants(interaction, adventureId) {
+    const adventure = await findAdventureForDiscord(interaction.user, adventureId);
+    if (!adventure) return { adventure: null, participants: [] };
+    const participants = await listAdventureParticipantsForDiscord(interaction.user, adventureId);
+    return { adventure, participants };
 }
 
 async function handle(interaction) {
@@ -249,10 +595,18 @@ async function handle(interaction) {
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(false);
 
+        const avatarInput = new TextInputBuilder()
+            .setCustomId('regAvatar')
+            .setLabel('Avatar (optional)')
+            .setPlaceholder('https://... oder /storage/.../avatar.png')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false);
+
         modal.addComponents(
             new ActionRowBuilder().addComponents(nameInput),
             new ActionRowBuilder().addComponents(tierInput),
             new ActionRowBuilder().addComponents(urlInput),
+            new ActionRowBuilder().addComponents(avatarInput),
             new ActionRowBuilder().addComponents(notesInput),
         );
 
@@ -270,10 +624,10 @@ async function handle(interaction) {
         const tier = interaction.fields.getTextInputValue('regTier').toLowerCase();
         const characterName = interaction.fields.getTextInputValue('regName');
         const notes = interaction.fields.getTextInputValue('regNotes') || '';
+        const avatar = interaction.fields.getTextInputValue('regAvatar') || '';
 
-        const allowedTiers = ['bt', 'lt', 'ht'];
-        if (!allowedTiers.includes(tier)) {
-            await interaction.reply({ content: 'Tier muss bt, lt oder ht sein.', flags: MessageFlags.Ephemeral });
+        if (!allowedStartTiers.has(tier)) {
+            await interaction.reply({ content: 'Tier muss bt, lt, ht oder et sein.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -283,15 +637,27 @@ async function handle(interaction) {
         }
 
         try {
-            await createCharacterForDiscord(interaction.user, {
+            const result = await createCharacterForDiscord(interaction.user, {
                 name: characterName,
                 startTier: tier,
                 externalLink: url,
                 notes,
+                avatar,
             });
 
+            if (!result.ok) {
+                await interaction.reply({ content: 'Charakter konnte nicht erstellt werden.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const character = await findCharacterForDiscord(interaction.user, result.id);
+            if (!character) {
+                await interaction.reply({ content: 'Charakter erstellt.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
             await interaction.reply({
-                content: 'Charakter erstellt. Tipp: `/mg-characters` erneut ausf\u00fchren, um die Karte zu sehen.',
+                ...buildCharacterCardPayload({ character, ownerDiscordId: interaction.user.id }),
                 flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
@@ -306,7 +672,43 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('updateCharacterModal_')) {
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersSelect_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const selectedId = Number(interaction.values[0]);
+        if (!Number.isFinite(selectedId) || selectedId < 1) {
+            await interaction.reply({ content: 'Ung\u00fcltige Auswahl.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let character;
+        try {
+            character = await findCharacterForDiscord(interaction.user, selectedId);
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await replyNotLinked(interaction);
+                return true;
+            }
+            throw error;
+        }
+
+        if (!character) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterCardPayload({ character, ownerDiscordId }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterClassesSelect_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) return false;
@@ -316,42 +718,178 @@ async function handle(interaction) {
             return true;
         }
 
-        const url = interaction.fields.getTextInputValue('updUrl');
-        const characterName = interaction.fields.getTextInputValue('updName');
-        const notes = interaction.fields.getTextInputValue('updNotes') || '';
-
-        if (!isHttpUrl(url)) {
-            await interaction.reply({ content: 'Ung\u00fcltige URL (nur http/https).', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
+        const classIds = interaction.values.map(value => Number(value)).filter(value => Number.isFinite(value));
         try {
-            const result = await updateCharacterForDiscord(interaction.user, characterId, {
-                name: characterName,
-                externalLink: url,
-                notes,
-            });
-
+            const result = await syncCharacterClassesForDiscord(interaction.user, characterId, classIds);
             if (!result.ok) {
+                await interaction.reply({ content: 'Klassen konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const character = await findCharacterForDiscord(interaction.user, characterId);
+            if (!character) {
                 await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
-            await interaction.reply({
-                content: 'Charakter aktualisiert. Tipp: `/mg-characters` erneut ausf\u00fchren.',
-                flags: MessageFlags.Ephemeral,
+            await interaction.update({
+                ...buildCharacterManageView(character, { ownerDiscordId }),
+                content: '',
             });
         } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Fehler beim Speichern des Charakters.', flags: MessageFlags.Ephemeral });
+            throw error;
         }
         return true;
     }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterDetailsModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const name = interaction.fields.getTextInputValue('detailsName').trim();
+        const tier = interaction.fields.getTextInputValue('detailsTier').trim().toLowerCase();
+        const url = interaction.fields.getTextInputValue('detailsUrl').trim();
+        const faction = interaction.fields.getTextInputValue('detailsFaction').trim().toLowerCase();
+        const version = interaction.fields.getTextInputValue('detailsVersion').trim();
+
+        if (!name) {
+            await interaction.reply({ content: 'Name fehlt.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        if (!allowedStartTiers.has(tier)) {
+            await interaction.reply({ content: 'Tier muss bt, lt, ht oder et sein.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        if (!isHttpUrl(url)) {
+            await interaction.reply({ content: 'Ung\u00fcltige URL (nur http/https).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        if (!allowedFactions.has(faction)) {
+            await interaction.reply({ content: 'Ung\u00fcltige Fraktion.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        if (!allowedVersions.has(version)) {
+            await interaction.reply({ content: 'Version muss 2014 oder 2024 sein.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await updateCharacterForDiscord(interaction.user, characterId, {
+            name,
+            startTier: tier,
+            externalLink: url,
+            faction,
+            version,
+        });
+
+        if (!result.ok) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.reply({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterNotesModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const avatar = interaction.fields.getTextInputValue('notesAvatar').trim();
+        const notes = interaction.fields.getTextInputValue('notesText') || '';
+
+        const result = await updateCharacterForDiscord(interaction.user, characterId, {
+            avatar,
+            notes,
+        });
+        if (!result.ok) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.reply({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterProgressModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const dmBubbles = interaction.fields.getTextInputValue('progressBubbles');
+        const dmCoins = interaction.fields.getTextInputValue('progressCoins');
+        const bubbleSpend = interaction.fields.getTextInputValue('progressSpend');
+        const fillerRaw = interaction.fields.getTextInputValue('progressFiller');
+        const filler = parseBooleanInput(fillerRaw);
+
+        if (filler === null) {
+            await interaction.reply({ content: 'Filler muss ja oder nein sein.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await updateCharacterForDiscord(interaction.user, characterId, {
+            dmBubbles,
+            dmCoins,
+            bubbleShopSpend: bubbleSpend,
+            isFiller: filler,
+        });
+
+        if (!result.ok) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter aktualisiert.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.reply({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
 
     if (interaction.isButton() && interaction.customId.startsWith('characterCard_')) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
@@ -381,40 +919,11 @@ async function handle(interaction) {
             return true;
         }
 
-        if (action === 'edit') {
-            const modal = new ModalBuilder()
-                .setCustomId(`updateCharacterModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Charakter bearbeiten');
-
-            const nameInput = new TextInputBuilder()
-                .setCustomId('updName')
-                .setLabel('Charaktername')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(character.name));
-
-            const urlInput = new TextInputBuilder()
-                .setCustomId('updUrl')
-                .setLabel('External Link (URL)')
-                .setPlaceholder('https://...')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(character.external_link));
-
-            const notesInput = new TextInputBuilder()
-                .setCustomId('updNotes')
-                .setLabel('Notizen')
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(false)
-                .setValue(safeModalValue(character.notes));
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(nameInput),
-                new ActionRowBuilder().addComponents(urlInput),
-                new ActionRowBuilder().addComponents(notesInput),
-            );
-
-            await interaction.showModal(modal);
+        if (action === 'manage') {
+            await interaction.update({
+                ...buildCharacterManageView(character, { ownerDiscordId }),
+                content: '',
+            });
             return true;
         }
 
@@ -471,6 +980,200 @@ async function handle(interaction) {
                 components: [buildCharacterCardRow({ characterId: character.id, ownerDiscordId, isFiller: character.is_filler })],
                 content: '',
             });
+            return true;
+        }
+
+        if (action === 'list') {
+            try {
+                const characters = await listCharactersForDiscord(interaction.user);
+                const listView = buildCharacterListView({
+                    ownerDiscordId,
+                    characters,
+                });
+                await interaction.update({
+                    ...listView,
+                    content: '',
+                });
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await replyNotLinked(interaction);
+                    return true;
+                }
+                throw error;
+            }
+            return true;
+        }
+
+        await interaction.reply({ content: 'Unbekannte Aktion.', flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterManage_')) {
+        const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            await interaction.reply({ content: 'Ung\u00fcltige Charakter-ID.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await interaction.reply({ content: 'Charakter nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (action === 'back') {
+            await interaction.update({
+                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'details') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterDetailsModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Charakterdetails');
+
+            const nameInput = new TextInputBuilder()
+                .setCustomId('detailsName')
+                .setLabel('Name')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(character.name));
+
+            const tierInput = new TextInputBuilder()
+                .setCustomId('detailsTier')
+                .setLabel('Start tier (bt/lt/ht/et)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.start_tier || 'bt')));
+
+            const urlInput = new TextInputBuilder()
+                .setCustomId('detailsUrl')
+                .setLabel('External Link (URL)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(character.external_link));
+
+            const factionInput = new TextInputBuilder()
+                .setCustomId('detailsFaction')
+                .setLabel('Fraktion')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.faction || 'none')));
+
+            const versionInput = new TextInputBuilder()
+                .setCustomId('detailsVersion')
+                .setLabel('Version (2014/2024)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.version || '2024')));
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(nameInput),
+                new ActionRowBuilder().addComponents(tierInput),
+                new ActionRowBuilder().addComponents(urlInput),
+                new ActionRowBuilder().addComponents(factionInput),
+                new ActionRowBuilder().addComponents(versionInput),
+            );
+
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        if (action === 'notes') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterNotesModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Notizen');
+
+            const avatarInput = new TextInputBuilder()
+                .setCustomId('notesAvatar')
+                .setLabel('Avatar (optional)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setValue(safeModalValue(character.avatar));
+
+            const notesInput = new TextInputBuilder()
+                .setCustomId('notesText')
+                .setLabel('Notizen (optional)')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(false)
+                .setValue(safeModalValue(character.notes));
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(avatarInput),
+                new ActionRowBuilder().addComponents(notesInput),
+            );
+
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        if (action === 'progress') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterProgressModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Fortschritt');
+
+            const bubbleInput = new TextInputBuilder()
+                .setCustomId('progressBubbles')
+                .setLabel('DM Bubbles')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.dm_bubbles ?? 0)));
+
+            const coinInput = new TextInputBuilder()
+                .setCustomId('progressCoins')
+                .setLabel('DM Coins')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.dm_coins ?? 0)));
+
+            const spendInput = new TextInputBuilder()
+                .setCustomId('progressSpend')
+                .setLabel('Bubble-Shop (Spend)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(character.bubble_shop_spend ?? 0)));
+
+            const fillerInput = new TextInputBuilder()
+                .setCustomId('progressFiller')
+                .setLabel('Filler (ja/nein)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(character.is_filler ? 'ja' : 'nein');
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(bubbleInput),
+                new ActionRowBuilder().addComponents(coinInput),
+                new ActionRowBuilder().addComponents(spendInput),
+                new ActionRowBuilder().addComponents(fillerInput),
+            );
+
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        if (action === 'classes') {
+            try {
+                const classesView = await buildCharacterClassesView({ interaction, character, ownerDiscordId });
+                await interaction.update({
+                    embeds: [classesView.embed],
+                    components: classesView.components,
+                    content: '',
+                });
+            } catch (error) {
+                if (error instanceof DiscordNotLinkedError) {
+                    await replyNotLinked(interaction);
+                    return true;
+                }
+                throw error;
+            }
             return true;
         }
 
@@ -624,23 +1327,11 @@ async function handle(interaction) {
                 return true;
             }
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`advEdit_${adventure.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Bearbeiten')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`advDelete_${adventure.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('L\u00f6schen')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
-                    .setStyle(ButtonStyle.Secondary),
-            );
+            const participants = await listAdventureParticipantsForDiscord(interaction.user, adventure.id);
+            const row = buildAdventureActionRow({ adventureId: adventure.id, characterId, ownerDiscordId });
 
             await interaction.reply({
-                embeds: [buildAdventureEmbed(adventure, 'Abenteuer gespeichert')],
+                embeds: [buildAdventureEmbed(adventure, 'Abenteuer gespeichert', participants)],
                 components: [row],
                 flags: MessageFlags.Ephemeral,
             });
@@ -874,28 +1565,180 @@ async function handle(interaction) {
             return true;
         }
 
-        const adventure = await findAdventureForDiscord(interaction.user, adventureId);
+        const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
             await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
             return true;
         }
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Bearbeiten')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('L\u00f6schen')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
-                .setStyle(ButtonStyle.Secondary),
-        );
+        const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
 
-        await interaction.update({ embeds: [buildAdventureEmbed(adventure, 'Abenteuer')], components: [row], content: '' });
+        await interaction.update({
+            embeds: [buildAdventureEmbed(adventure, 'Abenteuer', participants)],
+            components: [row],
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advParticipantsOpen_')) {
+        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const adventureId = Number(adventureIdRaw);
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
+        if (view.error) {
+            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            return true;
+        }
+
+        await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advParticipantsSearch_')) {
+        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const adventureId = Number(adventureIdRaw);
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId(`advParticipantsSearchModal_${adventureId}_${characterId}_${ownerDiscordId}`)
+            .setTitle('Teilnehmer suchen');
+
+        const searchInput = new TextInputBuilder()
+            .setCustomId('participantSearch')
+            .setLabel('Suche (Name oder Label)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setValue(safeModalValue(getParticipantSearch(adventureId, ownerDiscordId), 100));
+
+        modal.addComponents(new ActionRowBuilder().addComponents(searchInput));
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('advParticipantsSearchModal_')) {
+        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const adventureId = Number(adventureIdRaw);
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        setParticipantSearch(adventureId, ownerDiscordId, interaction.fields.getTextInputValue('participantSearch'));
+        const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
+        if (view.error) {
+            await interaction.reply({ content: 'Abenteuer nicht gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.reply({ embeds: [view.embed], components: view.components, flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('advParticipantsSelect_')) {
+        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const adventureId = Number(adventureIdRaw);
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const allyIds = [];
+        const guildCharacterIds = [];
+        for (const value of interaction.values ?? []) {
+            const [type, idRaw] = String(value).split(':');
+            const id = Number(idRaw);
+            if (!Number.isFinite(id) || id < 1) continue;
+            if (type === 'ally') allyIds.push(id);
+            if (type === 'guild') guildCharacterIds.push(id);
+        }
+
+        const result = await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
+            characterId,
+            allyIds,
+            guildCharacterIds,
+        });
+
+        if (!result.ok) {
+            await interaction.reply({ content: 'Teilnehmer konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
+        if (view.error) {
+            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            return true;
+        }
+
+        await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advParticipantsClear_')) {
+        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const adventureId = Number(adventureIdRaw);
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
+            characterId,
+            allyIds: [],
+            guildCharacterIds: [],
+        });
+
+        const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
+        if (view.error) {
+            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            return true;
+        }
+
+        await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advParticipantsBack_')) {
+        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const adventureId = Number(adventureIdRaw);
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
+        if (!adventure || Number(adventure.character_id) !== characterId) {
+            await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
+            return true;
+        }
+
+        const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
+        await interaction.update({ content: '', embeds: [buildAdventureEmbed(adventure, 'Abenteuer', participants)], components: [row] });
         return true;
     }
 
@@ -1034,29 +1877,16 @@ async function handle(interaction) {
                 return true;
             }
 
-            const adventure = await findAdventureForDiscord(interaction.user, adventureId);
+            const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
             if (!adventure) {
                 await interaction.reply({ content: 'Abenteuer aktualisiert.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Bearbeiten')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('L\u00f6schen')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
-                    .setStyle(ButtonStyle.Secondary),
-            );
+            const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
 
             await interaction.reply({
-                embeds: [buildAdventureEmbed(adventure, 'Abenteuer aktualisiert')],
+                embeds: [buildAdventureEmbed(adventure, 'Abenteuer aktualisiert', participants)],
                 components: [row],
                 flags: MessageFlags.Ephemeral,
             });
@@ -1102,28 +1932,19 @@ async function handle(interaction) {
         }
 
         if (action === 'deleteAdventureCancel') {
-            const adventure = await findAdventureForDiscord(interaction.user, adventureId);
+            const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
             if (!adventure || Number(adventure.character_id) !== characterId) {
                 await interaction.update({ content: 'Abenteuer nicht gefunden.', embeds: [], components: [] });
                 return true;
             }
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Bearbeiten')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('L\u00f6schen')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Zur\u00fcck')
-                    .setStyle(ButtonStyle.Secondary),
-            );
+            const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
 
-            await interaction.update({ content: '', embeds: [buildAdventureEmbed(adventure, 'Abenteuer')], components: [row] });
+            await interaction.update({
+                content: '',
+                embeds: [buildAdventureEmbed(adventure, 'Abenteuer', participants)],
+                components: [row],
+            });
             return true;
         }
 
