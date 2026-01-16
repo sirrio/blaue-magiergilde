@@ -12,7 +12,13 @@ interface CharacterClassToggleProps {
 const CharacterClassToggle: React.FC<CharacterClassToggleProps> = ({ classes, data, errors, setData }) => {
   const toggleCharacterClass = (classId: number) => {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
-      const updatedClasses = e.target.checked ? [...data.class, classId] : data.class.filter((id: number) => id !== classId)
+      if (e.target.checked) {
+        const updatedClasses = Array.from(new Set([...data.class, classId]))
+        setData('class', updatedClasses)
+        return
+      }
+
+      const updatedClasses = data.class.filter((id: number) => id !== classId)
       setData('class', updatedClasses)
     }
   }

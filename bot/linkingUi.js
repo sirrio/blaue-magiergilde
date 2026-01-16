@@ -48,7 +48,7 @@ async function replyNotLinked(interaction) {
 
 module.exports = {
     replyNotLinked,
+    buildNotLinkedButtons,
     buildJoinConfirmButtons,
     notLinkedContent,
 };
-

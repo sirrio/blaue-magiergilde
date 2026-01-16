@@ -5,7 +5,10 @@ const calculateClassString = (character: Character): string => {
     ? character.character_classes
     : []
 
-  return classes.map((c) => c.name).join('/ ')
+  const names = classes.map((c) => c.name).filter(Boolean)
+  const uniqueNames = Array.from(new Set(names))
+
+  return uniqueNames.join('/ ')
 }
 
 export { calculateClassString }

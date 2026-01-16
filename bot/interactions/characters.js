@@ -14,6 +14,7 @@ const {
 const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
+    listCharactersForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
     listCharacterClassesForDiscord,
@@ -43,10 +44,18 @@ const {
     buildCharacterListView,
 } = require('../commands/game/characters');
 
-const { replyNotLinked, notLinkedContent } = require('../linkingUi');
+const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
+const { pendingCharacterCreations } = require('../state');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
+}
+
+async function editNotLinked(interaction) {
+    await interaction.editReply({
+        content: notLinkedContent(),
+        components: [buildNotLinkedButtons(interaction.user.id)],
+    });
 }
 
 function isHttpUrl(urlString) {
@@ -218,6 +227,266 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
         })],
         files,
     };
+}
+
+function creationStateKey(userId) {
+    return String(userId);
+}
+
+function getCreationState(userId) {
+    return pendingCharacterCreations.get(creationStateKey(userId)) || null;
+}
+
+function setCreationState(userId, state) {
+    pendingCharacterCreations.set(creationStateKey(userId), state);
+}
+
+function clearCreationState(userId) {
+    pendingCharacterCreations.delete(creationStateKey(userId));
+}
+
+function buildCreationCancelRow(ownerDiscordId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
+            .setLabel('Abbrechen')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+function buildCreationEmbed(step, title, description) {
+    return new EmbedBuilder()
+        .setTitle(title)
+        .setColor(0x4f46e5)
+        .setDescription(description)
+        .setFooter({ text: `Schritt ${step}/6` });
+}
+
+function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`charactersCreate_classes_${ownerDiscordId}`)
+        .setPlaceholder('Klassen ausw\u00e4hlen\u2026')
+        .setMinValues(1)
+        .setMaxValues(Math.min(25, classes.length));
+
+    const selectedSet = new Set(selectedIds.map(String));
+
+    classes.slice(0, 25).forEach(entry => {
+        select.addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel(String(entry.name).slice(0, 100))
+                .setValue(String(entry.id))
+                .setDefault(selectedSet.has(String(entry.id))),
+        );
+    });
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+function buildStartTierRow(ownerDiscordId, selectedValue) {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`charactersCreate_tier_${ownerDiscordId}`)
+        .setPlaceholder('Start-Tier ausw\u00e4hlen\u2026')
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions([
+            { label: 'BT', value: 'bt' },
+            { label: 'LT', value: 'lt' },
+            { label: 'HT', value: 'ht' },
+            { label: 'ET', value: 'et' },
+            { label: 'Filler', value: 'filler' },
+        ].map(option =>
+            new StringSelectMenuOptionBuilder()
+                .setLabel(option.label)
+                .setValue(option.value)
+                .setDefault(option.value === selectedValue),
+        ));
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+function buildFactionRow(ownerDiscordId, selectedValue) {
+    const options = [
+        { label: 'Keine', value: 'none' },
+        { label: 'Heiler', value: 'heiler' },
+        { label: 'Handwerker', value: 'handwerker' },
+        { label: 'Feldforscher', value: 'feldforscher' },
+        { label: 'Bibliothekare', value: 'bibliothekare' },
+        { label: 'Diplomaten', value: 'diplomaten' },
+        { label: 'Gardisten', value: 'gardisten' },
+        { label: 'Unterhalter', value: 'unterhalter' },
+        { label: 'Logistiker', value: 'logistiker' },
+        { label: 'Flora & Fauna', value: 'flora & fauna' },
+    ];
+
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`charactersCreate_faction_${ownerDiscordId}`)
+        .setPlaceholder('Fraktion ausw\u00e4hlen\u2026')
+        .setMinValues(1)
+        .setMaxValues(1);
+
+    options.forEach(option => {
+        select.addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel(option.label)
+                .setValue(option.value)
+                .setDefault(option.value === selectedValue),
+        );
+    });
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+function buildVersionRow(ownerDiscordId, selectedValue) {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`charactersCreate_version_${ownerDiscordId}`)
+        .setPlaceholder('Version ausw\u00e4hlen\u2026')
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions([
+            { label: '2014', value: '2014' },
+            { label: '2024', value: '2024' },
+        ].map(option =>
+            new StringSelectMenuOptionBuilder()
+                .setLabel(option.label)
+                .setValue(option.value)
+                .setDefault(option.value === selectedValue),
+        ));
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+function buildNotesSkipRow(ownerDiscordId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_skipNotes_${ownerDiscordId}`)
+            .setLabel('Notizen \u00fcberspringen')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
+            .setLabel('Abbrechen')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+async function updateCreationReply(state, payload) {
+    if (!state?.promptInteraction) return;
+    await state.promptInteraction.editReply(payload);
+}
+
+async function finalizeCharacterCreation(state) {
+    const { data, ownerDiscordId } = state;
+    if (!data.name || !data.externalLink || !data.startTier || !data.version || !Array.isArray(data.classIds) || data.classIds.length === 0) {
+        await updateCreationReply(state, {
+            content: 'Charakterdaten unvollst\u00e4ndig. Bitte erneut starten.',
+            embeds: [],
+            components: [],
+        });
+        clearCreationState(state.userId);
+        return;
+    }
+
+    const result = await createCharacterForDiscord(state.promptInteraction.user, {
+        name: data.name,
+        startTier: data.startTier,
+        externalLink: data.externalLink,
+        notes: data.notes,
+        avatar: data.avatar,
+        faction: data.faction ?? 'none',
+        version: data.version ?? '2024',
+        isFiller: data.isFiller,
+        classIds: data.classIds,
+    });
+
+    clearCreationState(state.userId);
+
+    if (!result.ok) {
+        await updateCreationReply(state, {
+            content: 'Charakter konnte nicht erstellt werden.',
+            embeds: [],
+            components: [],
+        });
+        return;
+    }
+
+    const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
+    if (!character) {
+        await updateCreationReply(state, {
+            content: 'Charakter erstellt.',
+            embeds: [],
+            components: [],
+        });
+        return;
+    }
+
+    await updateCreationReply(state, {
+        ...buildCharacterCardPayload({ character, ownerDiscordId }),
+        content: '',
+    });
+}
+
+async function handleCreationMessage(message) {
+    if (!message || message.author.bot) return false;
+    const state = getCreationState(message.author.id);
+    if (!state) return false;
+    if (String(message.channelId) !== String(state.channelId)) return false;
+    if (!state.promptInteraction) return false;
+
+    if (state.step === 'basic') {
+        const raw = message.content.trim();
+        const splitByPipe = raw.split('|').map(part => part.trim()).filter(Boolean);
+        let name = '';
+        let externalLink = '';
+        let avatar = '';
+
+        if (splitByPipe.length >= 2) {
+            [name, externalLink, avatar] = splitByPipe;
+        } else {
+            const lines = raw.split('\n').map(line => line.trim()).filter(Boolean);
+            if (lines.length >= 2) {
+                [name, externalLink, avatar] = lines;
+            }
+        }
+
+        if (!name || !externalLink) {
+            await message.reply('Bitte sende **Name**, **External Link** und optional **Avatar** (z.B. `Name | https://link | https://avatar`).');
+            return true;
+        }
+
+        if (!isHttpUrl(externalLink)) {
+            await message.reply('Der External Link muss eine http/https URL sein.');
+            return true;
+        }
+
+        state.data.name = name;
+        state.data.externalLink = externalLink;
+        state.data.avatar = avatar || '';
+        state.step = 'classes';
+
+        const classes = await listCharacterClassesForDiscord();
+        await updateCreationReply(state, {
+            embeds: [
+                buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+            ],
+            components: [
+                buildClassesRow({ ownerDiscordId: state.ownerDiscordId, classes, selectedIds: [] }),
+                buildCreationCancelRow(state.ownerDiscordId),
+            ],
+        });
+
+        await message.delete().catch(() => {});
+        return true;
+    }
+
+    if (state.step === 'notes') {
+        const raw = message.content.trim();
+        state.data.notes = ['-', 'skip', 'keine', 'none'].includes(raw.toLowerCase()) ? '' : raw;
+        await message.delete().catch(() => {});
+        await finalizeCharacterCreation(state);
+        return true;
+    }
+
+    return false;
 }
 
 async function buildCharacterClassesView({ interaction, character, ownerDiscordId }) {
@@ -565,110 +834,39 @@ async function handle(interaction) {
             return true;
         }
 
-        const modal = new ModalBuilder()
-            .setCustomId('registerCharacterModal')
-            .setTitle('Charakter erstellen');
-
-        const nameInput = new TextInputBuilder()
-            .setCustomId('regName')
-            .setLabel('Charaktername')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const tierInput = new TextInputBuilder()
-            .setCustomId('regTier')
-            .setLabel('Start-Tier')
-            .setPlaceholder('bt | lt | ht')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const urlInput = new TextInputBuilder()
-            .setCustomId('regUrl')
-            .setLabel('External Link (URL)')
-            .setPlaceholder('https://...')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const notesInput = new TextInputBuilder()
-            .setCustomId('regNotes')
-            .setLabel('Notizen')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false);
-
-        const avatarInput = new TextInputBuilder()
-            .setCustomId('regAvatar')
-            .setLabel('Avatar (optional)')
-            .setPlaceholder('https://... oder /storage/.../avatar.png')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false);
-
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(nameInput),
-            new ActionRowBuilder().addComponents(tierInput),
-            new ActionRowBuilder().addComponents(urlInput),
-            new ActionRowBuilder().addComponents(avatarInput),
-            new ActionRowBuilder().addComponents(notesInput),
-        );
-
-        await interaction.showModal(modal);
-        return true;
-    }
-
-    if (interaction.isModalSubmit() && interaction.customId === 'registerCharacterModal') {
-        if (!interaction.inGuild()) {
-            await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const url = interaction.fields.getTextInputValue('regUrl');
-        const tier = interaction.fields.getTextInputValue('regTier').toLowerCase();
-        const characterName = interaction.fields.getTextInputValue('regName');
-        const notes = interaction.fields.getTextInputValue('regNotes') || '';
-        const avatar = interaction.fields.getTextInputValue('regAvatar') || '';
-
-        if (!allowedStartTiers.has(tier)) {
-            await interaction.reply({ content: 'Tier muss bt, lt, ht oder et sein.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        if (!isHttpUrl(url)) {
-            await interaction.reply({ content: 'Ung\u00fcltige URL (nur http/https).', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        try {
-            const result = await createCharacterForDiscord(interaction.user, {
-                name: characterName,
-                startTier: tier,
-                externalLink: url,
-                notes,
-                avatar,
-            });
-
-            if (!result.ok) {
-                await interaction.reply({ content: 'Charakter konnte nicht erstellt werden.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-
-            const character = await findCharacterForDiscord(interaction.user, result.id);
-            if (!character) {
-                await interaction.reply({ content: 'Charakter erstellt.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-
+        if (getCreationState(ownerDiscordId)) {
             await interaction.reply({
-                ...buildCharacterCardPayload({ character, ownerDiscordId: interaction.user.id }),
+                embeds: [buildCreationEmbed(1, 'Charakter erstellen', 'Du hast bereits eine offene Erstellung. Bitte beende sie oder klicke **Abbrechen**.')],
+                components: [buildCreationCancelRow(ownerDiscordId)],
                 flags: MessageFlags.Ephemeral,
             });
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error(error);
-            if (error instanceof DiscordNotLinkedError) {
-                await replyNotLinked(interaction);
-                return true;
-            }
-            await interaction.reply({ content: 'Fehler beim Speichern des Charakters.', flags: MessageFlags.Ephemeral });
+            return true;
         }
+
+        const state = {
+            userId: ownerDiscordId,
+            ownerDiscordId,
+            channelId: interaction.channelId,
+            step: 'basic',
+            data: {
+                classIds: [],
+                isFiller: false,
+            },
+            promptInteraction: interaction,
+        };
+        setCreationState(ownerDiscordId, state);
+
+        await interaction.reply({
+            embeds: [
+                buildCreationEmbed(
+                    1,
+                    'Charakter erstellen',
+                    'Sende eine Nachricht mit **Name**, **External Link** und optional **Avatar**.\nBeispiel: `Name | https://link | https://avatar`',
+                ),
+            ],
+            components: [buildCreationCancelRow(ownerDiscordId)],
+            flags: MessageFlags.Ephemeral,
+        });
         return true;
     }
 
@@ -703,6 +901,179 @@ async function handle(interaction) {
 
         await interaction.update({
             ...buildCharacterCardPayload({ character, ownerDiscordId }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_cancel_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_cancel_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        clearCreationState(ownerDiscordId);
+        await interaction.update({ content: 'Erstellung abgebrochen.', embeds: [], components: [] });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_skipNotes_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_skipNotes_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        state.promptInteraction = interaction;
+        state.data.notes = '';
+        await finalizeCharacterCreation(state);
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_classes_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_classes_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        state.promptInteraction = interaction;
+        state.data.classIds = interaction.values.map(value => Number(value)).filter(value => Number.isFinite(value));
+        state.step = 'tier';
+
+        await interaction.update({
+            embeds: [
+                buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+            ],
+            components: [
+                buildStartTierRow(ownerDiscordId, state.data.startTier),
+                buildCreationCancelRow(ownerDiscordId),
+            ],
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_tier_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_tier_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        state.promptInteraction = interaction;
+        const value = interaction.values[0];
+        if (value === 'filler') {
+            state.data.isFiller = true;
+            state.data.startTier = 'bt';
+        } else if (allowedStartTiers.has(value)) {
+            state.data.isFiller = false;
+            state.data.startTier = value;
+        }
+
+        if (state.data.startTier === 'bt' || state.data.isFiller) {
+            state.data.faction = 'none';
+            state.step = 'version';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                ],
+                components: [
+                    buildVersionRow(ownerDiscordId, state.data.version),
+                    buildCreationCancelRow(ownerDiscordId),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        state.step = 'faction';
+        await interaction.update({
+            embeds: [
+                buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+            ],
+            components: [
+                buildFactionRow(ownerDiscordId, state.data.faction),
+                buildCreationCancelRow(ownerDiscordId),
+            ],
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_faction_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_faction_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        state.promptInteraction = interaction;
+        state.data.faction = interaction.values[0];
+        state.step = 'version';
+
+        await interaction.update({
+            embeds: [
+                buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+            ],
+            components: [
+                buildVersionRow(ownerDiscordId, state.data.version),
+                buildCreationCancelRow(ownerDiscordId),
+            ],
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_version_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_version_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        state.promptInteraction = interaction;
+        state.data.version = interaction.values[0];
+        state.step = 'notes';
+
+        await interaction.update({
+            embeds: [
+                buildCreationEmbed(6, 'Notizen', 'Sende eine Nachricht mit den Notizen oder `-` zum \u00dcberspringen.'),
+            ],
+            components: [
+                buildNotesSkipRow(ownerDiscordId),
+            ],
             content: '',
         });
         return true;
@@ -984,19 +1355,20 @@ async function handle(interaction) {
         }
 
         if (action === 'list') {
+            await interaction.deferUpdate();
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
                 const listView = buildCharacterListView({
                     ownerDiscordId,
                     characters,
                 });
-                await interaction.update({
+                await interaction.editReply({
                     ...listView,
                     content: '',
                 });
             } catch (error) {
                 if (error instanceof DiscordNotLinkedError) {
-                    await replyNotLinked(interaction);
+                    await editNotLinked(interaction);
                     return true;
                 }
                 throw error;
@@ -2255,4 +2627,8 @@ async function handle(interaction) {
     return false;
 }
 
-module.exports = { handle };
+async function handleMessage(message) {
+    return handleCreationMessage(message);
+}
+
+module.exports = { handle, handleMessage };
