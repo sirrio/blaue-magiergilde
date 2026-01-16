@@ -476,7 +476,7 @@ function truncateText(value, max = 200) {
     return `${text.slice(0, max - 1)}...`;
 }
 
-function formatAdventureSummaryFields(state, participantsLabel) {
+function getAdventureFieldValues(state, participantsLabel) {
     const duration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
         ? formatDuration(state.data.durationSeconds)
         : '-';
@@ -491,15 +491,43 @@ function formatAdventureSummaryFields(state, participantsLabel) {
     const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
     const participants = participantsLabel || (state?.data?.guildCharacterIds?.length ? `${state.data.guildCharacterIds.length} selected` : '-');
 
+    return { duration, date, title, gameMaster, quest, notes, participants };
+}
+
+function formatAdventureSummaryFields(state, participantsLabel) {
+    const values = getAdventureFieldValues(state, participantsLabel);
     return [
-        { name: 'Duration', value: duration, inline: true },
-        { name: 'Date', value: date, inline: true },
-        { name: 'Character quest', value: quest, inline: true },
-        { name: 'Title', value: title, inline: false },
-        { name: 'Game Master', value: gameMaster, inline: false },
-        { name: 'Notes', value: notes, inline: false },
-        { name: 'Participants', value: participants, inline: false },
+        { name: 'Duration', value: values.duration, inline: true },
+        { name: 'Date', value: values.date, inline: true },
+        { name: 'Character quest', value: values.quest, inline: true },
+        { name: 'Title', value: values.title, inline: false },
+        { name: 'Game Master', value: values.gameMaster, inline: false },
+        { name: 'Notes', value: values.notes, inline: false },
+        { name: 'Participants', value: values.participants, inline: false },
     ];
+}
+
+function formatAdventureStepFields(stepKey, state, participantsLabel) {
+    const values = getAdventureFieldValues(state, participantsLabel);
+    switch (stepKey) {
+        case 'duration':
+            return [{ name: 'Duration', value: values.duration, inline: true }];
+        case 'date':
+            return [{ name: 'Date', value: values.date, inline: true }];
+        case 'title':
+            return [
+                { name: 'Title', value: values.title, inline: false },
+                { name: 'Game Master', value: values.gameMaster, inline: false },
+            ];
+        case 'quest':
+            return [{ name: 'Character quest', value: values.quest, inline: true }];
+        case 'notes':
+            return [{ name: 'Notes', value: values.notes, inline: false }];
+        case 'participants':
+            return [{ name: 'Participants', value: values.participants, inline: false }];
+        default:
+            return [];
+    }
 }
 
 function buildAdventureStepEmbed(stepKey, state, description, participantsLabel) {
@@ -511,8 +539,12 @@ function buildAdventureStepEmbed(stepKey, state, description, participantsLabel)
         .setDescription(description)
         .setFooter({ text: `Step ${stepNumber}/7` });
 
-    const fields = formatAdventureSummaryFields(state, participantsLabel);
-    embed.addFields(fields);
+    const fields = stepKey === 'confirm'
+        ? formatAdventureSummaryFields(state, participantsLabel)
+        : formatAdventureStepFields(stepKey, state, participantsLabel);
+    if (fields.length > 0) {
+        embed.addFields(fields);
+    }
     return embed;
 }
 
@@ -1667,7 +1699,7 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
     ];
 }
 
-function formatDowntimeSummaryFields(state) {
+function getDowntimeFieldValues(state) {
     const duration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
         ? formatDuration(state.data.durationSeconds)
         : '-';
@@ -1675,12 +1707,33 @@ function formatDowntimeSummaryFields(state) {
     const type = state?.data?.type || '-';
     const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
 
+    return { duration, date, type, notes };
+}
+
+function formatDowntimeSummaryFields(state) {
+    const values = getDowntimeFieldValues(state);
     return [
-        { name: 'Duration', value: duration, inline: true },
-        { name: 'Date', value: date, inline: true },
-        { name: 'Type', value: type, inline: true },
-        { name: 'Notes', value: notes, inline: false },
+        { name: 'Duration', value: values.duration, inline: true },
+        { name: 'Date', value: values.date, inline: true },
+        { name: 'Type', value: values.type, inline: true },
+        { name: 'Notes', value: values.notes, inline: false },
     ];
+}
+
+function formatDowntimeStepFields(stepKey, state) {
+    const values = getDowntimeFieldValues(state);
+    switch (stepKey) {
+        case 'duration':
+            return [{ name: 'Duration', value: values.duration, inline: true }];
+        case 'date':
+            return [{ name: 'Date', value: values.date, inline: true }];
+        case 'type':
+            return [{ name: 'Type', value: values.type, inline: true }];
+        case 'notes':
+            return [{ name: 'Notes', value: values.notes, inline: false }];
+        default:
+            return [];
+    }
 }
 
 function buildDowntimeStepEmbed(stepKey, state, description) {
@@ -1692,7 +1745,12 @@ function buildDowntimeStepEmbed(stepKey, state, description) {
         .setDescription(description)
         .setFooter({ text: `Step ${stepNumber}/5` });
 
-    embed.addFields(formatDowntimeSummaryFields(state));
+    const fields = stepKey === 'confirm'
+        ? formatDowntimeSummaryFields(state)
+        : formatDowntimeStepFields(stepKey, state);
+    if (fields.length > 0) {
+        embed.addFields(fields);
+    }
     return embed;
 }
 
