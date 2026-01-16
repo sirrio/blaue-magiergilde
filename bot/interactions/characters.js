@@ -246,9 +246,12 @@ function clearCreationState(userId) {
 }
 
 function ensurePromptMessage(state, interaction) {
-    if (!state || state.promptMessage) return;
-    if (interaction?.message) {
+    if (!state) return;
+    if (!state.promptMessage && interaction?.message) {
         state.promptMessage = interaction.message;
+    }
+    if (interaction?.isRepliable?.()) {
+        state.promptInteraction = interaction;
     }
 }
 
@@ -266,7 +269,7 @@ function buildCreationEmbed(step, title, description) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
-        .setFooter({ text: `Schritt ${step}/6` });
+        .setFooter({ text: `Schritt ${step}/7` });
 }
 
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
@@ -412,6 +415,15 @@ function buildCreationStepActionsRow(ownerDiscordId, stepKey) {
     );
 }
 
+function buildAvatarUploadRow(ownerDiscordId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersCreate_avatar_dm_${ownerDiscordId}`)
+            .setLabel('Avatar in DM hochladen')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
 function buildCreationBasicsEmbed(state, message) {
     const embed = buildCreationEmbed(1, 'Charakter erstellen', message || 'Bearbeite die Basisangaben.');
     embed.addFields(
@@ -420,6 +432,18 @@ function buildCreationBasicsEmbed(state, message) {
         { name: 'Avatar', value: state?.data?.avatar || 'Kein Avatar', inline: false },
         { name: 'Notizen', value: state?.data?.notes || '-', inline: false },
     );
+    return embed;
+}
+
+function buildAvatarStepEmbed(state, message) {
+    const description = message
+        || 'Lade ein Avatar-Bild hoch (optional). Nutze **Avatar in DM hochladen** und klicke dann **Weiter**.';
+    const embed = buildCreationEmbed(2, 'Avatar hochladen', description);
+    embed.addFields({
+        name: 'Avatar',
+        value: state?.data?.avatar ? 'Hochgeladen' : 'Kein Avatar',
+        inline: false,
+    });
     return embed;
 }
 
@@ -467,13 +491,6 @@ function buildCreationBasicModal(ownerDiscordId, state) {
         .setRequired(true)
         .setValue(safeModalValue(state?.data?.externalLink));
 
-    const avatarInput = new TextInputBuilder()
-        .setCustomId('createAvatar')
-        .setLabel('Avatar (optional)')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
-        .setValue(safeModalValue(state?.data?.avatar));
-
     const notesInput = new TextInputBuilder()
         .setCustomId('createNotes')
         .setLabel('Notizen (optional)')
@@ -484,7 +501,6 @@ function buildCreationBasicModal(ownerDiscordId, state) {
     modal.addComponents(
         new ActionRowBuilder().addComponents(nameInput),
         new ActionRowBuilder().addComponents(linkInput),
-        new ActionRowBuilder().addComponents(avatarInput),
         new ActionRowBuilder().addComponents(notesInput),
     );
 
@@ -582,6 +598,33 @@ async function finalizeCharacterCreation(state) {
         ...buildCharacterCardPayload({ character, ownerDiscordId }),
         content: '',
     });
+}
+
+async function handleCreationAvatarMessage(message) {
+    if (!message || message.author?.bot) return false;
+    const ownerDiscordId = message.author.id;
+    const state = getCreationState(ownerDiscordId);
+    if (!state || state.step !== 'avatar') return false;
+    if (message.guildId) return false;
+
+    const attachments = [...message.attachments.values()];
+    const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
+    if (!attachment?.url) return false;
+
+    state.data.avatar = attachment.url;
+    await message.delete().catch(() => {});
+
+    const payload = {
+        embeds: [buildAvatarStepEmbed(state, 'Avatar gespeichert. Du kannst fortfahren.')],
+        components: [
+            buildAvatarUploadRow(ownerDiscordId),
+            buildCreationStepActionsRow(ownerDiscordId, 'avatar'),
+        ],
+        content: '',
+    };
+
+    await updateCreationMessage(state, payload);
+    return true;
 }
 
 
@@ -1023,7 +1066,6 @@ async function handle(interaction) {
 
         const name = interaction.fields.getTextInputValue('createName').trim();
         const externalLink = interaction.fields.getTextInputValue('createLink').trim();
-        const avatar = interaction.fields.getTextInputValue('createAvatar').trim();
         const notes = interaction.fields.getTextInputValue('createNotes').trim();
 
         if (!name) {
@@ -1038,21 +1080,19 @@ async function handle(interaction) {
         const hadPrompt = Boolean(state.promptInteraction);
         state.data.name = name;
         state.data.externalLink = externalLink;
-        state.data.avatar = avatar;
         state.data.notes = notes;
-        state.step = 'classes';
+        state.step = 'avatar';
         if (!hadPrompt) {
             state.promptInteraction = interaction;
         }
 
-        const classes = await listCharacterClassesForDiscord();
         const payload = {
             embeds: [
-                buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                buildAvatarStepEmbed(state),
             ],
             components: [
-                buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
-                buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                buildAvatarUploadRow(ownerDiscordId),
+                buildCreationStepActionsRow(ownerDiscordId, 'avatar'),
             ],
         };
 
@@ -1108,11 +1148,12 @@ async function handle(interaction) {
 
         ensurePromptMessage(state, interaction);
         state.data.classIds = interaction.values.map(value => Number(value)).filter(value => Number.isFinite(value));
+        state.step = 'classes';
         const classes = await listCharacterClassesForDiscord();
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
             ],
             components: [
                 buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1145,10 +1186,11 @@ async function handle(interaction) {
             state.data.isFiller = false;
             state.data.startTier = value;
         }
+        state.step = 'tier';
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
             ],
             components: [
                 buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1174,10 +1216,11 @@ async function handle(interaction) {
 
         ensurePromptMessage(state, interaction);
         state.data.faction = interaction.values[0];
+        state.step = 'faction';
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1203,10 +1246,11 @@ async function handle(interaction) {
 
         ensurePromptMessage(state, interaction);
         state.data.version = interaction.values[0];
+        state.step = 'version';
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
             ],
             components: [
                 buildVersionRow(ownerDiscordId, state.data.version),
@@ -1257,7 +1301,7 @@ async function handle(interaction) {
             state.step = 'version';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                    buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
                 ],
                 components: [
                     buildVersionRow(ownerDiscordId, state.data.version),
@@ -1273,7 +1317,7 @@ async function handle(interaction) {
                 state.step = 'tier';
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                        buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
                     ],
                     components: [
                         buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1287,7 +1331,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                    buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1302,7 +1346,7 @@ async function handle(interaction) {
             state.step = 'tier';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                    buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
                 ],
                 components: [
                     buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1318,7 +1362,7 @@ async function handle(interaction) {
             state.step = 'classes';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                    buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
                 ],
                 components: [
                     buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1329,7 +1373,17 @@ async function handle(interaction) {
             return true;
         }
 
-        if (state.step === 'classes' || state.step === 'basic') {
+        if (state.step === 'classes') {
+            state.step = 'avatar';
+            await interaction.update({
+                embeds: [buildAvatarStepEmbed(state)],
+                components: [buildCreationStepActionsRow(ownerDiscordId, 'avatar')],
+                content: '',
+            });
+            return true;
+        }
+
+        if (state.step === 'avatar' || state.step === 'basic') {
             state.step = 'basic';
             await interaction.update({
                 embeds: [buildCreationBasicsEmbed(state)],
@@ -1358,12 +1412,28 @@ async function handle(interaction) {
         }
 
         ensurePromptMessage(state, interaction);
+        if (stepKey === 'avatar') {
+            state.step = 'classes';
+            const classes = await listCharacterClassesForDiscord();
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'W\u00e4hle eine oder mehrere Klassen.'),
+                ],
+                components: [
+                    buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
+                    buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
         if (stepKey === 'classes') {
             const classes = await listCharacterClassesForDiscord();
             if (!Array.isArray(state.data.classIds) || state.data.classIds.length === 0) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(2, 'Klassen w\u00e4hlen', 'Bitte w\u00e4hle mindestens eine Klasse.'),
+                    buildCreationEmbed(3, 'Klassen w\u00e4hlen', 'Bitte w\u00e4hle mindestens eine Klasse.'),
                     ],
                     components: [
                         buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1377,7 +1447,7 @@ async function handle(interaction) {
             state.step = 'tier';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
+                    buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'W\u00e4hle das Start-Tier oder **Filler**.'),
                 ],
                 components: [
                     buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1392,7 +1462,7 @@ async function handle(interaction) {
             if (!state.data.startTier) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(3, 'Start-Tier w\u00e4hlen', 'Bitte w\u00e4hle ein Start-Tier oder **Filler**.'),
+                        buildCreationEmbed(4, 'Start-Tier w\u00e4hlen', 'Bitte w\u00e4hle ein Start-Tier oder **Filler**.'),
                     ],
                     components: [
                         buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1408,7 +1478,7 @@ async function handle(interaction) {
                 state.step = 'version';
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                        buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
                     ],
                     components: [
                         buildVersionRow(ownerDiscordId, state.data.version),
@@ -1422,7 +1492,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
+                    buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'W\u00e4hle die Fraktion.'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1437,7 +1507,7 @@ async function handle(interaction) {
             if (!state.data.faction) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(4, 'Fraktion w\u00e4hlen', 'Bitte w\u00e4hle eine Fraktion.'),
+                        buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'Bitte w\u00e4hle eine Fraktion.'),
                     ],
                     components: [
                         buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1451,7 +1521,7 @@ async function handle(interaction) {
             state.step = 'version';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
+                    buildCreationEmbed(6, 'Version w\u00e4hlen', 'W\u00e4hle die Regelversion.'),
                 ],
                 components: [
                     buildVersionRow(ownerDiscordId, state.data.version),
@@ -1466,7 +1536,7 @@ async function handle(interaction) {
             if (!state.data.version) {
                 await interaction.update({
                     embeds: [
-                        buildCreationEmbed(5, 'Version w\u00e4hlen', 'Bitte w\u00e4hle eine Regelversion.'),
+                        buildCreationEmbed(6, 'Version w\u00e4hlen', 'Bitte w\u00e4hle eine Regelversion.'),
                     ],
                     components: [
                         buildVersionRow(ownerDiscordId, state.data.version),
@@ -1481,7 +1551,7 @@ async function handle(interaction) {
             const summary = await buildCreationSummaryEmbed(state);
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(6, 'Finalisieren', 'Bitte best\u00e4tige die Angaben.'),
+                    buildCreationEmbed(7, 'Finalisieren', 'Bitte best\u00e4tige die Angaben.'),
                     summary,
                 ],
                 components: [
@@ -1512,6 +1582,34 @@ async function handle(interaction) {
         state.step = 'basic';
         ensurePromptMessage(state, interaction);
         await interaction.showModal(buildCreationBasicModal(ownerDiscordId, state));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_avatar_dm_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_avatar_dm_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'Du kannst diese Aktion nicht ausf\u00fchren.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await interaction.reply({ content: 'Keine offene Erstellung gefunden.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const dm = await interaction.user.createDM();
+        await dm.send('Bitte sende mir hier dein Avatar-Bild. Ich speichere es nur f\u00fcr diesen Charakter.');
+
+        await interaction.deferUpdate();
+        await updateCreationMessage(state, {
+            embeds: [buildAvatarStepEmbed(state, 'Ich habe dir eine DM geschickt. Lade dort dein Avatar-Bild hoch.')],
+            components: [
+                buildAvatarUploadRow(ownerDiscordId),
+                buildCreationStepActionsRow(ownerDiscordId, 'avatar'),
+            ],
+            content: '',
+        });
         return true;
     }
 
@@ -3063,6 +3161,6 @@ async function handle(interaction) {
     return false;
 }
 
-module.exports = { handle };
+module.exports = { handle, handleCreationAvatarMessage };
 
 
