@@ -208,10 +208,6 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
                 .setCustomId(`characterManage_faction_${characterId}_${ownerDiscordId}`)
                 .setLabel('Fraktion')
                 .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Zur\u00fcck')
-                .setStyle(ButtonStyle.Secondary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -225,6 +221,12 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
             new ButtonBuilder()
                 .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
                 .setLabel('Bubble Shop')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Zur\u00fcck')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -260,11 +262,11 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
 
     return {
         embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail })],
-        components: [buildCharacterCardRow({
+        components: buildCharacterCardRows({
             ownerDiscordId,
             characterId: character.id,
             isFiller: character.is_filler,
-        })],
+        }),
         files,
     };
 }
@@ -412,47 +414,63 @@ function buildVersionRow(ownerDiscordId, selectedValue) {
     return new ActionRowBuilder().addComponents(select);
 }
 
-function buildCreationConfirmRow(ownerDiscordId) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
-            .setLabel('Zur\u00fcck')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_confirm_${ownerDiscordId}`)
-            .setLabel('Charakter erstellen')
-            .setStyle(ButtonStyle.Primary),
-    );
+function buildCreationConfirmRows(ownerDiscordId) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
+                .setLabel('Zur\u00fcck')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_confirm_${ownerDiscordId}`)
+                .setLabel('Charakter erstellen')
+                .setStyle(ButtonStyle.Primary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
+                .setLabel('Abbrechen')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
-function buildCreationBasicsRow(ownerDiscordId) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_basicopen_${ownerDiscordId}`)
-            .setLabel('Angaben bearbeiten')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-            .setLabel('Abbrechen')
-            .setStyle(ButtonStyle.Secondary),
-    );
+function buildCreationBasicsRows(ownerDiscordId) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_basicopen_${ownerDiscordId}`)
+                .setLabel('Weiter')
+                .setStyle(ButtonStyle.Primary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
+                .setLabel('Abbrechen')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
-function buildCreationStepActionsRow(ownerDiscordId, stepKey) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
-            .setLabel('Zur\u00fcck')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_next_${stepKey}_${ownerDiscordId}`)
-            .setLabel('Weiter')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-            .setLabel('Abbrechen')
-            .setStyle(ButtonStyle.Secondary),
-    );
+function buildCreationStepActionRows(ownerDiscordId, stepKey) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
+                .setLabel('Zur\u00fcck')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_next_${stepKey}_${ownerDiscordId}`)
+                .setLabel('Weiter')
+                .setStyle(ButtonStyle.Primary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
+                .setLabel('Abbrechen')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
 function buildAvatarUploadRow(ownerDiscordId) {
@@ -688,7 +706,7 @@ async function showCreationError(interaction, state, ownerDiscordId, message) {
     state.step = 'basic';
     const payload = {
         embeds: [buildCreationBasicsEmbed(state, message)],
-        components: [buildCreationBasicsRow(ownerDiscordId)],
+        components: buildCreationBasicsRows(ownerDiscordId),
     };
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await updateCreationMessage(state, payload);
@@ -771,7 +789,7 @@ async function handleCreationAvatarMessage(message) {
         embeds: [buildAvatarStepEmbed(state, 'Avatar gespeichert. Du kannst fortfahren.')],
         components: [
             buildAvatarUploadRow(ownerDiscordId),
-            buildCreationStepActionsRow(ownerDiscordId, 'avatar'),
+            ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
         ],
         content: '',
     };
@@ -932,30 +950,34 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRow({ characterId, ownerDiscordId, isFiller }) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
-            .setLabel('Abenteuer')
-            .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
-            .setLabel('Downtime')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(Boolean(isFiller)),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
-            .setLabel('Verwalten')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
-            .setLabel('Zur Liste')
-            .setStyle(ButtonStyle.Secondary),
-    );
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
+                .setLabel('Abenteuer')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
+                .setLabel('Downtime')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(Boolean(isFiller)),
+            new ButtonBuilder()
+                .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
+                .setLabel('Verwalten')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
+                .setLabel('L\u00f6schen')
+                .setStyle(ButtonStyle.Danger),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
+                .setLabel('Zur Liste')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
 function buildAdventureListRow({ characterId, ownerDiscordId, adventures }) {
@@ -1236,7 +1258,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [buildCreationBasicsEmbed(state, 'Starte mit den Basisangaben.')],
-            components: [buildCreationBasicsRow(ownerDiscordId)],
+            components: buildCreationBasicsRows(ownerDiscordId),
             content: '',
         });
         return true;
@@ -1319,7 +1341,7 @@ async function handle(interaction) {
             ],
             components: [
                 buildAvatarUploadRow(ownerDiscordId),
-                buildCreationStepActionsRow(ownerDiscordId, 'avatar'),
+                ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
             ],
         };
 
@@ -1384,7 +1406,7 @@ async function handle(interaction) {
             ],
             components: [
                 buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
-                buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                ...buildCreationStepActionRows(ownerDiscordId, 'classes'),
             ],
             content: '',
         });
@@ -1421,7 +1443,7 @@ async function handle(interaction) {
             ],
             components: [
                 buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
-                buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                ...buildCreationStepActionRows(ownerDiscordId, 'tier'),
             ],
             content: '',
         });
@@ -1451,7 +1473,7 @@ async function handle(interaction) {
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
-                buildCreationStepActionsRow(ownerDiscordId, 'faction'),
+                ...buildCreationStepActionRows(ownerDiscordId, 'faction'),
             ],
             content: '',
         });
@@ -1481,7 +1503,7 @@ async function handle(interaction) {
             ],
             components: [
                 buildVersionRow(ownerDiscordId, state.data.version),
-                buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                ...buildCreationStepActionRows(ownerDiscordId, 'version'),
             ],
             content: '',
         });
@@ -1532,7 +1554,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildVersionRow(ownerDiscordId, state.data.version),
-                    buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'version'),
                 ],
                 content: '',
             });
@@ -1548,7 +1570,7 @@ async function handle(interaction) {
                     ],
                     components: [
                         buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
-                        buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                        ...buildCreationStepActionRows(ownerDiscordId, 'tier'),
                     ],
                     content: '',
                 });
@@ -1562,7 +1584,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
-                    buildCreationStepActionsRow(ownerDiscordId, 'faction'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'faction'),
                 ],
                 content: '',
             });
@@ -1577,7 +1599,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
-                    buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'tier'),
                 ],
                 content: '',
             });
@@ -1593,7 +1615,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
-                    buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'classes'),
                 ],
                 content: '',
             });
@@ -1604,7 +1626,7 @@ async function handle(interaction) {
             state.step = 'avatar';
             await interaction.update({
                 embeds: [buildAvatarStepEmbed(state)],
-                components: [buildCreationStepActionsRow(ownerDiscordId, 'avatar')],
+                components: buildCreationStepActionRows(ownerDiscordId, 'avatar'),
                 content: '',
             });
             return true;
@@ -1614,7 +1636,7 @@ async function handle(interaction) {
             state.step = 'basic';
             await interaction.update({
                 embeds: [buildCreationBasicsEmbed(state)],
-                components: [buildCreationBasicsRow(ownerDiscordId)],
+                components: buildCreationBasicsRows(ownerDiscordId),
                 content: '',
             });
             return true;
@@ -1648,7 +1670,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
-                    buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'classes'),
                 ],
                 content: '',
             });
@@ -1664,7 +1686,7 @@ async function handle(interaction) {
                     ],
                     components: [
                         buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
-                        buildCreationStepActionsRow(ownerDiscordId, 'classes'),
+                        ...buildCreationStepActionRows(ownerDiscordId, 'classes'),
                     ],
                     content: '',
                 });
@@ -1678,7 +1700,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
-                    buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'tier'),
                 ],
                 content: '',
             });
@@ -1693,7 +1715,7 @@ async function handle(interaction) {
                     ],
                     components: [
                         buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
-                        buildCreationStepActionsRow(ownerDiscordId, 'tier'),
+                        ...buildCreationStepActionRows(ownerDiscordId, 'tier'),
                     ],
                     content: '',
                 });
@@ -1709,7 +1731,7 @@ async function handle(interaction) {
                     ],
                     components: [
                         buildVersionRow(ownerDiscordId, state.data.version),
-                        buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                        ...buildCreationStepActionRows(ownerDiscordId, 'version'),
                     ],
                     content: '',
                 });
@@ -1723,7 +1745,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
-                    buildCreationStepActionsRow(ownerDiscordId, 'faction'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'faction'),
                 ],
                 content: '',
             });
@@ -1736,10 +1758,10 @@ async function handle(interaction) {
                     embeds: [
                         buildCreationEmbed(5, 'Fraktion w\u00e4hlen', 'Bitte w\u00e4hle eine Fraktion.'),
                     ],
-                    components: [
-                        buildFactionRow(ownerDiscordId, state.data.faction),
-                        buildCreationStepActionsRow(ownerDiscordId, 'faction'),
-                    ],
+                components: [
+                    buildFactionRow(ownerDiscordId, state.data.faction),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'faction'),
+                ],
                     content: '',
                 });
                 return true;
@@ -1752,7 +1774,7 @@ async function handle(interaction) {
                 ],
                 components: [
                     buildVersionRow(ownerDiscordId, state.data.version),
-                    buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'version'),
                 ],
                 content: '',
             });
@@ -1767,7 +1789,7 @@ async function handle(interaction) {
                     ],
                     components: [
                         buildVersionRow(ownerDiscordId, state.data.version),
-                        buildCreationStepActionsRow(ownerDiscordId, 'version'),
+                        ...buildCreationStepActionRows(ownerDiscordId, 'version'),
                     ],
                     content: '',
                 });
@@ -1781,9 +1803,7 @@ async function handle(interaction) {
                     buildCreationEmbed(7, 'Finalisieren', 'Bitte best\u00e4tige die Angaben.'),
                     summary,
                 ],
-                components: [
-                    buildCreationConfirmRow(ownerDiscordId),
-                ],
+                components: buildCreationConfirmRows(ownerDiscordId),
                 content: '',
             });
             return true;
@@ -1834,7 +1854,7 @@ async function handle(interaction) {
             embeds: [buildAvatarStepEmbed(state, 'Ich habe dir eine DM geschickt. Lade dort dein Avatar-Bild hoch.')],
             components: [
                 buildAvatarUploadRow(ownerDiscordId),
-                buildCreationStepActionsRow(ownerDiscordId, 'avatar'),
+                ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
             ],
             content: '',
         });
@@ -2138,7 +2158,7 @@ async function handle(interaction) {
 
         if (action === 'back') {
             await interaction.update({
-                components: [buildCharacterCardRow({ characterId: character.id, ownerDiscordId, isFiller: character.is_filler })],
+                components: buildCharacterCardRows({ characterId: character.id, ownerDiscordId, isFiller: character.is_filler }),
                 content: '',
             });
             return true;
