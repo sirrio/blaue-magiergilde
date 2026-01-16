@@ -287,7 +287,7 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
             .setLabel('Neu')
-            .setStyle(ButtonStyle.Primary),
+            .setStyle(ButtonStyle.Success),
     ));
 
     return { embeds: [summary], components };

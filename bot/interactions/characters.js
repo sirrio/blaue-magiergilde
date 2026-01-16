@@ -189,6 +189,11 @@ function formatFactionLabel(value) {
         .join(' ');
 }
 
+function safeInt(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
+
 function buildCharacterManageRows({ characterId, ownerDiscordId }) {
     return [
         new ActionRowBuilder().addComponents(
@@ -233,14 +238,45 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
 }
 
 function buildCharacterManageView(character, { ownerDiscordId }) {
+    const name = String(character.name || `Charakter ${character.id}`);
+    const classNames = String(character.class_names || '').trim() || '-';
+    const isFiller = Boolean(character.is_filler);
+    const startTierRaw = String(character.start_tier || '').trim();
+    const startTier = isFiller ? 'Filler' : (startTierRaw ? startTierRaw.toUpperCase() : '-');
+    const version = String(character.version || '2024');
+    const faction = formatFactionLabel(character.faction);
+    const notesRaw = String(character.notes || '').trim();
+    const notes = notesRaw ? notesRaw.slice(0, 1000) : '-';
+    const avatarRaw = String(character.avatar || '').trim();
+    const avatar = avatarRaw ? 'Vorhanden' : 'Kein Avatar';
+    const externalLink = String(character.external_link || character.externalLink || '').trim();
+    const linkValue = externalLink
+        ? (isHttpUrl(externalLink) ? `[Link öffnen](${externalLink})` : externalLink.slice(0, 1000))
+        : '-';
+    const dmBubbles = String(safeInt(character.dm_bubbles));
+    const dmCoins = String(safeInt(character.dm_coins));
+    const bubbleSpend = String(safeInt(character.bubble_shop_spend));
+
+    const descriptionParts = [name];
+    if (startTier !== '-') {
+        descriptionParts.push(startTier);
+    }
+
     const embed = new EmbedBuilder()
         .setTitle('Charakter verwalten')
         .setColor(0x4f46e5)
-        .setDescription(`${character.name} \u00b7 ${String(character.start_tier || '').toUpperCase()}`)
+        .setDescription(descriptionParts.join(' \u00b7 '))
         .addFields(
-            { name: 'Version', value: String(character.version || '2024'), inline: true },
-            { name: 'Fraktion', value: String(character.faction || 'none'), inline: true },
-            { name: 'Filler', value: character.is_filler ? 'Ja' : 'Nein', inline: true },
+            { name: 'Klassen', value: classNames, inline: false },
+            { name: 'Fraktion', value: faction, inline: true },
+            { name: 'Version', value: version, inline: true },
+            { name: 'Start-Tier', value: startTier, inline: true },
+            { name: 'Avatar', value: avatar, inline: true },
+            { name: 'External Link', value: linkValue, inline: false },
+            { name: 'Notizen', value: notes, inline: false },
+            { name: 'DM Bubbles', value: dmBubbles, inline: true },
+            { name: 'DM Coins', value: dmCoins, inline: true },
+            { name: 'Bubble Shop', value: bubbleSpend, inline: true },
         );
 
     return {
@@ -424,7 +460,7 @@ function buildCreationConfirmRows(ownerDiscordId) {
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_confirm_${ownerDiscordId}`)
                 .setLabel('Charakter erstellen')
-                .setStyle(ButtonStyle.Primary),
+                .setStyle(ButtonStyle.Success),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -478,7 +514,7 @@ function buildAvatarUploadRow(ownerDiscordId) {
         new ButtonBuilder()
             .setCustomId(`charactersCreate_avatar_dm_${ownerDiscordId}`)
             .setLabel('Avatar in DM hochladen')
-            .setStyle(ButtonStyle.Secondary),
+            .setStyle(ButtonStyle.Primary),
     );
 }
 
@@ -965,7 +1001,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
             new ButtonBuilder()
                 .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
                 .setLabel('Verwalten')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
                 .setLabel('L\u00f6schen')
@@ -2121,11 +2157,11 @@ async function handle(interaction) {
                 new ButtonBuilder()
                     .setCustomId(`advAdd_${character.id}_${ownerDiscordId}`)
                     .setLabel('Neues Abenteuer')
-                    .setStyle(ButtonStyle.Primary),
+                    .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                     .setCustomId(`advList_${character.id}_${ownerDiscordId}`)
                     .setLabel('Liste')
-                    .setStyle(ButtonStyle.Secondary),
+                    .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
                     .setLabel('Zur\u00fcck')
@@ -2140,12 +2176,12 @@ async function handle(interaction) {
                 new ButtonBuilder()
                     .setCustomId(`dtAdd_${character.id}_${ownerDiscordId}`)
                     .setLabel('Downtime hinzuf\u00fcgen')
-                    .setStyle(ButtonStyle.Primary)
+                    .setStyle(ButtonStyle.Success)
                     .setDisabled(Boolean(character.is_filler)),
                 new ButtonBuilder()
                     .setCustomId(`dtList_${character.id}_${ownerDiscordId}`)
                     .setLabel('Liste')
-                    .setStyle(ButtonStyle.Secondary)
+                    .setStyle(ButtonStyle.Primary)
                     .setDisabled(Boolean(character.is_filler)),
                 new ButtonBuilder()
                     .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
