@@ -551,7 +551,7 @@ async function createAdventureForDiscord(
 async function updateAdventureForDiscord(
     discordUser,
     adventureId,
-    { duration, startDate, notes, title, gameMaster, allyIds = [], guildCharacterIds = [] },
+    { duration, startDate, notes, title, gameMaster, hasAdditionalBubble, allyIds = [], guildCharacterIds = [] },
 ) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
@@ -564,14 +564,17 @@ async function updateAdventureForDiscord(
     const newNotes = typeof notes === 'string' ? notes : existing.notes;
     const newTitle = typeof title === 'string' ? title : existing.title;
     const newGameMaster = typeof gameMaster === 'string' ? gameMaster : existing.game_master;
+    const newHasAdditionalBubble = typeof hasAdditionalBubble === 'boolean'
+        ? (hasAdditionalBubble ? 1 : 0)
+        : existing.has_additional_bubble;
 
     await db.execute(
         `
             UPDATE adventures
-            SET duration = ?, start_date = ?, notes = ?, title = ?, game_master = ?, updated_at = ?
+            SET duration = ?, start_date = ?, notes = ?, title = ?, game_master = ?, has_additional_bubble = ?, updated_at = ?
             WHERE id = ?
         `,
-        [safeDuration, date, newNotes ?? null, newTitle ?? null, newGameMaster ?? null, nowSql(), adventureId],
+        [safeDuration, date, newNotes ?? null, newTitle ?? null, newGameMaster ?? null, newHasAdditionalBubble, nowSql(), adventureId],
     );
 
     let participantsOk = true;
