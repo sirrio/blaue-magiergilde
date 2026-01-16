@@ -7,11 +7,11 @@ const {
     TextInputBuilder,
     TextInputStyle,
 } = require('discord.js');
-const { attachRateLimitListner, waitForDiscordRateLimit } = require('../discordRateLimit');
+const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
 const { pendingGames } = require('../state');
 
 async function handle(interaction) {
-    attachRateLimitListner(interaction?.client);
+    attachRateLimitListener(interaction?.client);
 
     if (interaction.isButton() && interaction.customId.startsWith('tier_')) {
         const [, id, tier] = interaction.customId.split('_');

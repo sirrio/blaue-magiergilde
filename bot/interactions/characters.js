@@ -46,7 +46,12 @@ const {
 } = require('../commands/game/characters');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
-const { pendingCharacterCreations, pendingCharacterAvatarUpdates, pendingAdventureCreations } = require('../state');
+const {
+    pendingCharacterCreations,
+    pendingCharacterAvatarUpdates,
+    pendingAdventureCreations,
+    pendingDowntimeCreations,
+} = require('../state');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -339,10 +344,28 @@ function clearAdventureCreationState(userId) {
     pendingAdventureCreations.delete(adventureCreationKey(userId));
 }
 
-function createAdventureState({ ownerDiscordId, characterId }) {
+function downtimeCreationKey(userId) {
+    return String(userId);
+}
+
+function getDowntimeCreationState(userId) {
+    return pendingDowntimeCreations.get(downtimeCreationKey(userId)) || null;
+}
+
+function setDowntimeCreationState(userId, state) {
+    pendingDowntimeCreations.set(downtimeCreationKey(userId), state);
+}
+
+function clearDowntimeCreationState(userId) {
+    pendingDowntimeCreations.delete(downtimeCreationKey(userId));
+}
+
+function createAdventureState({ ownerDiscordId, characterId, mode = 'create', adventureId = null }) {
     return {
         ownerDiscordId: String(ownerDiscordId),
         characterId: Number(characterId),
+        mode,
+        adventureId: adventureId ? Number(adventureId) : null,
         step: 'duration',
         data: {
             durationSeconds: null,
@@ -358,7 +381,27 @@ function createAdventureState({ ownerDiscordId, characterId }) {
     };
 }
 
+function createDowntimeState({ ownerDiscordId, characterId, mode = 'create', downtimeId = null }) {
+    return {
+        ownerDiscordId: String(ownerDiscordId),
+        characterId: Number(characterId),
+        mode,
+        downtimeId: downtimeId ? Number(downtimeId) : null,
+        step: 'duration',
+        data: {
+            durationSeconds: null,
+            startDate: '',
+            type: 'other',
+            notes: '',
+        },
+        promptMessage: null,
+        promptInteraction: null,
+    };
+}
+
 const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
+
+const downtimeCreationSteps = ['duration', 'date', 'type', 'notes', 'confirm'];
 
 function getAdventureStepNumber(stepKey) {
     const index = adventureCreationSteps.indexOf(stepKey);
@@ -369,6 +412,23 @@ function getAdventurePreviousStep(stepKey) {
     const index = adventureCreationSteps.indexOf(stepKey);
     if (index <= 0) return 'duration';
     return adventureCreationSteps[index - 1];
+}
+
+function getDowntimeStepNumber(stepKey) {
+    const index = downtimeCreationSteps.indexOf(stepKey);
+    return index >= 0 ? index + 1 : 1;
+}
+
+function getDowntimePreviousStep(stepKey) {
+    const index = downtimeCreationSteps.indexOf(stepKey);
+    if (index <= 0) return 'duration';
+    return downtimeCreationSteps[index - 1];
+}
+
+function getDowntimeNextStep(stepKey) {
+    const index = downtimeCreationSteps.indexOf(stepKey);
+    if (index < 0 || index >= downtimeCreationSteps.length - 1) return 'confirm';
+    return downtimeCreationSteps[index + 1];
 }
 
 function truncateText(value, max = 200) {
@@ -386,9 +446,9 @@ function formatAdventureSummaryFields(state, participantsLabel) {
     const title = state?.data?.title ? truncateText(state.data.title, 120) : '-';
     const gameMaster = state?.data?.gameMaster ? truncateText(state.data.gameMaster, 120) : '-';
     const quest = state?.data?.hasAdditionalBubble === true
-        ? 'Ja (+1 Bubble)'
+        ? 'Yes (+1 bubble)'
         : state?.data?.hasAdditionalBubble === false
-            ? 'Nein'
+            ? 'No'
             : '-';
     const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
     const participants = participantsLabel || (state?.data?.guildCharacterIds?.length ? `${state.data.guildCharacterIds.length} selected` : '-');
@@ -396,7 +456,7 @@ function formatAdventureSummaryFields(state, participantsLabel) {
     return [
         { name: 'Duration', value: duration, inline: true },
         { name: 'Date', value: date, inline: true },
-        { name: 'Characterquest', value: quest, inline: true },
+        { name: 'Character quest', value: quest, inline: true },
         { name: 'Title', value: title, inline: false },
         { name: 'Game Master', value: gameMaster, inline: false },
         { name: 'Notes', value: notes, inline: false },
@@ -406,8 +466,9 @@ function formatAdventureSummaryFields(state, participantsLabel) {
 
 function buildAdventureStepEmbed(stepKey, state, description, participantsLabel) {
     const stepNumber = getAdventureStepNumber(stepKey);
+    const title = state?.mode === 'edit' ? 'Edit adventure' : 'Create adventure';
     const embed = new EmbedBuilder()
-        .setTitle('Create adventure')
+        .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
         .setFooter({ text: `Step ${stepNumber}/7` });
@@ -429,14 +490,14 @@ function buildAdventureDurationRows(state) {
                 .setCustomId(`advCreate_duration_21600_${characterId}_${ownerDiscordId}`)
                 .setLabel('2 Bubble (6h)')
                 .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
-                .setLabel('3 Bubble (9h)')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Eigene Duration')
-                .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
+            .setLabel('3 Bubble (9h)')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
+            .setLabel('Custom duration')
+            .setStyle(ButtonStyle.Primary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -455,18 +516,18 @@ function buildAdventureDateRows(state) {
     const { characterId, ownerDiscordId } = state;
     return [
         new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`advCreate_date_today_${characterId}_${ownerDiscordId}`)
-                .setLabel('Heute')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_date_yesterday_${characterId}_${ownerDiscordId}`)
-                .setLabel('Gestern')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`advCreate_date_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Eigenes Date')
-                .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`advCreate_date_today_${characterId}_${ownerDiscordId}`)
+            .setLabel('Today')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`advCreate_date_yesterday_${characterId}_${ownerDiscordId}`)
+            .setLabel('Yesterday')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`advCreate_date_custom_${characterId}_${ownerDiscordId}`)
+            .setLabel('Custom date')
+            .setStyle(ButtonStyle.Primary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -518,11 +579,11 @@ function buildAdventureQuestRows(state) {
         .setMaxValues(1)
         .addOptions(
             new StringSelectMenuOptionBuilder()
-                .setLabel('Ja, Characterquest (+1 Bubble)')
+                .setLabel('Yes, character quest (+1 bubble)')
                 .setValue('yes')
                 .setDefault(selected === true),
             new StringSelectMenuOptionBuilder()
-                .setLabel('Nein')
+                .setLabel('No')
                 .setValue('no')
                 .setDefault(selected === false),
         );
@@ -625,6 +686,7 @@ function buildAdventureParticipantsRows(state, options) {
 
 function buildAdventureConfirmRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const confirmLabel = state?.mode === 'edit' ? 'Save adventure' : 'Create adventure';
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -633,7 +695,7 @@ function buildAdventureConfirmRows(state) {
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_confirm_${characterId}_${ownerDiscordId}`)
-                .setLabel('Create adventure')
+                .setLabel(confirmLabel)
                 .setStyle(ButtonStyle.Success),
         ),
         new ActionRowBuilder().addComponents(
@@ -655,6 +717,25 @@ function buildAdventureMenuRow(character, ownerDiscordId) {
             .setCustomId(`advList_${character.id}_${ownerDiscordId}`)
             .setLabel('List')
             .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
+            .setLabel('Back')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+function buildDowntimeMenuRow(character, ownerDiscordId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`dtAdd_${character.id}_${ownerDiscordId}`)
+            .setLabel('Add downtime')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(Boolean(character.is_filler)),
+        new ButtonBuilder()
+            .setCustomId(`dtList_${character.id}_${ownerDiscordId}`)
+            .setLabel('List')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(Boolean(character.is_filler)),
         new ButtonBuilder()
             .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
             .setLabel('Back')
@@ -1571,7 +1652,7 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
         .setPlaceholder('Select adventure...')
         .addOptions(
             adventures.slice(0, 25).map(a => {
-                const title = String(a.title || '').trim() || '(ohne Title)';
+                const title = String(a.title || '').trim() || '(No title)';
                 const extra = a.has_additional_bubble ? ' +1' : '';
                 return new StringSelectMenuOptionBuilder()
                     .setLabel(`${a.start_date} - ${title}`.slice(0, 100))
@@ -1588,6 +1669,325 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
+}
+
+function formatDowntimeSummaryFields(state) {
+    const duration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
+        ? formatDuration(state.data.durationSeconds)
+        : '-';
+    const date = state?.data?.startDate || '-';
+    const type = state?.data?.type || '-';
+    const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
+
+    return [
+        { name: 'Duration', value: duration, inline: true },
+        { name: 'Date', value: date, inline: true },
+        { name: 'Type', value: type, inline: true },
+        { name: 'Notes', value: notes, inline: false },
+    ];
+}
+
+function buildDowntimeStepEmbed(stepKey, state, description) {
+    const stepNumber = getDowntimeStepNumber(stepKey);
+    const title = state?.mode === 'edit' ? 'Edit downtime' : 'Create downtime';
+    const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setColor(0x4f46e5)
+        .setDescription(description)
+        .setFooter({ text: `Step ${stepNumber}/5` });
+
+    embed.addFields(formatDowntimeSummaryFields(state));
+    return embed;
+}
+
+function buildDowntimeDurationRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    const hasDuration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined;
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`dtCreate_duration_custom_${characterId}_${ownerDiscordId}`)
+            .setLabel('Set duration')
+            .setStyle(ButtonStyle.Primary),
+    );
+    if (hasDuration) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_duration_next_${characterId}_${ownerDiscordId}`)
+                .setLabel('Next')
+                .setStyle(ButtonStyle.Primary),
+        );
+    }
+
+    return [
+        row,
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildDowntimeDateRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    const hasDate = Boolean(state?.data?.startDate);
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`dtCreate_date_custom_${characterId}_${ownerDiscordId}`)
+            .setLabel('Set date')
+            .setStyle(ButtonStyle.Primary),
+    );
+    if (hasDate) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_date_next_${characterId}_${ownerDiscordId}`)
+                .setLabel('Next')
+                .setStyle(ButtonStyle.Primary),
+        );
+    }
+
+    return [
+        row,
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildDowntimeTypeRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    const selected = String(state?.data?.type || 'other').toLowerCase();
+
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`dtCreate_type_${characterId}_${ownerDiscordId}`)
+        .setPlaceholder('Select type...')
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions(
+            new StringSelectMenuOptionBuilder()
+                .setLabel('Faction')
+                .setValue('faction')
+                .setDefault(selected === 'faction'),
+            new StringSelectMenuOptionBuilder()
+                .setLabel('Other')
+                .setValue('other')
+                .setDefault(selected === 'other'),
+        );
+
+    return [
+        new ActionRowBuilder().addComponents(select),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildDowntimeNotesRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_notes_edit_${characterId}_${ownerDiscordId}`)
+                .setLabel('Edit notes')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_notes_skip_${characterId}_${ownerDiscordId}`)
+                .setLabel('Skip')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildDowntimeConfirmRows(state) {
+    const { characterId, ownerDiscordId } = state;
+    const confirmLabel = state?.mode === 'edit' ? 'Save downtime' : 'Create downtime';
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_confirm_${characterId}_${ownerDiscordId}`)
+                .setLabel(confirmLabel)
+                .setStyle(ButtonStyle.Success),
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+}
+
+function buildDowntimeDurationModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`dtCreate_durationModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Downtime duration');
+
+    const durationInput = new TextInputBuilder()
+        .setCustomId('dtDuration')
+        .setLabel('Duration (HH:MM or minutes)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
+            ? formatDuration(state.data.durationSeconds)
+            : '');
+
+    modal.addComponents(new ActionRowBuilder().addComponents(durationInput));
+    return modal;
+}
+
+function buildDowntimeDateModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`dtCreate_dateModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Downtime date');
+
+    const dateInput = new TextInputBuilder()
+        .setCustomId('dtDate')
+        .setLabel('Date (YYYY-MM-DD)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(safeModalValue(state?.data?.startDate, 10));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
+    return modal;
+}
+
+function buildDowntimeNotesModal(state) {
+    const { characterId, ownerDiscordId } = state;
+    const modal = new ModalBuilder()
+        .setCustomId(`dtCreate_notesModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Downtime notes');
+
+    const notesInput = new TextInputBuilder()
+        .setCustomId('dtNotes')
+        .setLabel('Notes (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setValue(safeModalValue(state?.data?.notes));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(notesInput));
+    return modal;
+}
+
+async function updateDowntimeMessage(state, payload) {
+    const activeInteraction = state?.activeInteraction;
+
+    if (state?.promptMessage?.editable) {
+        try {
+            await state.promptMessage.edit(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (!state?.promptMessage && state?.promptMessageId && state?.promptChannelId && state?.promptInteraction?.client) {
+        try {
+            const channel = await state.promptInteraction.client.channels.fetch(state.promptChannelId);
+            if (channel?.isTextBased?.()) {
+                const message = await channel.messages.fetch(state.promptMessageId);
+                if (message) {
+                    state.promptMessage = message;
+                    await message.edit(payload);
+                    return true;
+                }
+            }
+        } catch {
+            // fall through
+        }
+    }
+
+    if (activeInteraction?.isMessageComponent?.() || activeInteraction?.isModalSubmit?.()) {
+        try {
+            await activeInteraction.update(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (state?.promptInteraction?.isRepliable?.()) {
+        await state.promptInteraction.editReply(payload);
+        return true;
+    }
+
+    return false;
+}
+
+async function buildDowntimeStepPayload({ interaction, state, message }) {
+    const step = state.step;
+    const descriptionMap = {
+        duration: 'Choose the downtime duration.',
+        date: 'Choose the downtime date.',
+        type: 'Choose the downtime type.',
+        notes: 'Add optional notes.',
+        confirm: 'Please confirm the details.',
+    };
+    const description = message || descriptionMap[step] || 'Continue.';
+
+    if (step === 'duration') {
+        return {
+            embeds: [buildDowntimeStepEmbed(step, state, description)],
+            components: buildDowntimeDurationRows(state),
+        };
+    }
+    if (step === 'date') {
+        return {
+            embeds: [buildDowntimeStepEmbed(step, state, description)],
+            components: buildDowntimeDateRows(state),
+        };
+    }
+    if (step === 'type') {
+        return {
+            embeds: [buildDowntimeStepEmbed(step, state, description)],
+            components: buildDowntimeTypeRows(state),
+        };
+    }
+    if (step === 'notes') {
+        return {
+            embeds: [buildDowntimeStepEmbed(step, state, description)],
+            components: buildDowntimeNotesRows(state),
+        };
+    }
+
+    return {
+        embeds: [buildDowntimeStepEmbed(step, state, description)],
+        components: buildDowntimeConfirmRows(state),
+    };
 }
 
 function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
@@ -1762,7 +2162,7 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
     const embed = new EmbedBuilder()
         .setTitle('Edit participants')
         .setColor(0x4f46e5)
-        .setDescription(`${adventure.start_date} - ${String(adventure.title || '(ohne Title)')}`)
+        .setDescription(`${adventure.start_date} - ${String(adventure.title || '(No title)')}`)
         .addFields({ name: 'Aktuell', value: formatParticipantList(participants), inline: false });
 
     if (search) {
@@ -2716,22 +3116,7 @@ async function handle(interaction) {
         }
 
         if (action === 'dt') {
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`dtAdd_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Add downtime')
-                    .setStyle(ButtonStyle.Success)
-                    .setDisabled(Boolean(character.is_filler)),
-                new ButtonBuilder()
-                    .setCustomId(`dtList_${character.id}_${ownerDiscordId}`)
-                    .setLabel('List')
-                    .setStyle(ButtonStyle.Primary)
-                    .setDisabled(Boolean(character.is_filler)),
-                new ButtonBuilder()
-                    .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
-                    .setLabel('Back')
-                    .setStyle(ButtonStyle.Secondary),
-            );
+            const row = buildDowntimeMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
             return true;
         }
@@ -3446,18 +3831,32 @@ async function handle(interaction) {
         }
 
         try {
-            const result = await createAdventureForDiscord(interaction.user, {
-                characterId,
-                duration: state.data.durationSeconds,
-                startDate: state.data.startDate,
-                hasAdditionalBubble: state.data.hasAdditionalBubble === true,
-                title: state.data.title,
-                gameMaster: state.data.gameMaster,
-                notes: state.data.notes,
-                guildCharacterIds: state.data.guildCharacterIds,
-            });
+            const isEdit = state.mode === 'edit' && Number(state.adventureId) > 0;
+            let result;
 
-            if (!result.ok) {
+            if (isEdit) {
+                result = await updateAdventureForDiscord(interaction.user, state.adventureId, {
+                    duration: state.data.durationSeconds,
+                    startDate: state.data.startDate,
+                    hasAdditionalBubble: state.data.hasAdditionalBubble === true,
+                    title: state.data.title,
+                    gameMaster: state.data.gameMaster,
+                    notes: state.data.notes,
+                });
+            } else {
+                result = await createAdventureForDiscord(interaction.user, {
+                    characterId,
+                    duration: state.data.durationSeconds,
+                    startDate: state.data.startDate,
+                    hasAdditionalBubble: state.data.hasAdditionalBubble === true,
+                    title: state.data.title,
+                    gameMaster: state.data.gameMaster,
+                    notes: state.data.notes,
+                    guildCharacterIds: state.data.guildCharacterIds,
+                });
+            }
+
+            if (!result?.ok) {
                 await updateAdventureMessage(state, {
                     embeds: [buildAdventureStepEmbed('confirm', state, 'Adventure could not be saved.')],
                     components: buildAdventureConfirmRows(state),
@@ -3465,18 +3864,25 @@ async function handle(interaction) {
                 return true;
             }
 
+            const adventureId = isEdit ? Number(state.adventureId) : Number(result.id);
             clearAdventureCreationState(ownerDiscordId);
 
-            const adventure = await findAdventureForDiscord(interaction.user, result.id);
+            if (isEdit && adventureId) {
+                await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
+                    guildCharacterIds: state.data.guildCharacterIds,
+                });
+            }
+
+            const adventure = await findAdventureForDiscord(interaction.user, adventureId);
             if (!adventure) {
-                await interaction.update({ content: 'Adventure saved.', embeds: [], components: [] });
+                await interaction.update({ content: isEdit ? 'Adventure saved.' : 'Adventure saved.', embeds: [], components: [] });
                 return true;
             }
 
             const participants = await listAdventureParticipantsForDiscord(interaction.user, adventure.id);
             const row = buildAdventureActionRow({ adventureId: adventure.id, characterId, ownerDiscordId });
             await interaction.update({
-                embeds: [buildAdventureEmbed(adventure, 'Adventure saved', participants)],
+                embeds: [buildAdventureEmbed(adventure, isEdit ? 'Adventure updated' : 'Adventure saved', participants)],
                 components: [row],
                 content: '',
             });
@@ -3596,46 +4002,403 @@ async function handle(interaction) {
             return true;
         }
 
-        const modal = new ModalBuilder()
-            .setCustomId(`dtCreateModal_${characterId}_${ownerDiscordId}`)
-            .setTitle('Add downtime');
+        const state = createDowntimeState({ ownerDiscordId, characterId, mode: 'create' });
+        state.step = 'duration';
+        state.data.startDate = new Date().toISOString().slice(0, 10);
+        setDowntimeCreationState(ownerDiscordId, state);
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+            interaction,
+            state,
+            message: 'Choose the downtime duration.',
+        }));
+        return true;
+    }
 
-        const typeInput = new TextInputBuilder()
-            .setCustomId('dtTypee')
-            .setLabel('Type')
-            .setPlaceholder('faction | other')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue('other');
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_duration_custom_')) {
+        const match = interaction.customId.match(/^dtCreate_duration_custom_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
 
-        const durationInput = new TextInputBuilder()
-            .setCustomId('dtDuration')
-            .setLabel('Duration (HH:MM or minutes)')
-            .setPlaceholder('03:00')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
 
-        const dateInput = new TextInputBuilder()
-            .setCustomId('dtDate')
-            .setLabel('Date (YYYY-MM-DD)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(new Date().toISOString().slice(0, 10));
+        let state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) {
+            state = createDowntimeState({ ownerDiscordId, characterId, mode: 'create' });
+            setDowntimeCreationState(ownerDiscordId, state);
+        }
 
-        const notesInput = new TextInputBuilder()
-            .setCustomId('dtNotes')
-            .setLabel('Notes (optional)')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false);
+        ensurePromptMessage(state, interaction);
+        await interaction.showModal(buildDowntimeDurationModal(state));
+        return true;
+    }
 
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(typeInput),
-            new ActionRowBuilder().addComponents(durationInput),
-            new ActionRowBuilder().addComponents(dateInput),
-            new ActionRowBuilder().addComponents(notesInput),
-        );
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_duration_next_')) {
+        const match = interaction.customId.match(/^dtCreate_duration_next_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
 
-        await interaction.showModal(modal);
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        if (state.data.durationSeconds === null || state.data.durationSeconds === undefined) {
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Please set a duration before continuing.',
+            }));
+            return true;
+        }
+
+        state.step = getDowntimeNextStep('duration');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_durationModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
+        if (duration === null) {
+            ensurePromptMessage(state, interaction);
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.',
+            }));
+            return true;
+        }
+
+        state.data.durationSeconds = duration;
+        state.step = getDowntimeNextStep('duration');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_date_custom_')) {
+        const match = interaction.customId.match(/^dtCreate_date_custom_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) {
+            state = createDowntimeState({ ownerDiscordId, characterId, mode: 'create' });
+            setDowntimeCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+        await interaction.showModal(buildDowntimeDateModal(state));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_date_next_')) {
+        const match = interaction.customId.match(/^dtCreate_date_next_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        if (!state.data.startDate) {
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Please set a date before continuing.',
+            }));
+            return true;
+        }
+
+        state.step = getDowntimeNextStep('date');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_dateModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        const startDate = parseIsoDate(interaction.fields.getTextInputValue('dtDate'));
+        if (!startDate) {
+            ensurePromptMessage(state, interaction);
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Invalid date. Use YYYY-MM-DD.',
+            }));
+            return true;
+        }
+
+        state.data.startDate = startDate;
+        state.step = getDowntimeNextStep('date');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('dtCreate_type_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        state.data.type = interaction.values?.[0] === 'faction' ? 'faction' : 'other';
+        state.step = getDowntimeNextStep('type');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_notes_edit_')) {
+        const match = interaction.customId.match(/^dtCreate_notes_edit_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        ensurePromptMessage(state, interaction);
+        await interaction.showModal(buildDowntimeNotesModal(state));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_notes_skip_')) {
+        const match = interaction.customId.match(/^dtCreate_notes_skip_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        state.data.notes = '';
+        state.step = getDowntimeNextStep('notes');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_notesModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        state.data.notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
+        state.step = getDowntimeNextStep('notes');
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_back_')) {
+        const match = interaction.customId.match(/^dtCreate_back_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) return false;
+
+        state.step = getDowntimePreviousStep(state.step);
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_cancel_')) {
+        const match = interaction.customId.match(/^dtCreate_cancel_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        clearDowntimeCreationState(ownerDiscordId);
+        await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId)] });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('dtCreate_confirm_')) {
+        const match = interaction.customId.match(/^dtCreate_confirm_(\d+)_(\d+)$/);
+        if (!match) return false;
+        const characterId = Number(match[1]);
+        const ownerDiscordId = match[2];
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getDowntimeCreationState(ownerDiscordId);
+        if (!state) {
+            state = createDowntimeState({ ownerDiscordId, characterId, mode: 'create' });
+            setDowntimeCreationState(ownerDiscordId, state);
+        }
+
+        ensurePromptMessage(state, interaction);
+
+        if (state.data.durationSeconds === null || !state.data.startDate || !state.data.type) {
+            if (state.data.durationSeconds === null) {
+                state.step = 'duration';
+            } else if (!state.data.startDate) {
+                state.step = 'date';
+            } else {
+                state.step = 'type';
+            }
+            await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+                interaction,
+                state,
+                message: 'Please fill in the missing details.',
+            }));
+            return true;
+        }
+
+        try {
+            const isEdit = state.mode === 'edit' && Number(state.downtimeId) > 0;
+            let result;
+
+            if (isEdit) {
+                result = await updateDowntimeForDiscord(interaction.user, state.downtimeId, {
+                    duration: state.data.durationSeconds,
+                    startDate: state.data.startDate,
+                    type: state.data.type,
+                    notes: state.data.notes,
+                });
+            } else {
+                result = await createDowntimeForDiscord(interaction.user, {
+                    characterId,
+                    duration: state.data.durationSeconds,
+                    startDate: state.data.startDate,
+                    type: state.data.type,
+                    notes: state.data.notes,
+                });
+            }
+
+            if (!result?.ok) {
+                await updateDowntimeMessage(state, {
+                    embeds: [buildDowntimeStepEmbed('confirm', state, 'Downtime could not be saved.')],
+                    components: buildDowntimeConfirmRows(state),
+                });
+                return true;
+            }
+
+            const downtimeId = isEdit ? Number(state.downtimeId) : Number(result.id);
+            clearDowntimeCreationState(ownerDiscordId);
+
+            const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
+            if (!downtime) {
+                await interaction.update({ content: isEdit ? 'Downtime saved.' : 'Downtime saved.', embeds: [], components: [] });
+                return true;
+            }
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`dtEdit_${downtime.id}_${characterId}_${ownerDiscordId}`)
+                    .setLabel('Edit')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`dtDelete_${downtime.id}_${characterId}_${ownerDiscordId}`)
+                    .setLabel('Delete')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
+                    .setLabel('Back')
+                    .setStyle(ButtonStyle.Secondary),
+            );
+
+            await interaction.update({
+                embeds: [buildDowntimeEmbed(downtime, isEdit ? 'Downtime updated' : 'Downtime saved')],
+                components: [row],
+                content: '',
+            });
+        } catch (error) {
+            console.error(error);
+            if (error instanceof DiscordNotLinkedError) {
+                await updateDowntimeMessage(state, { content: notLinkedContent(), embeds: [], components: [] });
+                return true;
+            }
+            await updateDowntimeMessage(state, {
+                embeds: [buildDowntimeStepEmbed('confirm', state, 'Failed to save downtime.')],
+                components: buildDowntimeConfirmRows(state),
+            });
+        }
         return true;
     }
 
@@ -3999,46 +4762,30 @@ async function handle(interaction) {
             return true;
         }
 
-        const modal = new ModalBuilder()
-            .setCustomId(`advUpdateModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setTitle('Edit adventure');
+        const participants = await listAdventureParticipantsForDiscord(interaction.user, adventureId);
+        const linkedIds = participants
+            .map(participant => participant.linked_character_id)
+            .filter(Boolean)
+            .map(id => Number(id))
+            .filter(id => Number.isFinite(id) && id > 0);
 
-        const durationInput = new TextInputBuilder()
-            .setCustomId('advDuration')
-            .setLabel('Duration (HH:MM or minutes)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(formatDuration(adventure.duration));
+        const state = createAdventureState({ ownerDiscordId, characterId, mode: 'edit', adventureId });
+        state.step = 'confirm';
+        state.data.durationSeconds = Number(adventure.duration) || 0;
+        state.data.startDate = String(adventure.start_date || '');
+        state.data.title = String(adventure.title || '');
+        state.data.gameMaster = String(adventure.game_master || '');
+        state.data.hasAdditionalBubble = adventure.has_additional_bubble ? true : false;
+        state.data.notes = String(adventure.notes || '');
+        state.data.guildCharacterIds = linkedIds;
 
-        const dateInput = new TextInputBuilder()
-            .setCustomId('advDate')
-            .setLabel('Date (YYYY-MM-DD)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(safeModalValue(adventure.start_date, 10));
-
-        const titleInput = new TextInputBuilder()
-            .setCustomId('advTitle')
-            .setLabel('Title (optional)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false)
-            .setValue(safeModalValue(adventure.title));
-
-        const gmInput = new TextInputBuilder()
-            .setCustomId('advGm')
-            .setLabel('Game Master (optional)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false)
-            .setValue(safeModalValue(adventure.game_master));
-
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(durationInput),
-            new ActionRowBuilder().addComponents(dateInput),
-            new ActionRowBuilder().addComponents(titleInput),
-            new ActionRowBuilder().addComponents(gmInput),
-        );
-
-        await interaction.showModal(modal);
+        setAdventureCreationState(ownerDiscordId, state);
+        ensurePromptMessage(state, interaction);
+        await updateAdventureMessage(state, await buildAdventureStepPayload({
+            interaction,
+            state,
+            message: 'Review the adventure details.',
+        }));
         return true;
     }
 
@@ -4254,47 +5001,20 @@ async function handle(interaction) {
             return true;
         }
 
-        const modal = new ModalBuilder()
-            .setCustomId(`dtUpdateModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
-            .setTitle('Edit downtime');
+        const state = createDowntimeState({ ownerDiscordId, characterId, mode: 'edit', downtimeId });
+        state.step = 'confirm';
+        state.data.durationSeconds = Number(downtime.duration) || 0;
+        state.data.startDate = String(downtime.start_date || '');
+        state.data.type = String(downtime.type || 'other');
+        state.data.notes = String(downtime.notes || '');
 
-        const typeInput = new TextInputBuilder()
-            .setCustomId('dtTypee')
-            .setLabel('Type')
-            .setPlaceholder('faction | other')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(String(downtime.type || 'other'));
-
-        const durationInput = new TextInputBuilder()
-            .setCustomId('dtDuration')
-            .setLabel('Duration (HH:MM or minutes)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(formatDuration(downtime.duration));
-
-        const dateInput = new TextInputBuilder()
-            .setCustomId('dtDate')
-            .setLabel('Date (YYYY-MM-DD)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setValue(safeModalValue(downtime.start_date, 10));
-
-        const notesInput = new TextInputBuilder()
-            .setCustomId('dtNotes')
-            .setLabel('Notes (optional)')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false)
-            .setValue(safeModalValue(downtime.notes));
-
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(typeInput),
-            new ActionRowBuilder().addComponents(durationInput),
-            new ActionRowBuilder().addComponents(dateInput),
-            new ActionRowBuilder().addComponents(notesInput),
-        );
-
-        await interaction.showModal(modal);
+        setDowntimeCreationState(ownerDiscordId, state);
+        ensurePromptMessage(state, interaction);
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({
+            interaction,
+            state,
+            message: 'Review the downtime details.',
+        }));
         return true;
     }
 
