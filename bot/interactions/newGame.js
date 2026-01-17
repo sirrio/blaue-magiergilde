@@ -9,6 +9,7 @@ const {
 } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
 const { pendingGames } = require('../state');
+const { isThreadChannel, threadRestrictionMessage } = require('./newGameHelpers');
 
 async function handle(interaction) {
     attachRateLimitListener(interaction?.client);
@@ -101,6 +102,15 @@ async function handle(interaction) {
 
         if (!data) {
             await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (isThreadChannel(interaction.channel)) {
+            pendingGames.delete(id);
+            await interaction.reply({
+                content: threadRestrictionMessage(),
+                flags: MessageFlags.Ephemeral,
+            });
             return true;
         }
 
