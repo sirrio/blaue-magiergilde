@@ -7,12 +7,21 @@ const {
 } = require('discord.js');
 const { pendingGames } = require('../../state');
 const { commandName } = require('../../commandConfig');
+const { isThreadChannel, threadRestrictionMessage } = require('../../interactions/newGameHelpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('new-game'))
         .setDescription('Erstellt eine neue Spielankuendigung.'),
     async execute(interaction) {
+        if (isThreadChannel(interaction.channel)) {
+            await interaction.reply({
+                content: threadRestrictionMessage(),
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
+        }
+
         const id = interaction.id;
         pendingGames.set(id, {
             userId: interaction.user.id,
