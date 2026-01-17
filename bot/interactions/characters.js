@@ -2642,7 +2642,7 @@ async function handle(interaction) {
         const ownerDiscordId = interaction.customId.replace('charactersAction_new_', '');
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2696,7 +2696,7 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
         const ownerDiscordId = interaction.customId.replace('charactersSelect_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2732,7 +2732,7 @@ async function handle(interaction) {
     if (interaction.isModalSubmit() && interaction.customId.startsWith('charactersCreate_basic_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_basic_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2788,7 +2788,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_cancel_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_cancel_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2814,7 +2814,7 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_classes_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_classes_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2845,7 +2845,7 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_tier_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_tier_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2882,7 +2882,7 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_faction_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_faction_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2912,7 +2912,7 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_version_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_version_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2942,7 +2942,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_confirm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_confirm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -2962,7 +2962,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_back_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_back_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -4342,7 +4342,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
@@ -4842,7 +4842,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
 
