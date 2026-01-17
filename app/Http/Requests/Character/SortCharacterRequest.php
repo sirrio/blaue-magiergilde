@@ -15,7 +15,7 @@ class SortCharacterRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
     /**
@@ -26,7 +26,8 @@ class SortCharacterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'list' => 'required|array',
+            'list.*.id' => 'required|integer|exists:characters,id',
         ];
     }
 }

@@ -81,6 +81,8 @@ class CharacterController extends Controller
      */
     public function show(Character $character): Response
     {
+        $this->ensureCharacterOwner($character);
+
         $guildCharacters = Character::query()
             ->whereNull('deleted_at')
             ->where('guild_status', 'approved')
@@ -106,6 +108,8 @@ class CharacterController extends Controller
      */
     public function update(UpdateCharacterRequest $request, Character $character): RedirectResponse
     {
+        $this->ensureCharacterOwner($character);
+
         $character->name = $request->name;
         $character->faction = $request->faction;
         $character->notes = $request->notes;
@@ -129,6 +133,8 @@ class CharacterController extends Controller
      */
     public function destroy(Character $character): RedirectResponse
     {
+        $this->ensureCharacterOwner($character);
+
         if ($character->guild_status === 'approved') {
             $character->guild_status = 'retired';
         }
@@ -149,5 +155,13 @@ class CharacterController extends Controller
         $character->delete();
 
         return redirect()->back();
+    }
+
+    private function ensureCharacterOwner(Character $character): void
+    {
+        $userId = Auth::user()?->getAuthIdentifier();
+        if (! $userId || $character->user_id !== $userId) {
+            abort(403);
+        }
     }
 }
