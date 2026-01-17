@@ -1,9 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
-use App\Http\Controllers\RoomController;
-use App\Http\Controllers\RoomAssetLibraryController;
 use App\Http\Controllers\RoomAssetController;
+use App\Http\Controllers\RoomAssetLibraryController;
+use App\Http\Controllers\RoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])
@@ -17,7 +17,7 @@ Route::middleware(['auth'])
         Route::get('rooms/assets/library/asset', [RoomAssetLibraryController::class, 'show'])->name('rooms.assets.library.show');
     });
 
-Route::middleware(['auth'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Character;
 
+use App\Models\Character;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -23,7 +24,14 @@ class UpdateCharacterRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $character = $this->route('character');
+        if (! $character instanceof Character) {
+            return false;
+        }
+
+        $userId = $this->user()?->getAuthIdentifier();
+
+        return $userId && $character->user_id === $userId;
     }
 
     /**

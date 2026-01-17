@@ -3,7 +3,7 @@
 use App\Http\Controllers\Item\ItemController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

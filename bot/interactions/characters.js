@@ -45,6 +45,7 @@ const {
     tryBuildLocalAvatarAttachment,
     buildCharacterListView,
 } = require('../commands/game/characters');
+const { formatLocalIsoDate } = require('../dateUtils');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -1005,7 +1006,7 @@ function buildAdventureDateModal(state) {
         .setLabel('Date (YYYY-MM-DD)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(safeModalValue(state?.data?.startDate || new Date().toISOString().slice(0, 10), 10));
+        .setValue(safeModalValue(state?.data?.startDate || formatLocalIsoDate(), 10));
 
     modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
     return modal;
@@ -1146,6 +1147,9 @@ function buildFactionRow(ownerDiscordId, selectedValue) {
         { label: 'Unterhalter', value: 'unterhalter' },
         { label: 'Logistiker', value: 'logistiker' },
         { label: 'Flora & Fauna', value: 'flora & fauna' },
+        { label: 'Agenten', value: 'agenten' },
+        { label: 'Waffenmeister', value: 'waffenmeister' },
+        { label: 'Arkanisten', value: 'arkanisten' },
     ];
 
     const select = new StringSelectMenuBuilder()
@@ -1399,7 +1403,7 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
         const requestOptions = {
             method: 'POST',
             headers: {
-                'Content-Typee': 'application/json',
+                'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-Bot-Token': token,
             },
@@ -1424,19 +1428,19 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
             }
         }
 
-        const contentTypee = String(response.headers.get('content-type') || '');
+        const contentType = String(response.headers.get('content-type') || '');
 
         if (!response.ok) {
             const text = await response.text().catch(() => '');
             const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
-            console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentTypee} body=${preview}`);
+            console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentType} body=${preview}`);
             return false;
         }
 
-        if (!contentTypee.includes('application/json')) {
+        if (!contentType.includes('application/json')) {
             const text = await response.text().catch(() => '');
             const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
-            console.warn(`[bot] Avatar upload unexpected response. content-type=${contentTypee} body=${preview}`);
+            console.warn(`[bot] Avatar upload unexpected response. content-type=${contentType} body=${preview}`);
             return false;
         }
 
@@ -1533,7 +1537,7 @@ async function handleCreationAvatarMessage(message) {
     if (message.guildId) return false;
 
     const attachments = [...message.attachments.values()];
-    const attachment = attachments.find(item => String(item.contentTypee || '').startsWith('image/')) || attachments[0];
+    const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
     if (!attachment?.url) return false;
 
     state.data.avatar = attachment.url;
@@ -4058,7 +4062,7 @@ async function handle(interaction) {
         if (value === 'yesterday') {
             date.setDate(date.getDate() - 1);
         }
-        state.data.startDate = date.toISOString().slice(0, 10);
+        state.data.startDate = formatLocalIsoDate(date);
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -4402,7 +4406,7 @@ async function handle(interaction) {
 
         const state = createDowntimeState({ ownerDiscordId, characterId, mode: 'create' });
         state.step = 'duration';
-        state.data.startDate = new Date().toISOString().slice(0, 10);
+        state.data.startDate = formatLocalIsoDate();
         setDowntimeCreationState(ownerDiscordId, state);
         ensurePromptMessage(state, interaction);
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({
