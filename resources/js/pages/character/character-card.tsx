@@ -28,7 +28,10 @@ import React from 'react'
 import { useImage } from 'react-image'
 
 function CharacterImage({ character, className }: { character: Character; className?: string }) {
-  const srcList = character.avatar ? [`/storage/${character.avatar}`, '/images/no-avatar.svg'] : ['/images/no-avatar.svg']
+  const avatar = String(character.avatar || '').trim()
+  const srcList = avatar
+    ? [avatar.startsWith('http') ? avatar : `/storage/${avatar}`, '/images/no-avatar.svg']
+    : ['/images/no-avatar.svg']
   const { src } = useImage({
     srcList,
   })
