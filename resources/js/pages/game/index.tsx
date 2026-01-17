@@ -12,6 +12,7 @@ import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
 import { calculateCoinsSpend } from '@/helper/calculateCoinsSpend'
 import AppLayout from '@/layouts/app-layout'
+import DestroyGameModal, { DestroyGameButton } from '@/pages/game/destroy-game-modal'
 import StoreGameModal from '@/pages/game/store-game-modal'
 import UpdateGameModal from '@/pages/game/update-game-modal'
 import type { Character, Game, User } from '@/types'
@@ -765,12 +766,15 @@ export default function MasteredGames({ games, user, characters }: Props) {
                     <div className="text-right text-xs text-base-content/70">
                       {format(new Date(game.start_date), 'dd.MM.yyyy')}
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
                       <UpdateGameModal game={game}>
                         <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game">
                           <Pencil size={14} />
                         </Button>
                       </UpdateGameModal>
+                      <DestroyGameModal game={game}>
+                        <DestroyGameButton />
+                      </DestroyGameModal>
                     </div>
                   </ListRow>
                 )
