@@ -11,6 +11,7 @@ const {
     EmbedBuilder,
 } = require('discord.js');
 const { Agent } = require('undici');
+const { updateCreationReply } = require('./interactionReplies');
 
 const {
     DiscordNotLinkedError,
@@ -1337,23 +1338,6 @@ function buildCreationBasicModal(ownerDiscordId, state) {
     );
 
     return modal;
-}
-
-async function updateCreationReply(state, payload) {
-    const interaction = state?.promptInteraction;
-    if (!interaction || !interaction.isRepliable?.()) return;
-
-    if (interaction.replied || interaction.deferred) {
-        await interaction.editReply(payload);
-        return;
-    }
-
-    const replyPayload = {
-        ...payload,
-        flags: payload?.flags ?? MessageFlags.Ephemeral,
-    };
-
-    await interaction.reply(replyPayload);
 }
 
 async function updateCreationMessage(state, payload) {
@@ -5934,6 +5918,3 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
-
-
-
