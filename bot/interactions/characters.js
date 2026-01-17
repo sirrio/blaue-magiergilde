@@ -174,7 +174,8 @@ function parseDurationToSeconds(input) {
     const raw = String(input || '').trim();
     if (!raw) return null;
 
-    const matchHhMm = raw.match(/^(\d{1,2}):(\d{2})$/);
+    const normalized = raw.toLowerCase().replace(/\s+/g, ' ').trim();
+    const matchHhMm = normalized.match(/^(\d+)\s*:\s*(\d{1,2})$/);
     if (matchHhMm) {
         const hours = Number(matchHhMm[1]);
         const minutes = Number(matchHhMm[2]);
@@ -182,7 +183,24 @@ function parseDurationToSeconds(input) {
         return hours * 3600 + minutes * 60;
     }
 
-    const minutes = Number(raw);
+    if (normalized.includes('h') || normalized.includes('m')) {
+        const hourMatch = normalized.match(/(\d+)\s*h/);
+        const minuteMatch = normalized.match(/(\d+)\s*m/);
+        if (!hourMatch && !minuteMatch) return null;
+
+        let hours = hourMatch ? Number(hourMatch[1]) : 0;
+        let minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || minutes < 0) return null;
+
+        if (minutes >= 60) {
+            hours += Math.floor(minutes / 60);
+            minutes = minutes % 60;
+        }
+
+        return hours * 3600 + minutes * 60;
+    }
+
+    const minutes = Number(normalized);
     if (Number.isFinite(minutes) && minutes >= 0) return Math.floor(minutes) * 60;
     return null;
 }
@@ -214,6 +232,20 @@ function formatFactionLabel(value) {
 function safeInt(value, fallback = 0) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
+}
+
+function parseManageIds(customId) {
+    const parts = String(customId || '').split('_');
+    if (parts.length < 5) return null;
+
+    const recordId = Number(parts[2]);
+    const characterId = Number(parts[3]);
+    const ownerDiscordId = parts[4];
+    if (!Number.isFinite(recordId) || recordId < 1 || !Number.isFinite(characterId) || characterId < 1 || !ownerDiscordId) {
+        return null;
+    }
+
+    return { recordId, characterId, ownerDiscordId };
 }
 
 function buildCharacterManageRows({ characterId, ownerDiscordId }) {
@@ -924,7 +956,7 @@ function buildAdventureDurationModal(state) {
 
     const durationInput = new TextInputBuilder()
         .setCustomId('advDuration')
-        .setLabel('Duration (HH:MM or minutes)')
+        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
         .setPlaceholder('03:00')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
@@ -1888,7 +1920,7 @@ function buildDowntimeDurationModal(state) {
 
     const durationInput = new TextInputBuilder()
         .setCustomId('dtDuration')
-        .setLabel('Duration (HH:MM or minutes)')
+        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
@@ -1940,7 +1972,7 @@ function buildDowntimeManageDurationModal({ downtimeId, characterId, ownerDiscor
 
     const durationInput = new TextInputBuilder()
         .setCustomId('dtDuration')
-        .setLabel('Duration (HH:MM or minutes)')
+        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(formatDuration(Number(downtime.duration || 0)));
@@ -1988,7 +2020,7 @@ function buildAdventureManageDurationModal({ adventureId, characterId, ownerDisc
 
     const durationInput = new TextInputBuilder()
         .setCustomId('advDuration')
-        .setLabel('Duration (HH:MM or minutes)')
+        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(formatDuration(Number(adventure.duration || 0)));
@@ -2148,10 +2180,6 @@ function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
             .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
             .setLabel('Edit')
             .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`advParticipantsOpen_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Participants')
-            .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
             .setLabel('Delete')
@@ -3940,7 +3968,7 @@ async function handle(interaction) {
             await updateAdventureMessage(state, await buildAdventureStepPayload({
                 interaction,
                 state,
-                message: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.',
+                message: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.',
             }));
             return true;
         }
@@ -4375,7 +4403,7 @@ async function handle(interaction) {
             await updateDowntimeMessage(state, await buildDowntimeStepPayload({
                 interaction,
                 state,
-                message: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.',
+                message: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.',
             }));
             return true;
         }
@@ -4708,7 +4736,7 @@ async function handle(interaction) {
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
         if (duration === null) {
-            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
@@ -5049,10 +5077,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_back_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5080,10 +5107,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_duration_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5106,10 +5132,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advManage_durationModal_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5118,7 +5143,7 @@ async function handle(interaction) {
 
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('advDuration'));
         if (duration === null) {
-            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -5133,10 +5158,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_date_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5159,10 +5183,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advManage_dateModal_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5186,10 +5209,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_title_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5212,10 +5234,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advManage_titleModal_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5235,10 +5256,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_notes_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5261,10 +5281,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('advManage_notesModal_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5283,10 +5302,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_quest_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5305,10 +5323,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('advManage_questSelect_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5328,10 +5345,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('advManage_participants_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5503,10 +5519,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_back_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5539,10 +5554,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_duration_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5565,10 +5579,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtManage_durationModal_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5577,7 +5590,7 @@ async function handle(interaction) {
 
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
         if (duration === null) {
-            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00) or minutes.', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -5592,10 +5605,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_date_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5618,10 +5630,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtManage_dateModal_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5645,10 +5656,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_type_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5667,10 +5677,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('dtManage_typeSelect_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5694,10 +5703,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_notes_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -5720,10 +5728,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtManage_notesModal_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
+        const parsed = parseManageIds(interaction.customId);
+        if (!parsed) return false;
+        const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
