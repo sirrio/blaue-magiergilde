@@ -41,6 +41,8 @@ const allowedFactions = new Set([
     'waffenmeister',
     'arkanisten',
 ]);
+const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
+const downtimeCreationSteps = ['duration', 'date', 'type', 'notes', 'confirm'];
 
 function isHttpUrl(urlString) {
     try {
