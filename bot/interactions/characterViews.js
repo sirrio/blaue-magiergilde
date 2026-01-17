@@ -15,6 +15,7 @@ const {
     resolvePublicAvatarUrl,
     tryBuildLocalAvatarAttachment,
 } = require('../commands/game/characters');
+const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
 const { formatLocalIsoDate } = require('../dateUtils');
 const {
     listCharacterClassesForDiscord,
@@ -165,8 +166,11 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const name = String(character.name || `Character ${character.id}`);
     const classNames = String(character.class_names || '').trim() || '-';
     const isFiller = Boolean(character.is_filler);
+    const level = calculateLevel(character);
+    const tier = calculateTierFromLevel(level);
     const startTierRaw = String(character.start_tier || '').trim();
     const startTier = isFiller ? 'Filler' : (startTierRaw ? startTierRaw.toUpperCase() : '-');
+    const currentTier = isFiller ? 'Filler' : tier;
     const version = String(character.version || '2024');
     const faction = formatFactionLabel(character.faction);
     const notesRaw = String(character.notes || '').trim();
@@ -182,8 +186,8 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const bubbleSpend = String(safeInt(character.bubble_shop_spend));
 
     const descriptionParts = [name];
-    if (startTier !== '-') {
-        descriptionParts.push(startTier);
+    if (currentTier !== '-') {
+        descriptionParts.push(currentTier);
     }
 
     const embed = new EmbedBuilder()
@@ -194,6 +198,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Classes', value: classNames, inline: false },
             { name: 'Faction', value: faction, inline: true },
             { name: 'Version', value: version, inline: true },
+            { name: 'Current tier', value: currentTier, inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
             { name: 'External Link', value: linkValue, inline: false },
