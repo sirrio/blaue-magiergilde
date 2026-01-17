@@ -24,11 +24,11 @@ const calculateLevel = (character: Character): number => {
 
   if (character.is_filler) return 3
 
+  const availableBubbles = Math.max(0, normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend)
+
   return Math.min(
     20,
-    Math.floor(
-      1 + (Math.sqrt(8 * (normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend) + 1) - 1) / 2,
-    ),
+    Math.floor(1 + (Math.sqrt(8 * availableBubbles + 1) - 1) / 2),
   )
 }
 
