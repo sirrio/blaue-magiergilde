@@ -897,10 +897,19 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
 
 async function updateAdventureMessage(state, payload) {
     const activeInteraction = state?.activeInteraction;
+    const isModalSubmit = activeInteraction?.isModalSubmit?.();
+    const isMessageComponent = activeInteraction?.isMessageComponent?.();
+
+    if (isModalSubmit && !activeInteraction.deferred && !activeInteraction.replied) {
+        await activeInteraction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
 
     if (state?.promptMessage?.editable) {
         try {
             await state.promptMessage.edit(payload);
+            if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
+                await activeInteraction.deleteReply().catch(() => {});
+            }
             return true;
         } catch {
             // fall through
@@ -915,6 +924,9 @@ async function updateAdventureMessage(state, payload) {
                 if (message) {
                     state.promptMessage = message;
                     await message.edit(payload);
+                    if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
+                        await activeInteraction.deleteReply().catch(() => {});
+                    }
                     return true;
                 }
             }
@@ -923,7 +935,7 @@ async function updateAdventureMessage(state, payload) {
         }
     }
 
-    if (activeInteraction?.isMessageComponent?.() || activeInteraction?.isModalSubmit?.()) {
+    if (isMessageComponent) {
         try {
             await activeInteraction.update(payload);
             return true;
@@ -935,6 +947,18 @@ async function updateAdventureMessage(state, payload) {
     if (state?.promptInteraction?.isMessageComponent?.()) {
         try {
             await state.promptInteraction.update(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (state?.promptInteraction?.isRepliable?.()) {
+        try {
+            await state.promptInteraction.editReply(payload);
+            if (isModalSubmit && (activeInteraction?.deferred || activeInteraction?.replied)) {
+                await activeInteraction.deleteReply().catch(() => {});
+            }
             return true;
         } catch {
             // fall through
@@ -2089,10 +2113,19 @@ function buildAdventureManageNotesModal({ adventureId, characterId, ownerDiscord
 
 async function updateDowntimeMessage(state, payload) {
     const activeInteraction = state?.activeInteraction;
+    const isModalSubmit = activeInteraction?.isModalSubmit?.();
+    const isMessageComponent = activeInteraction?.isMessageComponent?.();
+
+    if (isModalSubmit && !activeInteraction.deferred && !activeInteraction.replied) {
+        await activeInteraction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
 
     if (state?.promptMessage?.editable) {
         try {
             await state.promptMessage.edit(payload);
+            if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
+                await activeInteraction.deleteReply().catch(() => {});
+            }
             return true;
         } catch {
             // fall through
@@ -2107,6 +2140,9 @@ async function updateDowntimeMessage(state, payload) {
                 if (message) {
                     state.promptMessage = message;
                     await message.edit(payload);
+                    if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
+                        await activeInteraction.deleteReply().catch(() => {});
+                    }
                     return true;
                 }
             }
@@ -2115,7 +2151,7 @@ async function updateDowntimeMessage(state, payload) {
         }
     }
 
-    if (activeInteraction?.isMessageComponent?.() || activeInteraction?.isModalSubmit?.()) {
+    if (isMessageComponent) {
         try {
             await activeInteraction.update(payload);
             return true;
@@ -2126,6 +2162,9 @@ async function updateDowntimeMessage(state, payload) {
 
     if (state?.promptInteraction?.isRepliable?.()) {
         await state.promptInteraction.editReply(payload);
+        if (isModalSubmit && (activeInteraction?.deferred || activeInteraction?.replied)) {
+            await activeInteraction.deleteReply().catch(() => {});
+        }
         return true;
     }
 
@@ -2577,25 +2616,50 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
 async function refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId }) {
     const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
     if (!adventure || Number(adventure.character_id) !== characterId) {
-        await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
-        return false;
+        await updateManageMessage(interaction, { content: 'Adventure not found.', embeds: [], components: [] });
+        return true;
     }
 
     const view = buildAdventureManageView({ adventure, participants, ownerDiscordId, characterId });
-    await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+    await updateManageMessage(interaction, { content: '', embeds: [view.embed], components: view.components });
     return true;
 }
 
 async function refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId }) {
     const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
     if (!downtime || Number(downtime.character_id) !== characterId) {
-        await interaction.update({ content: 'Downtime not found.', embeds: [], components: [] });
-        return false;
+        await updateManageMessage(interaction, { content: 'Downtime not found.', embeds: [], components: [] });
+        return true;
     }
 
     const view = buildDowntimeManageView({ downtime, ownerDiscordId, characterId });
-    await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+    await updateManageMessage(interaction, { content: '', embeds: [view.embed], components: view.components });
     return true;
+}
+
+async function updateManageMessage(interaction, payload) {
+    if (interaction?.isMessageComponent?.()) {
+        await interaction.update(payload);
+        return;
+    }
+
+    if (interaction?.isModalSubmit?.() && !interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+
+    if (interaction?.message?.editable) {
+        await interaction.message.edit(payload);
+    } else if (interaction?.isRepliable?.()) {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(payload).catch(() => {});
+        } else {
+            await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
+        }
+    }
+
+    if (interaction?.deferred || interaction?.replied) {
+        await interaction.deleteReply().catch(() => {});
+    }
 }
 
 async function getAdventureWithParticipants(interaction, adventureId) {
@@ -4385,8 +4449,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_durationModal_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
+        const parts = interaction.customId.split('_');
+        const characterId = Number(parts[2]);
+        const ownerDiscordId = parts[3];
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -4437,8 +4502,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_dateModal_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
+        const parts = interaction.customId.split('_');
+        const characterId = Number(parts[2]);
+        const ownerDiscordId = parts[3];
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -4467,8 +4533,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('dtCreate_type_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
+        const parts = interaction.customId.split('_');
+        const characterId = Number(parts[2]);
+        const ownerDiscordId = parts[3];
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -4505,8 +4572,9 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('dtCreate_notesModal_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
+        const parts = interaction.customId.split('_');
+        const characterId = Number(parts[2]);
+        const ownerDiscordId = parts[3];
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
