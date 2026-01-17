@@ -608,11 +608,11 @@ function buildAdventureDurationRows(state) {
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_21600_${characterId}_${ownerDiscordId}`)
-                .setLabel('2 Bubble (6h)')
+                .setLabel('2 Bubbles (6h)')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
-                .setLabel('3 Bubble (9h)')
+                .setLabel('3 Bubbles (9h)')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
@@ -663,7 +663,7 @@ function buildAdventureTitleRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_title_edit_${characterId}_${ownerDiscordId}`)
-                .setLabel('Edit title & GM')
+                .setLabel('Title & GM')
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -709,7 +709,7 @@ function buildAdventureNotesRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_notes_edit_${characterId}_${ownerDiscordId}`)
-                .setLabel('Edit notes')
+                .setLabel('Notes')
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -876,7 +876,7 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
 
     if (step === 'notes') {
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Add optional notes.', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, message || 'Add or edit notes.', participantsLabel)],
             components: buildAdventureNotesRows(state),
         };
     }
@@ -1834,7 +1834,7 @@ function buildDowntimeDurationRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_duration_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Set duration')
+                .setLabel('Custom duration')
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -1854,7 +1854,7 @@ function buildDowntimeDateRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_date_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Set date')
+                .setLabel('Custom date')
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -1900,7 +1900,7 @@ function buildDowntimeNotesRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_notes_edit_${characterId}_${ownerDiscordId}`)
-                .setLabel('Edit notes')
+                .setLabel('Notes')
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -2177,7 +2177,7 @@ async function buildDowntimeStepPayload({ interaction, state, message }) {
         duration: 'Choose the downtime duration.',
         date: 'Choose the downtime date.',
         type: 'Choose the downtime type.',
-        notes: 'Add optional notes.',
+        notes: 'Add or edit notes.',
         confirm: 'Please confirm the details.',
     };
     const description = message || descriptionMap[step] || 'Continue.';
@@ -2243,11 +2243,11 @@ function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId }) 
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_title_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Title/GM')
+                .setLabel('Title & GM')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_quest_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Quest')
+                .setLabel('Character quest')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_notes_${adventureId}_${characterId}_${ownerDiscordId}`)
@@ -2545,11 +2545,11 @@ function buildAdventureParticipantsActions({ adventureId, characterId, ownerDisc
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`advParticipantsSearch_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Suchen')
+            .setLabel('Search')
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`advParticipantsClear_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Alle entfernen')
+            .setLabel('Remove all')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!hasParticipants),
         new ButtonBuilder()
@@ -2581,12 +2581,12 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
         .setTitle('Edit participants')
         .setColor(0x4f46e5)
         .setDescription(`${adventure.start_date} - ${String(adventure.title || '(No title)')}`)
-        .addFields({ name: 'Aktuell', value: formatParticipantList(participants), inline: false });
+        .addFields({ name: 'Current', value: formatParticipantList(participants), inline: false });
 
     if (search) {
         embed.setFooter({ text: `Filter: ${search} (${limitedOptions.length}/${options.length})` });
     } else if (options.length > limitedOptions.length) {
-        embed.setFooter({ text: `Zeige ${limitedOptions.length} von ${options.length}. Nutze Suche.` });
+        embed.setFooter({ text: `Showing ${limitedOptions.length} of ${options.length}. Use search.` });
     }
 
     const components = [];
@@ -4963,7 +4963,7 @@ async function handle(interaction) {
 
         const searchInput = new TextInputBuilder()
             .setCustomId('participantSearch')
-            .setLabel('Suche (Name oder Label)')
+            .setLabel('Search (name or label)')
             .setStyle(TextInputStyle.Short)
             .setRequired(false)
             .setValue(safeModalValue(getParticipantSearch(adventureId, ownerDiscordId), 100));
