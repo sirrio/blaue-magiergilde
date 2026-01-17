@@ -325,12 +325,22 @@ function getDowntimeNextStep(stepKey) {
 async function buildAdventureStepPayload({ interaction, state, message }) {
     const step = state.step;
     const { characterId } = state;
+    const ownerDiscordId = state.ownerDiscordId;
+    const searchKey = `create-${characterId}`;
     let participantsLabel = undefined;
     let participantOptions = [];
 
+    let allParticipantOptions = [];
     if (step === 'participants' || step === 'confirm') {
-        participantOptions = await listGuildCharactersForDiscord(interaction.user, characterId);
-        participantsLabel = formatSelectedParticipantNames(participantOptions, state.data.guildCharacterIds);
+        allParticipantOptions = await listGuildCharactersForDiscord(interaction.user, characterId);
+        participantsLabel = formatSelectedParticipantNames(allParticipantOptions, state.data.guildCharacterIds);
+        const search = getParticipantSearch(searchKey, ownerDiscordId);
+        if (search) {
+            const query = search.toLowerCase();
+            participantOptions = allParticipantOptions.filter(option => String(option.name).toLowerCase().includes(query));
+        } else {
+            participantOptions = allParticipantOptions;
+        }
     }
 
     if (step === 'duration') {
@@ -369,9 +379,20 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
     }
 
     if (step === 'participants') {
+        const search = getParticipantSearch(searchKey, ownerDiscordId);
+        const totalCount = allParticipantOptions.length;
+        const visibleCount = Math.min(25, participantOptions.length);
+        const baseMessage = message || 'Choose participants (approved characters).';
+        const participantsMessage = baseMessage;
+        let footerNote = undefined;
+        if (search) {
+            footerNote = `Filter: ${search} (${visibleCount}/${participantOptions.length})`;
+        } else if (totalCount > 25) {
+            footerNote = `Showing ${visibleCount} of ${totalCount}. Use search.`;
+        }
         const components = buildAdventureParticipantsRows(state, participantOptions);
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Choose participants (approved characters).', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, participantsMessage, participantsLabel, footerNote)],
             components,
         };
     }
@@ -2082,6 +2103,7 @@ async function handle(interaction) {
 
         if (state.step === 'duration') {
             clearAdventureCreationState(ownerDiscordId);
+            setParticipantSearch(`create-${characterId}`, ownerDiscordId, '');
             await interaction.update({ content: '', embeds: [], components: [buildAdventureMenuRow({ id: characterId }, ownerDiscordId)] });
             return true;
         }
@@ -2104,6 +2126,7 @@ async function handle(interaction) {
         }
 
         clearAdventureCreationState(ownerDiscordId);
+        setParticipantSearch(`create-${characterId}`, ownerDiscordId, '');
         await interaction.update({ content: '', embeds: [], components: [buildAdventureMenuRow({ id: characterId }, ownerDiscordId)] });
         return true;
     }
@@ -2468,6 +2491,7 @@ async function handle(interaction) {
 
             const adventureId = isEdit ? Number(state.adventureId) : Number(result.id);
             clearAdventureCreationState(ownerDiscordId);
+            setParticipantSearch(`create-${characterId}`, ownerDiscordId, '');
 
             if (isEdit && adventureId) {
                 await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
@@ -2543,6 +2567,84 @@ async function handle(interaction) {
         );
         state.data.guildCharacterIds = selectedIds;
 
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_participants_search_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[3];
+        const ownerDiscordId = parts[4];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const searchKey = `create-${characterId}`;
+        const modal = new ModalBuilder()
+            .setCustomId(`advCreate_participants_searchModal_${characterId}_${ownerDiscordId}`)
+            .setTitle('Search participants');
+
+        const searchInput = new TextInputBuilder()
+            .setCustomId('participantSearch')
+            .setLabel('Search by name')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setValue(safeModalValue(getParticipantSearch(searchKey, ownerDiscordId), 100));
+
+        modal.addComponents(new ActionRowBuilder().addComponents(searchInput));
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('advCreate_participants_searchModal_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[3];
+        const ownerDiscordId = parts[4];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        const searchKey = `create-${characterId}`;
+        setParticipantSearch(searchKey, ownerDiscordId, interaction.fields.getTextInputValue('participantSearch'));
+        ensurePromptMessage(state, interaction);
+        await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('advCreate_participants_clear_')) {
+        const parts = interaction.customId.split('_');
+        const characterIdRaw = parts[3];
+        const ownerDiscordId = parts[4];
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let state = getAdventureCreationState(ownerDiscordId);
+        if (!state) {
+            state = createAdventureState({ ownerDiscordId, characterId });
+            setAdventureCreationState(ownerDiscordId, state);
+        }
+
+        state.data.guildCharacterIds = [];
+        ensurePromptMessage(state, interaction);
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }

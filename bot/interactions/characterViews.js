@@ -339,14 +339,17 @@ function formatAdventureStepFields(stepKey, state, participantsLabel) {
     }
 }
 
-function buildAdventureStepEmbed(stepKey, state, description, participantsLabel) {
+function buildAdventureStepEmbed(stepKey, state, description, participantsLabel, footerNote) {
     const stepNumber = getAdventureStepNumber(stepKey);
     const title = state?.mode === 'edit' ? 'Edit adventure' : 'Create adventure';
+    const footerText = footerNote
+        ? `Step ${stepNumber}/7 • ${footerNote}`
+        : `Step ${stepNumber}/7`;
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
-        .setFooter({ text: `Step ${stepNumber}/7` });
+        .setFooter({ text: footerText });
 
     const fields = stepKey === 'confirm'
         ? formatAdventureSummaryFields(state, participantsLabel)
@@ -512,6 +515,20 @@ function buildAdventureParticipantsRows(state, options) {
                 .setDisabled(true),
         ));
     }
+
+    components.push(
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`advCreate_participants_search_${characterId}_${ownerDiscordId}`)
+                .setLabel('Search')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`advCreate_participants_clear_${characterId}_${ownerDiscordId}`)
+                .setLabel('Remove all')
+                .setStyle(ButtonStyle.Danger)
+                .setDisabled(selectedIds.size === 0),
+        ),
+    );
 
     return components.concat(buildStepperNavRows({
         backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
