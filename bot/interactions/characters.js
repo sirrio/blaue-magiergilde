@@ -866,7 +866,7 @@ async function handle(interaction) {
         }
 
         if (!interaction.inGuild()) {
-            await interaction.reply({ content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -882,7 +882,7 @@ async function handle(interaction) {
                 return true;
             }
 
-            await interaction.reply({
+            await updateManageMessage(interaction, {
                 embeds: [buildCreationEmbed(1, 'Create character', 'You already have an open creation. Please finish it or click **Cancel**.')],
                 components: [buildCreationCancelRow(ownerDiscordId)],
                 flags: MessageFlags.Ephemeral,
@@ -921,7 +921,7 @@ async function handle(interaction) {
 
         const selectedId = Number(interaction.values[0]);
         if (!Number.isFinite(selectedId) || selectedId < 1) {
-            await interaction.reply({ content: 'Invalid selection.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid selection.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -937,7 +937,7 @@ async function handle(interaction) {
         }
 
         if (!character) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -957,7 +957,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1039,7 +1039,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1070,7 +1070,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1107,7 +1107,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1137,7 +1137,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1167,7 +1167,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1187,7 +1187,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1290,7 +1290,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'No previous step available.', flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { content: 'No previous step available.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -1298,13 +1298,13 @@ async function handle(interaction) {
         const suffix = interaction.customId.replace('charactersCreate_next_', '');
         const [stepKey, ownerDiscordId] = suffix.split('_');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1457,20 +1457,20 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Unknown step.', flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { content: 'Unknown step.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_basicopen_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_basicopen_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1483,13 +1483,13 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_avatar_dm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_avatar_dm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await interaction.reply({ content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1515,7 +1515,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1523,13 +1523,13 @@ async function handle(interaction) {
         try {
             const result = await syncCharacterClassesForDiscord(interaction.user, characterId, classIds);
             if (!result.ok) {
-                await interaction.reply({ content: 'Classes konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: 'Classes konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const character = await findCharacterForDiscord(interaction.user, characterId);
             if (!character) {
-                await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
@@ -1553,25 +1553,25 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const faction = String(interaction.values[0] || '').trim().toLowerCase();
         if (!allowedFactions.has(faction)) {
-            await interaction.reply({ content: 'Invalid faction.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid faction.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateCharacterForDiscord(interaction.user, characterId, { faction });
         if (!result.ok) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1588,7 +1588,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1597,11 +1597,11 @@ async function handle(interaction) {
         const notes = interaction.fields.getTextInputValue('basicNotes') || '';
 
         if (!name) {
-            await interaction.reply({ content: 'Name fehlt.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Name fehlt.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!isHttpUrl(url)) {
-            await interaction.reply({ content: 'Invalid URL (http/https only).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid URL (http/https only).', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1612,17 +1612,17 @@ async function handle(interaction) {
         });
 
         if (!result.ok) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        await interaction.reply({
+        await updateManageMessage(interaction, {
             ...buildCharacterManageView(character, { ownerDiscordId }),
             flags: MessageFlags.Ephemeral,
         });
@@ -1635,24 +1635,24 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const dmBubbles = interaction.fields.getTextInputValue('dmBubbles');
         const result = await updateCharacterForDiscord(interaction.user, characterId, { dmBubbles });
         if (!result.ok) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        await interaction.reply({
+        await updateManageMessage(interaction, {
             ...buildCharacterManageView(character, { ownerDiscordId }),
             flags: MessageFlags.Ephemeral,
         });
@@ -1665,24 +1665,24 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const dmCoins = interaction.fields.getTextInputValue('dmCoins');
         const result = await updateCharacterForDiscord(interaction.user, characterId, { dmCoins });
         if (!result.ok) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        await interaction.reply({
+        await updateManageMessage(interaction, {
             ...buildCharacterManageView(character, { ownerDiscordId }),
             flags: MessageFlags.Ephemeral,
         });
@@ -1695,24 +1695,24 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const bubbleShopSpend = interaction.fields.getTextInputValue('bubbleSpend');
         const result = await updateCharacterForDiscord(interaction.user, characterId, { bubbleShopSpend });
         if (!result.ok) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        await interaction.reply({
+        await updateManageMessage(interaction, {
             ...buildCharacterManageView(character, { ownerDiscordId }),
             flags: MessageFlags.Ephemeral,
         });
@@ -1723,12 +1723,12 @@ async function handle(interaction) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await interaction.reply({ content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1743,7 +1743,7 @@ async function handle(interaction) {
             throw error;
         }
         if (!character) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1805,7 +1805,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Unknown action.', flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { content: 'Unknown action.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -1817,18 +1817,18 @@ async function handle(interaction) {
         const action = parts.join('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await interaction.reply({ content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await interaction.reply({ content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1973,7 +1973,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.reply({ content: 'Unknown action.', flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { content: 'Unknown action.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -1981,11 +1981,11 @@ async function handle(interaction) {
         const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(idRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await interaction.reply({ content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (action === 'deleteCharacterCancel') {
@@ -2028,7 +2028,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2065,7 +2065,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2094,7 +2094,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2110,7 +2110,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2162,7 +2162,7 @@ async function handle(interaction) {
         const ownerDiscordId = parts[4];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2202,7 +2202,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2236,7 +2236,7 @@ async function handle(interaction) {
         const ownerDiscordId = parts[4];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2270,7 +2270,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2303,7 +2303,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2326,7 +2326,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2352,7 +2352,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2375,7 +2375,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2399,7 +2399,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2493,7 +2493,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2520,7 +2520,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2587,7 +2587,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2611,7 +2611,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2633,7 +2633,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2664,7 +2664,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2686,7 +2686,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2717,7 +2717,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2737,7 +2737,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2756,7 +2756,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2776,7 +2776,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2802,7 +2802,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2818,7 +2818,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2856,7 +2856,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2937,7 +2937,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2948,7 +2948,7 @@ async function handle(interaction) {
             return null;
         })();
         if (!normalizedTypee) {
-            await interaction.reply({ content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2957,11 +2957,11 @@ async function handle(interaction) {
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
         if (duration === null) {
-            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
-            await interaction.reply({ content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2975,18 +2975,18 @@ async function handle(interaction) {
             });
 
             if (!result.ok) {
-                await interaction.reply({ content: 'Downtime could not be saved.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: 'Downtime could not be saved.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const downtime = await findDowntimeForDiscord(interaction.user, result.id);
             if (!downtime) {
-                await interaction.reply({ content: 'Downtime saved.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: 'Downtime saved.', flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const view = buildDowntimeManageView({ downtime, ownerDiscordId, characterId });
-            await interaction.reply({
+            await updateManageMessage(interaction, {
                 embeds: [view.embed],
                 components: view.components,
                 flags: MessageFlags.Ephemeral,
@@ -2998,7 +2998,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await interaction.reply({ content: 'Failed to save downtime.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Failed to save downtime.', flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -3047,7 +3047,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1 || !Number.isFinite(adventureId) || adventureId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3062,7 +3062,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3089,18 +3089,18 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         setParticipantSearch(adventureId, ownerDiscordId, interaction.fields.getTextInputValue('participantSearch'));
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        await interaction.reply({ embeds: [view.embed], components: view.components, flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { embeds: [view.embed], components: view.components, flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -3111,7 +3111,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3132,7 +3132,7 @@ async function handle(interaction) {
         });
 
         if (!result.ok) {
-            await interaction.reply({ content: 'Participants could not be saved.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Participants could not be saved.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3153,7 +3153,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3180,7 +3180,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3195,7 +3195,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1 || !Number.isFinite(downtimeId) || downtimeId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3209,7 +3209,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3223,13 +3223,13 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await findAdventureForDiscord(interaction.user, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3248,19 +3248,19 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('advDuration'));
         if (duration === null) {
-            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { duration });
         if (!result.ok) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3274,13 +3274,13 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await findAdventureForDiscord(interaction.user, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3299,19 +3299,19 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('advDate'));
         if (!startDate) {
-            await interaction.reply({ content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { startDate });
         if (!result.ok) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3325,13 +3325,13 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await findAdventureForDiscord(interaction.user, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3350,7 +3350,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3358,7 +3358,7 @@ async function handle(interaction) {
         const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { title, gameMaster });
         if (!result.ok) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3372,13 +3372,13 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await findAdventureForDiscord(interaction.user, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3397,14 +3397,14 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { notes });
         if (!result.ok) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3418,13 +3418,13 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await findAdventureForDiscord(interaction.user, adventureId);
         if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3439,7 +3439,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3447,7 +3447,7 @@ async function handle(interaction) {
         const hasAdditionalBubble = value === 'yes';
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { hasAdditionalBubble });
         if (!result.ok) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3461,7 +3461,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3482,7 +3482,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3500,7 +3500,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3543,7 +3543,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3567,7 +3567,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3600,7 +3600,7 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3614,13 +3614,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3639,19 +3639,19 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
         if (duration === null) {
-            await interaction.reply({ content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { duration });
         if (!result.ok) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3665,13 +3665,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3690,19 +3690,19 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('dtDate'));
         if (!startDate) {
-            await interaction.reply({ content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { startDate });
         if (!result.ok) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3716,13 +3716,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3737,19 +3737,19 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const typeValue = String(interaction.values?.[0] || '').toLowerCase();
         if (typeValue !== 'faction' && typeValue !== 'other') {
-            await interaction.reply({ content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { type: typeValue });
         if (!result.ok) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3763,13 +3763,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3788,14 +3788,14 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { notes });
         if (!result.ok) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3810,7 +3810,7 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3828,7 +3828,7 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3871,7 +3871,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3893,3 +3893,4 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
+

@@ -39,11 +39,26 @@ function buildJoinConfirmButtons(discordUserId) {
 }
 
 async function replyNotLinked(interaction) {
-    await interaction.reply({
-        content: notLinkedContent(),
-        components: [buildNotLinkedButtons(interaction.user.id)],
-        flags: MessageFlags.Ephemeral,
-    });
+    if (interaction?.isMessageComponent?.()) {
+        await interaction.update({
+            content: notLinkedContent(),
+            components: [buildNotLinkedButtons(interaction.user.id)],
+        });
+        return;
+    }
+
+    if (interaction?.isRepliable?.()) {
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        }
+
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+                content: notLinkedContent(),
+                components: [buildNotLinkedButtons(interaction.user.id)],
+            });
+        }
+    }
 }
 
 module.exports = {

@@ -1,6 +1,7 @@
-const { Events, MessageFlags } = require('discord.js');
+const { Events } = require('discord.js');
 
 const { isOwner } = require('../commandConfig');
+const { updateManageMessage } = require('../utils/updateManageMessage');
 
 const appJoin = require('../interactions/appJoin');
 const characters = require('../interactions/characters');
@@ -20,7 +21,12 @@ module.exports = {
             if (!command) return;
 
             if (command.ownerOnly && !isOwner(interaction.user.id)) {
-                await interaction.reply({ content: 'You are not allowed to use this command.', flags: MessageFlags.Ephemeral });
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.deferReply({ flags: 64 });
+                }
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ content: 'You are not allowed to use this command.', components: [] });
+                }
                 return;
             }
 
@@ -29,12 +35,11 @@ module.exports = {
             // eslint-disable-next-line no-console
             console.error(error);
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
-
-            const payload = { content: 'An error occurred.', flags: MessageFlags.Ephemeral };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(payload);
-            } else {
-                await interaction.reply(payload);
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.deferReply({ flags: 64 });
+            }
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ content: 'An error occurred.', components: [] });
             }
         }
     },

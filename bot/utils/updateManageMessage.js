@@ -1,9 +1,14 @@
 const EPHEMERAL_FLAG = 64;
 
 async function updateManageMessage(interaction, payload, options = {}) {
+    const sanitizedPayload = payload ? { ...payload } : payload;
+    if (sanitizedPayload && 'flags' in sanitizedPayload) {
+        delete sanitizedPayload.flags;
+    }
+
     if (interaction?.isMessageComponent?.()) {
         try {
-            await interaction.update(payload);
+            await interaction.update(sanitizedPayload);
             return;
         } catch {
             return;
@@ -19,7 +24,7 @@ async function updateManageMessage(interaction, payload, options = {}) {
     let updatedMessage = false;
     if (interaction?.message?.editable) {
         try {
-            await interaction.message.edit(payload);
+            await interaction.message.edit(sanitizedPayload);
             updatedMessage = true;
         } catch {
             updatedMessage = false;
@@ -32,7 +37,7 @@ async function updateManageMessage(interaction, payload, options = {}) {
         }
 
         if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload).catch(() => {});
+            await interaction.editReply(sanitizedPayload).catch(() => {});
         }
     }
 

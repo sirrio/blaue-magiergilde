@@ -35,10 +35,14 @@ module.exports = {
                 .setStyle(ButtonStyle.Primary),
         );
 
-        await interaction.reply({
-            content: 'Tiers ausw\xC3\xA4hlen und dann "Weiter" klicken:',
-            components: [row1, row2],
-            flags: MessageFlags.Ephemeral,
-        });
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        }
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+                content: 'Tiers ausw\xC3\xA4hlen und dann "Weiter" klicken:',
+                components: [row1, row2],
+            });
+        }
     },
 };

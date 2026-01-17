@@ -1,5 +1,4 @@
 const {
-    MessageFlags,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -8,6 +7,7 @@ const {
     TextInputStyle,
 } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
+const { updateManageMessage } = require('../utils/updateManageMessage');
 const { pendingGames } = require('../state');
 
 async function handle(interaction) {
@@ -18,7 +18,7 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No data found.', components: [] });
             return true;
         }
 
@@ -50,7 +50,7 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No data found.', components: [] });
             return true;
         }
 
@@ -100,7 +100,7 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await interaction.reply({ content: 'No data found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'No data found.', components: [] });
             return true;
         }
 
@@ -141,8 +141,7 @@ async function handle(interaction) {
             await data.commandInteraction.deleteReply().catch(() => {});
         }
 
-        await interaction.reply({ content: 'Announcement created.', flags: MessageFlags.Ephemeral });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+        await updateManageMessage(interaction, { content: 'Announcement created.', components: [] });
         return true;
     }
 
