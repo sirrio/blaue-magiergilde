@@ -5,18 +5,30 @@ enum Bubble {
 }
 
 const calculateBubble = (character: Character): number => {
-  return calculateBubbleByAdventures(character.adventures) + character.dm_bubbles
+  const dmBubbles = Number(character.dm_bubbles ?? 0)
+
+  return calculateBubbleByAdventures(character.adventures) + (Number.isFinite(dmBubbles) ? dmBubbles : 0)
 }
 
 const calculateBubbleByAdventures = (adventures?: Adventure[]): number => {
   return (adventures ?? []).reduce((bubble: number, adventure: Adventure): number => {
-    return bubble + Math.floor(adventure.duration / Bubble.MIN_DURATION) + (adventure.has_additional_bubble ? 1 : 0)
+    const duration = Number(adventure.duration ?? 0)
+    const normalizedDuration = Number.isFinite(duration) ? duration : 0
+
+    return (
+      bubble +
+      Math.floor(normalizedDuration / Bubble.MIN_DURATION) +
+      (adventure.has_additional_bubble ? 1 : 0)
+    )
   }, 0)
 }
 
 const calculateBubbleByGames = (games?: Game[]): number => {
   return (games ?? []).reduce((bubble: number, game: Game): number => {
-    return bubble + Math.floor(game.duration / Bubble.MIN_DURATION) + (game.has_additional_bubble ? 1 : 0)
+    const duration = Number(game.duration ?? 0)
+    const normalizedDuration = Number.isFinite(duration) ? duration : 0
+
+    return bubble + Math.floor(normalizedDuration / Bubble.MIN_DURATION) + (game.has_additional_bubble ? 1 : 0)
   }, 0)
 }
 
