@@ -44,6 +44,7 @@ const {
     tryBuildLocalAvatarAttachment,
     buildCharacterListView,
 } = require('../commands/game/characters');
+const { formatLocalIsoDate } = require('../dateUtils');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -1004,7 +1005,7 @@ function buildAdventureDateModal(state) {
         .setLabel('Date (YYYY-MM-DD)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(safeModalValue(state?.data?.startDate || new Date().toISOString().slice(0, 10), 10));
+        .setValue(safeModalValue(state?.data?.startDate || formatLocalIsoDate(), 10));
 
     modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
     return modal;
@@ -4074,7 +4075,7 @@ async function handle(interaction) {
         if (value === 'yesterday') {
             date.setDate(date.getDate() - 1);
         }
-        state.data.startDate = date.toISOString().slice(0, 10);
+        state.data.startDate = formatLocalIsoDate(date);
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
     }
@@ -4418,7 +4419,7 @@ async function handle(interaction) {
 
         const state = createDowntimeState({ ownerDiscordId, characterId, mode: 'create' });
         state.step = 'duration';
-        state.data.startDate = new Date().toISOString().slice(0, 10);
+        state.data.startDate = formatLocalIsoDate();
         setDowntimeCreationState(ownerDiscordId, state);
         ensurePromptMessage(state, interaction);
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({
@@ -5930,7 +5931,6 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
-
 
 
 
