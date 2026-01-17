@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Progress } from '@/components/ui/progress'
+import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
 import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
@@ -47,6 +48,9 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
+  const additionalBubbles = character.start_tier === 'lt' ? 10 : character.start_tier === 'ht' ? 55 : 0
+  const earnedBubbles = calculateBubble(character) + additionalBubbles
+  const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
   const hasRoom = (character.room_count ?? 0) > 0
   const statusLabel = guildStatus === 'approved'
@@ -131,10 +135,16 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
             {!character.is_filler ? (
               <>
                 <Progress value={progressValue} max={progressMax} />
-                <div className="flex items-center justify-end text-xs whitespace-pre">
-                  <span>{bubblesToNextLevel}</span>
-                  <Droplets size={13} />
-                  <span> to next level</span>
+                <div className="flex items-center justify-end text-xs">
+                  {isBubbleOverspent ? (
+                    <span className="text-error/80">Overspent bubbles</span>
+                  ) : (
+                    <>
+                      <span>{bubblesToNextLevel}</span>
+                      <Droplets size={13} />
+                      <span> to next level</span>
+                    </>
+                  )}
                 </div>
                 <div className={cn('mt-4 grid grid-cols-2 gap-0.5')}>
                   <InfoBox>
