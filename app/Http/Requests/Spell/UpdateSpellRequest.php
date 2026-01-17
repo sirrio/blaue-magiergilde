@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Spell;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class UpdateSpellRequest extends FormRequest
 {
@@ -36,4 +37,3 @@ class UpdateSpellRequest extends FormRequest
         ];
     }
 }
-use Illuminate\Support\Facades\Auth;

@@ -89,7 +89,7 @@ class SpellController extends Controller
      */
     public function store(StoreSpellRequest $request): RedirectResponse
     {
-        $spell = new Spell();
+        $spell = new Spell;
 
         $spell->name = $request->name;
         $spell->url = $request->input('url');
@@ -111,7 +111,7 @@ class SpellController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Spell $spells)
+    public function show(Spell $spell)
     {
         //
     }
@@ -119,7 +119,7 @@ class SpellController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Spell $spells)
+    public function edit(Spell $spell)
     {
         //
     }
@@ -127,21 +127,21 @@ class SpellController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateSpellRequest $request, Spell $spells)
+    public function update(UpdateSpellRequest $request, Spell $spell)
     {
-        $spells->name = $request->name;
-        $spells->url = $request->input('url');
-        $spells->legacy_url = $request->input('legacy_url');
-        $spells->spell_school = $request->input('spell_school');
-        $spells->spell_level = (int) $request->input('spell_level', 0);
-        $spells->guild_enabled = $request->boolean('guild_enabled', true);
+        $spell->name = $request->name;
+        $spell->url = $request->input('url');
+        $spell->legacy_url = $request->input('legacy_url');
+        $spell->spell_school = $request->input('spell_school');
+        $spell->spell_level = (int) $request->input('spell_level', 0);
+        $spell->guild_enabled = $request->boolean('guild_enabled', true);
 
         $hasRulingChange = $request->boolean('ruling_changed');
         $note = $hasRulingChange ? trim((string) $request->input('ruling_note', '')) : '';
-        $spells->ruling_changed = $hasRulingChange;
-        $spells->ruling_note = $note !== '' ? $note : null;
+        $spell->ruling_changed = $hasRulingChange;
+        $spell->ruling_note = $note !== '' ? $note : null;
 
-        $spells->save();
+        $spell->save();
 
         return redirect()->back();
     }
@@ -149,7 +149,7 @@ class SpellController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Spell $spells)
+    public function destroy(Spell $spell)
     {
         //
     }
