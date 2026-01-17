@@ -30,12 +30,12 @@ const UpdateGameModal = ({
     notes: game.notes ?? '',
   }
 
-  const { data, setData, post } = useForm(initialFormData)
+  const { data, setData, put } = useForm(initialFormData)
   const { tiers, errors } = usePage<PageProps>().props
   const bubbleCount = Math.trunc(data.duration / 10800)
 
   const handleFormSubmit = () => {
-    post(route('game-master-log.update', { game_master_log: game.id, _method: 'put' }), {
+    put(route('game-master-log.update', { game_master_log: game.id }), {
       preserveState: 'errors',
       preserveScroll: true,
       onSuccess: () => {

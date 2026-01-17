@@ -49,7 +49,7 @@ class GameController extends Controller
     public function store(StoreGameRequest $request): \Illuminate\Http\RedirectResponse
     {
         $userId = $request->user()?->getAuthIdentifier();
-        if (!$userId) {
+        if (! $userId) {
             abort(403);
         }
 
@@ -87,17 +87,17 @@ class GameController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateGameRequest $request, Game $game): \Illuminate\Http\RedirectResponse
+    public function update(UpdateGameRequest $request, Game $gameMasterLog): \Illuminate\Http\RedirectResponse
     {
-        $game->duration = $request->duration;
-        $game->start_date = $request->start_date;
-        $game->title = $request->title;
-        $game->tier = $request->tier;
-        $game->has_additional_bubble = $request->has_additional_bubble;
-        $game->tier_of_month_reward = $request->tier_of_month_reward ?: null;
-        $game->sessions = $request->sessions;
-        $game->notes = $request->notes;
-        $game->save();
+        $gameMasterLog->duration = $request->duration;
+        $gameMasterLog->start_date = $request->start_date;
+        $gameMasterLog->title = $request->title;
+        $gameMasterLog->tier = $request->tier;
+        $gameMasterLog->has_additional_bubble = $request->has_additional_bubble;
+        $gameMasterLog->tier_of_month_reward = $request->tier_of_month_reward ?: null;
+        $gameMasterLog->sessions = $request->sessions;
+        $gameMasterLog->notes = $request->notes;
+        $gameMasterLog->save();
 
         return redirect()->back();
     }
@@ -105,9 +105,9 @@ class GameController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Game $game): \Illuminate\Http\RedirectResponse
+    public function destroy(Game $gameMasterLog): \Illuminate\Http\RedirectResponse
     {
-        $game->delete();
+        $gameMasterLog->delete();
 
         return redirect()->back();
     }
