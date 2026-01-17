@@ -5,9 +5,7 @@ namespace App\Http\Controllers\Character;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Character\StoreCharacterRequest;
 use App\Http\Requests\Character\UpdateCharacterRequest;
-use App\Models\Adventure;
 use App\Models\Character;
-use App\Models\Downtime;
 use App\Models\Game;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -140,15 +138,12 @@ class CharacterController extends Controller
         }
         $character->save();
 
-        Adventure::query()
-            ->where('character_id', $character->id)
-            ->whereNotNull('deleted_at')
-            ->forceDelete();
-
-        Downtime::query()
-            ->where('character_id', $character->id)
-            ->whereNotNull('deleted_at')
-            ->forceDelete();
+        $character->adventures()->update([
+            'deleted_by_character' => true,
+        ]);
+        $character->downtimes()->update([
+            'deleted_by_character' => true,
+        ]);
 
         $character->adventures()->delete();
         $character->downtimes()->delete();

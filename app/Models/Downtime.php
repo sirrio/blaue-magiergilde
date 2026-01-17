@@ -16,4 +16,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Downtime extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected $casts = [
+        'deleted_by_character' => 'boolean',
+    ];
 }
