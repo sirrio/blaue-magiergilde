@@ -13,6 +13,7 @@ const {
 const { Agent } = require('undici');
 const { updateCreationReply } = require('./interactionReplies');
 const { updateManageMessage } = require('../utils/updateManageMessage');
+const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
 const {
     DiscordNotLinkedError,
@@ -88,7 +89,7 @@ const {
     buildDowntimeDeleteConfirmRow,
     buildDowntimeDurationModal,
     buildDowntimeDurationRows,
-    buildDowntimeListRow,
+    buildDowntimeListRows,
     buildDowntimeManageDateModal,
     buildDowntimeManageDurationModal,
     buildDowntimeManageNotesModal,
@@ -857,6 +858,10 @@ async function getAdventureWithParticipants(interaction, adventureId) {
 }
 
 async function handle(interaction) {
+    if (interaction.isMessageComponent?.()) {
+        setManageMessageTarget(interaction);
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('charactersAction_new_')) {
         const ownerDiscordId = interaction.customId.replace('charactersAction_new_', '');
 
@@ -3021,7 +3026,7 @@ async function handle(interaction) {
             }
             await updateManageMessage(interaction, {
                 embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
-                components: [buildDowntimeListRow({ characterId, ownerDiscordId, downtimes })],
+                components: buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }),
                 content: '',
             });
         } catch (error) {
@@ -3594,6 +3599,39 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isButton() && interaction.customId.startsWith('dtListBack_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        let character;
+        try {
+            character = await findCharacterForDiscord(interaction.user, characterId);
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await replyNotLinked(interaction);
+                return true;
+            }
+            throw error;
+        }
+
+        if (!character) {
+            await interaction.update({ content: 'Character not found.', embeds: [], components: [] });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterCardPayload({ character, ownerDiscordId }),
+            content: '',
+        });
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_back_')) {
         const parsed = parseManageIds(interaction.customId);
         if (!parsed) return false;
@@ -3883,7 +3921,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
-            components: [buildDowntimeListRow({ characterId, ownerDiscordId, downtimes })],
+            components: buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }),
             content: '',
         });
         return true;

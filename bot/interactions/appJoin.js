@@ -1,6 +1,7 @@
 const { createUserForDiscord } = require('../appDb');
 const { buildJoinConfirmButtons, notLinkedContent } = require('../linkingUi');
 const { updateManageMessage } = require('../utils/updateManageMessage');
+const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -9,6 +10,7 @@ function isOwnerOfInteraction(interaction, ownerDiscordId) {
 async function handle(interaction) {
     if (!interaction.isButton()) return false;
     if (!interaction.customId.startsWith('app')) return false;
+    setManageMessageTarget(interaction);
 
     const [action, ownerDiscordId] = interaction.customId.split('_');
 

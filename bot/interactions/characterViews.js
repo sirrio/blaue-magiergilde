@@ -1553,7 +1553,7 @@ function buildAdventureQuestManageView({ adventure, ownerDiscordId, characterId 
     };
 }
 
-function buildDowntimeListRow({ characterId, ownerDiscordId, downtimes }) {
+function buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`dtSelect_${characterId}_${ownerDiscordId}`)
         .setPlaceholder('Select downtime...')
@@ -1565,7 +1565,15 @@ function buildDowntimeListRow({ characterId, ownerDiscordId, downtimes }) {
                     .setValue(String(d.id)),
             ),
         );
-    return new ActionRowBuilder().addComponents(select);
+    return [
+        new ActionRowBuilder().addComponents(select),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`dtListBack_${characterId}_${ownerDiscordId}`)
+                .setLabel('Back to character')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
 }
 
 function buildDowntimeManageRows({ downtimeId, characterId, ownerDiscordId }) {
@@ -1907,7 +1915,7 @@ module.exports = {
     buildAdventureManageEmbed,
     buildAdventureManageView,
     buildAdventureQuestManageView,
-    buildDowntimeListRow,
+    buildDowntimeListRows,
     buildDowntimeManageRows,
     buildDowntimeManageEmbed,
     buildDowntimeManageView,

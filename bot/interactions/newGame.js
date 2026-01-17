@@ -8,10 +8,14 @@ const {
 } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
 const { updateManageMessage } = require('../utils/updateManageMessage');
+const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 const { pendingGames } = require('../state');
 
 async function handle(interaction) {
     attachRateLimitListener(interaction?.client);
+    if (interaction.isMessageComponent?.()) {
+        setManageMessageTarget(interaction);
+    }
 
     if (interaction.isButton() && interaction.customId.startsWith('tier_')) {
         const [, id, tier] = interaction.customId.split('_');
