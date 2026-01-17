@@ -12,7 +12,7 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, Un
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
-import { BookUser, Copy, Plus, RefreshCw, RotateCcw } from 'lucide-react'
+import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
@@ -115,7 +115,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                   </Button>
                 </StoreCharacterModal>
                 <Button as="a" href={route('characters.deleted')} size="sm" modifier="square" variant="outline">
-                  <RotateCcw size={16} />
+                  <Archive size={16} />
                 </Button>
               </>
             )}
@@ -160,7 +160,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                 </Modal>
               )}
               <Button as="a" href={route('characters.deleted')} variant="outline" modifier="square">
-                <RotateCcw size={16} />
+                <Archive size={16} />
               </Button>
             </div>
           </div>

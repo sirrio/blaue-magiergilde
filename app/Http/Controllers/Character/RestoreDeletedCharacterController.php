@@ -18,12 +18,22 @@ class RestoreDeletedCharacterController extends Controller
             abort(403);
         }
 
-        $character->adventures()->withTrashed()->each(function (Adventure $adventure) {
-            $adventure->restore();
-        });
-        $character->downtimes()->withTrashed()->each(function (Downtime $downtime) {
-            $downtime->restore();
-        });
+        $character->adventures()
+            ->withTrashed()
+            ->where('deleted_by_character', true)
+            ->each(function (Adventure $adventure) {
+                $adventure->restore();
+                $adventure->deleted_by_character = false;
+                $adventure->save();
+            });
+        $character->downtimes()
+            ->withTrashed()
+            ->where('deleted_by_character', true)
+            ->each(function (Downtime $downtime) {
+                $downtime->restore();
+                $downtime->deleted_by_character = false;
+                $downtime->save();
+            });
         $character->restore();
 
         return to_route('characters.index');

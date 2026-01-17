@@ -22,6 +22,7 @@ class Adventure extends Model
 
     protected $casts = [
         'has_additional_bubble' => 'boolean',
+        'deleted_by_character' => 'boolean',
     ];
 
     public function allies(): BelongsToMany
