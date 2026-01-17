@@ -1,14 +1,14 @@
 import { List, ListRow } from '@/components/ui/list'
-import { Button } from '@/components/ui/button'
+import { ActionMenu } from '@/components/ui/action-menu'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import { Character, Ally } from '@/types'
-import { Head, Link } from '@inertiajs/react'
+import { Head, Link, router } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Settings } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle } from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
@@ -59,6 +59,8 @@ const formatParticipantSummary = (names: string[]) => {
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
   const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
   const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
+  const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
+  const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
   const [adventureSortDir, setAdventureSortDir] = useState<'desc' | 'asc'>('desc')
   const [downtimeSortDir, setDowntimeSortDir] = useState<'desc' | 'asc'>('desc')
   const [isAdventuresPending, startAdventuresTransition] = useTransition()
@@ -138,10 +140,26 @@ export default function Show({ character, guildCharacters }: { character: Charac
     )
   }
 
+  const handleAdventureDelete = (adventureId: number) => {
+    if (!window.confirm('Delete this adventure?')) return
+    router.delete(route('adventures.destroy', { adventure: adventureId }), {
+      preserveScroll: true,
+    })
+    setActiveAdventureModalId((current) => (current === adventureId ? null : current))
+  }
+
   const toggleDowntimeNotes = (id: number) => {
     setExpandedDowntimes((current) =>
       current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
     )
+  }
+
+  const handleDowntimeDelete = (downtimeId: number) => {
+    if (!window.confirm('Delete this downtime?')) return
+    router.delete(route('downtimes.destroy', { downtime: downtimeId }), {
+      preserveScroll: true,
+    })
+    setActiveDowntimeModalId((current) => (current === downtimeId ? null : current))
   }
 
   return (
@@ -188,7 +206,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.adventures.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_32px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_40px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
                       <span>Adventure</span>
                       <span>Notes</span>
                       <span className="text-right">Time</span>
@@ -202,7 +220,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         Date
                         {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </button>
-                      <span className="text-right">Edit</span>
+                      <span className="text-right">Actions</span>
                     </div>
                     <List className="shadow-none">
                       {sortedAdventures.map((adv) => {
@@ -213,7 +231,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         return (
                           <ListRow
                             key={adv.id}
-                            className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_32px] items-start gap-4"
+                            className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_40px] items-start gap-4"
                           >
                             <div className="min-w-0">
                               <h3 className="truncate text-sm font-medium">{adv.title || 'Adventure'}</h3>
@@ -247,17 +265,27 @@ export default function Show({ character, guildCharacters }: { character: Charac
                               {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                             </div>
                             <div className="flex justify-end">
-                              <UpdateAdventureModal adventure={adv} allies={character.allies} guildCharacters={guildCharacters}>
-                                <Button
-                                  size="xs"
-                                  modifier="square"
-                                  variant="ghost"
-                                  aria-label="Edit adventure"
-                                  title="Edit adventure"
-                                >
-                                  <Settings size={14} />
-                                </Button>
-                              </UpdateAdventureModal>
+                              <UpdateAdventureModal
+                                adventure={adv}
+                                allies={character.allies}
+                                guildCharacters={guildCharacters}
+                                isOpen={activeAdventureModalId === adv.id}
+                                onClose={() => setActiveAdventureModalId(null)}
+                                showTrigger={false}
+                              />
+                              <ActionMenu
+                                items={[
+                                  {
+                                    label: 'Edit',
+                                    onSelect: () => setActiveAdventureModalId(adv.id),
+                                  },
+                                  {
+                                    label: 'Delete',
+                                    tone: 'error',
+                                    onSelect: () => handleAdventureDelete(adv.id),
+                                  },
+                                ]}
+                              />
                             </div>
                           </ListRow>
                         )
@@ -302,7 +330,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.downtimes.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_32px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_40px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
                       <span>Type</span>
                       <span>Notes</span>
                       <span className="text-right">Time</span>
@@ -316,7 +344,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         Date
                         {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </button>
-                      <span className="text-right">Edit</span>
+                      <span className="text-right">Actions</span>
                     </div>
                     <List className="shadow-none">
                       {sortedDowntimes.map((dt) => {
@@ -326,7 +354,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         return (
                           <ListRow
                             key={dt.id}
-                            className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_32px] items-start gap-4"
+                            className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_40px] items-start gap-4"
                           >
                             <div className="min-w-0">
                               <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
@@ -357,17 +385,25 @@ export default function Show({ character, guildCharacters }: { character: Charac
                               {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                             </div>
                             <div className="flex justify-end">
-                              <UpdateDowntimeModal downtime={dt}>
-                                <Button
-                                  size="xs"
-                                  modifier="square"
-                                  variant="ghost"
-                                  aria-label="Edit downtime"
-                                  title="Edit downtime"
-                                >
-                                  <Settings size={14} />
-                                </Button>
-                              </UpdateDowntimeModal>
+                              <UpdateDowntimeModal
+                                downtime={dt}
+                                isOpen={activeDowntimeModalId === dt.id}
+                                onClose={() => setActiveDowntimeModalId(null)}
+                                showTrigger={false}
+                              />
+                              <ActionMenu
+                                items={[
+                                  {
+                                    label: 'Edit',
+                                    onSelect: () => setActiveDowntimeModalId(dt.id),
+                                  },
+                                  {
+                                    label: 'Delete',
+                                    tone: 'error',
+                                    onSelect: () => handleDowntimeDelete(dt.id),
+                                  },
+                                ]}
+                              />
                             </div>
                           </ListRow>
                         )

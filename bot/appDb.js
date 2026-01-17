@@ -37,6 +37,9 @@ const allowedFactions = new Set([
     'unterhalter',
     'logistiker',
     'flora & fauna',
+    'agenten',
+    'waffenmeister',
+    'arkanisten',
 ]);
 
 function normalizeTier(value, fallback = 'bt') {

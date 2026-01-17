@@ -20,16 +20,28 @@ return new class extends Migration
             $table->string('item_type')->nullable()->after('item_rarity');
         });
 
-        DB::statement(
-            'UPDATE auction_items ai '
-            .'INNER JOIN items i ON i.id = ai.item_id '
-            .'SET ai.item_name = i.name, '
-            .'ai.item_url = i.url, '
-            .'ai.item_cost = i.cost, '
-            .'ai.item_rarity = i.rarity, '
-            .'ai.item_type = i.type '
-            .'WHERE ai.item_name IS NULL'
-        );
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(
+                'UPDATE auction_items '
+                .'SET item_name = (SELECT name FROM items WHERE items.id = auction_items.item_id), '
+                .'item_url = (SELECT url FROM items WHERE items.id = auction_items.item_id), '
+                .'item_cost = (SELECT cost FROM items WHERE items.id = auction_items.item_id), '
+                .'item_rarity = (SELECT rarity FROM items WHERE items.id = auction_items.item_id), '
+                .'item_type = (SELECT type FROM items WHERE items.id = auction_items.item_id) '
+                .'WHERE item_name IS NULL'
+            );
+        } else {
+            DB::statement(
+                'UPDATE auction_items ai '
+                .'INNER JOIN items i ON i.id = ai.item_id '
+                .'SET ai.item_name = i.name, '
+                .'ai.item_url = i.url, '
+                .'ai.item_cost = i.cost, '
+                .'ai.item_rarity = i.rarity, '
+                .'ai.item_type = i.type '
+                .'WHERE ai.item_name IS NULL'
+            );
+        }
     }
 
     /**

@@ -39,7 +39,7 @@ class SocialAuthController extends Controller
             if ($discordAlreadyLinked) {
                 return redirect()
                     ->route('profile.edit')
-                    ->with('error', 'This Discord account is already linked to another user.');
+                    ->with('error', 'This Discord account is already linked to another user. Please contact an administrator.');
             }
 
             $user->discord_id = $discordId;

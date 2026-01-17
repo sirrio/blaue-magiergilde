@@ -9,7 +9,19 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import React from 'react'
 
-const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; children?: React.ReactNode }) => {
+const UpdateDowntimeModal = ({
+  downtime,
+  children,
+  isOpen,
+  onClose,
+  showTrigger = true,
+}: {
+  downtime: Downtime
+  children?: React.ReactNode
+  isOpen?: boolean
+  onClose?: () => void
+  showTrigger?: boolean
+}) => {
   const initialFormData = {
     duration: downtime.duration,
     start_date: downtime.start_date,
@@ -29,14 +41,16 @@ const UpdateDowntimeModal = ({ downtime, children }: { downtime: Downtime; child
   }
 
   return (
-    <Modal>
-      <ModalTrigger>
-        {children ?? (
-          <Button size="xs" modifier="square" variant="ghost" aria-label="Edit downtime" title="Edit downtime">
-            <Settings size={14} />
-          </Button>
-        )}
-      </ModalTrigger>
+    <Modal isOpen={isOpen} onClose={onClose}>
+      {showTrigger ? (
+        <ModalTrigger>
+          {children ?? (
+            <Button size="xs" modifier="square" variant="ghost" aria-label="Edit downtime" title="Edit downtime">
+              <Settings size={14} />
+            </Button>
+          )}
+        </ModalTrigger>
+      ) : null}
       <ModalTitle>Edit Downtime</ModalTitle>
       <ModalContent>
         <form>

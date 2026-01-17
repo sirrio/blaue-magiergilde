@@ -15,11 +15,17 @@ const UpdateAdventureModal = ({
   allies = [],
   guildCharacters = [],
   children,
+  isOpen,
+  onClose,
+  showTrigger = true,
 }: {
   adventure: Adventure
   allies?: Ally[]
   guildCharacters?: Character[]
   children?: React.ReactNode
+  isOpen?: boolean
+  onClose?: () => void
+  showTrigger?: boolean
 }) => {
   const initialFormData = {
     duration: adventure.duration,
@@ -47,14 +53,16 @@ const UpdateAdventureModal = ({
   const bubbleCount = Math.trunc(data.duration / 10800)
 
   return (
-    <Modal>
-      <ModalTrigger>
-        {children ?? (
-          <Button size="xs" modifier="square" variant="ghost" aria-label="Edit adventure" title="Edit adventure">
-            <Settings size={14} />
-          </Button>
-        )}
-      </ModalTrigger>
+    <Modal isOpen={isOpen} onClose={onClose}>
+      {showTrigger ? (
+        <ModalTrigger>
+          {children ?? (
+            <Button size="xs" modifier="square" variant="ghost" aria-label="Edit adventure" title="Edit adventure">
+              <Settings size={14} />
+            </Button>
+          )}
+        </ModalTrigger>
+      ) : null}
       <ModalTitle>Edit Adventure</ModalTitle>
       <ModalContent>
         <form>

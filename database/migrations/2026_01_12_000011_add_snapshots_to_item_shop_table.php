@@ -25,27 +25,49 @@ return new class extends Migration
             $table->string('spell_school')->nullable()->after('spell_level');
         });
 
-        DB::statement(
-            'UPDATE item_shop si '
-            .'INNER JOIN items i ON i.id = si.item_id '
-            .'SET si.item_name = i.name, '
-            .'si.item_url = i.url, '
-            .'si.item_cost = i.cost, '
-            .'si.item_rarity = i.rarity, '
-            .'si.item_type = i.type '
-            .'WHERE si.item_name IS NULL'
-        );
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(
+                'UPDATE item_shop '
+                .'SET item_name = (SELECT name FROM items WHERE items.id = item_shop.item_id), '
+                .'item_url = (SELECT url FROM items WHERE items.id = item_shop.item_id), '
+                .'item_cost = (SELECT cost FROM items WHERE items.id = item_shop.item_id), '
+                .'item_rarity = (SELECT rarity FROM items WHERE items.id = item_shop.item_id), '
+                .'item_type = (SELECT type FROM items WHERE items.id = item_shop.item_id) '
+                .'WHERE item_name IS NULL'
+            );
 
-        DB::statement(
-            'UPDATE item_shop si '
-            .'INNER JOIN spells s ON s.id = si.spell_id '
-            .'SET si.spell_name = s.name, '
-            .'si.spell_url = s.url, '
-            .'si.spell_legacy_url = s.legacy_url, '
-            .'si.spell_level = s.spell_level, '
-            .'si.spell_school = s.spell_school '
-            .'WHERE si.spell_id IS NOT NULL AND si.spell_name IS NULL'
-        );
+            DB::statement(
+                'UPDATE item_shop '
+                .'SET spell_name = (SELECT name FROM spells WHERE spells.id = item_shop.spell_id), '
+                .'spell_url = (SELECT url FROM spells WHERE spells.id = item_shop.spell_id), '
+                .'spell_legacy_url = (SELECT legacy_url FROM spells WHERE spells.id = item_shop.spell_id), '
+                .'spell_level = (SELECT spell_level FROM spells WHERE spells.id = item_shop.spell_id), '
+                .'spell_school = (SELECT spell_school FROM spells WHERE spells.id = item_shop.spell_id) '
+                .'WHERE spell_id IS NOT NULL AND spell_name IS NULL'
+            );
+        } else {
+            DB::statement(
+                'UPDATE item_shop si '
+                .'INNER JOIN items i ON i.id = si.item_id '
+                .'SET si.item_name = i.name, '
+                .'si.item_url = i.url, '
+                .'si.item_cost = i.cost, '
+                .'si.item_rarity = i.rarity, '
+                .'si.item_type = i.type '
+                .'WHERE si.item_name IS NULL'
+            );
+
+            DB::statement(
+                'UPDATE item_shop si '
+                .'INNER JOIN spells s ON s.id = si.spell_id '
+                .'SET si.spell_name = s.name, '
+                .'si.spell_url = s.url, '
+                .'si.spell_legacy_url = s.legacy_url, '
+                .'si.spell_level = s.spell_level, '
+                .'si.spell_school = s.spell_school '
+                .'WHERE si.spell_id IS NOT NULL AND si.spell_name IS NULL'
+            );
+        }
     }
 
     /**

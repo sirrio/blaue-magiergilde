@@ -139,6 +139,9 @@ function humanFactionName(faction) {
         unterhalter: 'Entertainers',
         logistiker: 'Logisticians',
         'flora & fauna': 'Flora & Fauna',
+        agenten: 'Agents',
+        waffenmeister: 'Weapon Masters',
+        arkanisten: 'Arcanists',
     };
     const key = String(faction || 'none');
     return map[key] || key;

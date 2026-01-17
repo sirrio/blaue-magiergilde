@@ -218,6 +218,9 @@ const allowedFactions = new Set([
     'unterhalter',
     'logistiker',
     'flora & fauna',
+    'agenten',
+    'waffenmeister',
+    'arkanisten',
 ]);
 
 function formatFactionLabel(value) {
