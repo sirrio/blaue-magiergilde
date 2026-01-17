@@ -43,14 +43,12 @@ const { formatLocalIsoDate } = require('../dateUtils');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
-    buildAdventureActionRow,
     buildAdventureConfirmRows,
     buildAdventureDateModal,
     buildAdventureDateRows,
     buildAdventureDeleteConfirmRow,
     buildAdventureDurationModal,
     buildAdventureDurationRows,
-    buildAdventureEmbed,
     buildAdventureListRows,
     buildAdventureManageDateModal,
     buildAdventureManageDurationModal,
@@ -90,7 +88,6 @@ const {
     buildDowntimeDeleteConfirmRow,
     buildDowntimeDurationModal,
     buildDowntimeDurationRows,
-    buildDowntimeEmbed,
     buildDowntimeListRow,
     buildDowntimeManageDateModal,
     buildDowntimeManageDurationModal,
@@ -118,27 +115,10 @@ const {
     pendingCharacterAvatarUpdates,
     pendingAdventureCreations,
     pendingDowntimeCreations,
-    participantReturnTargets,
 } = require('../state');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
-}
-
-function participantReturnKey(adventureId, ownerDiscordId) {
-    return `${adventureId}:${ownerDiscordId}`;
-}
-
-function getParticipantReturnTarget(adventureId, ownerDiscordId) {
-    return participantReturnTargets.get(participantReturnKey(adventureId, ownerDiscordId)) || 'detail';
-}
-
-function setParticipantReturnTarget(adventureId, ownerDiscordId, target) {
-    participantReturnTargets.set(participantReturnKey(adventureId, ownerDiscordId), target);
-}
-
-function clearParticipantReturnTarget(adventureId, ownerDiscordId) {
-    participantReturnTargets.delete(participantReturnKey(adventureId, ownerDiscordId));
 }
 
 function getAvatarUpdateState(userId) {
@@ -2490,19 +2470,7 @@ async function handle(interaction) {
                 });
             }
 
-            const adventure = await findAdventureForDiscord(interaction.user, adventureId);
-            if (!adventure) {
-                await interaction.update({ content: isEdit ? 'Adventure saved.' : 'Adventure saved.', embeds: [], components: [] });
-                return true;
-            }
-
-            const participants = await listAdventureParticipantsForDiscord(interaction.user, adventure.id);
-            const row = buildAdventureActionRow({ adventureId: adventure.id, characterId, ownerDiscordId });
-            await interaction.update({
-                embeds: [buildAdventureEmbed(adventure, isEdit ? 'Adventure updated' : 'Adventure saved', participants)],
-                components: [row],
-                content: '',
-            });
+            await refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId });
         } catch (error) {
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
@@ -2948,32 +2916,7 @@ async function handle(interaction) {
             const downtimeId = isEdit ? Number(state.downtimeId) : Number(result.id);
             clearDowntimeCreationState(ownerDiscordId);
 
-            const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
-            if (!downtime) {
-                await interaction.update({ content: isEdit ? 'Downtime saved.' : 'Downtime saved.', embeds: [], components: [] });
-                return true;
-            }
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`dtEdit_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Edit')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`dtDelete_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Delete')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back')
-                    .setStyle(ButtonStyle.Secondary),
-            );
-
-            await interaction.update({
-                embeds: [buildDowntimeEmbed(downtime, isEdit ? 'Downtime updated' : 'Downtime saved')],
-                components: [row],
-                content: '',
-            });
+            await refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId });
         } catch (error) {
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
@@ -3042,24 +2985,10 @@ async function handle(interaction) {
                 return true;
             }
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`dtEdit_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Edit')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`dtDelete_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Delete')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back')
-                    .setStyle(ButtonStyle.Secondary),
-            );
-
+            const view = buildDowntimeManageView({ downtime, ownerDiscordId, characterId });
             await interaction.reply({
-                embeds: [buildDowntimeEmbed(downtime, 'Downtime saved')],
-                components: [row],
+                embeds: [view.embed],
+                components: view.components,
                 flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
@@ -3122,41 +3051,7 @@ async function handle(interaction) {
             return true;
         }
 
-        const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
-            return true;
-        }
-
-        const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
-
-        await interaction.update({
-            embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)],
-            components: [row],
-            content: '',
-        });
-        return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('advParticipantsOpen_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        setParticipantReturnTarget(adventureId, ownerDiscordId, 'detail');
-        const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
-        if (view.error) {
-            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
-            return true;
-        }
-
-        await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+        await refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId });
         return true;
     }
 
@@ -3289,14 +3184,7 @@ async function handle(interaction) {
             return true;
         }
 
-        const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
-            return true;
-        }
-
-        const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
-        await interaction.update({ content: '', embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)], components: [row] });
+        await refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId });
         return true;
     }
 
@@ -3311,50 +3199,7 @@ async function handle(interaction) {
             return true;
         }
 
-        const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
-        if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.update({ content: 'Downtime not found.', embeds: [], components: [] });
-            return true;
-        }
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`dtEdit_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Edit')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Delete')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-        );
-
-        await interaction.update({ embeds: [buildDowntimeEmbed(downtime, 'Downtime')], components: [row], content: '' });
-        return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('advEdit_')) {
-        const [, adventureIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const adventureId = Number(adventureIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.reply({ content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const view = buildAdventureManageView({ adventure, participants, ownerDiscordId, characterId });
-        await interaction.update({ content: '', embeds: [view.embed], components: view.components });
+        await refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId });
         return true;
     }
 
@@ -3368,23 +3213,7 @@ async function handle(interaction) {
             return true;
         }
 
-        clearParticipantReturnTarget(adventureId, ownerDiscordId);
-        const returnTarget = getParticipantReturnTarget(adventureId, ownerDiscordId);
-        clearParticipantReturnTarget(adventureId, ownerDiscordId);
-
-        if (returnTarget === 'manage') {
-            await refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId });
-            return true;
-        }
-
-        const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
-            return true;
-        }
-
-        const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
-        await interaction.update({ content: '', embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)], components: [row] });
+        await refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId });
         return true;
     }
 
@@ -3636,7 +3465,6 @@ async function handle(interaction) {
             return true;
         }
 
-        setParticipantReturnTarget(adventureId, ownerDiscordId, 'manage');
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
             await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
@@ -3677,19 +3505,7 @@ async function handle(interaction) {
         }
 
         if (action === 'deleteAdventureCancel') {
-            const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
-            if (!adventure || Number(adventure.character_id) !== characterId) {
-                await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
-                return true;
-            }
-
-            const row = buildAdventureActionRow({ adventureId, characterId, ownerDiscordId });
-
-            await interaction.update({
-                content: '',
-                embeds: [buildAdventureEmbed(adventure, 'Adventure', participants)],
-                components: [row],
-            });
+            await refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId });
             return true;
         }
 
@@ -3778,28 +3594,6 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('dtEdit_')) {
-        const [, downtimeIdRaw, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const downtimeId = Number(downtimeIdRaw);
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
-        if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.reply({ content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const view = buildDowntimeManageView({ downtime, ownerDiscordId, characterId });
-        await interaction.update({ content: '', embeds: [view.embed], components: view.components });
-        return true;
-    }
-
     if (interaction.isButton() && interaction.customId.startsWith('dtManage_back_')) {
         const parsed = parseManageIds(interaction.customId);
         if (!parsed) return false;
@@ -3810,28 +3604,7 @@ async function handle(interaction) {
             return true;
         }
 
-        const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
-        if (!downtime || Number(downtime.character_id) !== characterId) {
-            await interaction.update({ content: 'Downtime not found.', embeds: [], components: [] });
-            return true;
-        }
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`dtEdit_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Edit')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Delete')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-        );
-
-        await interaction.update({ embeds: [buildDowntimeEmbed(downtime, 'Downtime')], components: [row], content: '' });
+        await refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId });
         return true;
     }
 
@@ -4060,28 +3833,7 @@ async function handle(interaction) {
         }
 
         if (action === 'deleteDowntimeCancel') {
-            const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
-            if (!downtime || Number(downtime.character_id) !== characterId) {
-                await interaction.update({ content: 'Downtime not found.', embeds: [], components: [] });
-                return true;
-            }
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`dtEdit_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Edit')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Delete')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back')
-                    .setStyle(ButtonStyle.Secondary),
-            );
-
-            await interaction.update({ content: '', embeds: [buildDowntimeEmbed(downtime, 'Downtime')], components: [row] });
+            await refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId });
             return true;
         }
 

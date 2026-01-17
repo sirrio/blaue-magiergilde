@@ -4,5 +4,4 @@ module.exports = {
     pendingCharacterAvatarUpdates: new Map(),
     pendingAdventureCreations: new Map(),
     pendingDowntimeCreations: new Map(),
-    participantReturnTargets: new Map(),
 };

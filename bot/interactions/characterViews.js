@@ -1447,23 +1447,6 @@ function buildAdventureManageNotesModal({ adventureId, characterId, ownerDiscord
     return modal;
 }
 
-function buildAdventureActionRow({ adventureId, characterId, ownerDiscordId }) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`advEdit_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Edit')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Delete')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-            .setLabel('Back')
-            .setStyle(ButtonStyle.Secondary),
-    );
-}
-
 function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId }) {
     return [
         new ActionRowBuilder().addComponents(
@@ -1498,7 +1481,7 @@ function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId }) 
                 .setLabel('Delete')
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
-                .setCustomId(`advManage_back_${adventureId}_${characterId}_${ownerDiscordId}`)
+                .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
                 .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
         ),
@@ -1611,7 +1594,7 @@ function buildDowntimeManageRows({ downtimeId, characterId, ownerDiscordId }) {
                 .setLabel('Delete')
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
-                .setCustomId(`dtManage_back_${downtimeId}_${characterId}_${ownerDiscordId}`)
+                .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
                 .setLabel('Back')
                 .setStyle(ButtonStyle.Secondary),
         ),
@@ -1920,7 +1903,6 @@ module.exports = {
     buildAdventureManageDateModal,
     buildAdventureManageTitleModal,
     buildAdventureManageNotesModal,
-    buildAdventureActionRow,
     buildAdventureManageRows,
     buildAdventureManageEmbed,
     buildAdventureManageView,
