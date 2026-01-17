@@ -6,7 +6,7 @@ async function updateManageMessage(interaction, payload, options = {}) {
             await interaction.update(payload);
             return;
         } catch {
-            // Fall through to reply-based update when message no longer exists.
+            return;
         }
     }
 
@@ -27,10 +27,12 @@ async function updateManageMessage(interaction, payload, options = {}) {
     }
 
     if (!updatedMessage && interaction?.isRepliable?.()) {
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ flags: ephemeralFlag });
+        }
+
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply(payload).catch(() => {});
-        } else {
-            await interaction.reply({ ...payload, flags: ephemeralFlag }).catch(() => {});
         }
     }
 

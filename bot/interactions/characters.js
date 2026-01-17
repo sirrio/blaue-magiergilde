@@ -4349,22 +4349,26 @@ async function handle(interaction) {
         try {
             const adventures = await listAdventuresForDiscord(interaction.user, characterId, 25);
             if (adventures.length === 0) {
-                await interaction.reply({ content: 'No adventures found.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: 'No adventures found.', embeds: [], components: [] });
                 return true;
             }
-            await interaction.reply({
+            await updateManageMessage(interaction, {
                 embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
                 components: buildAdventureListRows({ characterId, ownerDiscordId, adventures }),
-                flags: MessageFlags.Ephemeral,
+                content: '',
             });
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
-                await replyNotLinked(interaction);
+                await updateManageMessage(interaction, {
+                    content: notLinkedContent(),
+                    components: [buildNotLinkedButtons(interaction.user.id)],
+                    embeds: [],
+                });
                 return true;
             }
-            await interaction.reply({ content: 'Failed to load adventures.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Failed to load adventures.', embeds: [], components: [] });
         }
         return true;
     }
@@ -4845,22 +4849,26 @@ async function handle(interaction) {
         try {
             const downtimes = await listDowntimesForDiscord(interaction.user, characterId, 25);
             if (downtimes.length === 0) {
-                await interaction.reply({ content: 'No downtimes found.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: 'No downtimes found.', embeds: [], components: [] });
                 return true;
             }
-            await interaction.reply({
+            await updateManageMessage(interaction, {
                 embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
                 components: [buildDowntimeListRow({ characterId, ownerDiscordId, downtimes })],
-                flags: MessageFlags.Ephemeral,
+                content: '',
             });
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
-                await replyNotLinked(interaction);
+                await updateManageMessage(interaction, {
+                    content: notLinkedContent(),
+                    components: [buildNotLinkedButtons(interaction.user.id)],
+                    embeds: [],
+                });
                 return true;
             }
-            await interaction.reply({ content: 'Failed to load downtimes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Failed to load downtimes.', embeds: [], components: [] });
         }
         return true;
     }

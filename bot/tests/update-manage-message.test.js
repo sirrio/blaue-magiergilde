@@ -4,11 +4,11 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
 (async () => {
     let deferCalled = false;
     let editReplyCalled = false;
-    let replyCalled = false;
     let deleteCalled = false;
     let editAttempted = false;
     let updateAttempted = false;
     let updateReplyCalled = false;
+    let fallbackDeferred = false;
 
     const interaction = {
         isMessageComponent: () => false,
@@ -33,9 +33,6 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
             interaction.replied = true;
             interaction.editPayload = payload;
         },
-        reply: async () => {
-            replyCalled = true;
-        },
         deleteReply: async () => {
             deleteCalled = true;
         },
@@ -46,7 +43,6 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
     assert.equal(editAttempted, true);
     assert.equal(deferCalled, true);
     assert.equal(editReplyCalled, true);
-    assert.equal(replyCalled, false);
     assert.equal(deleteCalled, true);
 
     const componentInteraction = {
@@ -58,7 +54,10 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
             updateAttempted = true;
             throw new Error('Unknown Message');
         },
-        reply: async () => {
+        deferReply: async () => {
+            fallbackDeferred = true;
+        },
+        editReply: async () => {
             updateReplyCalled = true;
         },
     };
@@ -66,7 +65,8 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
     await updateManageMessage(componentInteraction, { content: 'fallback' });
 
     assert.equal(updateAttempted, true);
-    assert.equal(updateReplyCalled, true);
+    assert.equal(updateReplyCalled, false);
+    assert.equal(fallbackDeferred, false);
 
     console.log('update-manage-message.test.js passed');
 })();
