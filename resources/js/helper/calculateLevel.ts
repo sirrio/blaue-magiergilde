@@ -3,6 +3,9 @@ import { Character } from '@/types'
 
 const calculateLevel = (character: Character): number => {
   const bubbles = calculateBubble(character)
+  const bubbleShopSpend = Number(character.bubble_shop_spend ?? 0)
+  const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
+  const normalizedBubbles = Number.isFinite(bubbles) ? bubbles : 0
   let additional_bubbles: number
 
   switch (character.start_tier) {
@@ -21,7 +24,12 @@ const calculateLevel = (character: Character): number => {
 
   if (character.is_filler) return 3
 
-  return Math.min(20, Math.floor(1 + (Math.sqrt(8 * (bubbles + additional_bubbles - character.bubble_shop_spend) + 1) - 1) / 2))
+  return Math.min(
+    20,
+    Math.floor(
+      1 + (Math.sqrt(8 * (normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend) + 1) - 1) / 2,
+    ),
+  )
 }
 
 export { calculateLevel }
