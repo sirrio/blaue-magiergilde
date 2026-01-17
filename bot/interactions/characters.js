@@ -12,6 +12,7 @@ const {
 } = require('discord.js');
 const { Agent } = require('undici');
 const { updateCreationReply } = require('./interactionReplies');
+const { updateManageMessage } = require('../utils/updateManageMessage');
 
 const {
     DiscordNotLinkedError,
@@ -2628,30 +2629,6 @@ async function refreshDowntimeManageView({ interaction, downtimeId, characterId,
     return true;
 }
 
-async function updateManageMessage(interaction, payload) {
-    if (interaction?.isMessageComponent?.()) {
-        await interaction.update(payload);
-        return;
-    }
-
-    if (interaction?.isModalSubmit?.() && !interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    }
-
-    if (interaction?.message?.editable) {
-        await interaction.message.edit(payload);
-    } else if (interaction?.isRepliable?.()) {
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload).catch(() => {});
-        } else {
-            await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
-        }
-    }
-
-    if (interaction?.deferred || interaction?.replied) {
-        await interaction.deleteReply().catch(() => {});
-    }
-}
 
 async function getAdventureWithParticipants(interaction, adventureId) {
     const adventure = await findAdventureForDiscord(interaction.user, adventureId);
