@@ -1,84 +1,86 @@
 # blauer-magiergilde-bot
 
-## Befehle
+## Commands
 
-Standard-Prefix ist `mg` (z.B. `/mg-characters`).
+Default prefix is `mg` (example: `/mg-characters`).
 
-### Charaktere (App)
+### Characters (App)
 
-Diese Commands verwalten **deine App-Charaktere** (Tabelle `characters`) direkt über Discord.  
-Voraussetzung: dein App-Account ist in `settings/profile` mit Discord verbunden (damit `users.discord_id` gesetzt ist).  
-Der Bot erstellt **keinen** User automatisch.
+These commands manage **your app characters** (table `characters`) directly via Discord.
+Requirement: your app account is connected to Discord in `settings/profile` (so `users.discord_id` is set).
+The bot does **not** create a user automatically.
 
-- `/[prefix]-characters` - zeigt deine Charaktere im Dashboard-Stil und Buttons für **Bearbeiten**, **Löschen** und **Neu**.
-  - Wenn der Charakter in der App einen Avatar hat (z.B. `avatars/foo.webp`), zeigt der Bot ihn als Thumbnail.
-  - Avatar und Start-Tier können im Bot **nicht** geändert werden (Start-Tier nur bei Erstellung).
+- `/[prefix]-characters` - shows your characters in a dashboard view with **Edit**, **Delete**, and **New**.
+  - If the character has an avatar in the app (for example `avatars/foo.webp`), the bot shows it as a thumbnail.
+  - Avatar and starting tier cannot be changed in the bot (starting tier only during creation).
 
-Wenn Discord nicht verbunden ist, zeigt der Bot in Discord einen **Join-Button** an, mit dem ein neuer App-Account erstellt werden kann (explizite Bestätigung nötig).
+If Discord is not connected, the bot shows a **Join** button in Discord to create a new app account (explicit confirmation required).
 
 ### Shop
 
-- Shops werden aus der App gepostet (Shop-Seite). Der Bot reagiert auf den HTTP-Request und erstellt bei Bedarf einen Thread.
+- Shops are posted from the app (Shop page). The bot handles the HTTP request and creates a thread when needed.
 
 ### Voice Sync
 
-- Voice-Channel Kandidaten werden von der App aus per HTTP-Endpoint synchronisiert (kein Slash-Command).
+- Voice channel candidates are synced from the app via an HTTP endpoint (no slash command).
 
 ### Discord Backup (App)
 
-- Das Admin-Panel der App kann ein manuelles Backup aller Text-Channels und Threads starten.
-- Die App bestimmt, welche Channels gesichert werden (Auswahl im Admin-Panel).
-- Der Bot liest die Historie, laedt Attachments herunter und speichert alles in der App.
-- Voraussetzungen: `GuildMessages` + `MessageContent` Intent im Discord Developer Portal aktivieren.
+- The app admin panel can start a manual backup of selected text channels and threads.
+- The app decides which channels to back up (selection in the admin panel).
+- The bot reads history, downloads attachments, and stores everything in the app.
+- Requirements: enable `GuildMessages` + `MessageContent` intents in the Discord Developer Portal.
 
-### Auktionen (App)
+### Auctions (App)
 
-- Auktionen werden in der App verwaltet; beim Schliessen wird automatisch eine neue Auktion erstellt.
-- Wenn keine Auktion existiert, erstellt die App beim ersten Aufruf automatisch eine neue Auktion.
-- Geheime Gebote werden in der App gepflegt; der Bot hat hier keine Funktion.
-- Der Bot hat keine Auction-Commands, bleibt hier nur passiv.
+- Auctions are managed in the app; closing an auction automatically creates a new one.
+- If no auction exists, the app creates one automatically on first visit.
+- Hidden bids are managed in the app; the bot has no role here.
+- The bot has no auction commands and is passive for auctions.
 
-## Konfiguration (ein einziges Env)
+## Configuration (single .env)
 
-Der Bot nutzt die **gleiche** Root-`.env` wie die Laravel-App (ein einziges Env-File im Projekt-Hauptordner).  
-`bot/config.json` wird nicht mehr unterstützt.
+The bot uses the **same** root `.env` as the Laravel app (one env file in the project root).
+`bot/config.json` is no longer supported.
 
-### Root `.env` (empfohlen)
+### Root `.env` (recommended)
 
-Setze folgende Variablen in der Root-`.env`:
+Set these in the root `.env`:
 
-- `DISCORD_BOT_TOKEN` - Bot Token
-- `DISCORD_CLIENT_ID` - Discord Application ID (wird auch für OAuth in der App genutzt)
-- `DISCORD_GUILD_IDS` - kommaseparierte Liste (für Guild-Commands, meist sofort sichtbar)
-- `DISCORD_COMMAND_PREFIX` - z.B. `mg`
+- `DISCORD_BOT_TOKEN` - bot token
+- `DISCORD_CLIENT_ID` - Discord application ID (also used for OAuth in the app)
+- `DISCORD_GUILD_IDS` - comma-separated list (for guild commands, visible immediately)
+- `DISCORD_COMMAND_PREFIX` - for example `mg`
 - `DISCORD_OWNER_IDS` - fallback list of Discord user IDs (owner-only commands). The app can override this list.
-- `BOT_PUBLIC_APP_URL` - optional: öffentliche Base-URL für Links/Avatare im Discord (z.B. `https://blaue-magiergilde.de`). Überschreibt `APP_URL` nur für den Bot.
+- `BOT_PUBLIC_APP_URL` - optional public base URL for links/avatars in Discord (for example `https://blaue-magiergilde.de`). Overrides `APP_URL` for the bot only.
 
-- `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (voice sync + shop/auction posting + backup).
-- `BOT_HTTP_URL` - base URL for the bot HTTP server (no path, e.g. `http://127.0.0.1:3125`).
-- `BOT_HTTP_HOST` - optional: listen host override (default: 127.0.0.1).
-- `BOT_HTTP_PORT` - optional: listen port override (default: 3125).
-- `BOT_HTTP_RATE_LIMIT_MS` - optional: throttle inbound bot HTTP requests (default: 15000).
-- `BOT_BACKUP_BATCH_SIZE` - optional: message batch size per channel (default: 100).
-- `BOT_BACKUP_DELAY_MS` - optional: delay between message batches (default: 1200).
-- `BOT_BACKUP_ATTACHMENT_DELAY_MS` - optional: delay between attachment uploads (default: 250).
-DB nutzt die gleichen Laravel-Variablen:
+- `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (voice sync + shop/auction posting + backup)
+- `BOT_HTTP_URL` - base URL for the bot HTTP server (no path, for example `http://127.0.0.1:3125`)
+- `BOT_HTTP_HOST` - optional listen host override (default: 127.0.0.1)
+- `BOT_HTTP_PORT` - optional listen port override (default: 3125)
+- `BOT_HTTP_RATE_LIMIT_MS` - optional throttle for inbound bot HTTP requests (default: 15000)
+- `BOT_BACKUP_BATCH_SIZE` - optional message batch size per channel (default: 100)
+- `BOT_BACKUP_DELAY_MS` - optional delay between message batches (default: 1200)
+- `BOT_BACKUP_ATTACHMENT_DELAY_MS` - optional delay between attachment uploads (default: 250)
+
+Database uses the same Laravel variables:
+
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
 
-### Kein `bot/config.json`
+### No `bot/config.json`
 
-Wenn du noch `bot/config.json` hast: löschen und alles in der Root-`.env` pflegen.
+If you still have `bot/config.json`, delete it and use the root `.env` only.
 
-## Commands deployen
+## Deploying commands
 
-Registriere/aktualisiere Slash-Commands mit `node deploy-commands.js` und starte danach den Bot neu.
+Register or update slash commands with `node deploy-commands.js` and then restart the bot.
 
-- Wenn du `DISCORD_GUILD_IDS` setzt, werden Commands als **Guild Commands** deployed (meist sofort sichtbar).
-- Ohne `DISCORD_GUILD_IDS` werden **Global Commands** deployed (kann bis zu ~1h dauern, bis sie in Discord auftauchen).
+- With `DISCORD_GUILD_IDS`, commands are deployed as **Guild Commands** (usually immediate).
+- Without `DISCORD_GUILD_IDS`, commands are **Global Commands** (can take up to ~1 hour to appear).
 
 ## Security / Sharing
 
-- Poste niemals Tokens (oder DB-Passwörter) in Chat/Issues/Screenshots.
-- Wenn du Konfiguration teilen musst, nutze den Redaction-Helper (liest aus `.env`):
+- Never post tokens (or DB passwords) in chat/issues/screenshots.
+- If you must share config, use the redaction helper (reads from `.env`):
   - `node redact-config.js > config.redacted.json`
-  - Teile dann `config.redacted.json` statt echter Secrets.
+  - Share `config.redacted.json` instead of real secrets.

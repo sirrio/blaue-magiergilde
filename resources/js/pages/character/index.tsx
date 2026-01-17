@@ -46,7 +46,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     const header = `${label} ${titleSuffix}:\n`
     const body = characters
       .map((char) => {
-        const classes = char.character_classes.map((cc) => cc.name).join(', ')
+        const classes = calculateClassString(char)
         return `**${char.name}** - ${classes} (${char.external_link})`
       })
       .join('\n')

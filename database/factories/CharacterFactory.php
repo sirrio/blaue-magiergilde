@@ -28,6 +28,7 @@ class CharacterFactory extends Factory
             'is_filler' => $this->faker->boolean(),
             'faction' => $this->faker->randomElement([
                 'none', 'heiler', 'handwerker', 'feldforscher', 'bibliothekare', 'diplomaten', 'gardisten', 'unterhalter', 'logistiker', 'flora & fauna', 'waffenmeister', 'ermittler', 'arkanisten',
+                'agenten',
             ]),
             'notes' => $this->faker->sentence(),
             'position' => $this->faker->numberBetween(0, 10),

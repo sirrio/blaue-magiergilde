@@ -15,6 +15,67 @@ function pickDiscordAvatarUrl(discordUser) {
     return null;
 }
 
+function uniqueNumberList(values) {
+    if (!Array.isArray(values)) return [];
+    const numbers = values
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value) && value > 0)
+        .map(value => Math.floor(value));
+    return Array.from(new Set(numbers));
+}
+
+const allowedTiers = new Set(['bt', 'lt', 'ht', 'et']);
+const allowedVersions = new Set(['2014', '2024']);
+const allowedFactions = new Set([
+    'none',
+    'heiler',
+    'handwerker',
+    'feldforscher',
+    'bibliothekare',
+    'diplomaten',
+    'gardisten',
+    'unterhalter',
+    'logistiker',
+    'flora & fauna',
+    'agenten',
+    'waffenmeister',
+    'arkanisten',
+]);
+
+function normalizeTier(value, fallback = 'bt') {
+    const tier = String(value || '').trim().toLowerCase();
+    return allowedTiers.has(tier) ? tier : fallback;
+}
+
+function normalizeVersion(value, fallback = '2024') {
+    const version = String(value || '').trim();
+    return allowedVersions.has(version) ? version : fallback;
+}
+
+function normalizeFaction(value, fallback = 'none') {
+    const faction = String(value || '').trim().toLowerCase();
+    return allowedFactions.has(faction) ? faction : fallback;
+}
+
+function normalizeBoolean(value, fallback = false) {
+    if (typeof value === 'boolean') return value;
+    const text = String(value || '').trim().toLowerCase();
+    if (['1', 'true', 'yes', 'y', 'ja', 'j'].includes(text)) return true;
+    if (['0', 'false', 'no', 'n', 'nein'].includes(text)) return false;
+    return fallback;
+}
+
+function normalizeNumber(value, fallback = 0, max = 1024) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.max(0, Math.min(max, Math.floor(number)));
+}
+
+function normalizeAvatar(value) {
+    const text = String(value || '').trim();
+    return text.length > 0 ? text : null;
+}
+
 class DiscordNotLinkedError extends Error {
     constructor() {
         super('DISCORD_NOT_LINKED');
@@ -187,10 +248,39 @@ async function findCharacterForDiscord(discordUser, characterId) {
     return rows[0] ?? null;
 }
 
-async function createCharacterForDiscord(discordUser, { name, startTier, externalLink, notes }) {
+async function createCharacterForDiscord(
+    discordUser,
+    {
+        name,
+        startTier,
+        externalLink,
+        notes,
+        faction,
+        version,
+        avatar,
+        dmBubbles,
+        dmCoins,
+        bubbleShopSpend,
+        isFiller,
+        classIds = [],
+    },
+) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
     const createdAt = nowSql();
+
+    const safeName = String(name || '').trim();
+    if (!safeName) return { ok: false, reason: 'invalid_name' };
+    const safeTier = normalizeTier(startTier, 'bt');
+    const safeVersion = normalizeVersion(version, '2024');
+    const safeFaction = normalizeFaction(faction, 'none');
+    const safeExternal = String(externalLink || '').trim();
+    if (!safeExternal) return { ok: false, reason: 'invalid_link' };
+    const safeAvatar = normalizeAvatar(avatar);
+    const safeDmBubbles = normalizeNumber(dmBubbles, 0);
+    const safeDmCoins = normalizeNumber(dmCoins, 0);
+    const safeBubbleShop = normalizeNumber(bubbleShopSpend, 0);
+    const safeIsFiller = normalizeBoolean(isFiller, false);
 
     const connection = await db.getConnection();
     try {
@@ -199,20 +289,52 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
         const [insertCharacter] = await connection.execute(
             `
             INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, user_id, guild_status, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, created_at, updated_at)
             VALUES
-                    (?, ?, 0, 0, 0, ?, ?, 'pending', ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
             `,
-            [name, startTier, externalLink, userId, createdAt, createdAt],
+            [
+                safeName,
+                safeTier,
+                safeDmBubbles,
+                safeDmCoins,
+                safeBubbleShop,
+                safeExternal,
+                safeAvatar,
+                safeFaction,
+                safeVersion,
+                safeIsFiller ? 1 : 0,
+                userId,
+                createdAt,
+                createdAt,
+            ],
         );
 
         const characterId = insertCharacter.insertId;
-        const defaultClassId = await getDefaultCharacterClassId(connection);
-        if (defaultClassId) {
-            await connection.execute(
-                'INSERT INTO character_character_class (character_id, character_class_id) VALUES (?, ?)',
-                [characterId, defaultClassId],
+        const safeClassIds = uniqueNumberList(classIds);
+        if (safeClassIds.length > 0) {
+            const placeholders = safeClassIds.map(() => '?').join(', ');
+            const [validRows] = await connection.execute(
+                `SELECT id FROM character_classes WHERE id IN (${placeholders})`,
+                safeClassIds,
             );
+            const validIds = validRows.map(row => row.id);
+            if (validIds.length > 0) {
+                const values = validIds.map(() => '(?, ?)').join(', ');
+                const params = validIds.flatMap(id => [characterId, id]);
+                await connection.execute(
+                    `INSERT INTO character_character_class (character_id, character_class_id) VALUES ${values}`,
+                    params,
+                );
+            }
+        } else {
+            const defaultClassId = await getDefaultCharacterClassId(connection);
+            if (defaultClassId) {
+                await connection.execute(
+                    'INSERT INTO character_character_class (character_id, character_class_id) VALUES (?, ?)',
+                    [characterId, defaultClassId],
+                );
+            }
         }
 
         if (typeof notes === 'string' && notes.trim().length > 0) {
@@ -223,7 +345,7 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
         }
 
         await connection.commit();
-        return characterId;
+        return { ok: true, id: characterId };
     } catch (error) {
         await connection.rollback();
         throw error;
@@ -232,7 +354,11 @@ async function createCharacterForDiscord(discordUser, { name, startTier, externa
     }
 }
 
-async function updateCharacterForDiscord(discordUser, characterId, { name, startTier, externalLink, notes }) {
+async function updateCharacterForDiscord(
+    discordUser,
+    characterId,
+    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller },
+) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
     const existing = await findCharacterForDiscord(discordUser, characterId);
@@ -240,17 +366,41 @@ async function updateCharacterForDiscord(discordUser, characterId, { name, start
 
     const updatedAt = nowSql();
     const newName = typeof name === 'string' ? name : existing.name;
-    const newStartTier = typeof startTier === 'string' ? startTier : existing.start_tier;
+    const newStartTier = typeof startTier === 'string' ? normalizeTier(startTier, existing.start_tier) : existing.start_tier;
     const newExternalLink = typeof externalLink === 'string' ? externalLink : existing.external_link;
     const newNotes = typeof notes === 'string' ? notes : existing.notes;
+    const newFaction = typeof faction === 'string' ? normalizeFaction(faction, existing.faction) : existing.faction;
+    const newVersion = typeof version === 'string' ? normalizeVersion(version, existing.version) : existing.version;
+    const newAvatar = typeof avatar === 'string' ? normalizeAvatar(avatar) : existing.avatar;
+    const newDmBubbles = typeof dmBubbles !== 'undefined' ? normalizeNumber(dmBubbles, existing.dm_bubbles) : existing.dm_bubbles;
+    const newDmCoins = typeof dmCoins !== 'undefined' ? normalizeNumber(dmCoins, existing.dm_coins) : existing.dm_coins;
+    const newBubbleShopSpend = typeof bubbleShopSpend !== 'undefined'
+        ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
+        : existing.bubble_shop_spend;
+    const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
 
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
-        [newName, newStartTier, newExternalLink, newNotes, updatedAt, characterId, userId],
+        [
+            newName,
+            newStartTier,
+            newExternalLink,
+            newNotes,
+            newFaction,
+            newVersion,
+            newAvatar,
+            newDmBubbles,
+            newDmCoins,
+            newBubbleShopSpend,
+            newIsFiller ? 1 : 0,
+            updatedAt,
+            characterId,
+            userId,
+        ],
     );
 
     return { ok: true };
@@ -351,7 +501,10 @@ async function findAdventureForDiscord(discordUser, adventureId) {
     return rows[0] ?? null;
 }
 
-async function createAdventureForDiscord(discordUser, { characterId, duration, startDate, hasAdditionalBubble, notes, title, gameMaster }) {
+async function createAdventureForDiscord(
+    discordUser,
+    { characterId, duration, startDate, hasAdditionalBubble, notes, title, gameMaster, allyIds = [], guildCharacterIds = [] },
+) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
 
@@ -383,10 +536,26 @@ async function createAdventureForDiscord(discordUser, { characterId, duration, s
         ],
     );
 
-    return { ok: true, id: result.insertId };
+    let participantsOk = true;
+    try {
+        const participantResult = await syncAdventureParticipantsForDiscord(discordUser, result.insertId, {
+            characterId,
+            allyIds,
+            guildCharacterIds,
+        });
+        participantsOk = participantResult.ok;
+    } catch {
+        participantsOk = false;
+    }
+
+    return { ok: true, id: result.insertId, participantsOk };
 }
 
-async function updateAdventureForDiscord(discordUser, adventureId, { duration, startDate, notes, title, gameMaster }) {
+async function updateAdventureForDiscord(
+    discordUser,
+    adventureId,
+    { duration, startDate, notes, title, gameMaster, hasAdditionalBubble, allyIds = [], guildCharacterIds = [] },
+) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
 
@@ -398,17 +567,274 @@ async function updateAdventureForDiscord(discordUser, adventureId, { duration, s
     const newNotes = typeof notes === 'string' ? notes : existing.notes;
     const newTitle = typeof title === 'string' ? title : existing.title;
     const newGameMaster = typeof gameMaster === 'string' ? gameMaster : existing.game_master;
+    const newHasAdditionalBubble = typeof hasAdditionalBubble === 'boolean'
+        ? (hasAdditionalBubble ? 1 : 0)
+        : existing.has_additional_bubble;
 
     await db.execute(
         `
             UPDATE adventures
-            SET duration = ?, start_date = ?, notes = ?, title = ?, game_master = ?, updated_at = ?
+            SET duration = ?, start_date = ?, notes = ?, title = ?, game_master = ?, has_additional_bubble = ?, updated_at = ?
             WHERE id = ?
         `,
-        [safeDuration, date, newNotes ?? null, newTitle ?? null, newGameMaster ?? null, nowSql(), adventureId],
+        [safeDuration, date, newNotes ?? null, newTitle ?? null, newGameMaster ?? null, newHasAdditionalBubble, nowSql(), adventureId],
     );
 
-    return { ok: true };
+    let participantsOk = true;
+    try {
+        const participantResult = await syncAdventureParticipantsForDiscord(discordUser, adventureId, {
+            characterId: existing.character_id,
+            allyIds,
+            guildCharacterIds,
+        });
+        participantsOk = participantResult.ok;
+    } catch {
+        participantsOk = false;
+    }
+
+    return { ok: true, participantsOk };
+}
+
+async function listCharacterClassesForDiscord() {
+    const [rows] = await db.execute('SELECT id, name FROM character_classes ORDER BY name ASC');
+    return rows;
+}
+
+async function listCharacterClassIdsForDiscord(discordUser, characterId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute(
+        `
+            SELECT ccc.character_class_id
+            FROM character_character_class ccc
+            INNER JOIN characters c ON c.id = ccc.character_id
+            WHERE ccc.character_id = ? AND c.user_id = ?
+        `,
+        [characterId, userId],
+    );
+
+    return rows.map(row => Number(row.character_class_id)).filter(id => Number.isFinite(id));
+}
+
+async function syncCharacterClassesForDiscord(discordUser, characterId, classIds) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findCharacterForDiscord(discordUser, characterId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    const safeIds = uniqueNumberList(classIds);
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        if (safeIds.length === 0) {
+            await connection.execute('DELETE FROM character_character_class WHERE character_id = ?', [characterId]);
+            await connection.commit();
+            return { ok: true };
+        }
+
+        const placeholders = safeIds.map(() => '?').join(', ');
+        const [validRows] = await connection.execute(
+            `SELECT id FROM character_classes WHERE id IN (${placeholders})`,
+            safeIds,
+        );
+        const validIds = validRows.map(row => Number(row.id));
+
+        if (validIds.length === 0) {
+            await connection.execute('DELETE FROM character_character_class WHERE character_id = ?', [characterId]);
+            await connection.commit();
+            return { ok: true };
+        }
+
+        const validPlaceholders = validIds.map(() => '?').join(', ');
+        await connection.execute(
+            `DELETE FROM character_character_class WHERE character_id = ? AND character_class_id NOT IN (${validPlaceholders})`,
+            [characterId, ...validIds],
+        );
+
+        const values = validIds.map(() => '(?, ?)').join(', ');
+        const params = validIds.flatMap(id => [characterId, id]);
+        await connection.execute(
+            `INSERT IGNORE INTO character_character_class (character_id, character_class_id) VALUES ${values}`,
+            params,
+        );
+
+        await connection.commit();
+        return { ok: true };
+    } catch {
+        await connection.rollback();
+        return { ok: false, reason: 'error' };
+    } finally {
+        connection.release();
+    }
+}
+
+async function listAlliesForDiscord(discordUser, characterId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute(
+        `
+            SELECT a.id, a.name, a.linked_character_id
+            FROM allies a
+            INNER JOIN characters c ON c.id = a.character_id
+            WHERE a.character_id = ? AND c.user_id = ?
+            ORDER BY a.name ASC, a.id ASC
+        `,
+        [characterId, userId],
+    );
+
+    return rows;
+}
+
+async function listGuildCharactersForDiscord(discordUser, characterId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute(
+        `
+            SELECT id, name
+            FROM characters
+            WHERE guild_status = 'approved'
+              AND deleted_at IS NULL
+              AND id <> ?
+            ORDER BY name ASC, id ASC
+        `,
+        [characterId],
+    );
+
+    return rows;
+}
+
+async function listAdventureParticipantsForDiscord(discordUser, adventureId) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute(
+        `
+            SELECT a.id, a.name, a.linked_character_id, c.name AS linked_name
+            FROM adventure_ally aa
+            INNER JOIN allies a ON a.id = aa.ally_id
+            INNER JOIN adventures adv ON adv.id = aa.adventure_id
+            INNER JOIN characters ch ON ch.id = adv.character_id
+            LEFT JOIN characters c ON c.id = a.linked_character_id
+            WHERE aa.adventure_id = ? AND ch.user_id = ?
+            ORDER BY a.name ASC, a.id ASC
+        `,
+        [adventureId, userId],
+    );
+
+    return rows;
+}
+
+async function resolveGuildAlliesForDiscord(discordUser, characterId, guildCharacterIds, connection = null) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const executor = connection ?? db;
+    const safeIds = uniqueNumberList(guildCharacterIds).filter(id => id !== Number(characterId));
+    if (safeIds.length === 0) return [];
+
+    const [ownRows] = await executor.execute(
+        'SELECT id FROM characters WHERE id = ? AND user_id = ? LIMIT 1',
+        [characterId, userId],
+    );
+    if (ownRows.length === 0) return [];
+
+    const placeholders = safeIds.map(() => '?').join(', ');
+    const [existingRows] = await executor.execute(
+        `
+            SELECT id, linked_character_id
+            FROM allies
+            WHERE character_id = ? AND linked_character_id IN (${placeholders})
+        `,
+        [characterId, ...safeIds],
+    );
+    const existingByLinked = new Map(existingRows.map(row => [Number(row.linked_character_id), Number(row.id)]));
+
+    const [characters] = await executor.execute(
+        `
+            SELECT id, name
+            FROM characters
+            WHERE id IN (${placeholders})
+              AND guild_status = 'approved'
+              AND deleted_at IS NULL
+        `,
+        safeIds,
+    );
+
+    const createdAt = nowSql();
+    const allyIds = [];
+
+    for (const character of characters) {
+        const linkedId = Number(character.id);
+        const existingId = existingByLinked.get(linkedId);
+        if (existingId) {
+            allyIds.push(existingId);
+            continue;
+        }
+
+        const [insertResult] = await executor.execute(
+            `
+                INSERT INTO allies (name, rating, linked_character_id, character_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `,
+            [character.name, 3, linkedId, characterId, createdAt, createdAt],
+        );
+        allyIds.push(insertResult.insertId);
+    }
+
+    return allyIds;
+}
+
+async function syncAdventureParticipantsForDiscord(discordUser, adventureId, { characterId = null, allyIds = [], guildCharacterIds = [] }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const adventure = await findAdventureForDiscord(discordUser, adventureId);
+    if (!adventure) return { ok: false, reason: 'not_found' };
+
+    const targetCharacterId = Number(characterId || adventure.character_id);
+    const safeAllyIds = uniqueNumberList(allyIds);
+    const safeGuildIds = uniqueNumberList(guildCharacterIds).filter(id => id !== targetCharacterId);
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const guildAllyIds = await resolveGuildAlliesForDiscord(discordUser, targetCharacterId, safeGuildIds, connection);
+        const combined = Array.from(new Set([...safeAllyIds, ...guildAllyIds]));
+
+        if (combined.length === 0) {
+            await connection.execute('DELETE FROM adventure_ally WHERE adventure_id = ?', [adventureId]);
+        } else {
+            const placeholders = combined.map(() => '?').join(', ');
+            await connection.execute(
+                `
+                    DELETE FROM adventure_ally
+                    WHERE adventure_id = ? AND ally_id NOT IN (${placeholders})
+                `,
+                [adventureId, ...combined],
+            );
+
+            const values = combined.map(() => '(?, ?)').join(', ');
+            const flatValues = combined.flatMap(id => [adventureId, id]);
+            await connection.execute(
+                `INSERT IGNORE INTO adventure_ally (adventure_id, ally_id) VALUES ${values}`,
+                flatValues,
+            );
+        }
+
+        await connection.commit();
+        return { ok: true };
+    } catch {
+        await connection.rollback();
+        return { ok: false, reason: 'error' };
+    } finally {
+        connection.release();
+    }
 }
 
 async function softDeleteAdventureForDiscord(discordUser, adventureId) {
@@ -553,11 +979,18 @@ module.exports = {
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,
+    listCharacterClassesForDiscord,
+    listCharacterClassIdsForDiscord,
+    syncCharacterClassesForDiscord,
     listAdventuresForDiscord,
     findAdventureForDiscord,
     createAdventureForDiscord,
     updateAdventureForDiscord,
     softDeleteAdventureForDiscord,
+    listAlliesForDiscord,
+    listGuildCharactersForDiscord,
+    listAdventureParticipantsForDiscord,
+    syncAdventureParticipantsForDiscord,
     listDowntimesForDiscord,
     findDowntimeForDiscord,
     createDowntimeForDiscord,

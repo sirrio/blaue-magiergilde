@@ -18,10 +18,12 @@ interface AlliesModalProps {
 
 const getAllyAvatarSrc = (ally: Ally) => {
   if (ally.linked_character?.avatar) {
-    return `/storage/${ally.linked_character.avatar}`
+    const linkedAvatar = String(ally.linked_character.avatar || '').trim()
+    return linkedAvatar.startsWith('http') ? linkedAvatar : `/storage/${linkedAvatar}`
   }
   if (ally.avatar && typeof ally.avatar === 'string') {
-    return `/storage/${ally.avatar}`
+    const avatar = String(ally.avatar || '').trim()
+    return avatar.startsWith('http') ? avatar : `/storage/${avatar}`
   }
   return ''
 }
@@ -143,7 +145,11 @@ const AllyCard: React.FC<AllyCardProps> = ({
     const linkedCharacter =
       editData.linked_character ??
       (editData.linked_character_id ? linkedCharacterLookup.get(editData.linked_character_id) ?? null : null)
-    const linkedAvatar = linkedCharacter?.avatar ? `/storage/${linkedCharacter.avatar}` : ''
+    const linkedAvatar = linkedCharacter?.avatar
+      ? (String(linkedCharacter.avatar || '').trim().startsWith('http')
+        ? String(linkedCharacter.avatar || '').trim()
+        : `/storage/${linkedCharacter.avatar}`)
+      : ''
     if (linkedAvatar) {
       setEditAvatarSrc(linkedAvatar)
       return
@@ -153,7 +159,8 @@ const AllyCard: React.FC<AllyCardProps> = ({
       return
     }
     if (typeof editData.avatar === 'string') {
-      setEditAvatarSrc(`/storage/${editData.avatar}`)
+      const avatar = String(editData.avatar || '').trim()
+      setEditAvatarSrc(avatar.startsWith('http') ? avatar : `/storage/${avatar}`)
       return
     }
     const url = URL.createObjectURL(editData.avatar)

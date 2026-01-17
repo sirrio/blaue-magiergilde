@@ -284,6 +284,9 @@ export interface Character {
     | 'unterhalter'
     | 'logistiker'
     | 'flora & fauna'
+    | 'agenten'
+    | 'waffenmeister'
+    | 'arkanisten'
   notes: string
   id: number
   name: string

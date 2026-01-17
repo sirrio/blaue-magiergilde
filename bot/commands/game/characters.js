@@ -7,6 +7,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const { commandName } = require('../../commandConfig');
 const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
@@ -104,7 +106,7 @@ function calculateBubblesInCurrentLevel(character, level) {
 }
 
 function buildProgressBar(current, total, width = 10) {
-    if (total <= 0) return '\u2014';
+    if (total <= 0) return '-';
     const ratio = Math.max(0, Math.min(1, current / total));
     const filled = Math.round(ratio * width);
     const empty = Math.max(0, width - filled);
@@ -127,16 +129,19 @@ function calculateFactionLevel(character, level, tier) {
 
 function humanFactionName(faction) {
     const map = {
-        none: 'Keine',
-        heiler: 'Heiler',
-        handwerker: 'Handwerker',
-        feldforscher: 'Feldforscher',
-        bibliothekare: 'Bibliothekare',
-        diplomaten: 'Diplomaten',
-        gardisten: 'Gardisten',
-        unterhalter: 'Unterhalter',
-        logistiker: 'Logistiker',
+        none: 'None',
+        heiler: 'Healer',
+        handwerker: 'Crafter',
+        feldforscher: 'Field Researcher',
+        bibliothekare: 'Librarians',
+        diplomaten: 'Diplomats',
+        gardisten: 'Guards',
+        unterhalter: 'Entertainers',
+        logistiker: 'Logisticians',
         'flora & fauna': 'Flora & Fauna',
+        agenten: 'Agents',
+        waffenmeister: 'Weapon Masters',
+        arkanisten: 'Arcanists',
     };
     const key = String(faction || 'none');
     return map[key] || key;
@@ -212,7 +217,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const factionName = humanFactionName(character.faction);
 
     const titleParts = [
-        String(character.name || `Charakter ${character.id}`),
+        String(character.name || `Character ${character.id}`),
         tier,
         `Level ${level}`,
         classNames,
@@ -220,14 +225,14 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
 
     const embed = new EmbedBuilder()
         .setColor(0x4f46e5)
-        .setTitle(titleParts.join(' \u00b7 '))
+        .setTitle(titleParts.join(' - '))
         .addFields(
             { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
-            { name: 'Fortschritt', value: `${buildProgressBar(inCurrent, toNextTotal)}\nNoch: **${toNext}** Bubble(s)`, inline: false },
+            { name: 'Progress', value: `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`, inline: false },
             { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
             { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },
-            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} \u00b7 Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
+            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );
@@ -235,7 +240,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const link = String(character.external_link || '').trim();
     if (isHttpUrl(link)) {
         embed.setURL(link);
-        embed.setDescription(`[Sheet \u00f6ffnen](${link})`);
+        embed.setDescription(`[Open sheet](${link})`);
     }
 
     if (thumbnailUrlOrAttachment) {
@@ -245,44 +250,59 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildSummaryRow(ownerDiscordId) {
-    return new ActionRowBuilder().addComponents(
+function buildCharacterListView({ ownerDiscordId, characters }) {
+    const summary = new EmbedBuilder()
+        .setTitle('Your Characters')
+        .setColor(0x4f46e5)
+        .setDescription(
+            characters.length > 0
+                ? `**${characters.length}** active. Choose a character or create a new one.`
+                : 'No characters yet. Create your first with **New**.',
+        );
+
+    const components = [];
+    const selection = characters.slice(0, 25);
+    if (selection.length > 0) {
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`charactersSelect_${ownerDiscordId}`)
+            .setPlaceholder('Select character...')
+            .addOptions(
+                selection.map(character => {
+                    const option = new StringSelectMenuOptionBuilder()
+                        .setLabel(String(character.name || `Character ${character.id}`).slice(0, 100))
+                        .setValue(String(character.id));
+                    const tier = String(character.start_tier || '').trim();
+                    if (tier) {
+                        option.setDescription(tier.toUpperCase());
+                    }
+                    return option;
+                }),
+            );
+
+        components.push(new ActionRowBuilder().addComponents(select));
+
+        if (characters.length > selection.length) {
+            summary.setFooter({ text: `Showing ${selection.length} of ${characters.length}.` });
+        }
+    }
+
+    components.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
-            .setLabel('Neu')
-            .setStyle(ButtonStyle.Primary),
-    );
-}
-
-function buildCharacterCardRow({ ownerDiscordId, characterId, isFiller }) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
-            .setLabel('Abenteuer')
+            .setLabel('New')
             .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
-            .setLabel('Downtime')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(Boolean(isFiller)),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_edit_${characterId}_${ownerDiscordId}`)
-            .setLabel('Bearbeiten')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-            .setLabel('L\u00f6schen')
-            .setStyle(ButtonStyle.Danger),
-    );
+    ));
+
+    return { embeds: [summary], components };
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription('Deine Charaktere (Dashboard) inkl. Bearbeiten/L\u00f6schen/Neu.'),
+        .setDescription('Your characters (dashboard) with Edit/Delete/New.'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
-            await interaction.reply({ content: 'Bitte nutze diesen Befehl in einem Server (nicht in DMs).', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return;
         }
 
@@ -297,39 +317,18 @@ module.exports = {
             throw error;
         }
 
-        const summary = new EmbedBuilder()
-            .setTitle('Your Characters')
-            .setColor(0x4f46e5)
-            .setDescription(characters.length > 0 ? `**${characters.length}** aktiv` : 'Noch keine Charaktere. Erstelle deinen ersten mit **Neu**.');
-
-        await interaction.reply({
-            embeds: [summary],
-            components: [buildSummaryRow(interaction.user.id)],
-            flags: MessageFlags.Ephemeral,
+        const listView = buildCharacterListView({
+            ownerDiscordId: interaction.user.id,
+            characters,
         });
 
-        for (const character of characters.slice(0, 8)) {
-            const attachment = tryBuildLocalAvatarAttachment(character);
-            const url = resolvePublicAvatarUrl(character.avatar);
-
-            const files = [];
-            let thumbnail = url;
-            if (attachment) {
-                files.push({ attachment: attachment.filePath, name: attachment.fileName });
-                thumbnail = `attachment://${attachment.fileName}`;
-            }
-
-            // eslint-disable-next-line no-await-in-loop
-            await interaction.followUp({
-                embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail })],
-                components: [buildCharacterCardRow({
-                    ownerDiscordId: interaction.user.id,
-                    characterId: character.id,
-                    isFiller: character.is_filler,
-                })],
-                files,
-                flags: MessageFlags.Ephemeral,
-            });
-        }
+        await interaction.reply({
+            ...listView,
+            flags: MessageFlags.Ephemeral,
+        });
     },
+    buildCharacterEmbed,
+    resolvePublicAvatarUrl,
+    tryBuildLocalAvatarAttachment,
+    buildCharacterListView,
 };

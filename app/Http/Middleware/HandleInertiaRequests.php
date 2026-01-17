@@ -87,6 +87,9 @@ class HandleInertiaRequests extends Middleware
                 'unterhalter' => 'Unterhalter',
                 'logistiker' => 'Logistiker',
                 'flora & fauna' => 'Flora & Fauna',
+                'agenten' => 'Agenten',
+                'waffenmeister' => 'Waffenmeister',
+                'arkanisten' => 'Arkanisten',
             ],
             'versions' => [
                 '2014',
