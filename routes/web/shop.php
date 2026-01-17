@@ -1,16 +1,16 @@
 <?php
 
 use App\Http\Controllers\Shop\AddSpellToItemController;
+use App\Http\Controllers\Shop\RefreshShopItemSnapshotController;
 use App\Http\Controllers\Shop\RemoveSpellFromItemController;
 use App\Http\Controllers\Shop\ShopController;
 use App\Http\Controllers\Shop\ShopPostController;
-use App\Http\Controllers\Shop\ShopUpdatePostController;
 use App\Http\Controllers\Shop\ShopSettingController;
-use App\Http\Controllers\Shop\RefreshShopItemSnapshotController;
+use App\Http\Controllers\Shop\ShopUpdatePostController;
 use App\Http\Controllers\Shop\UpdateShopItemSnapshotController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

@@ -1,12 +1,12 @@
 <?php
 
 use App\Http\Controllers\Admin\BackupController;
-use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use App\Http\Controllers\Admin\DiscordBackupController;
 use App\Http\Controllers\Admin\DiscordBackupSettingsController;
+use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'admin'])->group(function () {
     Route::redirect('/admin/backup', '/admin/settings');
     Route::get('/admin/settings', [BackupController::class, 'index'])->name('admin.settings');
 
