@@ -33,6 +33,12 @@ function publicBaseUrl() {
     return value ? value.replace(/\/$/, '') : null;
 }
 
+function resolveCharacterManagerUrl(characterId) {
+    const baseUrl = publicBaseUrl();
+    if (!baseUrl) return null;
+    return `${baseUrl}/characters/${characterId}`;
+}
+
 function resolvePublicAvatarUrl(avatarValue) {
     const value = String(avatarValue || '').trim();
     if (!value) return null;
@@ -210,10 +216,15 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );
 
-    const link = String(character.external_link || '').trim();
-    if (isHttpUrl(link)) {
-        embed.setURL(link);
-        embed.setDescription(`[Open sheet](${link})`);
+    const externalLink = String(character.external_link || '').trim();
+    const managerUrl = resolveCharacterManagerUrl(character.id);
+    if (managerUrl) {
+        embed.setURL(managerUrl);
+    } else if (isHttpUrl(externalLink)) {
+        embed.setURL(externalLink);
+    }
+    if (isHttpUrl(externalLink)) {
+        embed.setDescription(`[Open sheet](${externalLink})`);
     }
 
     if (thumbnailUrlOrAttachment) {
