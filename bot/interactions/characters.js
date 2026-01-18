@@ -983,8 +983,10 @@ async function handle(interaction) {
             return true;
         }
 
+        await interaction.deferUpdate().catch(() => {});
+
         const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-        await interaction.update({
+        await updateManageMessage(interaction, {
             ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }),
             content: '',
         });
@@ -1002,11 +1004,13 @@ async function handle(interaction) {
             return true;
         }
 
+        await interaction.deferUpdate().catch(() => {});
+
         if (action === 'back') {
             const characters = await listCharactersForDiscord(interaction.user);
             const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
             const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
-            await interaction.update({ ...listView, content: '' });
+            await updateManageMessage(interaction, { ...listView, content: '' });
             return true;
         }
 
@@ -1015,7 +1019,7 @@ async function handle(interaction) {
             await updateUserTrackingModeForDiscord(interaction.user, simplifiedTracking);
             const characters = await listCharactersForDiscord(interaction.user);
             const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
-            await interaction.update({ ...listView, content: '' });
+            await updateManageMessage(interaction, { ...listView, content: '' });
             return true;
         }
     }
@@ -1026,6 +1030,8 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
             return true;
         }
+
+        await interaction.deferUpdate().catch(() => {});
 
         const selectedId = Number(interaction.values[0]);
         if (!Number.isFinite(selectedId) || selectedId < 1) {
@@ -1049,7 +1055,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.update({
+        await updateManageMessage(interaction, {
             ...buildCharacterCardPayload({ character, ownerDiscordId }),
             content: '',
         });

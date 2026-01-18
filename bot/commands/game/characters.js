@@ -301,6 +301,10 @@ module.exports = {
             return;
         }
 
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        }
+
         let characters;
         let simplifiedTracking = false;
         try {
@@ -320,9 +324,6 @@ module.exports = {
             simplifiedTracking,
         });
 
-        if (!interaction.deferred && !interaction.replied) {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        }
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply(listView);
         }
