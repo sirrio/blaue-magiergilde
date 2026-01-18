@@ -1,6 +1,7 @@
-const { MessageFlags } = require('discord.js');
 const { createUserForDiscord } = require('../appDb');
 const { buildJoinConfirmButtons, notLinkedContent } = require('../linkingUi');
+const { updateManageMessage } = require('../utils/updateManageMessage');
+const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -9,11 +10,12 @@ function isOwnerOfInteraction(interaction, ownerDiscordId) {
 async function handle(interaction) {
     if (!interaction.isButton()) return false;
     if (!interaction.customId.startsWith('app')) return false;
+    setManageMessageTarget(interaction);
 
     const [action, ownerDiscordId] = interaction.customId.split('_');
 
     if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-        await interaction.reply({ content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { content: 'You cannot perform this action.', components: [] });
         return true;
     }
 
@@ -65,9 +67,8 @@ async function handle(interaction) {
         return true;
     }
 
-    await interaction.reply({ content: 'Unknown action.', flags: MessageFlags.Ephemeral });
+    await updateManageMessage(interaction, { content: 'Unknown action.', components: [] });
     return true;
 }
 
 module.exports = { handle };
-

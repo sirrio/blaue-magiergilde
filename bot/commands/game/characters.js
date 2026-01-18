@@ -274,7 +274,12 @@ module.exports = {
         .setDescription('Your characters (dashboard) with Edit/Delete/New.'),
     async execute(interaction) {
         if (!interaction.inGuild()) {
-            await interaction.reply({ content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            }
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ content: 'Please use this command in a server (not in DMs).', components: [] });
+            }
             return;
         }
 
@@ -294,10 +299,12 @@ module.exports = {
             characters,
         });
 
-        await interaction.reply({
-            ...listView,
-            flags: MessageFlags.Ephemeral,
-        });
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        }
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(listView);
+        }
     },
     buildCharacterEmbed,
     resolvePublicAvatarUrl,
