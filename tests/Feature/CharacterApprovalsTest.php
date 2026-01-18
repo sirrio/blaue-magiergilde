@@ -4,6 +4,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
@@ -39,4 +40,15 @@ it('logs an audit entry when admin updates guild status', function () {
         'from' => 'pending',
         'to' => 'approved',
     ]);
+});
+
+it('includes simplified tracking flag for character approvals', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $user = User::factory()->create(['simplified_tracking' => true]);
+    Character::factory()->for($user)->create();
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('characters.0.user.simplified_tracking', true));
 });

@@ -45,6 +45,7 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
 
   const level = calculateLevel(character)
   const tier = calculateTier(character)
+  const simplifiedTracking = Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
@@ -72,8 +73,8 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
     : guildStatus === 'declined'
       ? 'text-error'
       : guildStatus === 'retired'
-        ? 'text-base-content/50'
-        : 'text-warning'
+    ? 'text-base-content/50'
+    : 'text-warning'
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
@@ -134,32 +135,38 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
             <CharacterImage className="mt-4 mb-2" character={character} />
             {!character.is_filler ? (
               <>
-                <Progress value={progressValue} max={progressMax} />
-                <div className="flex items-center justify-end text-xs">
-                  {isBubbleOverspent ? (
-                    <span className="text-error/80">Overspent bubbles</span>
-                  ) : (
-                    <>
-                      <span>{bubblesToNextLevel}</span>
-                      <Droplets size={13} />
-                      <span> to next level</span>
-                    </>
-                  )}
-                </div>
-                <div className={cn('mt-4 grid grid-cols-2 gap-0.5')}>
-                  <InfoBox>
-                    <InfoBoxTitle>
-                      <Swords size={15} /> Adventures
-                    </InfoBoxTitle>
-                    <InfoBoxLine>Played: {character.adventures.length}</InfoBoxLine>
-                    <InfoBoxLine>
-                      Started in: <LogoTier width={13} tier={character.start_tier} />
-                    </InfoBoxLine>
-                    <InfoBoxLine>
-                      Bubble Shop: {character.bubble_shop_spend}
-                      <Droplets size={13} />
-                    </InfoBoxLine>
-                  </InfoBox>
+                {!simplifiedTracking ? (
+                  <>
+                    <Progress value={progressValue} max={progressMax} />
+                    <div className="flex items-center justify-end text-xs">
+                      {isBubbleOverspent ? (
+                        <span className="text-error/80">Overspent bubbles</span>
+                      ) : (
+                        <>
+                          <span>{bubblesToNextLevel}</span>
+                          <Droplets size={13} />
+                          <span> to next level</span>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+                <div className={cn('mt-4 grid gap-0.5', simplifiedTracking ? 'grid-cols-2' : 'grid-cols-2')}>
+                  {!simplifiedTracking ? (
+                    <InfoBox>
+                      <InfoBoxTitle>
+                        <Swords size={15} /> Adventures
+                      </InfoBoxTitle>
+                      <InfoBoxLine>Played: {character.adventures.length}</InfoBoxLine>
+                      <InfoBoxLine>
+                        Started in: <LogoTier width={13} tier={character.start_tier} />
+                      </InfoBoxLine>
+                      <InfoBoxLine>
+                        Bubble Shop: {character.bubble_shop_spend}
+                        <Droplets size={13} />
+                      </InfoBoxLine>
+                    </InfoBox>
+                  ) : null}
                   <InfoBox>
                     <InfoBoxTitle>
                       <Anvil size={15} /> Factions
@@ -167,15 +174,17 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
                     <InfoBoxLine>Level: {calculateFactionLevel(character)}</InfoBoxLine>
                   </InfoBox>
-                  <InfoBox>
-                    <InfoBoxTitle>
-                      <FlameKindling size={15} /> Downtime
-                    </InfoBoxTitle>
-                    <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
-                    <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
-                    <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
-                    <InfoBoxLine className="font-semibold">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
-                  </InfoBox>
+                  {!simplifiedTracking ? (
+                    <InfoBox>
+                      <InfoBoxTitle>
+                        <FlameKindling size={15} /> Downtime
+                      </InfoBoxTitle>
+                      <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
+                      <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
+                      <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
+                      <InfoBoxLine className="font-semibold">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
+                    </InfoBox>
+                  ) : null}
                   <InfoBox>
                     <InfoBoxTitle>
                       <Crown size={15} /> Game Master
@@ -201,25 +210,42 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
                 </div>
               </div>
             )}
-            <div className={cn('mt-4 grid grid-cols-4 gap-1')}>
-              <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-4')}>
-                <BookOpen size={14} />
-                Details
-              </Button>
-              <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
-              <StoreDowntimeModal character={character}></StoreDowntimeModal>
-              <AlliesModal character={character} guildCharacters={guildCharacters} />
-              <Button
-                as="a"
-                size="sm"
-                href={character.external_link}
-                target="_blank"
-                aria-label="Open external link"
-                title="Open external link"
-              >
-                <ExternalLink size={14} />
-              </Button>
-            </div>
+            {simplifiedTracking ? (
+              <div className={cn('mt-4')}>
+                <Button
+                  as="a"
+                  size="sm"
+                  href={character.external_link}
+                  target="_blank"
+                  className="w-full"
+                  aria-label="Open external link"
+                  title="Open external link"
+                >
+                  <ExternalLink size={14} />
+                  Open link
+                </Button>
+              </div>
+            ) : (
+              <div className={cn('mt-4 grid grid-cols-4 gap-1')}>
+                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-4')}>
+                  <BookOpen size={14} />
+                  Details
+                </Button>
+                <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
+                <StoreDowntimeModal character={character}></StoreDowntimeModal>
+                <AlliesModal character={character} guildCharacters={guildCharacters} />
+                <Button
+                  as="a"
+                  size="sm"
+                  href={character.external_link}
+                  target="_blank"
+                  aria-label="Open external link"
+                  title="Open external link"
+                >
+                  <ExternalLink size={14} />
+                </Button>
+              </div>
+            )}
           </CardContent>
         </CardBody>
       </Card>

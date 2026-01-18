@@ -31,6 +31,7 @@ export interface User {
   created_at: string
   updated_at: string
   is_admin: boolean
+  simplified_tracking?: boolean
 
   [key: string]: unknown // This allows for additional properties...
 }
@@ -297,6 +298,8 @@ export interface Character {
   dm_coins: number
   is_filler: boolean
   bubble_shop_spend: number
+  manual_level?: number | null
+  simplified_tracking?: boolean
   external_link: string
   avatar: string
   user_id: number
@@ -304,6 +307,7 @@ export interface Character {
     id: number
     name: string
     discord_id?: number | null
+    simplified_tracking?: boolean
   }
   character?: Character
 }

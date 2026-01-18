@@ -19,6 +19,9 @@ const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
     listCharactersForDiscord,
+    getUserTrackingModeForDiscord,
+    updateUserTrackingModeForDiscord,
+    updateCharacterManualLevelForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
     listCharacterClassesForDiscord,
@@ -42,6 +45,7 @@ const {
 
 const { buildCharacterListView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
+const { calculateLevel } = require('../utils/characterTier');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -102,6 +106,7 @@ const {
     buildDowntimeStepEmbed,
     buildDowntimeTypeManageView,
     buildDowntimeTypeRows,
+    buildTrackingSettingsView,
     buildFactionRow,
     buildStartTierRow,
     buildVersionRow,
@@ -138,7 +143,8 @@ function clearAvatarUpdateState(userId) {
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters });
+    const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
     await interaction.update({
         ...listView,
         content: '',
@@ -953,6 +959,56 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_tracking_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_tracking_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+        await interaction.update({
+            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersTracking_')) {
+        const raw = interaction.customId.replace('charactersTracking_', '');
+        const parts = raw.split('_');
+        const ownerDiscordId = parts.pop();
+        const action = parts.join('_');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (action === 'back') {
+            const characters = await listCharactersForDiscord(interaction.user);
+            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+            await interaction.update({ ...listView, content: '' });
+            return true;
+        }
+
+        if (action === 'standard' || action === 'simplified') {
+            const simplifiedTracking = action === 'simplified';
+            await updateUserTrackingModeForDiscord(interaction.user, simplifiedTracking);
+            const characters = await listCharactersForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+            await interaction.update({ ...listView, content: '' });
+            return true;
+        }
+    }
+
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
         const ownerDiscordId = interaction.customId.replace('charactersSelect_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -1055,7 +1111,8 @@ async function handle(interaction) {
         clearCreationState(ownerDiscordId);
         try {
             const characters = await listCharactersForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
             await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
@@ -1760,6 +1817,54 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterManualLevelModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (!character.simplified_tracking) {
+            await updateManageMessage(interaction, { content: 'Manual level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const rawLevel = interaction.fields.getTextInputValue('manualLevel');
+        const parsedLevel = Number(rawLevel);
+        const level = Number.isFinite(parsedLevel) ? Math.floor(parsedLevel) : NaN;
+        if (!Number.isFinite(level) || level < 1 || level > 20) {
+            await updateManageMessage(interaction, { content: 'Please enter a level between 1 and 20.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await updateCharacterManualLevelForDiscord(interaction.user, characterId, level);
+        if (!result.ok) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) {
+            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await updateManageMessage(interaction, {
+            ...buildCharacterManageView(refreshed, { ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('characterCard_')) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -1818,7 +1923,12 @@ async function handle(interaction) {
 
         if (action === 'back') {
             await interaction.update({
-                components: buildCharacterCardRows({ characterId: character.id, ownerDiscordId, isFiller: character.is_filler }),
+                components: buildCharacterCardRows({
+                    characterId: character.id,
+                    ownerDiscordId,
+                    isFiller: character.is_filler,
+                    simplifiedTracking: Boolean(character.simplified_tracking),
+                }),
                 content: '',
             });
             return true;
@@ -1828,9 +1938,11 @@ async function handle(interaction) {
             await interaction.deferUpdate();
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
+                const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
                 const listView = buildCharacterListView({
                     ownerDiscordId,
                     characters,
+                    simplifiedTracking,
                 });
                 await interaction.editReply({
                     ...listView,
@@ -1977,6 +2089,24 @@ async function handle(interaction) {
                 .setValue(safeModalValue(String(character.dm_bubbles ?? 0)));
 
             modal.addComponents(new ActionRowBuilder().addComponents(bubbleInput));
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        if (action === 'manual_level') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterManualLevelModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Set level');
+
+            const currentLevel = calculateLevel(character);
+            const manualInput = new TextInputBuilder()
+                .setCustomId('manualLevel')
+                .setLabel('Level (1-20)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setValue(safeModalValue(String(currentLevel)));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(manualInput));
             await interaction.showModal(modal);
             return true;
         }
@@ -4058,4 +4188,3 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
-

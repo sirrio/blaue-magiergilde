@@ -39,6 +39,7 @@ type CharacterGroup = {
   key: string
   label: string
   discordId?: number | null
+  simplifiedTracking?: boolean
   characters: AdminCharacter[]
 }
 
@@ -238,12 +239,14 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
       const userId = character.user_id
       const userName = character.user?.name ?? 'Unknown User'
       const discordId = character.user?.discord_id ?? null
+      const simplifiedTracking = Boolean(character.user?.simplified_tracking)
       const groupKey = String(userId)
       if (!grouped.has(groupKey)) {
         grouped.set(groupKey, {
           key: groupKey,
           label: userName,
           discordId,
+          simplifiedTracking,
           characters: [],
         })
       }
@@ -367,6 +370,11 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                     ) : (
                       <span>No Discord</span>
                     )}
+                    {group.simplifiedTracking ? (
+                      <span className="rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
+                        Simplified tracking
+                      </span>
+                    ) : null}
                     <DeleteUserModal userId={Number(group.key)} userLabel={group.label} />
                   </span>
                 </div>

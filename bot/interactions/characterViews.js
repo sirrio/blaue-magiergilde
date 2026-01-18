@@ -114,8 +114,8 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId }) {
-    return [
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking }) {
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_basic_${characterId}_${ownerDiscordId}`)
@@ -148,13 +148,16 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
                 .setLabel('Bubble Shop')
                 .setStyle(ButtonStyle.Secondary),
         ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-        ),
     ];
+
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
+            .setLabel('Back')
+            .setStyle(ButtonStyle.Secondary),
+    ));
+
+    return rows;
 }
 
 function buildCharacterManageView(character, { ownerDiscordId }) {
@@ -163,6 +166,9 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const isFiller = Boolean(character.is_filler);
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level);
+    const simplifiedTracking = Boolean(character.simplified_tracking);
+    const manualLevelRaw = Number(character.manual_level);
+    const manualLevel = Number.isFinite(manualLevelRaw) && manualLevelRaw > 0 ? String(manualLevelRaw) : 'Not set';
     const startTierRaw = String(character.start_tier || '').trim();
     const startTier = isFiller ? 'Filler' : (startTierRaw ? startTierRaw.toUpperCase() : '-');
     const currentTier = isFiller ? 'Filler' : tier;
@@ -194,6 +200,8 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Faction', value: faction, inline: true },
             { name: 'Version', value: version, inline: true },
             { name: 'Current tier', value: currentTier, inline: true },
+            { name: 'Tracking', value: simplifiedTracking ? 'Simplified (manual level)' : 'Standard', inline: true },
+            ...(simplifiedTracking ? [{ name: 'Manual Level', value: manualLevel, inline: true }] : []),
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
             { name: 'External Link', value: linkValue, inline: false },
@@ -205,13 +213,14 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 
     return {
         embeds: [embed],
-        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId }),
+        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId, simplifiedTracking }),
     };
 }
 
 function buildCharacterCardPayload({ character, ownerDiscordId }) {
     const attachment = tryBuildLocalAvatarAttachment(character);
     const url = resolvePublicAvatarUrl(character.avatar);
+    const simplifiedTracking = Boolean(character.simplified_tracking);
 
     const files = [];
     let thumbnail = url;
@@ -226,9 +235,41 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
             ownerDiscordId,
             characterId: character.id,
             isFiller: character.is_filler,
+            simplifiedTracking,
         }),
         files,
     };
+}
+
+function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }) {
+    const embed = new EmbedBuilder()
+        .setTitle('Settings')
+        .setColor(0x4f46e5)
+        .setDescription('Choose how you want to track character progress.')
+        .addFields({
+            name: 'Tracking mode',
+            value: simplifiedTracking ? 'Simplified (manual level)' : 'Standard (adventures + downtime)',
+            inline: false,
+        });
+
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersTracking_standard_${ownerDiscordId}`)
+            .setLabel('Standard tracking')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!simplifiedTracking),
+        new ButtonBuilder()
+            .setCustomId(`charactersTracking_simplified_${ownerDiscordId}`)
+            .setLabel('Simplified tracking')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(simplifiedTracking),
+        new ButtonBuilder()
+            .setCustomId(`charactersTracking_back_${ownerDiscordId}`)
+            .setLabel('Back')
+            .setStyle(ButtonStyle.Secondary),
+    );
+
+    return { embeds: [embed], components: [buttons] };
 }
 
 function getAdventureStepNumber(stepKey) {
@@ -1074,9 +1115,10 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
-    return [
-        new ActionRowBuilder().addComponents(
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking }) {
+    const primaryRow = new ActionRowBuilder();
+    if (!simplifiedTracking) {
+        primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
                 .setLabel('Adventure')
@@ -1086,15 +1128,29 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
                 .setLabel('Downtime')
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(Boolean(isFiller)),
+        );
+    }
+    if (simplifiedTracking) {
+        primaryRow.addComponents(
             new ButtonBuilder()
-                .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
-                .setLabel('Manage')
+                .setCustomId(`characterManage_manual_level_${characterId}_${ownerDiscordId}`)
+                .setLabel('Set level')
                 .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-                .setLabel('Delete')
-                .setStyle(ButtonStyle.Danger),
-        ),
+        );
+    }
+    primaryRow.addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
+            .setLabel('Manage')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
+            .setLabel('Delete')
+            .setStyle(ButtonStyle.Danger),
+    );
+
+    return [
+        primaryRow,
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
@@ -1878,6 +1934,7 @@ module.exports = {
     buildCharacterManageRows,
     buildCharacterManageView,
     buildCharacterCardPayload,
+    buildTrackingSettingsView,
     buildAdventureStepEmbed,
     buildAdventureDurationRows,
     buildAdventureDateRows,

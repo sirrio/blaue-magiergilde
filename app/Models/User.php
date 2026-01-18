@@ -5,10 +5,10 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 
 /**
  * @property mixed $is_admin
@@ -41,6 +41,7 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
+        'simplified_tracking',
     ];
 
     /**
@@ -62,6 +63,7 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'simplified_tracking' => 'boolean',
         ];
     }
 
@@ -69,5 +71,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(Character::class);
     }
-
 }

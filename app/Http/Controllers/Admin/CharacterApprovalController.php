@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +29,7 @@ class CharacterApprovalController extends Controller
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->withCount('room')
             ->with([
-                'user:id,name,discord_id',
+                'user:id,name,discord_id,simplified_tracking',
                 'adventures:id,character_id,duration,has_additional_bubble',
             ]);
 
@@ -75,6 +75,7 @@ class CharacterApprovalController extends Controller
                 'admin_notes',
                 'dm_bubbles',
                 'bubble_shop_spend',
+                'manual_level',
                 'is_filler',
             ]);
 
