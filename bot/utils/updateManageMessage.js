@@ -1,5 +1,5 @@
 const EPHEMERAL_FLAG = 64;
-const { getManageMessageTarget } = require('./manageMessageTarget');
+const { getManageMessageTarget, setManageMessageTarget } = require('./manageMessageTarget');
 
 async function updateManageMessage(interaction, payload, options = {}) {
     const sanitizedPayload = payload ? { ...payload } : payload;
@@ -13,7 +13,7 @@ async function updateManageMessage(interaction, payload, options = {}) {
             await interaction.update(sanitizedPayload);
             return;
         } catch {
-            return;
+            // fall through to other update paths
         }
     }
 
@@ -69,7 +69,23 @@ async function updateManageMessage(interaction, payload, options = {}) {
         }
 
         if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(sanitizedPayload).catch(() => {});
+            try {
+                await interaction.editReply(sanitizedPayload);
+                updatedMessage = true;
+            } catch {
+                updatedMessage = false;
+            }
+        }
+    }
+
+    if (!updatedMessage && interaction?.channel?.isTextBased?.()) {
+        try {
+            const message = await interaction.channel.send(sanitizedPayload);
+            if (message && interaction.user?.id) {
+                setManageMessageTarget({ message, user: interaction.user });
+            }
+        } catch {
+            // ignore final send failure
         }
     }
 

@@ -5,6 +5,7 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
+    MessageFlags,
 } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
 const { formatLocalIsoDate, formatTimeHHMM } = require('../dateUtils');
@@ -115,6 +116,15 @@ async function handle(interaction) {
             await interaction.reply({
                 content: threadRestrictionMessage(),
                 flags: MessageFlags.Ephemeral,
+            });
+            return true;
+        }
+
+        if (!interaction.channel?.threads) {
+            pendingGames.delete(id);
+            await updateManageMessage(interaction, {
+                content: 'Announcements can only be created in server text or announcement channels.',
+                components: [],
             });
             return true;
         }

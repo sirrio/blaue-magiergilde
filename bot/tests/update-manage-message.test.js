@@ -56,6 +56,7 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
         },
         deferReply: async () => {
             fallbackDeferred = true;
+            componentInteraction.deferred = true;
         },
         editReply: async () => {
             updateReplyCalled = true;
@@ -65,8 +66,8 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
     await updateManageMessage(componentInteraction, { content: 'fallback' });
 
     assert.equal(updateAttempted, true);
-    assert.equal(updateReplyCalled, false);
-    assert.equal(fallbackDeferred, false);
+    assert.equal(updateReplyCalled, true);
+    assert.equal(fallbackDeferred, true);
 
     console.log('update-manage-message.test.js passed');
 })();
