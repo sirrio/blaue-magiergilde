@@ -83,6 +83,7 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
         onChange({ allyIds: selectedAllyIds.filter((entry) => entry !== id), guildCharacterIds: selectedGuildCharacterIds })
         return
       }
+      setSearch('')
       onChange({ allyIds: [...selectedAllyIds, id], guildCharacterIds: selectedGuildCharacterIds })
       return
     }
@@ -90,6 +91,7 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
       onChange({ allyIds: selectedAllyIds, guildCharacterIds: selectedGuildCharacterIds.filter((entry) => entry !== id) })
       return
     }
+    setSearch('')
     onChange({ allyIds: selectedAllyIds, guildCharacterIds: [...selectedGuildCharacterIds, id] })
   }
 
