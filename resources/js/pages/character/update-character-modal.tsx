@@ -41,7 +41,7 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
     <Modal>
       <ModalTrigger>
         <Button
-          className={'hidden group-hover:flex'}
+          className="flex md:hidden md:group-hover:flex"
           size="xs"
           modifier="square"
           aria-label="Edit character"

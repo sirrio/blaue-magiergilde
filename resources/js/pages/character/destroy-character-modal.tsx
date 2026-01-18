@@ -6,14 +6,14 @@ import { Trash } from 'lucide-react'
 
 const DestroyCharacterModal = ({ character }: { character: Character }) => {
   const handleFormSubmit = () => {
-  router.delete(route('characters.destroy', character.id), { preserveState: 'errors' })
+    router.delete(route('characters.destroy', character.id), { preserveState: 'errors' })
   }
 
   return (
     <Modal>
       <ModalTrigger>
         <Button
-          className={'hidden group-hover:flex'}
+          className="flex md:hidden md:group-hover:flex"
           size="xs"
           modifier="square"
           color="error"

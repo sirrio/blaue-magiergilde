@@ -92,7 +92,7 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
         <CardBody>
           <CardAction className={cn('absolute top-2 right-2 gap-1')}>
             <Button
-              className={'hidden group-hover:flex'}
+              className="flex md:hidden md:group-hover:flex"
               size="xs"
               modifier="square"
               aria-label="Reorder character"
@@ -104,7 +104,7 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
             </Button>
             <UpdateCharacterModal character={character} />
             <Button
-              className={'hidden group-hover:flex'}
+              className="flex md:hidden md:group-hover:flex"
               as="a"
               href={route('characters.download', character.id)}
               modifier="square"
