@@ -1834,7 +1834,7 @@ async function handle(interaction) {
         }
 
         if (!character.simplified_tracking) {
-            await updateManageMessage(interaction, { content: 'Manual level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Set level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
             return true;
         }
 

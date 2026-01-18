@@ -10,7 +10,7 @@ import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { Head, router, usePage } from '@inertiajs/react'
+import { Head, router, useForm, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
 import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
@@ -18,6 +18,7 @@ import { useState } from 'react'
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const { features, auth } = usePage<PageProps>().props
   const simplifiedTracking = Boolean(auth.user?.simplified_tracking)
+  const trackingForm = useForm({ simplified_tracking: simplifiedTracking })
   const visibleCharacters = characters.filter((char) => !char.deleted_at)
   const [chars, setChars] = useState([...visibleCharacters])
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
@@ -92,6 +93,11 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
   }
 
+  const updateTrackingMode = (value: boolean) => {
+    trackingForm.setData('simplified_tracking', value)
+    trackingForm.patch(route('characters.tracking'), { preserveScroll: true, preserveState: true })
+  }
+
   return (
     <AppLayout>
       <Head title="Characters" />
@@ -109,6 +115,27 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <p className="text-base-content/70 text-sm">Manage all your characters easily below.</p>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Tracking</span>
+              <div className="join">
+                <Button
+                  size="xs"
+                  className={cn('join-item', !simplifiedTracking ? 'btn-primary' : 'btn-outline')}
+                  disabled={trackingForm.processing}
+                  onClick={() => updateTrackingMode(false)}
+                >
+                  Standard
+                </Button>
+                <Button
+                  size="xs"
+                  className={cn('join-item', simplifiedTracking ? 'btn-primary' : 'btn-outline')}
+                  disabled={trackingForm.processing}
+                  onClick={() => updateTrackingMode(true)}
+                >
+                  Simplified
+                </Button>
+              </div>
+            </div>
             <Button size="sm" variant="ghost" className="flex items-center space-x-1" onClick={() => copyCharactersToClipboard(characters)}>
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>

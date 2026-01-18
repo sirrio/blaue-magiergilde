@@ -21,6 +21,7 @@ import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
+import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -211,7 +212,8 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
               </div>
             )}
             {simplifiedTracking ? (
-              <div className={cn('mt-4')}>
+              <div className={cn('mt-4 grid gap-2')}>
+                <SetCharacterLevelModal character={character} />
                 <Button
                   as="a"
                   size="sm"
