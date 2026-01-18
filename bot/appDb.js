@@ -166,7 +166,6 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
-                c.manual_level,
                 c.is_filler,
                 c.guild_status,
                 u.simplified_tracking,
@@ -233,7 +232,6 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
-                c.manual_level,
                 c.is_filler,
                 u.simplified_tracking,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
@@ -444,14 +442,9 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             }
         }
 
-        await connection.execute(
-            'UPDATE characters SET manual_level = ?, updated_at = ? WHERE id = ? AND user_id = ?',
-            [level, nowSql(), characterId, userId],
-        );
-
         await connection.commit();
 
-        return { ok: true, manualLevel: level };
+        return { ok: true };
     } catch (error) {
         await connection.rollback();
         throw error;

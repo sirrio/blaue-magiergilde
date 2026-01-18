@@ -75,7 +75,6 @@ class CharacterApprovalController extends Controller
                 'admin_notes',
                 'dm_bubbles',
                 'bubble_shop_spend',
-                'manual_level',
                 'is_filler',
             ]);
 

@@ -167,8 +167,6 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level);
     const simplifiedTracking = Boolean(character.simplified_tracking);
-    const manualLevelRaw = Number(character.manual_level);
-    const manualLevel = Number.isFinite(manualLevelRaw) && manualLevelRaw > 0 ? String(manualLevelRaw) : 'Not set';
     const startTierRaw = String(character.start_tier || '').trim();
     const startTier = isFiller ? 'Filler' : (startTierRaw ? startTierRaw.toUpperCase() : '-');
     const currentTier = isFiller ? 'Filler' : tier;
@@ -200,8 +198,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Faction', value: faction, inline: true },
             { name: 'Version', value: version, inline: true },
             { name: 'Current tier', value: currentTier, inline: true },
-            { name: 'Tracking', value: simplifiedTracking ? 'Simplified (manual level)' : 'Standard', inline: true },
-            ...(simplifiedTracking ? [{ name: 'Manual Level', value: manualLevel, inline: true }] : []),
+            { name: 'Tracking', value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard', inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
             { name: 'External Link', value: linkValue, inline: false },
@@ -248,7 +245,7 @@ function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }) {
         .setDescription('Choose how you want to track character progress.')
         .addFields({
             name: 'Tracking mode',
-            value: simplifiedTracking ? 'Simplified (manual level)' : 'Standard (adventures + downtime)',
+            value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)',
             inline: false,
         });
 
