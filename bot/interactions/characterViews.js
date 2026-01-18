@@ -298,7 +298,8 @@ function getAdventureFieldValues(state, participantsLabel) {
             ? 'No'
             : '-';
     const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
-    const participants = participantsLabel || (state?.data?.guildCharacterIds?.length ? `${state.data.guildCharacterIds.length} selected` : '-');
+    const selectedCount = (state?.data?.allyIds?.length || 0) + (state?.data?.guildCharacterIds?.length || 0);
+    const participants = participantsLabel || (selectedCount ? `${selectedCount} selected` : '-');
 
     return { duration, date, title, gameMaster, quest, notes, participants };
 }
@@ -486,7 +487,6 @@ function buildAdventureNotesRows(state) {
 
 function buildAdventureParticipantsRows(state, options) {
     const { characterId, ownerDiscordId } = state;
-    const selectedIds = new Set((state?.data?.guildCharacterIds || []).map(String));
     const components = [];
 
     if (options.length > 0) {
@@ -497,12 +497,12 @@ function buildAdventureParticipantsRows(state, options) {
             .setMaxValues(Math.min(25, options.length));
 
         options.slice(0, 25).forEach(option => {
-            select.addOptions(
-                new StringSelectMenuOptionBuilder()
-                    .setLabel(String(option.name).slice(0, 100))
-                    .setValue(String(option.id))
-                    .setDefault(selectedIds.has(String(option.id))),
-            );
+            const builder = new StringSelectMenuOptionBuilder()
+                .setLabel(String(option.label).slice(0, 100))
+                .setDescription(String(option.description || '').slice(0, 100))
+                .setValue(`${option.type}:${option.id}`)
+                .setDefault(Boolean(option.selected));
+            select.addOptions(builder);
         });
 
         components.push(new ActionRowBuilder().addComponents(select));
@@ -526,7 +526,9 @@ function buildAdventureParticipantsRows(state, options) {
                 .setCustomId(`advCreate_participants_clear_${characterId}_${ownerDiscordId}`)
                 .setLabel('Remove all')
                 .setStyle(ButtonStyle.Danger)
-                .setDisabled(selectedIds.size === 0),
+                .setDisabled(
+                    (state?.data?.allyIds?.length || 0) + (state?.data?.guildCharacterIds?.length || 0) === 0,
+                ),
         ),
     );
 

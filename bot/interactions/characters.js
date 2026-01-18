@@ -29,6 +29,7 @@ const {
     createAdventureForDiscord,
     updateAdventureForDiscord,
     softDeleteAdventureForDiscord,
+    listAlliesForDiscord,
     listGuildCharactersForDiscord,
     listAdventureParticipantsForDiscord,
     syncAdventureParticipantsForDiscord,
@@ -68,6 +69,7 @@ const {
     buildAdventureTitleRows,
     buildAvatarStepEmbed,
     buildAvatarUploadRow,
+    buildParticipantOptions,
     buildCharacterCardPayload,
     buildCharacterCardRows,
     buildCharacterClassesView,
@@ -104,7 +106,7 @@ const {
     buildStartTierRow,
     buildVersionRow,
     allowedFactions,
-    formatSelectedParticipantNames,
+    formatParticipantList,
     getParticipantSearch,
     getStartTierSelection,
     isHttpUrl,
@@ -269,6 +271,7 @@ function createAdventureState({ ownerDiscordId, characterId, mode = 'create', ad
             gameMaster: '',
             hasAdditionalBubble: null,
             notes: '',
+            allyIds: [],
             guildCharacterIds: [],
         },
         promptMessage: null,
@@ -329,18 +332,30 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
     const searchKey = `create-${characterId}`;
     let participantsLabel = undefined;
     let participantOptions = [];
+    let participantTotal = 0;
 
     let allParticipantOptions = [];
     if (step === 'participants' || step === 'confirm') {
-        allParticipantOptions = await listGuildCharactersForDiscord(interaction.user, characterId);
-        participantsLabel = formatSelectedParticipantNames(allParticipantOptions, state.data.guildCharacterIds);
+        const [allies, guildCharacters] = await Promise.all([
+            listAlliesForDiscord(interaction.user, characterId),
+            listGuildCharactersForDiscord(interaction.user, characterId),
+        ]);
         const search = getParticipantSearch(searchKey, ownerDiscordId);
-        if (search) {
-            const query = search.toLowerCase();
-            participantOptions = allParticipantOptions.filter(option => String(option.name).toLowerCase().includes(query));
-        } else {
-            participantOptions = allParticipantOptions;
+        allParticipantOptions = buildParticipantOptions({
+            allies,
+            guildCharacters,
+            selectedAllyIds: state.data.allyIds,
+            selectedGuildCharacterIds: state.data.guildCharacterIds,
+            search,
+        });
+        participantTotal = allParticipantOptions.length;
+        const selectedParticipants = allParticipantOptions
+            .filter(option => option.selected)
+            .map(option => ({ name: option.label }));
+        if (selectedParticipants.length > 0) {
+            participantsLabel = formatParticipantList(selectedParticipants);
         }
+        participantOptions = allParticipantOptions;
     }
 
     if (step === 'duration') {
@@ -380,7 +395,7 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
 
     if (step === 'participants') {
         const search = getParticipantSearch(searchKey, ownerDiscordId);
-        const totalCount = allParticipantOptions.length;
+        const totalCount = participantTotal;
         const visibleCount = Math.min(25, participantOptions.length);
         const baseMessage = message || 'Choose participants (approved characters).';
         const participantsMessage = baseMessage;
@@ -2467,6 +2482,8 @@ async function handle(interaction) {
                     title: state.data.title,
                     gameMaster: state.data.gameMaster,
                     notes: state.data.notes,
+                    allyIds: state.data.allyIds,
+                    guildCharacterIds: state.data.guildCharacterIds,
                 });
             } else {
                 result = await createAdventureForDiscord(interaction.user, {
@@ -2477,6 +2494,7 @@ async function handle(interaction) {
                     title: state.data.title,
                     gameMaster: state.data.gameMaster,
                     notes: state.data.notes,
+                    allyIds: state.data.allyIds,
                     guildCharacterIds: state.data.guildCharacterIds,
                 });
             }
@@ -2495,6 +2513,7 @@ async function handle(interaction) {
 
             if (isEdit && adventureId) {
                 await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
+                    allyIds: state.data.allyIds,
                     guildCharacterIds: state.data.guildCharacterIds,
                 });
             }
@@ -2560,12 +2579,17 @@ async function handle(interaction) {
         }
 
         ensurePromptMessage(state, interaction);
-        const selectedIds = Array.from(
-            new Set((interaction.values || [])
-                .map(value => Number(value))
-                .filter(value => Number.isFinite(value) && value > 0)),
-        );
-        state.data.guildCharacterIds = selectedIds;
+        const allyIds = [];
+        const guildCharacterIds = [];
+        for (const value of interaction.values ?? []) {
+            const [type, idRaw] = String(value).split(':');
+            const id = Number(idRaw);
+            if (!Number.isFinite(id) || id < 1) continue;
+            if (type === 'ally') allyIds.push(id);
+            if (type === 'guild') guildCharacterIds.push(id);
+        }
+        state.data.allyIds = allyIds;
+        state.data.guildCharacterIds = guildCharacterIds;
 
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
@@ -2643,6 +2667,7 @@ async function handle(interaction) {
             setAdventureCreationState(ownerDiscordId, state);
         }
 
+        state.data.allyIds = [];
         state.data.guildCharacterIds = [];
         ensurePromptMessage(state, interaction);
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
