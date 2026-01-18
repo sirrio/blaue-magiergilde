@@ -1,5 +1,9 @@
 const db = require('./db');
 const { additionalBubblesForStartTier } = require('./utils/characterTier');
+const {
+    calculateMinAllowedLevel,
+    calculateRequiredAdventureBubbles,
+} = require('./utils/quickMode');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -335,7 +339,8 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             `
                 SELECT
                     COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS total_bubbles,
-                    COALESCE(SUM(CASE WHEN is_pseudo = 0 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS real_bubbles
+                    COALESCE(SUM(CASE WHEN is_pseudo = 0 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS real_bubbles,
+                    COALESCE(SUM(CASE WHEN is_pseudo = 1 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS pseudo_bubbles
                 FROM adventures
                 WHERE character_id = ?
                   AND deleted_at IS NULL
@@ -345,16 +350,44 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
 
         const totalAdventureBubbles = safeInt(bubbleTotals?.total_bubbles);
         const realAdventureBubbles = safeInt(bubbleTotals?.real_bubbles);
-        const effectiveReal = Math.max(0, realAdventureBubbles + dmBubbles + additional - bubbleSpend);
-        const minAllowedLevel = Math.min(20, Math.floor(1 + (Math.sqrt(8 * effectiveReal + 1) - 1) / 2));
+        const pseudoAdventureBubbles = safeInt(bubbleTotals?.pseudo_bubbles);
+        const [[latestPseudo]] = await connection.execute(
+            `
+                SELECT id, duration, has_additional_bubble
+                FROM adventures
+                WHERE character_id = ?
+                  AND is_pseudo = 1
+                  AND deleted_at IS NULL
+                ORDER BY start_date DESC, id DESC
+                LIMIT 1
+            `,
+            [characterId],
+        );
+        const latestPseudoBubbles = latestPseudo
+            ? bubblesForDuration(latestPseudo.duration, Boolean(latestPseudo.has_additional_bubble))
+            : 0;
+        const immutableAdventureBubbles = Math.max(
+            0,
+            realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles),
+        );
+        const minAllowedLevel = calculateMinAllowedLevel({
+            immutableAdventureBubbles,
+            dmBubbles,
+            additionalBubbles: additional,
+            bubbleSpend,
+        });
 
         if (!character.is_filler && level < minAllowedLevel) {
             await connection.rollback();
             return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
         }
 
-        const targetAvailableBubbles = (level - 1) * level / 2;
-        const requiredAdventureBubbles = Math.max(0, targetAvailableBubbles - dmBubbles - additional + bubbleSpend);
+        const requiredAdventureBubbles = calculateRequiredAdventureBubbles({
+            level,
+            dmBubbles,
+            additionalBubbles: additional,
+            bubbleSpend,
+        });
         let delta = requiredAdventureBubbles - totalAdventureBubbles;
 
         if (delta > 0) {
@@ -390,39 +423,24 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                 ],
             );
         } else if (delta < 0) {
-            let remaining = Math.abs(delta);
-            const [pseudoRows] = await connection.execute(
-                `
-                    SELECT id, duration, has_additional_bubble
-                    FROM adventures
-                    WHERE character_id = ?
-                      AND is_pseudo = 1
-                      AND deleted_at IS NULL
-                    ORDER BY start_date DESC, id DESC
-                `,
-                [characterId],
-            );
+            const remaining = Math.abs(delta);
+            if (!latestPseudo) {
+                await connection.rollback();
+                return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
+            }
 
             const now = nowSql();
-            for (const row of pseudoRows) {
-                if (remaining <= 0) break;
-                const bubbles = bubblesForDuration(row.duration, Boolean(row.has_additional_bubble));
-                if (remaining >= bubbles) {
-                    await connection.execute(
-                        'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
-                        [now, now, row.id],
-                    );
-                    remaining -= bubbles;
-                    continue;
-                }
-
+            if (remaining >= latestPseudoBubbles) {
+                await connection.execute(
+                    'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
+                    [now, now, latestPseudo.id],
+                );
+            } else {
                 const duration = remaining * 10800;
                 await connection.execute(
                     'UPDATE adventures SET duration = ?, has_additional_bubble = 0, updated_at = ? WHERE id = ?',
-                    [duration, now, row.id],
+                    [duration, now, latestPseudo.id],
                 );
-                remaining = 0;
-                break;
             }
         }
 
