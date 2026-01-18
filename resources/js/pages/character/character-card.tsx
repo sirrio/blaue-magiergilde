@@ -40,13 +40,21 @@ function CharacterImage({ character, className }: { character: Character; classN
   return <img className={cn('aspect-square w-full rounded-full', className)} src={src} alt={character.name} />
 }
 
-export function CharacterCard({ character, guildCharacters = [] }: { character: Character; guildCharacters?: Character[] }) {
+export function CharacterCard({
+  character,
+  guildCharacters = [],
+  simplifiedTrackingOverride,
+}: {
+  character: Character
+  guildCharacters?: Character[]
+  simplifiedTrackingOverride?: boolean
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
 
   const level = calculateLevel(character)
   const tier = calculateTier(character)
-  const simplifiedTracking = Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
+  const simplifiedTracking = simplifiedTrackingOverride ?? Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)

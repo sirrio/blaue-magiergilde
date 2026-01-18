@@ -10,15 +10,19 @@ import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { Head, router, useForm, usePage } from '@inertiajs/react'
+import { Head, router, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
 import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const { features, auth } = usePage<PageProps>().props
-  const simplifiedTracking = Boolean(auth.user?.simplified_tracking)
-  const trackingForm = useForm({ simplified_tracking: simplifiedTracking })
+  const [simplifiedTracking, setSimplifiedTracking] = useState(Boolean(auth.user?.simplified_tracking))
+  const [isUpdatingTracking, setIsUpdatingTracking] = useState(false)
+  useEffect(() => {
+    const nextValue = Boolean(auth.user?.simplified_tracking)
+    setSimplifiedTracking(nextValue)
+  }, [auth.user?.simplified_tracking])
   const visibleCharacters = characters.filter((char) => !char.deleted_at)
   const [chars, setChars] = useState([...visibleCharacters])
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
@@ -94,8 +98,19 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   }
 
   const updateTrackingMode = (value: boolean) => {
-    trackingForm.setData('simplified_tracking', value)
-    trackingForm.patch(route('characters.tracking'), { preserveScroll: true, preserveState: true })
+    if (isUpdatingTracking) return
+    setSimplifiedTracking(value)
+    setIsUpdatingTracking(true)
+    router.patch(
+      route('characters.tracking'),
+      { simplified_tracking: value },
+      {
+        preserveScroll: true,
+        preserveState: true,
+        onError: () => setSimplifiedTracking(Boolean(auth.user?.simplified_tracking)),
+        onFinish: () => setIsUpdatingTracking(false),
+      },
+    )
   }
 
   return (
@@ -121,7 +136,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                 <Button
                   size="xs"
                   className={cn('join-item', !simplifiedTracking ? 'btn-primary' : 'btn-outline')}
-                  disabled={trackingForm.processing}
+                  disabled={isUpdatingTracking}
                   onClick={() => updateTrackingMode(false)}
                 >
                   Standard
@@ -129,7 +144,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                 <Button
                   size="xs"
                   className={cn('join-item', simplifiedTracking ? 'btn-primary' : 'btn-outline')}
-                  disabled={trackingForm.processing}
+                  disabled={isUpdatingTracking}
                   onClick={() => updateTrackingMode(true)}
                 >
                   Simplified
@@ -202,7 +217,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
-                  <CharacterCard key={char.id} character={char} guildCharacters={guildCharacters} />
+                  <CharacterCard key={char.id} character={char} guildCharacters={guildCharacters} simplifiedTrackingOverride={simplifiedTracking} />
                 ))}
               </SortableContext>
             </DndContext>

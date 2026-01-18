@@ -15,7 +15,7 @@ class SetQuickLevel
             $dmBubbles = $this->safeInt($character->dm_bubbles);
             $bubbleSpend = $this->safeInt($character->bubble_shop_spend);
 
-            $durationBubbleSql = 'CAST(duration / 10800 AS INTEGER)';
+            $durationBubbleSql = $this->durationBubbleSql();
 
             $totals = Adventure::query()
                 ->where('character_id', $character->id)
@@ -125,5 +125,16 @@ class SetQuickLevel
         $number = filter_var($value, FILTER_VALIDATE_INT);
 
         return $number !== false ? (int) $number : $fallback;
+    }
+
+    private function durationBubbleSql(): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        return match ($driver) {
+            'sqlite' => 'CAST(duration / 10800 AS INTEGER)',
+            'mysql', 'mariadb' => 'CAST(duration / 10800 AS UNSIGNED)',
+            default => 'FLOOR(duration / 10800)',
+        };
     }
 }
