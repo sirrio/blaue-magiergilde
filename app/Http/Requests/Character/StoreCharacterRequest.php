@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * @property string $name
- * @property string $class
+ * @property array $class
  * @property mixed $start_tier
  * @property mixed $version
  * @property mixed $external_link
@@ -37,7 +37,8 @@ class StoreCharacterRequest extends FormRequest
     {
         return [
             'name' => 'required|string',
-            'class' => 'required|exists:character_classes,id',
+            'class' => 'required|array|min:1',
+            'class.*' => 'integer|exists:character_classes,id',
             'external_link' => 'required|url',
             'start_tier' => 'required|string',
             'version' => 'required|string',

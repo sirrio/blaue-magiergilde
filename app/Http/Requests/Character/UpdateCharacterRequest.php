@@ -7,7 +7,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * @property mixed $class
+ * @property array $class
  * @property mixed $external_link
  * @property mixed $name
  * @property mixed $version
@@ -43,7 +43,8 @@ class UpdateCharacterRequest extends FormRequest
     {
         return [
             'name' => 'required|string',
-            'class' => 'required|exists:character_classes,id',
+            'class' => 'required|array|min:1',
+            'class.*' => 'integer|exists:character_classes,id',
             'external_link' => 'required|url',
             'version' => 'required|string',
             'dm_bubbles' => 'required|integer|min:0|max:1024',
