@@ -347,6 +347,13 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
             listGuildCharactersForDiscord(interaction.user, characterId),
         ]);
         const search = getParticipantSearch(searchKey, ownerDiscordId);
+        const fullOptions = buildParticipantOptions({
+            allies,
+            guildCharacters,
+            selectedAllyIds: state.data.allyIds,
+            selectedGuildCharacterIds: state.data.guildCharacterIds,
+            search: '',
+        });
         allParticipantOptions = buildParticipantOptions({
             allies,
             guildCharacters,
@@ -354,8 +361,8 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
             selectedGuildCharacterIds: state.data.guildCharacterIds,
             search,
         });
-        participantTotal = allParticipantOptions.length;
-        const selectedParticipants = allParticipantOptions
+        participantTotal = fullOptions.length;
+        const selectedParticipants = fullOptions
             .filter(option => option.selected)
             .map(option => ({ name: option.label }));
         if (selectedParticipants.length > 0) {
@@ -2716,17 +2723,50 @@ async function handle(interaction) {
         }
 
         ensurePromptMessage(state, interaction);
-        const allyIds = [];
-        const guildCharacterIds = [];
-        for (const value of interaction.values ?? []) {
-            const [type, idRaw] = String(value).split(':');
-            const id = Number(idRaw);
-            if (!Number.isFinite(id) || id < 1) continue;
-            if (type === 'ally') allyIds.push(id);
-            if (type === 'guild') guildCharacterIds.push(id);
+        const searchKey = `create-${characterId}`;
+        const search = getParticipantSearch(searchKey, ownerDiscordId);
+        const [allies, guildCharacters] = await Promise.all([
+            listAlliesForDiscord(interaction.user, characterId),
+            listGuildCharactersForDiscord(interaction.user, characterId),
+        ]);
+        const filteredOptions = buildParticipantOptions({
+            allies,
+            guildCharacters,
+            selectedAllyIds: state.data.allyIds,
+            selectedGuildCharacterIds: state.data.guildCharacterIds,
+            search,
+        });
+
+        const selectedValues = new Set(interaction.values ?? []);
+        const toNumberSet = (values) => new Set(
+            (values ?? [])
+                .map(value => Number(value))
+                .filter(value => Number.isFinite(value) && value > 0),
+        );
+        const allyIds = toNumberSet(state.data.allyIds);
+        const guildCharacterIds = toNumberSet(state.data.guildCharacterIds);
+
+        for (const option of filteredOptions) {
+            const valueKey = `${option.type}:${option.id}`;
+            const isSelected = selectedValues.has(valueKey);
+            if (option.type === 'ally') {
+                if (isSelected) {
+                    allyIds.add(option.id);
+                } else {
+                    allyIds.delete(option.id);
+                }
+            }
+            if (option.type === 'guild') {
+                if (isSelected) {
+                    guildCharacterIds.add(option.id);
+                } else {
+                    guildCharacterIds.delete(option.id);
+                }
+            }
         }
-        state.data.allyIds = allyIds;
-        state.data.guildCharacterIds = guildCharacterIds;
+
+        state.data.allyIds = Array.from(allyIds);
+        state.data.guildCharacterIds = Array.from(guildCharacterIds);
 
         await updateAdventureMessage(state, await buildAdventureStepPayload({ interaction, state }));
         return true;
@@ -3384,20 +3424,47 @@ async function handle(interaction) {
             return true;
         }
 
-        const allyIds = [];
-        const guildCharacterIds = [];
-        for (const value of interaction.values ?? []) {
-            const [type, idRaw] = String(value).split(':');
-            const id = Number(idRaw);
-            if (!Number.isFinite(id) || id < 1) continue;
-            if (type === 'ally') allyIds.push(id);
-            if (type === 'guild') guildCharacterIds.push(id);
+        const [participants, allies, guildCharacters] = await Promise.all([
+            listAdventureParticipantsForDiscord(interaction.user, adventureId),
+            listAlliesForDiscord(interaction.user, characterId),
+            listGuildCharactersForDiscord(interaction.user, characterId),
+        ]);
+        const search = getParticipantSearch(adventureId, ownerDiscordId);
+        const filteredOptions = buildParticipantOptions({
+            allies,
+            guildCharacters,
+            selectedAllyIds: participants.map(entry => Number(entry.id)),
+            selectedGuildCharacterIds: [],
+            search,
+        });
+
+        const selectedValues = new Set(interaction.values ?? []);
+        const allyIds = new Set(participants.map(entry => Number(entry.id)));
+        const guildCharacterIds = new Set();
+
+        for (const option of filteredOptions) {
+            const valueKey = `${option.type}:${option.id}`;
+            const isSelected = selectedValues.has(valueKey);
+            if (option.type === 'ally') {
+                if (isSelected) {
+                    allyIds.add(option.id);
+                } else {
+                    allyIds.delete(option.id);
+                }
+            }
+            if (option.type === 'guild') {
+                if (isSelected) {
+                    guildCharacterIds.add(option.id);
+                } else {
+                    guildCharacterIds.delete(option.id);
+                }
+            }
         }
 
         const result = await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
             characterId,
-            allyIds,
-            guildCharacterIds,
+            allyIds: Array.from(allyIds),
+            guildCharacterIds: Array.from(guildCharacterIds),
         });
 
         if (!result.ok) {
