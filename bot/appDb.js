@@ -71,6 +71,14 @@ function normalizeNumber(value, fallback = 0, max = 1024) {
     return Math.max(0, Math.min(max, Math.floor(number)));
 }
 
+function normalizeLevel(value, fallback = null) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    const normalized = Math.floor(number);
+    if (normalized < 1 || normalized > 20) return fallback;
+    return normalized;
+}
+
 function normalizeAvatar(value) {
     const text = String(value || '').trim();
     return text.length > 0 ? text : null;
@@ -138,8 +146,10 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                c.manual_level,
                 c.is_filler,
                 c.guild_status,
+                u.simplified_tracking,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -148,6 +158,7 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
+            INNER JOIN users u ON u.id = c.user_id
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -202,7 +213,9 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                c.manual_level,
                 c.is_filler,
+                u.simplified_tracking,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -211,6 +224,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
+            INNER JOIN users u ON u.id = c.user_id
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -246,6 +260,42 @@ async function findCharacterForDiscord(discordUser, characterId) {
         [characterId, userId],
     );
     return rows[0] ?? null;
+}
+
+async function getUserTrackingModeForDiscord(discordUser) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute('SELECT simplified_tracking FROM users WHERE id = ? LIMIT 1', [userId]);
+    return Boolean(rows[0]?.simplified_tracking);
+}
+
+async function updateUserTrackingModeForDiscord(discordUser, simplifiedTracking) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const value = normalizeBoolean(simplifiedTracking, false);
+    await db.execute(
+        'UPDATE users SET simplified_tracking = ?, updated_at = ? WHERE id = ?',
+        [value ? 1 : 0, nowSql(), userId],
+    );
+    return { ok: true, simplifiedTracking: value };
+}
+
+async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findCharacterForDiscord(discordUser, characterId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    const level = normalizeLevel(manualLevel, null);
+    await db.execute(
+        'UPDATE characters SET manual_level = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+        [level, nowSql(), characterId, userId],
+    );
+
+    return { ok: true, manualLevel: level };
 }
 
 async function createCharacterForDiscord(
@@ -976,6 +1026,9 @@ module.exports = {
     createUserForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
+    getUserTrackingModeForDiscord,
+    updateUserTrackingModeForDiscord,
+    updateCharacterManualLevelForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,

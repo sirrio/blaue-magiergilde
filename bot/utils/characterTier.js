@@ -17,6 +17,11 @@ function additionalBubblesForStartTier(startTier) {
 
 function calculateLevel(character) {
     const isFiller = Boolean(character.is_filler);
+    const simplifiedTracking = Boolean(character.simplified_tracking);
+    const manualLevel = safeInt(character.manual_level, 0);
+    if (simplifiedTracking && manualLevel > 0) {
+        return Math.min(20, Math.max(1, manualLevel));
+    }
     if (isFiller) return 3;
 
     const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
