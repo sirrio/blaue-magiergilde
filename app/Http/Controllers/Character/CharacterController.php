@@ -69,7 +69,9 @@ class CharacterController extends Controller
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }
         $character->save();
-        $character->characterClasses()->attach($request->class);
+
+        $classIds = array_values(array_unique($request->class));
+        $character->characterClasses()->sync($classIds);
 
         return to_route('characters.index');
     }
@@ -121,7 +123,8 @@ class CharacterController extends Controller
         }
         $character->save();
 
-        $character->characterClasses()->sync($request->class);
+        $classIds = array_values(array_unique($request->class));
+        $character->characterClasses()->sync($classIds);
 
         return to_route('characters.index');
     }

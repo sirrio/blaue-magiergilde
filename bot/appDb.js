@@ -323,7 +323,7 @@ async function createCharacterForDiscord(
                 const values = validIds.map(() => '(?, ?)').join(', ');
                 const params = validIds.flatMap(id => [characterId, id]);
                 await connection.execute(
-                    `INSERT INTO character_character_class (character_id, character_class_id) VALUES ${values}`,
+                    `INSERT IGNORE INTO character_character_class (character_id, character_class_id) VALUES ${values}`,
                     params,
                 );
             }
@@ -331,7 +331,7 @@ async function createCharacterForDiscord(
             const defaultClassId = await getDefaultCharacterClassId(connection);
             if (defaultClassId) {
                 await connection.execute(
-                    'INSERT INTO character_character_class (character_id, character_class_id) VALUES (?, ?)',
+                    'INSERT IGNORE INTO character_character_class (character_id, character_class_id) VALUES (?, ?)',
                     [characterId, defaultClassId],
                 );
             }
