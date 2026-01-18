@@ -298,6 +298,7 @@ export interface Character {
   dm_coins: number
   is_filler: boolean
   bubble_shop_spend: number
+  faction_rank?: number
   simplified_tracking?: boolean
   external_link: string
   avatar: string
