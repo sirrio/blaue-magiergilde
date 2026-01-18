@@ -301,7 +301,7 @@ async function uploadAttachment(appUrl, token, messageId, attachment) {
     form.append('content_type', attachment.contentType || '');
     form.append('size', String(attachment.size || 0));
     form.append('url', attachment.url);
-    form.append('file', new Blob([buffer], { type: contentType }), filename);
+    form.append('file', new Blob([buffer], { type: contentType }));
 
     const uploadResponse = await fetch(`${appUrl}/bot/discord-backups/attachments`, {
         method: 'POST',

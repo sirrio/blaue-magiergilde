@@ -1,9 +1,8 @@
 const assert = require('node:assert/strict');
-const test = require('node:test');
 
 const { updateCreationReply } = require('../interactions/interactionReplies');
 
-test('updateCreationReply updates message components instead of replying', async () => {
+async function run() {
     const calls = {
         update: 0,
         reply: 0,
@@ -31,4 +30,10 @@ test('updateCreationReply updates message components instead of replying', async
     assert.equal(calls.update, 1);
     assert.equal(calls.reply, 0);
     assert.equal(calls.editReply, 0);
+    console.log('updateCreationReply.test.js passed');
+}
+
+run().catch(error => {
+    console.error(error);
+    process.exit(1);
 });

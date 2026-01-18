@@ -562,6 +562,10 @@ function enableInsecureTlsIfNeeded(urlString) {
 async function storeCharacterAvatar(characterId, avatarUrl) {
     const appUrl = resolveAppUrl();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    if (!characterId || !avatarUrl) {
+        console.warn('[bot] Avatar upload skipped: missing character id or avatar url.');
+        return false;
+    }
     if (!appUrl || !token) {
         console.warn('[bot] Avatar upload skipped: BOT_PUBLIC_APP_URL/APP_URL or BOT_HTTP_TOKEN missing.');
         return false;
@@ -734,7 +738,7 @@ async function handleAvatarUpdateMessage(message) {
     if (!state) return false;
 
     const attachments = [...message.attachments.values()];
-    const attachment = attachments.find(item => String(item.contentTypee || '').startsWith('image/')) || attachments[0];
+    const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
     if (!attachment?.url) return false;
 
     await message.delete().catch(() => {});
@@ -4194,4 +4198,9 @@ async function handle(interaction) {
     return false;
 }
 
-module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
+module.exports = {
+    handle,
+    handleCreationAvatarMessage,
+    handleAvatarUpdateMessage,
+    storeCharacterAvatar,
+};
