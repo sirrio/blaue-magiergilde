@@ -279,7 +279,7 @@ function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`charactersAction_tracking_${ownerDiscordId}`)
-            .setLabel('Tracking')
+            .setLabel('Settings')
             .setStyle(ButtonStyle.Secondary),
     ));
 

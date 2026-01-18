@@ -150,15 +150,6 @@ function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTrack
         ),
     ];
 
-    if (simplifiedTracking) {
-        rows[1].addComponents(
-            new ButtonBuilder()
-                .setCustomId(`characterManage_manual_level_${characterId}_${ownerDiscordId}`)
-                .setLabel('Set level')
-                .setStyle(ButtonStyle.Primary),
-        );
-    }
-
     rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
@@ -252,11 +243,11 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
 
 function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }) {
     const embed = new EmbedBuilder()
-        .setTitle('Tracking settings')
+        .setTitle('Settings')
         .setColor(0x4f46e5)
         .setDescription('Choose how you want to track character progress.')
         .addFields({
-            name: 'Current mode',
+            name: 'Tracking mode',
             value: simplifiedTracking ? 'Simplified (manual level)' : 'Standard (adventures + downtime)',
             inline: false,
         });
@@ -1137,6 +1128,14 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
                 .setLabel('Downtime')
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(Boolean(isFiller)),
+        );
+    }
+    if (simplifiedTracking) {
+        primaryRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_manual_level_${characterId}_${ownerDiscordId}`)
+                .setLabel('Set level')
+                .setStyle(ButtonStyle.Primary),
         );
     }
     primaryRow.addComponents(

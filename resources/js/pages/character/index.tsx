@@ -16,7 +16,8 @@ import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
-  const { features } = usePage<PageProps>().props
+  const { features, auth } = usePage<PageProps>().props
+  const simplifiedTracking = Boolean(auth.user?.simplified_tracking)
   const visibleCharacters = characters.filter((char) => !char.deleted_at)
   const [chars, setChars] = useState([...visibleCharacters])
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
@@ -99,6 +100,11 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
           <div>
             <h1 className="text-2xl font-bold">
               Your Characters <span className="text-base-content/50 ml-1 text-sm font-normal">{activeCharacterCount}/8 Active</span>
+              {simplifiedTracking ? (
+                <span className="ml-2 rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
+                  Simplified tracking
+                </span>
+              ) : null}
             </h1>
             <p className="text-base-content/70 text-sm">Manage all your characters easily below.</p>
           </div>
