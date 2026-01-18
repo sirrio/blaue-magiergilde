@@ -25,6 +25,7 @@ const {
     listAdventureParticipantsForDiscord,
     findAdventureForDiscord,
 } = require('../appDb');
+const { formatAdventureListDescription, formatDateOnly } = require('../utils/adventureList');
 
 const adventureParticipantSearch = new Map();
 const allowedFactions = new Set([
@@ -1116,10 +1117,11 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
         .addOptions(
             adventures.slice(0, 25).map(a => {
                 const title = String(a.title || '').trim() || '(No title)';
+                const date = formatDateOnly(a.start_date);
                 const extra = a.has_additional_bubble ? ' +1' : '';
                 return new StringSelectMenuOptionBuilder()
-                    .setLabel(`${a.start_date} - ${title}`.slice(0, 100))
-                    .setDescription(`${formatDuration(a.duration)}${extra}`)
+                    .setLabel(`${date} - ${title}`.slice(0, 100))
+                    .setDescription(formatAdventureListDescription(a))
                     .setValue(String(a.id));
             }),
         );
