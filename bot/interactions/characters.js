@@ -45,7 +45,7 @@ const {
     tryBuildLocalAvatarAttachment,
     buildCharacterListView,
 } = require('../commands/game/characters');
-const { formatLocalIsoDate } = require('../dateUtils');
+const { formatDateOnly, formatLocalIsoDate } = require('../dateUtils');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -1745,10 +1745,13 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
         .addOptions(
             adventures.slice(0, 25).map(a => {
                 const title = String(a.title || '').trim() || '(No title)';
-                const extra = a.has_additional_bubble ? ' +1' : '';
+                const dateValue = formatDateOnly(a.start_date) || '-';
+                const gameMaster = String(a.game_master || '').trim() || '-';
+                const descriptionValue = String(a.notes || '').trim() || '-';
+                const description = `DM: ${truncateText(gameMaster, 25)} | Date: ${dateValue} | Desc: ${truncateText(descriptionValue, 35)}`;
                 return new StringSelectMenuOptionBuilder()
-                    .setLabel(`${a.start_date} - ${title}`.slice(0, 100))
-                    .setDescription(`${formatDuration(a.duration)}${extra}`)
+                    .setLabel(title.slice(0, 100))
+                    .setDescription(truncateText(description, 100))
                     .setValue(String(a.id));
             }),
         );

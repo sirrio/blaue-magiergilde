@@ -5,4 +5,12 @@ function formatLocalIsoDate(date = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
-module.exports = { formatLocalIsoDate };
+function formatDateOnly(value) {
+    if (!value) return '';
+    if (value instanceof Date) return formatLocalIsoDate(value);
+    const text = String(value).trim();
+    if (!text) return '';
+    return text.slice(0, 10);
+}
+
+module.exports = { formatLocalIsoDate, formatDateOnly };
