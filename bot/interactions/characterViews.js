@@ -197,6 +197,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Classes', value: classNames, inline: false },
             { name: 'Faction', value: faction, inline: true },
             { name: 'Version', value: version, inline: true },
+            { name: 'Level', value: String(level), inline: true },
             { name: 'Current tier', value: currentTier, inline: true },
             { name: 'Tracking', value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard', inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
