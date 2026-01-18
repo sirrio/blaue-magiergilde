@@ -11,7 +11,7 @@ const {
     StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const { commandName } = require('../../commandConfig');
-const { DiscordNotLinkedError, listCharactersForDiscord } = require('../../appDb');
+const { DiscordNotLinkedError, listCharactersForDiscord, getUserTrackingPreferenceForDiscord } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 const {
     additionalBubblesForStartTier,
@@ -228,7 +228,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildCharacterListView({ ownerDiscordId, characters }) {
+function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking }) {
     const summary = new EmbedBuilder()
         .setTitle('Your Characters')
         .setColor(0x4f46e5)
@@ -237,6 +237,12 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
                 ? `**${characters.length}** active. Choose a character or create a new one.`
                 : 'No characters yet. Create your first with **New**.',
         );
+
+    summary.addFields({
+        name: 'Tracking',
+        value: simplifiedTracking ? 'Simplified' : 'Normal',
+        inline: true,
+    });
 
     const components = [];
     const selection = characters.slice(0, 25);
@@ -268,6 +274,10 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
             .setLabel('New')
             .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`charactersAction_tracking_${ownerDiscordId}`)
+            .setLabel(simplifiedTracking ? 'Tracking: Simplified' : 'Tracking: Normal')
+            .setStyle(ButtonStyle.Secondary),
     ));
 
     return { embeds: [summary], components };
@@ -289,8 +299,12 @@ module.exports = {
         }
 
         let characters;
+        let trackingPreference;
         try {
-            characters = await listCharactersForDiscord(interaction.user);
+            [characters, trackingPreference] = await Promise.all([
+                listCharactersForDiscord(interaction.user),
+                getUserTrackingPreferenceForDiscord(interaction.user),
+            ]);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -302,6 +316,7 @@ module.exports = {
         const listView = buildCharacterListView({
             ownerDiscordId: interaction.user.id,
             characters,
+            simplifiedTracking: trackingPreference?.simplifiedTracking ?? false,
         });
 
         if (!interaction.deferred && !interaction.replied) {

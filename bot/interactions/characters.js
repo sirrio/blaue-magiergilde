@@ -18,6 +18,8 @@ const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
+    getUserTrackingPreferenceForDiscord,
+    updateUserTrackingPreferenceForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
@@ -137,8 +139,15 @@ function clearAvatarUpdateState(userId) {
 }
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
-    const characters = await listCharactersForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters });
+    const [characters, trackingPreference] = await Promise.all([
+        listCharactersForDiscord(interaction.user),
+        getUserTrackingPreferenceForDiscord(interaction.user),
+    ]);
+    const listView = buildCharacterListView({
+        ownerDiscordId,
+        characters,
+        simplifiedTracking: trackingPreference.simplifiedTracking,
+    });
     await interaction.update({
         ...listView,
         content: '',
@@ -953,6 +962,43 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_tracking_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_tracking_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        try {
+            const currentPreference = await getUserTrackingPreferenceForDiscord(interaction.user);
+            const updatedPreference = await updateUserTrackingPreferenceForDiscord(
+                interaction.user,
+                !currentPreference.simplifiedTracking,
+            );
+            const characters = await listCharactersForDiscord(interaction.user);
+            const listView = buildCharacterListView({
+                ownerDiscordId,
+                characters,
+                simplifiedTracking: updatedPreference.simplifiedTracking,
+            });
+            await interaction.update({ ...listView, content: '' });
+        } catch (error) {
+            if (error instanceof DiscordNotLinkedError) {
+                await replyNotLinked(interaction);
+                return true;
+            }
+            throw error;
+        }
+
+        return true;
+    }
+
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
         const ownerDiscordId = interaction.customId.replace('charactersSelect_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -1054,8 +1100,15 @@ async function handle(interaction) {
 
         clearCreationState(ownerDiscordId);
         try {
-            const characters = await listCharactersForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            const [characters, trackingPreference] = await Promise.all([
+                listCharactersForDiscord(interaction.user),
+                getUserTrackingPreferenceForDiscord(interaction.user),
+            ]);
+            const listView = buildCharacterListView({
+                ownerDiscordId,
+                characters,
+                simplifiedTracking: trackingPreference.simplifiedTracking,
+            });
             await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
@@ -1788,6 +1841,8 @@ async function handle(interaction) {
             return true;
         }
 
+        const usesSimplifiedTracking = Boolean(character.user_simplified_tracking);
+
         if (action === 'manage') {
             await interaction.update({
                 ...buildCharacterManageView(character, { ownerDiscordId }),
@@ -1805,12 +1860,36 @@ async function handle(interaction) {
         }
 
         if (action === 'adv') {
+            if (usesSimplifiedTracking) {
+                await interaction.update({
+                    content: 'Simplified tracking is enabled. Adventures are disabled for this character.',
+                    components: buildCharacterCardRows({
+                        characterId: character.id,
+                        ownerDiscordId,
+                        isFiller: character.is_filler,
+                        usesSimplifiedTracking,
+                    }),
+                });
+                return true;
+            }
             const row = buildAdventureMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
             return true;
         }
 
         if (action === 'dt') {
+            if (usesSimplifiedTracking) {
+                await interaction.update({
+                    content: 'Simplified tracking is enabled. Downtime is disabled for this character.',
+                    components: buildCharacterCardRows({
+                        characterId: character.id,
+                        ownerDiscordId,
+                        isFiller: character.is_filler,
+                        usesSimplifiedTracking,
+                    }),
+                });
+                return true;
+            }
             const row = buildDowntimeMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
             return true;
@@ -1818,7 +1897,12 @@ async function handle(interaction) {
 
         if (action === 'back') {
             await interaction.update({
-                components: buildCharacterCardRows({ characterId: character.id, ownerDiscordId, isFiller: character.is_filler }),
+                components: buildCharacterCardRows({
+                    characterId: character.id,
+                    ownerDiscordId,
+                    isFiller: character.is_filler,
+                    usesSimplifiedTracking,
+                }),
                 content: '',
             });
             return true;
@@ -1827,10 +1911,14 @@ async function handle(interaction) {
         if (action === 'list') {
             await interaction.deferUpdate();
             try {
-                const characters = await listCharactersForDiscord(interaction.user);
+                const [characters, trackingPreference] = await Promise.all([
+                    listCharactersForDiscord(interaction.user),
+                    getUserTrackingPreferenceForDiscord(interaction.user),
+                ]);
                 const listView = buildCharacterListView({
                     ownerDiscordId,
                     characters,
+                    simplifiedTracking: trackingPreference.simplifiedTracking,
                 });
                 await interaction.editReply({
                     ...listView,
@@ -4058,4 +4146,3 @@ async function handle(interaction) {
 }
 
 module.exports = { handle, handleCreationAvatarMessage, handleAvatarUpdateMessage };
-

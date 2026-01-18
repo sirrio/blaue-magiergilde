@@ -2,6 +2,16 @@ import { calculateBubble } from '@/helper/calculateBubble'
 import { Character } from '@/types'
 
 const calculateLevel = (character: Character): number => {
+  if (character.is_filler) return 3
+
+  const usesSimplifiedTracking =
+    Boolean(character.use_simplified_tracking) || Boolean(character.user?.simplified_tracking)
+  const simplifiedLevel = Number(character.simplified_level)
+
+  if (usesSimplifiedTracking && Number.isFinite(simplifiedLevel) && simplifiedLevel > 0) {
+    return Math.min(20, Math.max(1, Math.floor(simplifiedLevel)))
+  }
+
   const bubbles = calculateBubble(character)
   const bubbleShopSpend = Number(character.bubble_shop_spend ?? 0)
   const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
@@ -21,8 +31,6 @@ const calculateLevel = (character: Character): number => {
     default:
       additional_bubbles = 0
   }
-
-  if (character.is_filler) return 3
 
   const availableBubbles = Math.max(0, normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend)
 

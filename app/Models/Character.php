@@ -38,6 +38,7 @@ class Character extends Model
 
     protected $casts = [
         'is_filler' => 'boolean',
+        'simplified_level' => 'integer',
     ];
 
     public function allies(): HasMany

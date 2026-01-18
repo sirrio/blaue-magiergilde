@@ -33,12 +33,14 @@ type AdminCharacter = Pick<
   | 'bubble_shop_spend'
   | 'is_filler'
   | 'room_count'
+  | 'simplified_level'
 >
 
 type CharacterGroup = {
   key: string
   label: string
   discordId?: number | null
+  usesSimplifiedTracking: boolean
   characters: AdminCharacter[]
 }
 
@@ -244,10 +246,17 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
           key: groupKey,
           label: userName,
           discordId,
+          usesSimplifiedTracking: Boolean(character.user?.simplified_tracking),
           characters: [],
         })
       }
-      grouped.get(groupKey)?.characters.push(character)
+      const group = grouped.get(groupKey)
+      if (group) {
+        group.characters.push(character)
+        if (character.user?.simplified_tracking) {
+          group.usesSimplifiedTracking = true
+        }
+      }
     })
 
     return Array.from(grouped.values())
@@ -367,6 +376,11 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                     ) : (
                       <span>No Discord</span>
                     )}
+                    {group.usesSimplifiedTracking ? (
+                      <span className="rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-xs text-base-content/70">
+                        Simplified tracking
+                      </span>
+                    ) : null}
                     <DeleteUserModal userId={Number(group.key)} userLabel={group.label} />
                   </span>
                 </div>

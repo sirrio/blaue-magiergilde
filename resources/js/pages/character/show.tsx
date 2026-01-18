@@ -2,11 +2,12 @@ import { List, ListRow } from '@/components/ui/list'
 import { ActionMenu } from '@/components/ui/action-menu'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
+import UpdateSimplifiedLevelModal from '@/pages/character/update-simplified-level-modal'
 import AppLayout from '@/layouts/app-layout'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
-import { Character, Ally } from '@/types'
-import { Head, Link, router } from '@inertiajs/react'
+import { Character, Ally, PageProps } from '@/types'
+import { Head, Link, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle } from 'lucide-react'
 import { useImage } from 'react-image'
@@ -57,6 +58,10 @@ const formatParticipantSummary = (names: string[]) => {
 }
 
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
+  const { auth } = usePage<PageProps>().props
+  const usesSimplifiedTracking = Boolean(
+    character.use_simplified_tracking ?? auth.user?.simplified_tracking,
+  )
   const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
   const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
@@ -176,8 +181,23 @@ export default function Show({ character, guildCharacters }: { character: Charac
           <CharacterPortrait character={character} className="h-32 w-32" />
         </div>
 
-        <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+        {usesSimplifiedTracking ? (
+          <div className="rounded-box border border-base-200 bg-base-100 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Simplified tracking</h2>
+                <p className="text-sm text-base-content/70">
+                  Adventures and downtime are hidden. Set the current level to keep tiers in sync.
+                </p>
+              </div>
+              <UpdateSimplifiedLevelModal character={character} />
+            </div>
+          </div>
+        ) : null}
+
+        {!usesSimplifiedTracking ? (
+          <div>
+            <div className="rounded-box border border-base-200 bg-base-100">
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
@@ -297,11 +317,13 @@ export default function Show({ character, guildCharacters }: { character: Charac
                 )}
               </div>
             ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+        {!usesSimplifiedTracking ? (
+          <div>
+            <div className="rounded-box border border-base-200 bg-base-100">
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
@@ -415,8 +437,9 @@ export default function Show({ character, guildCharacters }: { character: Charac
                 )}
               </div>
             ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div>
           <div className="rounded-box border border-base-200 bg-base-100">

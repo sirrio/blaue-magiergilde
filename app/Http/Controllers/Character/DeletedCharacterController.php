@@ -12,6 +12,7 @@ class DeletedCharacterController extends Controller
 {
     public function __invoke(): Response
     {
+        $user = Auth::user();
         $characters = Character::onlyTrashed()
             ->with([
                 'adventures' => fn ($q) => $q->withTrashed(),
@@ -21,6 +22,10 @@ class DeletedCharacterController extends Controller
             ->where('user_id', Auth::id())
             ->orderBy('deleted_at', 'desc')
             ->get();
+
+        $characters->each(function (Character $character) use ($user): void {
+            $character->setAttribute('use_simplified_tracking', (bool) $user?->simplified_tracking);
+        });
 
         return Inertia::render('character/deleted', [
             'characters' => $characters,

@@ -212,6 +212,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 function buildCharacterCardPayload({ character, ownerDiscordId }) {
     const attachment = tryBuildLocalAvatarAttachment(character);
     const url = resolvePublicAvatarUrl(character.avatar);
+    const usesSimplifiedTracking = Boolean(character.user_simplified_tracking);
 
     const files = [];
     let thumbnail = url;
@@ -226,6 +227,7 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
             ownerDiscordId,
             characterId: character.id,
             isFiller: character.is_filler,
+            usesSimplifiedTracking,
         }),
         files,
     };
@@ -1074,9 +1076,10 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
-    return [
-        new ActionRowBuilder().addComponents(
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, usesSimplifiedTracking }) {
+    const buttons = [];
+    if (!usesSimplifiedTracking) {
+        buttons.push(
             new ButtonBuilder()
                 .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
                 .setLabel('Adventure')
@@ -1086,15 +1089,21 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller }) {
                 .setLabel('Downtime')
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(Boolean(isFiller)),
-            new ButtonBuilder()
-                .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
-                .setLabel('Manage')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-                .setLabel('Delete')
-                .setStyle(ButtonStyle.Danger),
-        ),
+        );
+    }
+    buttons.push(
+        new ButtonBuilder()
+            .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
+            .setLabel('Manage')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
+            .setLabel('Delete')
+            .setStyle(ButtonStyle.Danger),
+    );
+
+    return [
+        new ActionRowBuilder().addComponents(buttons),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)

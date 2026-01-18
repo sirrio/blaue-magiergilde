@@ -17,19 +17,24 @@ class GameController extends Controller
      */
     public function index()
     {
+        $user = Auth::user();
         $characters = Character::query()
-            ->where('user_id', Auth::user()->getAuthIdentifier())
+            ->where('user_id', $user->getAuthIdentifier())
             ->with(['adventures' => fn ($q) => $q->withTrashed()])
             ->withTrashed()
             ->orderBy('position')
             ->get();
         $games = Game::query()
-            ->where('user_id', Auth::user()->getAuthIdentifier())
+            ->where('user_id', $user->getAuthIdentifier())
             ->orderby('start_date', 'desc')
             ->get();
 
+        $characters->each(function (Character $character) use ($user): void {
+            $character->setAttribute('use_simplified_tracking', (bool) $user->simplified_tracking);
+        });
+
         return Inertia::render('game/index', [
-            'user' => Auth::user(),
+            'user' => $user,
             'characters' => $characters,
             'games' => $games,
         ]);

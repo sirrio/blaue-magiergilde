@@ -1,11 +1,12 @@
 <?php
 
 use App\Http\Controllers\Character\CharacterController;
+use App\Http\Controllers\Character\DeletedCharacterController;
+use App\Http\Controllers\Character\DownloadCharacterController;
 use App\Http\Controllers\Character\PermanentDeleteCharacterController;
 use App\Http\Controllers\Character\RestoreDeletedCharacterController;
-use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\SortCharacterController;
-use App\Http\Controllers\Character\DownloadCharacterController;
+use App\Http\Controllers\Character\UpdateSimplifiedLevelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('characters/deleted', DeletedCharacterController::class)
@@ -19,6 +20,10 @@ Route::resource('characters', CharacterController::class)->only([
     'update',
     'destroy',
 ])->middleware(['auth']);
+
+Route::patch('characters/{character}/simplified-level', UpdateSimplifiedLevelController::class)
+    ->middleware(['auth'])
+    ->name('characters.simplified-level');
 
 Route::post('characters/sort', SortCharacterController::class)
     ->middleware(['auth'])

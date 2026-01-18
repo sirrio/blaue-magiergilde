@@ -115,6 +115,24 @@ async function createUserForDiscord(discordUser) {
     return { created: true, userId: result.insertId };
 }
 
+async function getUserTrackingPreferenceForDiscord(discordUser) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute('SELECT simplified_tracking FROM users WHERE id = ? LIMIT 1', [userId]);
+    const simplifiedTracking = rows.length > 0 ? Boolean(rows[0].simplified_tracking) : false;
+    return { userId, simplifiedTracking };
+}
+
+async function updateUserTrackingPreferenceForDiscord(discordUser, simplifiedTracking) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const value = normalizeBoolean(simplifiedTracking, false);
+    await db.execute('UPDATE users SET simplified_tracking = ?, updated_at = ? WHERE id = ?', [value ? 1 : 0, nowSql(), userId]);
+    return { ok: true, simplifiedTracking: value };
+}
+
 async function getDefaultCharacterClassId(connection) {
     const executor = connection ?? db;
     const [rows] = await executor.execute('SELECT id FROM character_classes ORDER BY id ASC LIMIT 1');
@@ -138,8 +156,10 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                c.simplified_level,
                 c.is_filler,
                 c.guild_status,
+                u.simplified_tracking AS user_simplified_tracking,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -148,6 +168,7 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
+            INNER JOIN users u ON u.id = c.user_id
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -202,7 +223,9 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                c.simplified_level,
                 c.is_filler,
+                u.simplified_tracking AS user_simplified_tracking,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -211,6 +234,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
+            INNER JOIN users u ON u.id = c.user_id
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -974,6 +998,8 @@ module.exports = {
     DiscordNotLinkedError,
     getLinkedUserIdForDiscord,
     createUserForDiscord,
+    getUserTrackingPreferenceForDiscord,
+    updateUserTrackingPreferenceForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
     createCharacterForDiscord,

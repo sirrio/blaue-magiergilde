@@ -19,8 +19,9 @@ class CharacterController extends Controller
      */
     public function index(): Response
     {
+        $user = Auth::user();
         $characters = Character::query()
-            ->where('user_id', Auth::user()->getAuthIdentifier())
+            ->where('user_id', $user->getAuthIdentifier())
             ->withTrashed()
             ->withCount('room')
             ->with('adventures')
@@ -32,11 +33,15 @@ class CharacterController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'avatar', 'guild_status']);
         $games = Game::query()
-            ->where('user_id', Auth::user()->getAuthIdentifier())
+            ->where('user_id', $user->getAuthIdentifier())
             ->get();
 
+        $characters->each(function (Character $character) use ($user): void {
+            $character->setAttribute('use_simplified_tracking', (bool) $user->simplified_tracking);
+        });
+
         return Inertia::render('character/index', [
-            'user' => Auth::user(),
+            'user' => $user,
             'characters' => $characters,
             'guildCharacters' => $guildCharacters,
             'games' => $games,
@@ -82,6 +87,7 @@ class CharacterController extends Controller
     public function show(Character $character): Response
     {
         $this->ensureCharacterOwner($character);
+        $user = Auth::user();
 
         $guildCharacters = Character::query()
             ->whereNull('deleted_at')
@@ -90,7 +96,9 @@ class CharacterController extends Controller
             ->get(['id', 'name', 'avatar', 'guild_status']);
 
         return Inertia::render('character/show', [
-            'character' => $character->load('adventures.allies.linkedCharacter'),
+            'character' => $character
+                ->load('adventures.allies.linkedCharacter')
+                ->setAttribute('use_simplified_tracking', (bool) $user?->simplified_tracking),
             'guildCharacters' => $guildCharacters,
         ]);
     }

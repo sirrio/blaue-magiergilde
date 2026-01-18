@@ -19,6 +19,16 @@ function calculateLevel(character) {
     const isFiller = Boolean(character.is_filler);
     if (isFiller) return 3;
 
+    const usesSimplifiedTracking = Boolean(
+        character.user_simplified_tracking
+        || character.use_simplified_tracking
+        || character.simplified_tracking,
+    );
+    const simplifiedLevel = safeInt(character.simplified_level);
+    if (usesSimplifiedTracking && simplifiedLevel > 0) {
+        return Math.min(20, Math.max(1, simplifiedLevel));
+    }
+
     const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const additional = additionalBubblesForStartTier(character.start_tier);
     const spend = safeInt(character.bubble_shop_spend);
