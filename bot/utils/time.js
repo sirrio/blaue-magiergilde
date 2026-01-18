@@ -1,0 +1,8 @@
+function formatDurationSeconds(seconds) {
+    const total = Math.max(0, Number(seconds) || 0);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+}
+
+module.exports = { formatDurationSeconds };

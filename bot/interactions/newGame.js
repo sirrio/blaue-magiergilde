@@ -7,6 +7,7 @@ const {
     TextInputStyle,
 } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discordRateLimit');
+const { formatLocalIsoDate, formatTimeHHMM } = require('../dateUtils');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 const { pendingGames } = require('../state');
@@ -143,7 +144,7 @@ async function handle(interaction) {
         }).join(' ');
 
         const date = new Date(time);
-        const formattedDate = `${date.toLocaleString('en-GB', { day: '2-digit' })}. ${date.toLocaleString('en-GB', { month: 'long' })} ${date.toLocaleString('en-GB', { year: 'numeric' })} ${date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+        const formattedDate = `${formatLocalIsoDate(date)} ${formatTimeHHMM(date)}`;
 
         const announcement = `${tiers} - ${formattedDate} - by <@${data.userId}> - ${mention} - ${text}`;
         await waitForDiscordRateLimit(interaction.client);

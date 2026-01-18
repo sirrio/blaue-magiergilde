@@ -18,6 +18,7 @@ const {
     calculateLevel,
     calculateTierFromLevel,
 } = require('../../utils/characterTier');
+const { formatDurationSeconds } = require('../../utils/time');
 
 function isHttpUrl(urlString) {
     try {
@@ -59,14 +60,7 @@ function safeInt(value, fallback = 0) {
 }
 
 function secondsToHourMinuteString(seconds) {
-    const total = Math.max(0, safeInt(seconds, 0));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const parts = [];
-    if (h > 0) parts.push(`${h}h`);
-    if (m > 0) parts.push(`${m}m`);
-    if (parts.length === 0) return '0h';
-    return parts.join(' ');
+    return formatDurationSeconds(safeInt(seconds, 0));
 }
 
 function calculateTotalBubblesToNextLevel(character, level) {

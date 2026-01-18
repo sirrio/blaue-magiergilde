@@ -16,7 +16,8 @@ const {
     tryBuildLocalAvatarAttachment,
 } = require('../commands/game/characters');
 const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
-const { formatLocalIsoDate } = require('../dateUtils');
+const { formatIsoDate, formatLocalIsoDate } = require('../dateUtils');
+const { formatDurationSeconds } = require('../utils/time');
 const {
     listCharacterClassesForDiscord,
     listCharacterClassIdsForDiscord,
@@ -78,13 +79,6 @@ function setParticipantSearch(adventureId, ownerDiscordId, query) {
 
 function getParticipantSearch(adventureId, ownerDiscordId) {
     return adventureParticipantSearch.get(participantSearchKey(adventureId, ownerDiscordId)) || '';
-}
-
-function formatDuration(seconds) {
-    const total = Math.max(0, Number(seconds) || 0);
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function formatParticipantName(participant) {
@@ -288,9 +282,9 @@ function truncateText(value, max = 200) {
 
 function getAdventureFieldValues(state, participantsLabel) {
     const duration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
-        ? formatDuration(state.data.durationSeconds)
+        ? formatDurationSeconds(state.data.durationSeconds)
         : '-';
-    const date = state?.data?.startDate || '-';
+    const date = formatIsoDate(state?.data?.startDate);
     const title = state?.data?.title ? truncateText(state.data.title, 120) : '-';
     const gameMaster = state?.data?.gameMaster ? truncateText(state.data.gameMaster, 120) : '-';
     const quest = state?.data?.hasAdditionalBubble === true
@@ -622,7 +616,7 @@ function buildAdventureDurationModal(state) {
         .setTitle('Enter duration');
 
     const durationValue = state?.data?.durationSeconds
-        ? formatDuration(state.data.durationSeconds)
+        ? formatDurationSeconds(state.data.durationSeconds)
         : '';
 
     const durationInput = new TextInputBuilder()
@@ -1137,9 +1131,9 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
 
 function getDowntimeFieldValues(state) {
     const duration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
-        ? formatDuration(state.data.durationSeconds)
+        ? formatDurationSeconds(state.data.durationSeconds)
         : '-';
-    const date = state?.data?.startDate || '-';
+    const date = formatIsoDate(state?.data?.startDate);
     const type = state?.data?.type || '-';
     const notes = state?.data?.notes ? truncateText(state.data.notes, 200) : '-';
 
@@ -1311,7 +1305,7 @@ function buildDowntimeDurationModal(state) {
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
-            ? formatDuration(state.data.durationSeconds)
+            ? formatDurationSeconds(state.data.durationSeconds)
             : '');
 
     modal.addComponents(new ActionRowBuilder().addComponents(durationInput));
@@ -1329,7 +1323,7 @@ function buildDowntimeDateModal(state) {
         .setLabel('Date (YYYY-MM-DD)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(safeModalValue(state?.data?.startDate, 10));
+        .setValue(safeModalValue(formatIsoDate(state?.data?.startDate, ''), 10));
 
     modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
     return modal;
@@ -1362,7 +1356,7 @@ function buildDowntimeManageDurationModal({ downtimeId, characterId, ownerDiscor
         .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(formatDuration(Number(downtime.duration || 0)));
+        .setValue(formatDurationSeconds(Number(downtime.duration || 0)));
 
     modal.addComponents(new ActionRowBuilder().addComponents(durationInput));
     return modal;
@@ -1378,7 +1372,7 @@ function buildDowntimeManageDateModal({ downtimeId, characterId, ownerDiscordId,
         .setLabel('Date (YYYY-MM-DD)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(safeModalValue(downtime.start_date, 10));
+        .setValue(safeModalValue(formatIsoDate(downtime.start_date, ''), 10));
 
     modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
     return modal;
@@ -1410,7 +1404,7 @@ function buildAdventureManageDurationModal({ adventureId, characterId, ownerDisc
         .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(formatDuration(Number(adventure.duration || 0)));
+        .setValue(formatDurationSeconds(Number(adventure.duration || 0)));
 
     modal.addComponents(new ActionRowBuilder().addComponents(durationInput));
     return modal;
@@ -1426,7 +1420,7 @@ function buildAdventureManageDateModal({ adventureId, characterId, ownerDiscordI
         .setLabel('Date (YYYY-MM-DD)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
-        .setValue(safeModalValue(adventure.start_date, 10));
+        .setValue(safeModalValue(formatIsoDate(adventure.start_date, ''), 10));
 
     modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
     return modal;
@@ -1526,8 +1520,8 @@ function buildAdventureManageEmbed(adventure, participants) {
         .setTitle('Manage adventure')
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: String(adventure.start_date), inline: true },
-            { name: 'Duration', value: formatDuration(adventure.duration), inline: true },
+            { name: 'Date', value: formatIsoDate(adventure.start_date), inline: true },
+            { name: 'Duration', value: formatDurationSeconds(adventure.duration), inline: true },
             { name: 'Character quest', value: questValue, inline: true },
             { name: 'Title', value: titleValue, inline: false },
             { name: 'Game Master', value: gameMasterValue, inline: false },
@@ -1587,8 +1581,8 @@ function buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }) {
         .addOptions(
             downtimes.slice(0, 25).map(d =>
                 new StringSelectMenuOptionBuilder()
-                    .setLabel(`${d.start_date} - ${String(d.type || 'other')}`.slice(0, 100))
-                    .setDescription(formatDuration(d.duration))
+                    .setLabel(`${formatIsoDate(d.start_date)} - ${String(d.type || 'other')}`.slice(0, 100))
+                    .setDescription(formatDurationSeconds(d.duration))
                     .setValue(String(d.id)),
             ),
         );
@@ -1644,8 +1638,8 @@ function buildDowntimeManageEmbed(downtime) {
         .setTitle('Manage downtime')
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: String(downtime.start_date), inline: true },
-            { name: 'Duration', value: formatDuration(downtime.duration), inline: true },
+            { name: 'Date', value: formatIsoDate(downtime.start_date), inline: true },
+            { name: 'Duration', value: formatDurationSeconds(downtime.duration), inline: true },
             { name: 'Type', value: typeValue, inline: true },
             { name: 'Notes', value: notesValue.slice(0, 1024), inline: false },
         );
@@ -1701,8 +1695,8 @@ function buildAdventureEmbed(adventure, title, participants = []) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: String(adventure.start_date), inline: true },
-            { name: 'Duration', value: `${formatDuration(adventure.duration)}${extra}`, inline: true },
+            { name: 'Date', value: formatIsoDate(adventure.start_date), inline: true },
+            { name: 'Duration', value: `${formatDurationSeconds(adventure.duration)}${extra}`, inline: true },
             { name: 'ID', value: String(adventure.id), inline: true },
         );
 
@@ -1721,8 +1715,8 @@ function buildDowntimeEmbed(downtime, title) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: String(downtime.start_date), inline: true },
-            { name: 'Duration', value: formatDuration(downtime.duration), inline: true },
+            { name: 'Date', value: formatIsoDate(downtime.start_date), inline: true },
+            { name: 'Duration', value: formatDurationSeconds(downtime.duration), inline: true },
             { name: 'Type', value: String(downtime.type || 'other'), inline: true },
             { name: 'ID', value: String(downtime.id), inline: true },
         );
@@ -1832,7 +1826,7 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
     const embed = new EmbedBuilder()
         .setTitle('Edit participants')
         .setColor(0x4f46e5)
-        .setDescription(`${adventure.start_date} - ${String(adventure.title || '(No title)')}`)
+        .setDescription(`${formatIsoDate(adventure.start_date)} - ${String(adventure.title || '(No title)')}`)
         .addFields({ name: 'Current', value: formatParticipantList(participants), inline: false });
 
     if (search) {
@@ -1869,7 +1863,6 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
 module.exports = {
     isHttpUrl,
     safeModalValue,
-    formatDuration,
     formatParticipantName,
     formatParticipantList,
     truncateText,
