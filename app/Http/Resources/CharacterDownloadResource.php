@@ -31,6 +31,7 @@ class CharacterDownloadResource extends JsonResource
                 'duration' => $adv->duration,
                 'notes' => $adv->notes,
                 'bonus_bubble' => $adv->has_additional_bubble,
+                'is_pseudo' => $adv->is_pseudo,
             ]),
             'downtimes' => $this->whenLoaded('downtimes')->map(fn($down) => [
                 'type' => $down->type,

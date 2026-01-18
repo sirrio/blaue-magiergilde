@@ -12,17 +12,4 @@ const level = calculateLevel({
 assert.equal(level, 5);
 assert.equal(calculateTierFromLevel(level), 'LT');
 
-const manualLevel = calculateLevel({
-    start_tier: 'bt',
-    adventure_bubbles: 0,
-    dm_bubbles: 0,
-    bubble_shop_spend: 0,
-    is_filler: 0,
-    simplified_tracking: true,
-    manual_level: 12,
-});
-
-assert.equal(manualLevel, 12);
-assert.equal(calculateTierFromLevel(manualLevel), 'HT');
-
 console.log('character-tier.test.js passed');

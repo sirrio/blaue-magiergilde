@@ -234,7 +234,16 @@ export default function Show({ character, guildCharacters }: { character: Charac
                             className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_40px] items-start gap-4"
                           >
                             <div className="min-w-0">
-                              <h3 className="truncate text-sm font-medium">{adv.title || 'Adventure'}</h3>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="min-w-0 flex-1 truncate text-sm font-medium">
+                                  {adv.title || 'Adventure'}
+                                </h3>
+                                {adv.is_pseudo ? (
+                                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                                    Quick mode
+                                  </span>
+                                ) : null}
+                              </div>
                               {participantSummary ? (
                                 <p className="text-xs text-base-content/50">Played with: {participantSummary}</p>
                               ) : null}
@@ -265,27 +274,33 @@ export default function Show({ character, guildCharacters }: { character: Charac
                               {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                             </div>
                             <div className="flex justify-end">
-                              <UpdateAdventureModal
-                                adventure={adv}
-                                allies={character.allies}
-                                guildCharacters={guildCharacters}
-                                isOpen={activeAdventureModalId === adv.id}
-                                onClose={() => setActiveAdventureModalId(null)}
-                                showTrigger={false}
-                              />
-                              <ActionMenu
-                                items={[
-                                  {
-                                    label: 'Edit',
-                                    onSelect: () => setActiveAdventureModalId(adv.id),
-                                  },
-                                  {
-                                    label: 'Delete',
-                                    tone: 'error',
-                                    onSelect: () => handleAdventureDelete(adv.id),
-                                  },
-                                ]}
-                              />
+                              {adv.is_pseudo ? (
+                                <span className="text-xs text-base-content/50">Auto</span>
+                              ) : (
+                                <>
+                                  <UpdateAdventureModal
+                                    adventure={adv}
+                                    allies={character.allies}
+                                    guildCharacters={guildCharacters}
+                                    isOpen={activeAdventureModalId === adv.id}
+                                    onClose={() => setActiveAdventureModalId(null)}
+                                    showTrigger={false}
+                                  />
+                                  <ActionMenu
+                                    items={[
+                                      {
+                                        label: 'Edit',
+                                        onSelect: () => setActiveAdventureModalId(adv.id),
+                                      },
+                                      {
+                                        label: 'Delete',
+                                        tone: 'error',
+                                        onSelect: () => handleAdventureDelete(adv.id),
+                                      },
+                                    ]}
+                                  />
+                                </>
+                              )}
                             </div>
                           </ListRow>
                         )

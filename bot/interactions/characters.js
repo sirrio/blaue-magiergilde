@@ -1834,7 +1834,7 @@ async function handle(interaction) {
         }
 
         if (!character.simplified_tracking) {
-            await updateManageMessage(interaction, { content: 'Manual level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: 'Set level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1848,6 +1848,13 @@ async function handle(interaction) {
 
         const result = await updateCharacterManualLevelForDiscord(interaction.user, characterId, level);
         if (!result.ok) {
+            if (result.reason === 'below_real' && result.minLevel) {
+                await updateManageMessage(interaction, {
+                    content: `Level cannot be set below ${result.minLevel} based on recorded adventures.`,
+                    flags: MessageFlags.Ephemeral,
+                });
+                return true;
+            }
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }

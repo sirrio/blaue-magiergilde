@@ -243,7 +243,7 @@ function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking
         );
     summary.addFields({
         name: 'Tracking',
-        value: simplifiedTracking ? 'Simplified (manual level)' : 'Standard (adventures + downtime)',
+        value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)',
         inline: false,
     });
 

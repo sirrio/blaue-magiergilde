@@ -298,7 +298,6 @@ export interface Character {
   dm_coins: number
   is_filler: boolean
   bubble_shop_spend: number
-  manual_level?: number | null
   simplified_tracking?: boolean
   external_link: string
   avatar: string
@@ -382,6 +381,7 @@ export interface Adventure {
   duration: number
   start_date: string
   has_additional_bubble: boolean
+  is_pseudo?: boolean
   notes: string
   game_master: string
   character_id: number

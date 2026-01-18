@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $title
  * @property mixed $start_date
  * @property mixed $has_additional_bubble
+ * @property bool $is_pseudo
  * @property mixed $notes
  */
 class Adventure extends Model
@@ -23,6 +24,7 @@ class Adventure extends Model
     protected $casts = [
         'has_additional_bubble' => 'boolean',
         'deleted_by_character' => 'boolean',
+        'is_pseudo' => 'boolean',
     ];
 
     public function allies(): BelongsToMany

@@ -1,4 +1,9 @@
 const db = require('./db');
+const { additionalBubblesForStartTier } = require('./utils/characterTier');
+const {
+    calculateMinAllowedLevel,
+    calculateRequiredAdventureBubbles,
+} = require('./utils/quickMode');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -79,6 +84,21 @@ function normalizeLevel(value, fallback = null) {
     return normalized;
 }
 
+function safeInt(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
+
+function todaySqlDate() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function bubblesForDuration(duration, hasAdditionalBubble) {
+    const normalizedDuration = safeInt(duration);
+    const bubbleCount = Math.floor(normalizedDuration / 10800);
+    return bubbleCount + (hasAdditionalBubble ? 1 : 0);
+}
+
 function normalizeAvatar(value) {
     const text = String(value || '').trim();
     return text.length > 0 ? text : null;
@@ -146,7 +166,6 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
-                c.manual_level,
                 c.is_filler,
                 c.guild_status,
                 u.simplified_tracking,
@@ -213,7 +232,6 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
-                c.manual_level,
                 c.is_filler,
                 u.simplified_tracking,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
@@ -290,12 +308,149 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
     if (!existing) return { ok: false, reason: 'not_found' };
 
     const level = normalizeLevel(manualLevel, null);
-    await db.execute(
-        'UPDATE characters SET manual_level = ?, updated_at = ? WHERE id = ? AND user_id = ?',
-        [level, nowSql(), characterId, userId],
-    );
+    if (!level) return { ok: false, reason: 'invalid_level' };
 
-    return { ok: true, manualLevel: level };
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [[character]] = await connection.execute(
+            `
+                SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler
+                FROM characters
+                WHERE id = ? AND user_id = ?
+                LIMIT 1
+            `,
+            [characterId, userId],
+        );
+
+        if (!character) {
+            await connection.rollback();
+            return { ok: false, reason: 'not_found' };
+        }
+
+        const additional = additionalBubblesForStartTier(character.start_tier);
+        const dmBubbles = safeInt(character.dm_bubbles);
+        const bubbleSpend = safeInt(character.bubble_shop_spend);
+
+        const [[bubbleTotals]] = await connection.execute(
+            `
+                SELECT
+                    COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS total_bubbles,
+                    COALESCE(SUM(CASE WHEN is_pseudo = 0 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS real_bubbles,
+                    COALESCE(SUM(CASE WHEN is_pseudo = 1 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS pseudo_bubbles
+                FROM adventures
+                WHERE character_id = ?
+                  AND deleted_at IS NULL
+            `,
+            [characterId],
+        );
+
+        const totalAdventureBubbles = safeInt(bubbleTotals?.total_bubbles);
+        const realAdventureBubbles = safeInt(bubbleTotals?.real_bubbles);
+        const pseudoAdventureBubbles = safeInt(bubbleTotals?.pseudo_bubbles);
+        const [[latestPseudo]] = await connection.execute(
+            `
+                SELECT id, duration, has_additional_bubble
+                FROM adventures
+                WHERE character_id = ?
+                  AND is_pseudo = 1
+                  AND deleted_at IS NULL
+                ORDER BY start_date DESC, id DESC
+                LIMIT 1
+            `,
+            [characterId],
+        );
+        const latestPseudoBubbles = latestPseudo
+            ? bubblesForDuration(latestPseudo.duration, Boolean(latestPseudo.has_additional_bubble))
+            : 0;
+        const immutableAdventureBubbles = Math.max(
+            0,
+            realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles),
+        );
+        const minAllowedLevel = calculateMinAllowedLevel({
+            immutableAdventureBubbles,
+            dmBubbles,
+            additionalBubbles: additional,
+            bubbleSpend,
+        });
+
+        if (!character.is_filler && level < minAllowedLevel) {
+            await connection.rollback();
+            return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
+        }
+
+        const requiredAdventureBubbles = calculateRequiredAdventureBubbles({
+            level,
+            dmBubbles,
+            additionalBubbles: additional,
+            bubbleSpend,
+        });
+        let delta = requiredAdventureBubbles - totalAdventureBubbles;
+
+        if (delta > 0) {
+            const duration = delta * 10800;
+            const now = nowSql();
+            await connection.execute(
+                `
+                    INSERT INTO adventures (
+                        duration,
+                        start_date,
+                        has_additional_bubble,
+                        is_pseudo,
+                        character_id,
+                        title,
+                        game_master,
+                        notes,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+                [
+                    duration,
+                    todaySqlDate(),
+                    0,
+                    1,
+                    characterId,
+                    'Quick mode adjustment',
+                    'Quick mode',
+                    'Auto-generated to align quick mode level.',
+                    now,
+                    now,
+                ],
+            );
+        } else if (delta < 0) {
+            const remaining = Math.abs(delta);
+            if (!latestPseudo) {
+                await connection.rollback();
+                return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
+            }
+
+            const now = nowSql();
+            if (remaining >= latestPseudoBubbles) {
+                await connection.execute(
+                    'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
+                    [now, now, latestPseudo.id],
+                );
+            } else {
+                const duration = Math.max(0, latestPseudoBubbles - remaining) * 10800;
+                await connection.execute(
+                    'UPDATE adventures SET duration = ?, has_additional_bubble = 0, updated_at = ? WHERE id = ?',
+                    [duration, now, latestPseudo.id],
+                );
+            }
+        }
+
+        await connection.commit();
+
+        return { ok: true };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 }
 
 async function createCharacterForDiscord(

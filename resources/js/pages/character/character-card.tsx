@@ -21,6 +21,7 @@ import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
+import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -39,13 +40,21 @@ function CharacterImage({ character, className }: { character: Character; classN
   return <img className={cn('aspect-square w-full rounded-full', className)} src={src} alt={character.name} />
 }
 
-export function CharacterCard({ character, guildCharacters = [] }: { character: Character; guildCharacters?: Character[] }) {
+export function CharacterCard({
+  character,
+  guildCharacters = [],
+  simplifiedTrackingOverride,
+}: {
+  character: Character
+  guildCharacters?: Character[]
+  simplifiedTrackingOverride?: boolean
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
 
   const level = calculateLevel(character)
   const tier = calculateTier(character)
-  const simplifiedTracking = Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
+  const simplifiedTracking = simplifiedTrackingOverride ?? Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
@@ -211,7 +220,8 @@ export function CharacterCard({ character, guildCharacters = [] }: { character: 
               </div>
             )}
             {simplifiedTracking ? (
-              <div className={cn('mt-4')}>
+              <div className={cn('mt-4 grid gap-2')}>
+                <SetCharacterLevelModal character={character} />
                 <Button
                   as="a"
                   size="sm"

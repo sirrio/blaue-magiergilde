@@ -1,16 +1,25 @@
 <?php
 
 use App\Http\Controllers\Character\CharacterController;
-use App\Http\Controllers\Character\PermanentDeleteCharacterController;
-use App\Http\Controllers\Character\RestoreDeletedCharacterController;
 use App\Http\Controllers\Character\DeletedCharacterController;
-use App\Http\Controllers\Character\SortCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
+use App\Http\Controllers\Character\PermanentDeleteCharacterController;
+use App\Http\Controllers\Character\QuickLevelController;
+use App\Http\Controllers\Character\RestoreDeletedCharacterController;
+use App\Http\Controllers\Character\SortCharacterController;
+use App\Http\Controllers\Character\TrackingModeController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('characters/deleted', DeletedCharacterController::class)
     ->middleware(['auth'])
     ->name('characters.deleted');
+
+Route::patch('characters/tracking', TrackingModeController::class)
+    ->middleware(['auth'])
+    ->name('characters.tracking');
+Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
+    ->middleware(['auth'])
+    ->name('characters.quick-level');
 
 Route::resource('characters', CharacterController::class)->only([
     'index',

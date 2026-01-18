@@ -5,6 +5,7 @@ import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
@@ -12,12 +13,17 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, Un
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
-import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { Archive, BookUser, Copy, Plus, RefreshCw, SlidersHorizontal, Zap } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const { features, auth } = usePage<PageProps>().props
-  const simplifiedTracking = Boolean(auth.user?.simplified_tracking)
+  const [simplifiedTracking, setSimplifiedTracking] = useState(Boolean(auth.user?.simplified_tracking))
+  const [isUpdatingTracking, setIsUpdatingTracking] = useState(false)
+  useEffect(() => {
+    const nextValue = Boolean(auth.user?.simplified_tracking)
+    setSimplifiedTracking(nextValue)
+  }, [auth.user?.simplified_tracking])
   const visibleCharacters = characters.filter((char) => !char.deleted_at)
   const [chars, setChars] = useState([...visibleCharacters])
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
@@ -92,6 +98,22 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
   }
 
+  const updateTrackingMode = (value: boolean) => {
+    if (isUpdatingTracking) return
+    setSimplifiedTracking(value)
+    setIsUpdatingTracking(true)
+    router.patch(
+      route('characters.tracking'),
+      { simplified_tracking: value },
+      {
+        preserveScroll: true,
+        preserveState: true,
+        onError: () => setSimplifiedTracking(Boolean(auth.user?.simplified_tracking)),
+        onFinish: () => setIsUpdatingTracking(false),
+      },
+    )
+  }
+
   return (
     <AppLayout>
       <Head title="Characters" />
@@ -112,6 +134,24 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <Button size="sm" variant="ghost" className="flex items-center space-x-1" onClick={() => copyCharactersToClipboard(characters)}>
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>
+            <ActionMenu
+              items={[
+                {
+                  label: 'Use standard tracking',
+                  onSelect: () => updateTrackingMode(false),
+                  disabled: isUpdatingTracking || !simplifiedTracking,
+                  active: !simplifiedTracking,
+                  icon: <SlidersHorizontal size={14} />,
+                },
+                {
+                  label: 'Use simplified tracking',
+                  onSelect: () => updateTrackingMode(true),
+                  disabled: isUpdatingTracking || simplifiedTracking,
+                  active: simplifiedTracking,
+                  icon: <Zap size={14} />,
+                },
+              ]}
+            />
             {chars.length > 0 && (
               <>
                 <StoreCharacterModal>
@@ -175,7 +215,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
-                  <CharacterCard key={char.id} character={char} guildCharacters={guildCharacters} />
+                  <CharacterCard key={char.id} character={char} guildCharacters={guildCharacters} simplifiedTrackingOverride={simplifiedTracking} />
                 ))}
               </SortableContext>
             </DndContext>
