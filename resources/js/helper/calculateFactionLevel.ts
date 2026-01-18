@@ -11,15 +11,15 @@ const calculateFactionLevel = (character: Character): number => {
 
   if (tier === 'bt' || character.faction === 'none') return 0
 
+  if (adventures < 10) return 1
+
   if (level >= 18 && downtime >= 1800000) return 5
 
-  if (adventures >= 10 && downtime >= 360000 && level >= 14) return 4
+  if (level >= 14 && downtime >= 360000) return 4
 
-  if (adventures >= 10 && downtime >= 360000) return 3
+  if (level >= 9 && downtime >= 360000) return 3
 
-  if (adventures >= 10) return 2
-
-  return 1
+  return 2
 }
 
 export { calculateFactionLevel }

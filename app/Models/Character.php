@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\FactionRankCalculator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +41,8 @@ class Character extends Model
         'is_filler' => 'boolean',
     ];
 
+    protected $appends = ['faction_rank'];
+
     public function allies(): HasMany
     {
         return $this->hasMany(Ally::class)->orderBy('name');
@@ -68,5 +71,10 @@ class Character extends Model
     public function room(): HasOne
     {
         return $this->hasOne(Room::class);
+    }
+
+    public function getFactionRankAttribute(): int
+    {
+        return (new FactionRankCalculator)->calculate($this);
     }
 }

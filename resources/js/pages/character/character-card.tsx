@@ -94,6 +94,7 @@ export function CharacterCard({
     other: secondsToHourMinuteString(otherDowntimeSeconds),
     remaining: secondsToHourMinuteString(calculateRemainingDowntime(character)),
   }
+  const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
 
   return (
     <div ref={setNodeRef} style={dragStyle}>
@@ -181,7 +182,7 @@ export function CharacterCard({
                       <Anvil size={15} /> Factions
                     </InfoBoxTitle>
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
-                    <InfoBoxLine>Level: {calculateFactionLevel(character)}</InfoBoxLine>
+                    <InfoBoxLine>Level: {factionLevel}</InfoBoxLine>
                   </InfoBox>
                   {!simplifiedTracking ? (
                     <InfoBox>

@@ -97,11 +97,11 @@ function calculateFactionLevel(character, level, tier) {
     const downtime = safeInt(character.faction_downtime);
     const adventures = safeInt(character.adventures_count);
 
+    if (adventures < 10) return 1;
     if (level >= 18 && downtime >= 1800000) return 5;
-    if (adventures >= 10 && downtime >= 360000 && level >= 14) return 4;
-    if (adventures >= 10 && downtime >= 360000) return 3;
-    if (adventures >= 10) return 2;
-    return 1;
+    if (level >= 14 && downtime >= 360000) return 4;
+    if (level >= 9 && downtime >= 360000) return 3;
+    return 2;
 }
 
 function humanFactionName(faction) {
