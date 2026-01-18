@@ -1848,6 +1848,13 @@ async function handle(interaction) {
 
         const result = await updateCharacterManualLevelForDiscord(interaction.user, characterId, level);
         if (!result.ok) {
+            if (result.reason === 'below_real' && result.minLevel) {
+                await updateManageMessage(interaction, {
+                    content: `Level cannot be set below ${result.minLevel} based on recorded adventures.`,
+                    flags: MessageFlags.Ephemeral,
+                });
+                return true;
+            }
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
         }

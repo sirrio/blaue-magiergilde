@@ -2,14 +2,6 @@ import { calculateBubble } from '@/helper/calculateBubble'
 import { Character } from '@/types'
 
 const calculateLevel = (character: Character): number => {
-  const simplifiedTracking = Boolean(
-    character.simplified_tracking ?? character.user?.simplified_tracking,
-  )
-  const manualLevel = Number(character.manual_level)
-  if (simplifiedTracking && Number.isFinite(manualLevel) && manualLevel > 0) {
-    return Math.min(20, Math.max(1, Math.floor(manualLevel)))
-  }
-
   const bubbles = calculateBubble(character)
   const bubbleShopSpend = Number(character.bubble_shop_spend ?? 0)
   const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
