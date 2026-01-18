@@ -434,7 +434,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                     [now, now, latestPseudo.id],
                 );
             } else {
-                const duration = remaining * 10800;
+                const duration = Math.max(0, latestPseudoBubbles - remaining) * 10800;
                 await connection.execute(
                     'UPDATE adventures SET duration = ?, has_additional_bubble = 0, updated_at = ? WHERE id = ?',
                     [duration, now, latestPseudo.id],
