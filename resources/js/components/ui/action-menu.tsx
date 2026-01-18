@@ -7,6 +7,8 @@ type ActionMenuItem = {
   onSelect: () => void
   disabled?: boolean
   tone?: 'default' | 'error'
+  active?: boolean
+  icon?: React.ReactNode
 }
 
 export const ActionMenu = ({
@@ -35,15 +37,19 @@ export const ActionMenu = ({
           <li key={item.label}>
             <button
               type="button"
-              className={cn(item.tone === 'error' && 'text-error')}
+              className={cn(item.tone === 'error' && 'text-error', item.active && 'menu-active')}
               disabled={item.disabled}
+              aria-current={item.active ? 'true' : undefined}
               onClick={(event) => {
                 if (item.disabled) return
                 item.onSelect()
                 closeMenu(event)
               }}
             >
-              {item.label}
+              <span className="flex items-center gap-2">
+                {item.icon}
+                {item.label}
+              </span>
             </button>
           </li>
         ))}

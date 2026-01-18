@@ -5,6 +5,7 @@ import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
@@ -12,7 +13,7 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, Un
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
-import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
+import { Archive, BookUser, Copy, Plus, RefreshCw, SlidersHorizontal, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
@@ -130,30 +131,27 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <p className="text-base-content/70 text-sm">Manage all your characters easily below.</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Tracking</span>
-              <div className="join">
-                <Button
-                  size="xs"
-                  className={cn('join-item', !simplifiedTracking ? 'btn-primary' : 'btn-outline')}
-                  disabled={isUpdatingTracking}
-                  onClick={() => updateTrackingMode(false)}
-                >
-                  Standard
-                </Button>
-                <Button
-                  size="xs"
-                  className={cn('join-item', simplifiedTracking ? 'btn-primary' : 'btn-outline')}
-                  disabled={isUpdatingTracking}
-                  onClick={() => updateTrackingMode(true)}
-                >
-                  Simplified
-                </Button>
-              </div>
-            </div>
             <Button size="sm" variant="ghost" className="flex items-center space-x-1" onClick={() => copyCharactersToClipboard(characters)}>
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>
+            <ActionMenu
+              items={[
+                {
+                  label: 'Use standard tracking',
+                  onSelect: () => updateTrackingMode(false),
+                  disabled: isUpdatingTracking || !simplifiedTracking,
+                  active: !simplifiedTracking,
+                  icon: <SlidersHorizontal size={14} />,
+                },
+                {
+                  label: 'Use simplified tracking',
+                  onSelect: () => updateTrackingMode(true),
+                  disabled: isUpdatingTracking || simplifiedTracking,
+                  active: simplifiedTracking,
+                  icon: <Zap size={14} />,
+                },
+              ]}
+            />
             {chars.length > 0 && (
               <>
                 <StoreCharacterModal>
