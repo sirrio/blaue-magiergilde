@@ -575,7 +575,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     [allies],
   )
   const handleSave = (ally: Ally) => {
-    const { linked_character: _linkedCharacter, avatar, ...rest } = ally
+    const { linked_character: linkedCharacter, avatar, ...rest } = ally
+    void linkedCharacter
     const payload: Record<string, FormDataConvertible> = { ...rest }
     if (ally.id === 0) {
       payload.character_id = character.id
