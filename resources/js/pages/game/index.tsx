@@ -61,6 +61,16 @@ type BreakdownModalKey =
   | 'et_bubbles'
   | 'et_coins'
 
+type BreakdownModalConfig = {
+  title: string
+  description: string
+  editable: boolean
+  inputLabel?: string
+  value?: number
+  onChange?: (value: number) => void
+  fromGames?: number
+}
+
 export default function MasteredGames({ games, user, characters }: Props) {
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<'all' | 'bt' | 'lt' | 'ht' | 'et'>('all')
@@ -265,7 +275,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
     setBreakdownModalKey(key)
   }
 
-  const breakdownModalConfig = useMemo(() => {
+  const breakdownModalConfig = useMemo<Record<BreakdownModalKey, BreakdownModalConfig>>(() => {
     return {
       games_bubbles: {
         title: 'Games — Bubbles',

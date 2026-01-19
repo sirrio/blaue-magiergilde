@@ -29,6 +29,7 @@ class RoomAssetLibraryController extends Controller
             $items = $items->filter(function ($item) use ($search) {
                 $label = Str::lower($item['label'] ?? '');
                 $categoryLabel = Str::lower($item['category_label'] ?? '');
+
                 return Str::contains($label, $search) || Str::contains($categoryLabel, $search);
             });
         }
@@ -38,6 +39,7 @@ class RoomAssetLibraryController extends Controller
 
         $items = $items->map(function ($item) {
             $item['url'] = route('rooms.assets.library.show', ['path' => $item['path']]);
+
             return $item;
         });
 

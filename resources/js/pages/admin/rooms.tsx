@@ -688,38 +688,36 @@ export default function Rooms({
     setIsMapModalOpen(true)
   }
 
-  if (!activeMap) {
-    return (
-      <AppLayout>
-        <Head title="Rooms" />
-        <div className="container mx-auto max-w-5xl px-4 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold">Rooms</h1>
-              <p className="text-sm text-base-content/70">No room maps configured yet.</p>
-            </div>
-            {canManageRooms ? (
-              <Button size="sm" variant="outline" onClick={openCreateMapModal}>
-                Add floor
-              </Button>
-            ) : null}
+  const noMapView = (
+    <AppLayout>
+      <Head title="Rooms" />
+      <div className="container mx-auto max-w-5xl px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Rooms</h1>
+            <p className="text-sm text-base-content/70">No room maps configured yet.</p>
           </div>
+          {canManageRooms ? (
+            <Button size="sm" variant="outline" onClick={openCreateMapModal}>
+              Add floor
+            </Button>
+          ) : null}
         </div>
-        {canManageRooms ? (
-          <RoomMapFormModal
-            open={isMapModalOpen}
-            mode={mapModalMode}
-            map={mapModalTarget}
-            onClose={() => setIsMapModalOpen(false)}
-          />
-        ) : null}
-      </AppLayout>
-    )
-  }
+      </div>
+      {canManageRooms ? (
+        <RoomMapFormModal
+          open={isMapModalOpen}
+          mode={mapModalMode}
+          map={mapModalTarget}
+          onClose={() => setIsMapModalOpen(false)}
+        />
+      ) : null}
+    </AppLayout>
+  )
 
-  const gridColumns = activeMap.grid_columns
-  const gridRows = activeMap.grid_rows
-  const roomList = activeMap.rooms ?? []
+  const gridColumns = activeMap?.grid_columns ?? 0
+  const gridRows = activeMap?.grid_rows ?? 0
+  const roomList = activeMap?.rooms ?? []
   const selectedRoom = useMemo(
     () => roomList.find((room) => room.id === selectedRoomId) ?? null,
     [roomList, selectedRoomId],
@@ -737,7 +735,7 @@ export default function Rooms({
 
   useEffect(() => {
     autoSelectRoomRef.current = true
-  }, [activeMap.id])
+  }, [activeMap?.id])
 
   useEffect(() => {
     if (!selectedRoomId && isMoveMode) {
@@ -756,7 +754,7 @@ export default function Rooms({
 
   const getGridFromScreen = useCallback(
     (screenX: number, screenY: number) => {
-      if (!mapImage) return null
+      if (!mapImage || gridColumns === 0 || gridRows === 0) return null
       const transform = getTransform()
       if (!transform) return null
       const worldX = (screenX - transform.offsetX) / transform.scale
@@ -1206,7 +1204,7 @@ export default function Rooms({
       scale_y: state.scale_y ?? state.scale ?? 1,
       scale: state.scale,
       rotation: state.rotation,
-      z_index: state.z_index,
+      z_index: state.z_index ?? undefined,
     })
   }
 
@@ -1289,7 +1287,7 @@ export default function Rooms({
       scale_y: state.scale_y ?? state.scale ?? 1,
       scale: state.scale,
       rotation: state.rotation,
-      z_index: state.z_index,
+      z_index: state.z_index ?? undefined,
     })
   }
 
@@ -1350,7 +1348,7 @@ export default function Rooms({
       scale_y: state.scale_y ?? state.scale ?? 1,
       scale: state.scale,
       rotation: state.rotation,
-      z_index: state.z_index,
+      z_index: state.z_index ?? undefined,
     })
   }
 
@@ -1465,7 +1463,7 @@ export default function Rooms({
   }, [assetEntries, getAssetState, getTransform, mapImage])
 
   const resolveAvatarSrc = useCallback((avatar?: string | null) => {
-    if (!avatar) return null
+    if (!avatar) return undefined
     return avatar.startsWith('http') ? avatar : `/storage/${avatar}`
   }, [])
 
@@ -1593,7 +1591,7 @@ export default function Rooms({
         scale_y: state.scale_y ?? state.scale ?? 1,
         scale: state.scale,
         rotation: state.rotation,
-        z_index: state.z_index,
+        z_index: state.z_index ?? undefined,
         locked: nextLocked,
       })
     },
@@ -1617,7 +1615,7 @@ export default function Rooms({
         scale_y: 1,
         scale: 1,
         rotation: 0,
-        z_index: state.z_index,
+        z_index: state.z_index ?? undefined,
         locked: state.locked,
       })
     },
@@ -1633,7 +1631,7 @@ export default function Rooms({
       onSuccess: () => {
         setIsUploadOpen(false)
         resetAssetForm()
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.image || 'Upload failed.'
@@ -1651,7 +1649,7 @@ export default function Rooms({
       preserveScroll: true,
       onSuccess: () => {
         setSelectedAssetId((current) => (current === assetId ? null : current))
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: () => {
         toast.show('Asset could not be removed.', 'error')
@@ -1693,7 +1691,7 @@ export default function Rooms({
       }
 
       toast.show('Asset added.', 'info')
-      router.reload({ preserveScroll: true, preserveState: true })
+      router.reload()
     } catch {
       toast.show('Asset could not be added.', 'error')
     }
@@ -1708,12 +1706,16 @@ export default function Rooms({
       preserveScroll: true,
       onSuccess: () => {
         setSelectedAssetId(null)
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: () => {
-        toast.show('Assets could not be removed.', 'error')
-      },
-    })
+      toast.show('Assets could not be removed.', 'error')
+    },
+  })
+  }
+
+  if (!activeMap) {
+    return noMapView
   }
 
   return (
@@ -1780,7 +1782,7 @@ export default function Rooms({
                     <>
                       {selectedRoom.character?.avatar ? (
                         <img
-                          src={resolveAvatarSrc(selectedRoom.character?.avatar)}
+                          src={resolveAvatarSrc(selectedRoom.character?.avatar ?? undefined)}
                           alt={selectedRoom.character?.name ?? selectedRoom.name}
                           className="h-6 w-6 rounded-full border border-base-200 object-cover"
                         />
@@ -2038,7 +2040,6 @@ export default function Rooms({
                     const character = room.character ?? null
                     const labelText = character?.name ?? room.name
                     const isSelectedRoom = selectedRoomId === room.id
-                    const hasRoomSelection = selectedRoomId !== null
                     const isClickable = canEditRoom(room)
                     return (
                       <button
@@ -2074,7 +2075,7 @@ export default function Rooms({
                               <span className="flex items-center gap-1">
                                 {room.character?.avatar ? (
                                   <img
-                                    src={resolveAvatarSrc(room.character?.avatar)}
+                                    src={resolveAvatarSrc(room.character?.avatar ?? undefined)}
                                     alt=""
                                     className="h-4 w-4 rounded-full border border-white/70 object-cover"
                                   />
@@ -2126,7 +2127,7 @@ export default function Rooms({
                           {showOverlays && isAssigned && avatarSrc ? (
                             <img
                               src={avatarSrc}
-                              alt={character.name}
+                              alt={character?.name ?? room.name}
                               className="rounded-full border border-base-100 object-cover shadow-sm ring-1 ring-base-100/60"
                               style={{ width: avatarSize, height: avatarSize }}
                             />
@@ -2240,7 +2241,7 @@ export default function Rooms({
                       <>
                         {selectedRoom.character?.avatar ? (
                           <img
-                            src={resolveAvatarSrc(selectedRoom.character?.avatar)}
+                            src={resolveAvatarSrc(selectedRoom.character?.avatar ?? undefined)}
                             alt={selectedRoom.character?.name ?? selectedRoom.name}
                             className="h-6 w-6 rounded-full border border-base-200 object-cover"
                           />

@@ -155,7 +155,7 @@ const DeleteUserModal = ({
 export default function CharacterApprovals({ characters }: { characters: AdminCharacter[] }) {
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const navOptions = { preserveState: true, preserveScroll: true }
-  const normalizedParams = {
+  const normalizedParams: Record<string, string | number | undefined> = {
     ...currentQueryParams,
     discord:
       currentQueryParams.discord ??

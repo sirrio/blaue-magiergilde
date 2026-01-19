@@ -4,7 +4,7 @@ const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js'
 const { token } = require('./config');
 
 if (!token) {
-    // eslint-disable-next-line no-console
+     
     console.error('Missing bot token. Set DISCORD_BOT_TOKEN in the root .env.');
     process.exit(1);
 }

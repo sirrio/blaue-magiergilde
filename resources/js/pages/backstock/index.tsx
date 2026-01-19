@@ -124,7 +124,7 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
@@ -258,7 +258,7 @@ export default function BackstockIndex({
           post_channel_is_thread: selection.is_thread,
         }))
         toast.show('Posting channel saved.', 'info')
-      } catch (error) {
+      } catch {
         toast.show('Channel could not be saved.', 'error')
       } finally {
         setIsSavingChannel(false)
@@ -304,7 +304,7 @@ export default function BackstockIndex({
 
       toast.show('Backstock post started.', 'info')
       router.reload({ only: ['backstockSettings'] })
-    } catch (error) {
+    } catch {
       toast.show('Backstock could not be posted.', 'error')
     } finally {
       setIsPosting(false)
@@ -321,7 +321,7 @@ export default function BackstockIndex({
       onSuccess: () => {
         setIsAddOpen(false)
         setData('notes', '')
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
     })
   }
@@ -477,7 +477,7 @@ export default function BackstockIndex({
                         preserveScroll: true,
                         onSuccess: () => {
                           toast.show('Listing refreshed.', 'info')
-                          router.reload({ preserveScroll: true, preserveState: true })
+                          router.reload()
                         },
                         onError: (errors) => {
                           const message = errors.snapshot || 'Listing could not be refreshed.'

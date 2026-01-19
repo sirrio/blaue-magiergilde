@@ -1,10 +1,12 @@
-import { Adventure, Character, Game } from '@/types'
+import type { Adventure, Character, Game } from '@/types'
+
+type BubbleCharacter = Pick<Character, 'adventures' | 'dm_bubbles' | 'is_filler'>
 
 enum Bubble {
   MIN_DURATION = 10800,
 }
 
-const calculateBubble = (character: Character): number => {
+const calculateBubble = (character: BubbleCharacter): number => {
   const dmBubbles = Number(character.dm_bubbles ?? 0)
 
   return calculateBubbleByAdventures(character.adventures) + (Number.isFinite(dmBubbles) ? dmBubbles : 0)
@@ -32,10 +34,11 @@ const calculateBubbleByGames = (games?: Game[]): number => {
   }, 0)
 }
 
-const calculateBubbleByFillerCharacters = (characters?: Character[]): number => {
-  return (characters ?? []).reduce((bubble: number, character: Character): number => {
+const calculateBubbleByFillerCharacters = (characters?: BubbleCharacter[]): number => {
+  return (characters ?? []).reduce((bubble: number, character: BubbleCharacter): number => {
     return character.is_filler ? bubble + calculateBubble(character) : bubble
   }, 0)
 }
 
 export { calculateBubble, calculateBubbleByAdventures, calculateBubbleByFillerCharacters, calculateBubbleByGames }
+export type { BubbleCharacter }

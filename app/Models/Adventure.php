@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -21,6 +22,10 @@ class Adventure extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $attributes = [
+        'is_pseudo' => false,
+    ];
+
     protected $casts = [
         'has_additional_bubble' => 'boolean',
         'deleted_by_character' => 'boolean',
@@ -30,5 +35,10 @@ class Adventure extends Model
     public function allies(): BelongsToMany
     {
         return $this->belongsToMany(Ally::class);
+    }
+
+    public function character(): BelongsTo
+    {
+        return $this->belongsTo(Character::class);
     }
 }

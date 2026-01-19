@@ -128,7 +128,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
           post_channel_is_thread: selection.is_thread,
         }))
         toast.show('Posting channel saved.', 'info')
-      } catch (error) {
+      } catch {
         toast.show('Channel could not be saved.', 'error')
       } finally {
         setIsSavingChannel(false)
@@ -175,7 +175,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         ...(data?.shop_settings ?? payload),
       }))
       toast.show('Schedule saved.', 'info')
-    } catch (error) {
+    } catch {
       toast.show('Schedule could not be saved.', 'error')
     } finally {
       setIsSavingSchedule(false)
@@ -223,7 +223,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
       toast.show('Shop post started.', 'info')
       router.reload({ only: ['shopSettings'] })
-    } catch (error) {
+    } catch {
       toast.show('Shop could not be posted.', 'error')
     } finally {
       setIsPosting(false)
@@ -271,7 +271,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
       toast.show('Shop updated.', 'info')
       router.reload({ only: ['shopSettings'] })
-    } catch (error) {
+    } catch {
       toast.show('Shop could not be updated.', 'error')
     } finally {
       setIsUpdatingPost(false)

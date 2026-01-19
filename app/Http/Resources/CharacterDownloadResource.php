@@ -20,11 +20,11 @@ class CharacterDownloadResource extends JsonResource
             'bubble_shop_spend' => $this->bubble_shop_spend,
             'external_link' => $this->external_link,
             'classes' => $this->whenLoaded('characterClasses')->pluck('name'),
-            'allies' => $this->whenLoaded('allies')->map(fn($ally) => [
+            'allies' => $this->whenLoaded('allies')->map(fn ($ally) => [
                 'name' => $ally->name,
                 'rating' => $ally->rating,
             ]),
-            'adventures' => $this->whenLoaded('adventures')->map(fn($adv) => [
+            'adventures' => $this->whenLoaded('adventures')->map(fn ($adv) => [
                 'title' => $adv->title,
                 'game_master' => $adv->game_master,
                 'date' => optional($adv->start_date)->toDateString(),
@@ -33,7 +33,7 @@ class CharacterDownloadResource extends JsonResource
                 'bonus_bubble' => $adv->has_additional_bubble,
                 'is_pseudo' => $adv->is_pseudo,
             ]),
-            'downtimes' => $this->whenLoaded('downtimes')->map(fn($down) => [
+            'downtimes' => $this->whenLoaded('downtimes')->map(fn ($down) => [
                 'type' => $down->type,
                 'date' => optional($down->start_date)->toDateString(),
                 'duration' => $down->duration,

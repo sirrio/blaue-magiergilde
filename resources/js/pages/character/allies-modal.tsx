@@ -9,7 +9,7 @@ import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, Heart, Link2, PlusCircle, User } from 'lucide-react'
 import React, { useEffect, useMemo, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
-import type { RequestPayload } from '@inertiajs/core'
+import type { FormDataConvertible } from '@inertiajs/core'
 
 interface AlliesModalProps {
   character: Character
@@ -575,15 +575,15 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     [allies],
   )
   const handleSave = (ally: Ally) => {
-    const payload: RequestPayload = { ...ally }
+    const { linked_character: _linkedCharacter, avatar, ...rest } = ally
+    const payload: Record<string, FormDataConvertible> = { ...rest }
     if (ally.id === 0) {
       payload.character_id = character.id
     } else {
       payload._method = 'put'
     }
-    delete payload.linked_character
-    if (!payload.avatar || typeof payload.avatar === 'string') {
-      delete payload.avatar
+    if (avatar instanceof File) {
+      payload.avatar = avatar
     }
 
     if (ally.id === 0) {

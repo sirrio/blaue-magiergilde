@@ -4,13 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 if (!token) {
-    // eslint-disable-next-line no-console
+     
     console.error('Missing bot token. Set DISCORD_BOT_TOKEN in the root .env.');
     process.exit(1);
 }
 
 if (!clientId) {
-    // eslint-disable-next-line no-console
+     
     console.error('Missing clientId. Set DISCORD_CLIENT_ID in the root .env.');
     process.exit(1);
 }
@@ -50,7 +50,7 @@ const rest = new REST().setToken(token);
         }
 
         for (const gid of targetGuildIds) {
-            // eslint-disable-next-line no-await-in-loop
+             
             const data = await rest.put(Routes.applicationGuildCommands(clientId, gid), { body: commands });
             console.log(`Successfully reloaded ${data.length} application (/) commands for guildId=${gid}.`);
         }

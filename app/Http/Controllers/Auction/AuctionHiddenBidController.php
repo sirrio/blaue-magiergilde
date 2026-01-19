@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\StoreAuctionHiddenBidRequest;
+use App\Models\Auction;
 use App\Models\AuctionHiddenBid;
 use App\Models\AuctionItem;
-use App\Models\Auction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

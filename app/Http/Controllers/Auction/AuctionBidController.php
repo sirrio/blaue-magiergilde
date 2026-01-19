@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\StoreAuctionBidRequest;
+use App\Models\Auction;
 use App\Models\AuctionBid;
 use App\Models\AuctionItem;
-use App\Models\Auction;
 use App\Models\AuctionSetting;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
@@ -38,6 +38,7 @@ class AuctionBidController extends Controller
     {
         $repairCurrent = (int) ($auctionItem->repair_current ?? 0);
         $halfRepair = (int) ceil($repairCurrent / 2);
+
         return (int) (ceil($halfRepair / $step) * $step);
     }
 
@@ -48,58 +49,62 @@ class AuctionBidController extends Controller
     {
         $createdBid = null;
 
-        DB::transaction(function () use ($request, $auctionItem, &$createdBid): void {
-            $lockedAuction = Auction::query()
-                ->lockForUpdate()
-                ->findOrFail($auctionItem->auction_id);
+        try {
+            DB::transaction(function () use ($request, $auctionItem, &$createdBid): void {
+                $lockedAuction = Auction::query()
+                    ->lockForUpdate()
+                    ->findOrFail($auctionItem->auction_id);
 
-            $lockedItem = AuctionItem::query()
-                ->with(['item', 'hiddenBids'])
-                ->lockForUpdate()
-                ->findOrFail($auctionItem->id);
+                $lockedItem = AuctionItem::query()
+                    ->with(['item', 'hiddenBids'])
+                    ->lockForUpdate()
+                    ->findOrFail($auctionItem->id);
 
-            if ($lockedAuction->status !== 'open') {
-                throw ValidationException::withMessages([
-                    'auction' => 'Auction is closed.',
+                if ($lockedAuction->status !== 'open') {
+                    throw ValidationException::withMessages([
+                        'auction' => 'Auction is closed.',
+                    ]);
+                }
+
+                $step = $this->getBidStep($lockedItem->item);
+                $startingBid = $this->getStartingBid($lockedItem, $step);
+                $highestBid = (int) $lockedItem->bids()->max('amount');
+                $minBid = $highestBid > 0
+                    ? max($startingBid, $highestBid + $step)
+                    : $startingBid;
+
+                $amount = (int) $request->amount;
+                $hiddenBid = $lockedItem->hiddenBids
+                    ->firstWhere('bidder_discord_id', $request->bidder_discord_id);
+
+                if ($hiddenBid && $amount > $hiddenBid->max_amount) {
+                    throw ValidationException::withMessages([
+                        'amount' => "Max bid for {$hiddenBid->bidder_name} is {$hiddenBid->max_amount}.",
+                    ]);
+                }
+
+                if ($amount < $minBid) {
+                    throw ValidationException::withMessages([
+                        'amount' => "Minimum bid is {$minBid}.",
+                    ]);
+                }
+
+                if (($amount - $startingBid) % $step !== 0) {
+                    throw ValidationException::withMessages([
+                        'amount' => "Bids must be in steps of {$step}.",
+                    ]);
+                }
+
+                $createdBid = $lockedItem->bids()->create([
+                    'bidder_name' => $request->bidder_name,
+                    'bidder_discord_id' => $request->bidder_discord_id,
+                    'amount' => $request->amount,
+                    'created_by' => $request->user()->id,
                 ]);
-            }
-
-            $step = $this->getBidStep($lockedItem->item);
-            $startingBid = $this->getStartingBid($lockedItem, $step);
-            $highestBid = (int) $lockedItem->bids()->max('amount');
-            $minBid = $highestBid > 0
-                ? max($startingBid, $highestBid + $step)
-                : $startingBid;
-
-            $amount = (int) $request->amount;
-            $hiddenBid = $lockedItem->hiddenBids
-                ->firstWhere('bidder_discord_id', $request->bidder_discord_id);
-
-            if ($hiddenBid && $amount > $hiddenBid->max_amount) {
-                throw ValidationException::withMessages([
-                    'amount' => "Max bid for {$hiddenBid->bidder_name} is {$hiddenBid->max_amount}.",
-                ]);
-            }
-
-            if ($amount < $minBid) {
-                throw ValidationException::withMessages([
-                    'amount' => "Minimum bid is {$minBid}.",
-                ]);
-            }
-
-            if (($amount - $startingBid) % $step !== 0) {
-                throw ValidationException::withMessages([
-                    'amount' => "Bids must be in steps of {$step}.",
-                ]);
-            }
-
-            $createdBid = $lockedItem->bids()->create([
-                'bidder_name' => $request->bidder_name,
-                'bidder_discord_id' => $request->bidder_discord_id,
-                'amount' => $request->amount,
-                'created_by' => $request->user()->id,
-            ]);
-        });
+            });
+        } catch (ValidationException $exception) {
+            return redirect()->back()->withErrors($exception->errors());
+        }
 
         if ($createdBid instanceof AuctionBid) {
             $this->notifyVoiceHighestBid($auctionItem, $createdBid);

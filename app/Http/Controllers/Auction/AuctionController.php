@@ -139,16 +139,17 @@ class AuctionController extends Controller
                 if ($nextRemaining <= 0) {
                     BackstockItem::query()->create([
                         'item_id' => $auctionItem->item_id,
-                    'item_name' => $auctionItem->item_name,
-                    'item_url' => $auctionItem->item_url,
-                    'item_cost' => $auctionItem->item_cost,
-                    'item_rarity' => $auctionItem->item_rarity,
-                    'item_type' => $auctionItem->item_type,
-                    'snapshot_custom' => $auctionItem->snapshot_custom ?? false,
-                    'notes' => $auctionItem->notes,
-                ]);
-                continue;
-            }
+                        'item_name' => $auctionItem->item_name,
+                        'item_url' => $auctionItem->item_url,
+                        'item_cost' => $auctionItem->item_cost,
+                        'item_rarity' => $auctionItem->item_rarity,
+                        'item_type' => $auctionItem->item_type,
+                        'snapshot_custom' => $auctionItem->snapshot_custom ?? false,
+                        'notes' => $auctionItem->notes,
+                    ]);
+
+                    continue;
+                }
 
                 $newAuction->auctionItems()->create([
                     'item_id' => $auctionItem->item_id,

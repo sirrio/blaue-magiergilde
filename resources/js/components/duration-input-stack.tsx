@@ -47,22 +47,29 @@ const DurationInputStack = ({
   mode = 'session',
 }: DurationInputStackProps) => {
   const totalMinutes = Math.max(0, Math.round(value / 60))
+  const isSession = mode === 'session'
+  const sessionMinutes = clamp(totalMinutes || DEFAULT_SESSION_MINUTES, MAX_SESSION_MINUTES)
+  const sessionDisplay = useMemo(() => formatLongTime(sessionMinutes), [sessionMinutes])
   const [downtimeInput, setDowntimeInput] = useState(formatLongTime(totalMinutes))
   const [downtimeFocused, setDowntimeFocused] = useState(false)
 
-  if (mode === 'session') {
-    const sessionMinutes = clamp(totalMinutes || DEFAULT_SESSION_MINUTES, MAX_SESSION_MINUTES)
-    const display = useMemo(() => formatLongTime(sessionMinutes), [sessionMinutes])
-    const setMinutes = (next: number) => {
-      onChange(clamp(next, MAX_SESSION_MINUTES) * 60)
+  const setMinutes = (next: number) => {
+    onChange(clamp(next, MAX_SESSION_MINUTES) * 60)
+  }
+
+  useEffect(() => {
+    if (!isSession) return
+    if (value === 0) {
+      onChange(DEFAULT_SESSION_MINUTES * 60)
     }
+  }, [isSession, value, onChange])
 
-    useEffect(() => {
-      if (value === 0) {
-        onChange(DEFAULT_SESSION_MINUTES * 60)
-      }
-    }, [value, onChange])
+  useEffect(() => {
+    if (isSession || downtimeFocused) return
+    setDowntimeInput(formatLongTime(totalMinutes))
+  }, [isSession, totalMinutes, downtimeFocused])
 
+  if (isSession) {
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -75,7 +82,7 @@ const DurationInputStack = ({
             </Button>
           </div>
           <div className="rounded-xl bg-base-200 px-4 py-2 text-3xl font-semibold tracking-[0.12em] text-base-content tabular-nums">
-            {display}
+            {sessionDisplay}
           </div>
           <div className="flex gap-2">
             <Button type="button" size="xs" color="success" onClick={() => setMinutes(sessionMinutes + 15)}>
@@ -90,12 +97,6 @@ const DurationInputStack = ({
       </div>
     )
   }
-
-  useEffect(() => {
-    if (!downtimeFocused) {
-      setDowntimeInput(formatLongTime(totalMinutes))
-    }
-  }, [totalMinutes, downtimeFocused])
 
   return (
     <div className="space-y-2">

@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\Room\StoreRoomAssetRequest;
 use App\Http\Requests\Room\StoreRoomAssetLibraryRequest;
+use App\Http\Requests\Room\StoreRoomAssetRequest;
 use App\Http\Requests\Room\UpdateRoomAssetRequest;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\RoomMap;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Response;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -243,6 +243,7 @@ class RoomAssetController extends Controller
         }
 
         $path = Storage::disk('public')->path($relative);
+
         return $this->resolveImageSize($path);
     }
 

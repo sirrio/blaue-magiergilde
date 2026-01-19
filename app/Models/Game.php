@@ -24,7 +24,7 @@ class Game extends Model
     protected static function booted(): void
     {
         static::creating(function (Game $game): void {
-            if (!$game->user_id && auth()->check()) {
+            if (! $game->user_id && auth()->check()) {
                 $game->user_id = auth()->id();
             }
         });

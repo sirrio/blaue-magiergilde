@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, RotateCcw, ScrollText, Scale, Shield, Store, Sword, XCircle } from 'lucide-react'
-import React, { useEffect, useState, JSX } from 'react'
+import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
   common: 'text-gray-700',
@@ -18,7 +18,7 @@ const rarityColors: Record<string, string> = {
   very_rare: 'text-purple-700',
 }
 
-const typeIcons: Record<string, JSX.Element> = {
+const typeIcons: Record<string, ReactElement> = {
   item: <Sword />,
   spellscroll: <ScrollText />,
   consumable: <FlaskRound />,
@@ -28,7 +28,7 @@ const getRarityTextColor = (rarity: string): string => {
   return rarityColors[rarity] || ''
 }
 
-const renderIcon = (type: string): JSX.Element | null => {
+const renderIcon = (type: string): ReactElement | null => {
   return typeIcons[type] || null
 }
 
@@ -126,8 +126,13 @@ const spellSchools = [
   'transmutation',
 ] as const
 
+type SpellSchool = (typeof spellSchools)[number]
+
 const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
-  const { data, setData, post } = useForm({ spell_levels: [] as number[], spell_schools: [] as string[] })
+  const { data, setData, post } = useForm({
+    spell_levels: [] as number[],
+    spell_schools: [] as SpellSchool[],
+  })
 
   const [isOpen, setIsOpen] = useState(false)
 
@@ -146,7 +151,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
     )
   }
 
-  const toggleSchool = (school: string) => {
+  const toggleSchool = (school: SpellSchool) => {
     setData(
       'spell_schools',
       data.spell_schools.includes(school)
@@ -255,7 +260,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
@@ -324,7 +329,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     guild_enabled: item.guild_enabled ?? true,
     default_spell_roll_enabled: item.default_spell_roll_enabled ?? false,
     default_spell_levels: item.default_spell_levels ?? [],
-    default_spell_schools: item.default_spell_schools ?? [],
+    default_spell_schools: (item.default_spell_schools ?? []) as SpellSchool[],
     ruling_changed: item.ruling_changed ?? false,
     ruling_note: item.ruling_note ?? '',
   }
@@ -355,7 +360,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     setData('default_spell_roll_enabled', enabled)
     if (!enabled) {
       setData('default_spell_levels', [])
-      setData('default_spell_schools', [])
+      setData('default_spell_schools', [] as SpellSchool[])
       return
     }
     if (data.default_spell_levels.length === 0) {
@@ -375,7 +380,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     )
   }
 
-  const toggleDefaultSpellSchool = (school: string) => {
+  const toggleDefaultSpellSchool = (school: SpellSchool) => {
     setData(
       'default_spell_schools',
       data.default_spell_schools.includes(school)
@@ -409,7 +414,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Listing refreshed.', 'info')
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.snapshot || 'Listing could not be refreshed.'
@@ -425,7 +430,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     router.delete(route('admin.shop-items.spell.destroy', { shopItem: shopItem.id }), {
       preserveScroll: true,
       onSuccess: () => {
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: () => {
         toast.show('Spell could not be removed.', 'error')
@@ -454,7 +459,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
       {!shopItem ? (
         <div className="flex items-center justify-center gap-2 text-xs">
           {isShopEnabled ? (
-            <Store className="h-4 w-4 text-success" title="Included in shop rolls" aria-label="Included in shop rolls" />
+            <Store className="h-4 w-4 text-success" aria-label="Included in shop rolls" />
           ) : (
             <span
               className="relative inline-flex h-4 w-4 items-center justify-center"
@@ -466,7 +471,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
             </span>
           )}
           {isGuildEnabled ? (
-            <Shield className="h-4 w-4 text-success" title="Allowed in guild" aria-label="Allowed in guild" />
+            <Shield className="h-4 w-4 text-success" aria-label="Allowed in guild" />
           ) : (
             <span
               className="relative inline-flex h-4 w-4 items-center justify-center"

@@ -12,7 +12,7 @@ import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, Au
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2, XCircle } from 'lucide-react'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
   common: 'Common',
@@ -34,7 +34,7 @@ const rarityColors: Record<string, string> = {
   very_rare: 'text-purple-700',
 }
 
-const typeIcons: Record<string, JSX.Element> = {
+const typeIcons: Record<string, ReactElement> = {
   item: <Sword size={14} />,
   spellscroll: <ScrollText size={14} />,
   consumable: <FlaskRound size={14} />,
@@ -58,7 +58,7 @@ const getRarityTextColor = (rarity: string): string => {
   return rarityColors[rarity] || ''
 }
 
-const renderIcon = (type: string): JSX.Element | null => {
+const renderIcon = (type: string): ReactElement | null => {
   return typeIcons[type] || null
 }
 
@@ -235,7 +235,7 @@ const AuctionItemBidControls = ({
       {
         preserveScroll: true,
         onSuccess: () => {
-          router.reload({ preserveScroll: true, preserveState: true })
+          router.reload()
         },
         onError: (errors) => {
           const message = errors.amount || errors.bidder_discord_id
@@ -451,7 +451,7 @@ const HiddenBidModal = ({
       onSuccess: () => {
         reset('bidder_discord_id', 'bidder_name')
         setData('max_amount', defaultMaxAmount)
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.max_amount || errors.bidder_discord_id || errors.bidder_name
@@ -578,7 +578,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
@@ -678,7 +678,7 @@ const AuctionItemRow = ({
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Listing refreshed.', 'info')
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.snapshot || 'Listing could not be refreshed.'
@@ -785,7 +785,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload({ preserveScroll: true, preserveState: true })
+        router.reload()
       },
       onError: (errors) => {
         const message = errors.notes || errors.repair_current || errors.remaining_auctions || errors.item_id
@@ -968,7 +968,7 @@ export default function Index({
           post_channel_is_thread: selection.is_thread,
         }))
         toast.show('Posting channel saved.', 'info')
-      } catch (error) {
+      } catch {
         toast.show('Channel could not be saved.', 'error')
       } finally {
         setIsSavingChannel(false)
@@ -1017,7 +1017,7 @@ export default function Index({
       }
 
       toast.show('Auction post started.', 'info')
-    } catch (error) {
+    } catch {
       toast.show('Auction could not be posted.', 'error')
     } finally {
       setIsPostingAuction(false)
@@ -1084,7 +1084,7 @@ export default function Index({
       if (showToast) {
         toast.show('Voice candidates updated', 'info')
       }
-    } catch (error) {
+    } catch {
       if (showToast) toast.show('Sync failed.', 'error')
     } finally {
       isSyncingRef.current = false

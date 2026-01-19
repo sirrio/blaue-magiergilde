@@ -32,7 +32,7 @@ module.exports = {
 
             await command.execute(interaction);
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
             if (!interaction.deferred && !interaction.replied) {
