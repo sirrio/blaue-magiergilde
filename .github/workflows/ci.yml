@@ -87,6 +87,12 @@ jobs:
         run: npm ci --prefix bot
 
       - name: Run bot tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USERNAME: ci
+          DB_PASSWORD: ''
+          DB_DATABASE: ci
         run: npm test --prefix bot
 
   audits:
