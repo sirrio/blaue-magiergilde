@@ -37,6 +37,12 @@ jobs:
 
       - name: Lint Frontend
         run: npm run lint
+
+      - name: Install Bot dependencies
+        run: npm ci --prefix bot
+
+      - name: Lint Bot
+        run: npm run lint --prefix bot
       # - name: Commit Changes
       #   uses: stefanzweifel/git-auto-commit-action@v5
       #   with:

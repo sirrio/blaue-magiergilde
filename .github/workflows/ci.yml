@@ -86,6 +86,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefix bot
 
+      - name: Run bot tests
+        run: npm test --prefix bot
+
   audits:
     runs-on: ubuntu-latest
     continue-on-error: true
