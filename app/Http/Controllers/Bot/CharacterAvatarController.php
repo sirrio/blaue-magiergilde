@@ -48,7 +48,7 @@ class CharacterAvatarController extends Controller
             $extension = 'png';
         }
 
-        $path = 'avatars/discord/' . Str::uuid()->toString() . '.' . $extension;
+        $path = 'avatars/discord/'.Str::uuid()->toString().'.'.$extension;
         Storage::disk('public')->put($path, $body);
 
         $previous = $character->avatar;

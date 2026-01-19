@@ -207,7 +207,9 @@ export default function DiscordChannelPickerModal({
         return
       }
 
-      const guilds = Array.isArray(payload?.guilds) ? payload.guilds : []
+      const guilds = Array.isArray(payload?.guilds)
+        ? (payload.guilds as Array<{ guild_id: string | number; channels: DiscordBackupChannel[] }>)
+        : []
       const nextGroups: Record<string, DiscordBackupChannel[]> = {}
 
       guilds.forEach((guild) => {
@@ -218,7 +220,7 @@ export default function DiscordChannelPickerModal({
       setAvailableChannelGroups(nextGroups)
       setLoadedThreadParents([])
       toast.show('Channel list updated.', 'info')
-    } catch (error) {
+    } catch {
       toast.show('Channel list could not be loaded.', 'error')
     } finally {
       setIsRefreshingChannels(false)
@@ -293,7 +295,7 @@ export default function DiscordChannelPickerModal({
         current.includes(pendingSingle.id) ? current : [...current, pendingSingle.id]
       )
       toast.show('Threads loaded.', 'info')
-    } catch (error) {
+    } catch {
       toast.show('Threads could not be loaded.', 'error')
     } finally {
       setThreadLoadingId(null)

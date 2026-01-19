@@ -206,7 +206,7 @@ async function deletePreviousPosts({ client, settings }) {
     for (const messageId of allMessageIds) {
         try {
             await waitForDiscordRateLimit(client);
-            // eslint-disable-next-line no-await-in-loop
+             
             await channel.messages.delete(messageId);
         } catch {
             // Ignore missing permissions or deleted messages.
@@ -335,7 +335,7 @@ async function sendOneLine(destination, line) {
 async function sendLines(destination, lines) {
     const messageIds = [];
     for (const line of lines) {
-        // eslint-disable-next-line no-await-in-loop
+         
         const messageId = await sendOneLine(destination, line);
         if (messageId) messageIds.push(messageId);
     }
@@ -404,7 +404,7 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
         const sectionId = await sendOneLine(destination, `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`);
         if (sectionId) headerMessageIds.push(sectionId);
         for (const row of byType.get('item') ?? []) {
-            // eslint-disable-next-line no-await-in-loop
+             
             const messageId = await sendItemLine(destination, row);
             if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
         }
@@ -413,7 +413,7 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
             const consumableHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable`);
             if (consumableHeaderId) headerMessageIds.push(consumableHeaderId);
             for (const row of byType.get('consumable') ?? []) {
-                // eslint-disable-next-line no-await-in-loop
+                 
                 const messageId = await sendItemLine(destination, row);
                 if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
             }
@@ -421,7 +421,7 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
             const scrollHeaderId = await sendOneLine(destination, `### ${rarityLabel} Spell Scroll`);
             if (scrollHeaderId) headerMessageIds.push(scrollHeaderId);
             for (const row of byType.get('spellscroll') ?? []) {
-                // eslint-disable-next-line no-await-in-loop
+                 
                 const messageId = await sendItemLine(destination, row);
                 if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
             }
@@ -429,7 +429,7 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
             const mixedHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable/Spell Scroll`);
             if (mixedHeaderId) headerMessageIds.push(mixedHeaderId);
             for (const row of [...(byType.get('consumable') ?? []), ...(byType.get('spellscroll') ?? [])]) {
-                // eslint-disable-next-line no-await-in-loop
+                 
                 const messageId = await sendItemLine(destination, row);
                 if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
             }
@@ -496,7 +496,7 @@ async function updateShopPost({ client, shopId }) {
         const content = formatItemLine(row);
 
         if (!messageId) {
-            // eslint-disable-next-line no-await-in-loop
+             
             const newMessageId = await sendOneLine(destination, content);
             if (newMessageId) {
                 updatedItemMessageIds[String(row.shop_item_id)] = newMessageId;
@@ -506,10 +506,10 @@ async function updateShopPost({ client, shopId }) {
 
         try {
             await waitForDiscordRateLimit(client);
-            // eslint-disable-next-line no-await-in-loop
+             
             await destination.messages.edit(messageId, content);
         } catch {
-            // eslint-disable-next-line no-await-in-loop
+             
             const fallbackId = await sendOneLine(destination, content);
             if (fallbackId) {
                 updatedItemMessageIds[String(row.shop_item_id)] = fallbackId;

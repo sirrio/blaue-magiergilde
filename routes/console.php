@@ -17,6 +17,7 @@ Artisan::command('shop:post-weekly', function (ShopRollService $shopRoller, Shop
 
     if (! $channelId) {
         $this->error('No shop posting channel configured.');
+
         return 1;
     }
 
@@ -25,6 +26,7 @@ Artisan::command('shop:post-weekly', function (ShopRollService $shopRoller, Shop
     $result = $service->post($shop, $channelId);
     if (! ($result['ok'] ?? false)) {
         $this->error((string) ($result['error'] ?? 'Shop post failed.'));
+
         return 1;
     }
 

@@ -1,14 +1,14 @@
 <?php
 
-use App\Http\Controllers\Bot\DiscordBackupController;
 use App\Http\Controllers\Bot\CharacterAvatarController;
+use App\Http\Controllers\Bot\DiscordBackupController;
 use App\Http\Controllers\Bot\DiscordBotSettingsController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
 
-    Route::prefix('bot')
-        ->withoutMiddleware([VerifyCsrfToken::class])
-        ->group(function () {
+Route::prefix('bot')
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->group(function () {
         Route::get('discord-backups/channels', [DiscordBackupController::class, 'channels'])
             ->name('bot.discord-backups.channels');
 

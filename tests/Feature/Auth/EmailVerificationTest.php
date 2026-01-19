@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Support\Facades\URL;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 

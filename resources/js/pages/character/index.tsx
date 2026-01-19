@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
+import { calculateClassString } from '@/helper/calculateClassString'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { ActionMenu } from '@/components/ui/action-menu'
@@ -14,7 +15,7 @@ import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortab
 import { Head, router, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
 import { Archive, BookUser, Copy, Plus, RefreshCw, SlidersHorizontal, Zap } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const { features, auth } = usePage<PageProps>().props
@@ -24,8 +25,11 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     const nextValue = Boolean(auth.user?.simplified_tracking)
     setSimplifiedTracking(nextValue)
   }, [auth.user?.simplified_tracking])
-  const visibleCharacters = characters.filter((char) => !char.deleted_at)
+  const visibleCharacters = useMemo(() => characters.filter((char) => !char.deleted_at), [characters])
   const [chars, setChars] = useState([...visibleCharacters])
+  useEffect(() => {
+    setChars([...visibleCharacters])
+  }, [visibleCharacters])
   const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
 
   function handleDragEnd(event: DragEndEvent) {

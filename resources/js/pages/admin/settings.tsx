@@ -90,7 +90,7 @@ export default function Settings({
           return
         }
         setBackupStatus(status as DiscordBackupStatus)
-      } catch (error) {
+      } catch {
         if (showToast) {
           toast.show('Status could not be loaded.', 'error')
         }
@@ -152,7 +152,7 @@ export default function Settings({
         return
       }
       setOwnerStatus(payload as DiscordBotOwnersStatus)
-    } catch (error) {
+    } catch {
       setOwnerStatus(null)
       setOwnerStatusError('Owner status could not be loaded.')
     } finally {
@@ -360,7 +360,7 @@ export default function Settings({
         toast.show('Channel sync started.', 'info')
         void fetchBackupStatus(false)
         router.reload({ only: ['discordBackup'] })
-      } catch (error) {
+      } catch {
         toast.show('Channel sync failed.', 'error')
       } finally {
         setSyncingChannelId(null)

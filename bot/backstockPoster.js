@@ -121,7 +121,7 @@ async function deletePreviousPosts({ client, settings }) {
     for (const messageId of settings.lastPostMessageIds) {
         try {
             await waitForDiscordRateLimit(client);
-            // eslint-disable-next-line no-await-in-loop
+             
             await channel.messages.delete(messageId);
         } catch {
             // Ignore missing permissions or deleted messages.
@@ -234,7 +234,7 @@ async function sendOneLine(destination, line) {
 async function sendLines(destination, lines) {
     const messageIds = [];
     for (const line of lines) {
-        // eslint-disable-next-line no-await-in-loop
+         
         const messageId = await sendOneLine(destination, line);
         if (messageId) messageIds.push(messageId);
     }

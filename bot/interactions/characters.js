@@ -2205,7 +2205,7 @@ async function handle(interaction) {
             }
             await updateCharacterListMessage(interaction, ownerDiscordId);
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({ content: notLinkedContent(), components: [] });
@@ -2883,7 +2883,7 @@ async function handle(interaction) {
                 content: '',
             });
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await updateManageMessage(interaction, {
@@ -3311,7 +3311,7 @@ async function handle(interaction) {
                 flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -3344,7 +3344,7 @@ async function handle(interaction) {
                 content: '',
             });
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await updateManageMessage(interaction, {
@@ -3872,7 +3872,7 @@ async function handle(interaction) {
             );
             await interaction.update({ content: 'Adventure deleted.', embeds: [], components: [row] });
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({ content: notLinkedContent(), embeds: [], components: [] });
@@ -4233,7 +4233,7 @@ async function handle(interaction) {
             );
             await interaction.update({ content: 'Downtime deleted.', embeds: [], components: [row] });
         } catch (error) {
-            // eslint-disable-next-line no-console
+             
             console.error(error);
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({ content: notLinkedContent(), embeds: [], components: [] });

@@ -1,7 +1,6 @@
-import { calculateLevel } from '@/helper/calculateLevel'
-import { Character } from '@/types'
+import { calculateLevel, type LevelCharacter } from '@/helper/calculateLevel'
 
-const calculateTier = (character: Character): string => {
+const calculateTier = (character: LevelCharacter): string => {
   if (character.is_filler) return 'filler'
 
   switch (calculateLevel(character)) {

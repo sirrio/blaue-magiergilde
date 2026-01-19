@@ -38,7 +38,7 @@ it('rejects bids above a hidden max', function () {
     ]);
 
     $this->actingAs($admin)
-        ->post("/auction-items/{$auctionItem->id}/bids", [
+        ->post(route('admin.auction-items.bids.store', ['auctionItem' => $auctionItem->id]), [
             'bidder_name' => 'Tester',
             'bidder_discord_id' => '12345',
             'amount' => 110,

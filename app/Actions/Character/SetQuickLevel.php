@@ -30,19 +30,21 @@ class SetQuickLevel
             $realAdventureBubbles = $this->safeInt($totals?->real_bubbles);
             $pseudoAdventureBubbles = $this->safeInt($totals?->pseudo_bubbles);
 
-            $latestPseudo = Adventure::query()
+            $latestAdventure = Adventure::query()
                 ->where('character_id', $character->id)
-                ->where('is_pseudo', true)
                 ->whereNull('deleted_at')
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
                 ->first();
 
+            $latestPseudo = ($latestAdventure && $latestAdventure->is_pseudo) ? $latestAdventure : null;
             $latestPseudoBubbles = $latestPseudo
                 ? $this->bubblesForAdventure($latestPseudo->duration, (bool) $latestPseudo->has_additional_bubble)
                 : 0;
 
-            $immutableAdventureBubbles = max(0, $realAdventureBubbles + max(0, $pseudoAdventureBubbles - $latestPseudoBubbles));
+            $immutableAdventureBubbles = $latestPseudo
+                ? max(0, $realAdventureBubbles + max(0, $pseudoAdventureBubbles - $latestPseudoBubbles))
+                : max(0, $realAdventureBubbles + $pseudoAdventureBubbles);
             $minAllowedLevel = $this->calculateLevelFromBubbles(
                 $immutableAdventureBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend,
             );
@@ -133,7 +135,7 @@ class SetQuickLevel
 
         return match ($driver) {
             'sqlite' => 'CAST(duration / 10800 AS INTEGER)',
-            'mysql', 'mariadb' => 'CAST(duration / 10800 AS UNSIGNED)',
+            'mysql', 'mariadb' => 'FLOOR(duration / 10800)',
             default => 'FLOOR(duration / 10800)',
         };
     }

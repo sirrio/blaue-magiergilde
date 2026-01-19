@@ -40,6 +40,7 @@ class AuctionVoiceSyncController extends Controller
         } catch (\Throwable $error) {
             $detail = trim((string) $error->getMessage());
             $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
+
             return response()->json(['error' => $message], 502);
         }
 

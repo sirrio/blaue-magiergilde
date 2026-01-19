@@ -55,12 +55,12 @@ class StoreAuctionItemRequest extends FormRequest
                     }
 
                     $itemId = $this->input('item_id');
-                    if (!$itemId) {
+                    if (! $itemId) {
                         return;
                     }
 
                     $item = Item::query()->select('cost')->find($itemId);
-                    if (!$item) {
+                    if (! $item) {
                         return;
                     }
 

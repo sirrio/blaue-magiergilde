@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Progress } from '@/components/ui/progress'
+import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
 import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
@@ -58,7 +59,7 @@ export function CharacterCard({
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
-  const additionalBubbles = character.start_tier === 'lt' ? 10 : character.start_tier === 'ht' ? 55 : 0
+  const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
   const earnedBubbles = calculateBubble(character) + additionalBubbles
   const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'

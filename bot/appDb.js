@@ -349,25 +349,24 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
         const totalAdventureBubbles = safeInt(bubbleTotals?.total_bubbles);
         const realAdventureBubbles = safeInt(bubbleTotals?.real_bubbles);
         const pseudoAdventureBubbles = safeInt(bubbleTotals?.pseudo_bubbles);
-        const [[latestPseudo]] = await connection.execute(
+        const [[latestAdventure]] = await connection.execute(
             `
-                SELECT id, duration, has_additional_bubble
+                SELECT id, duration, has_additional_bubble, is_pseudo
                 FROM adventures
                 WHERE character_id = ?
-                  AND is_pseudo = 1
                   AND deleted_at IS NULL
                 ORDER BY start_date DESC, id DESC
                 LIMIT 1
             `,
             [characterId],
         );
+        const latestPseudo = latestAdventure && latestAdventure.is_pseudo ? latestAdventure : null;
         const latestPseudoBubbles = latestPseudo
             ? bubblesForDuration(latestPseudo.duration, Boolean(latestPseudo.has_additional_bubble))
             : 0;
-        const immutableAdventureBubbles = Math.max(
-            0,
-            realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles),
-        );
+        const immutableAdventureBubbles = latestPseudo
+            ? Math.max(0, realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles))
+            : Math.max(0, realAdventureBubbles + pseudoAdventureBubbles);
         const minAllowedLevel = calculateMinAllowedLevel({
             immutableAdventureBubbles,
             dmBubbles,
@@ -386,10 +385,24 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             additionalBubbles: additional,
             bubbleSpend,
         });
-        let delta = requiredAdventureBubbles - totalAdventureBubbles;
+        const desiredLatestPseudoBubbles = Math.max(0, requiredAdventureBubbles - immutableAdventureBubbles);
 
-        if (delta > 0) {
-            const duration = delta * 10800;
+        if (desiredLatestPseudoBubbles === 0) {
+            if (latestPseudo) {
+                const now = nowSql();
+                await connection.execute(
+                    'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
+                    [now, now, latestPseudo.id],
+                );
+            }
+        } else if (latestPseudo) {
+            const now = nowSql();
+            await connection.execute(
+                'UPDATE adventures SET duration = ?, has_additional_bubble = 0, updated_at = ? WHERE id = ?',
+                [desiredLatestPseudoBubbles * 10800, now, latestPseudo.id],
+            );
+        } else {
+            const duration = desiredLatestPseudoBubbles * 10800;
             const now = nowSql();
             await connection.execute(
                 `
@@ -420,26 +433,6 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                     now,
                 ],
             );
-        } else if (delta < 0) {
-            const remaining = Math.abs(delta);
-            if (!latestPseudo) {
-                await connection.rollback();
-                return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
-            }
-
-            const now = nowSql();
-            if (remaining >= latestPseudoBubbles) {
-                await connection.execute(
-                    'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
-                    [now, now, latestPseudo.id],
-                );
-            } else {
-                const duration = Math.max(0, latestPseudoBubbles - remaining) * 10800;
-                await connection.execute(
-                    'UPDATE adventures SET duration = ?, has_additional_bubble = 0, updated_at = ? WHERE id = ?',
-                    [duration, now, latestPseudo.id],
-                );
-            }
         }
 
         await connection.commit();

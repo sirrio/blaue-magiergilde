@@ -81,7 +81,7 @@ export default function SpellRow({ spell }: { spell: Spell }) {
       </div>
       <div className="flex items-center justify-center text-xs">
         {isGuildEnabled ? (
-          <Shield className="h-4 w-4 text-success" title="Allowed in guild" aria-label="Allowed in guild" />
+          <Shield className="h-4 w-4 text-success" aria-label="Allowed in guild" />
         ) : (
           <span
             className="relative inline-flex h-4 w-4 items-center justify-center"

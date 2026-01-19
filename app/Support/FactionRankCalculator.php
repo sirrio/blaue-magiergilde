@@ -10,7 +10,9 @@ use Illuminate\Support\Collection;
 class FactionRankCalculator
 {
     private const MIN_BUBBLE_DURATION = 10800;
+
     private const RANK_THREE_DOWNTIME = 360000;
+
     private const RANK_FIVE_DOWNTIME = 1800000;
 
     public function calculate(Character $character): int

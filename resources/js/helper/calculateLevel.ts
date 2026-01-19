@@ -1,28 +1,16 @@
-import { calculateBubble } from '@/helper/calculateBubble'
-import { Character } from '@/types'
+import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
+import { calculateBubble, type BubbleCharacter } from '@/helper/calculateBubble'
+import type { Character } from '@/types'
 
-const calculateLevel = (character: Character): number => {
+type LevelCharacter = BubbleCharacter & Pick<Character, 'bubble_shop_spend' | 'start_tier'>
+
+const calculateLevel = (character: LevelCharacter): number => {
   const bubbles = calculateBubble(character)
   const bubbleShopSpend = Number(character.bubble_shop_spend ?? 0)
   const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
   const normalizedBubbles = Number.isFinite(bubbles) ? bubbles : 0
-  let additional_bubbles: number
-
-  switch (character.start_tier) {
-    case 'bt':
-      additional_bubbles = 0
-      break
-    case 'lt':
-      additional_bubbles = 10
-      break
-    case 'ht':
-      additional_bubbles = 55
-      break
-    default:
-      additional_bubbles = 0
-  }
-
   if (character.is_filler) return 3
+  const additional_bubbles = additionalBubblesForStartTier(character.start_tier)
 
   const availableBubbles = Math.max(0, normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend)
 
@@ -33,3 +21,4 @@ const calculateLevel = (character: Character): number => {
 }
 
 export { calculateLevel }
+export type { LevelCharacter }
