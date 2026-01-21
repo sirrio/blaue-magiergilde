@@ -30,7 +30,15 @@ import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, 
 import React from 'react'
 import { useImage } from 'react-image'
 
-function CharacterImage({ character, className }: { character: Character; className?: string }) {
+function CharacterImage({
+  character,
+  className,
+  masked = true,
+}: {
+  character: Character
+  className?: string
+  masked?: boolean
+}) {
   const avatar = String(character.avatar || '').trim()
   const srcList = avatar
     ? [avatar.startsWith('http') ? avatar : `/storage/${avatar}`, '/images/no-avatar.svg']
@@ -38,17 +46,25 @@ function CharacterImage({ character, className }: { character: Character; classN
   const { src } = useImage({
     srcList,
   })
-  return <img className={cn('aspect-square w-full rounded-full', className)} src={src} alt={character.name} />
+  return (
+    <img
+      className={cn('aspect-square w-full object-cover', masked ? 'rounded-full' : 'rounded-none', className)}
+      src={src}
+      alt={character.name}
+    />
+  )
 }
 
 export function CharacterCard({
   character,
   guildCharacters = [],
   simplifiedTrackingOverride,
+  avatarMaskedOverride,
 }: {
   character: Character
   guildCharacters?: Character[]
   simplifiedTrackingOverride?: boolean
+  avatarMaskedOverride?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
@@ -56,6 +72,7 @@ export function CharacterCard({
   const level = calculateLevel(character)
   const tier = calculateTier(character)
   const simplifiedTracking = simplifiedTrackingOverride ?? Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
+  const avatarMasked = avatarMaskedOverride ?? (character.user?.avatar_masked ?? true)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
@@ -143,7 +160,7 @@ export function CharacterCard({
             <div className={cn('text-xs')}>
               Level {level} {calculateClassString(character)}
             </div>
-            <CharacterImage className="mt-4 mb-2" character={character} />
+            <CharacterImage className="mt-4 mb-2" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
               <>
                 {!simplifiedTracking ? (

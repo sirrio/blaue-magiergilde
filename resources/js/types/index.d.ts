@@ -32,6 +32,7 @@ export interface User {
   updated_at: string
   is_admin: boolean
   simplified_tracking?: boolean
+  avatar_masked?: boolean
 
   [key: string]: unknown // This allows for additional properties...
 }
@@ -300,6 +301,7 @@ export interface Character {
   bubble_shop_spend: number
   faction_rank?: number
   simplified_tracking?: boolean
+  avatar_masked?: boolean
   external_link: string
   avatar: string
   user_id: number
@@ -308,6 +310,7 @@ export interface Character {
     name: string
     discord_id?: number | null
     simplified_tracking?: boolean
+    avatar_masked?: boolean
   }
   character?: Character
 }

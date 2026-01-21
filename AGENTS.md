@@ -26,6 +26,9 @@ Requests hit Laravel route files which map to controller classes. Controllers in
 - **Administration subpages:** Settings, Items, Spells, Shop, Auctions, Character Approvals.
 - **UI passes:** Review all pages above together to keep layout, spacing, and language consistent.
 
+## 4.2 UI Guidelines
+- **daisyUI rules:** Follow the UI guidance in `daisy_llms.txt` for styling, layout, and component usage.
+
 ## 5. Models & Data Pipelines
 No ML models or data pipelines are defined in this repository.
 

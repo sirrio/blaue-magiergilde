@@ -216,8 +216,9 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 }
 
 function buildCharacterCardPayload({ character, ownerDiscordId }) {
-    const attachment = tryBuildLocalAvatarAttachment(character);
-    const url = resolvePublicAvatarUrl(character.avatar);
+    const avatarMasked = Boolean(character.avatar_masked);
+    const attachment = avatarMasked ? null : tryBuildLocalAvatarAttachment(character);
+    const url = resolvePublicAvatarUrl(character.avatar, { masked: avatarMasked });
     const simplifiedTracking = Boolean(character.simplified_tracking);
 
     const files = [];
@@ -239,16 +240,23 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
     };
 }
 
-function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }) {
+function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }) {
     const embed = new EmbedBuilder()
         .setTitle('Settings')
         .setColor(0x4f46e5)
         .setDescription('Choose how you want to track character progress.')
-        .addFields({
-            name: 'Tracking mode',
-            value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)',
-            inline: false,
-        });
+        .addFields(
+            {
+                name: 'Tracking mode',
+                value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)',
+                inline: false,
+            },
+            {
+                name: 'Token mask',
+                value: avatarMasked ? 'On' : 'Off',
+                inline: true,
+            },
+        );
 
     const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -261,13 +269,20 @@ function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }) {
             .setLabel('Simplified tracking')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(simplifiedTracking),
+    );
+
+    const settingsRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`charactersTracking_avatar_${ownerDiscordId}`)
+            .setLabel(`Token mask: ${avatarMasked ? 'On' : 'Off'}`)
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`charactersTracking_back_${ownerDiscordId}`)
             .setLabel('Back')
             .setStyle(ButtonStyle.Secondary),
     );
 
-    return { embeds: [embed], components: [buttons] };
+    return { embeds: [embed], components: [buttons, settingsRow] };
 }
 
 function getAdventureStepNumber(stepKey) {

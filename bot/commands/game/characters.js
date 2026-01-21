@@ -15,6 +15,7 @@ const {
     DiscordNotLinkedError,
     listCharactersForDiscord,
     getUserTrackingModeForDiscord,
+    getUserAvatarMaskedForDiscord,
 } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 const {
@@ -38,13 +39,24 @@ function publicBaseUrl() {
     return value ? value.replace(/\/$/, '') : null;
 }
 
+function normalizeStoragePath(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    let normalized = raw;
+    if (normalized.startsWith('/')) normalized = normalized.slice(1);
+    if (normalized.startsWith('storage/')) normalized = normalized.slice('storage/'.length);
+
+    return normalized || null;
+}
+
 function resolveCharacterManagerUrl(characterId) {
     const baseUrl = publicBaseUrl();
     if (!baseUrl) return null;
     return `${baseUrl}/characters/${characterId}`;
 }
 
-function resolvePublicAvatarUrl(avatarValue) {
+function resolvePublicAvatarUrl(avatarValue, options = {}) {
     const value = String(avatarValue || '').trim();
     if (!value) return null;
     if (isHttpUrl(value)) return value;
@@ -52,10 +64,14 @@ function resolvePublicAvatarUrl(avatarValue) {
     const baseUrl = publicBaseUrl();
     if (!baseUrl) return null;
 
-    if (value.startsWith('/')) return `${baseUrl}${value}`;
-    if (value.startsWith('storage/')) return `${baseUrl}/${value}`;
+    const storagePath = normalizeStoragePath(value);
+    if (!storagePath) return null;
 
-    return `${baseUrl}/storage/${value}`;
+    if (options.masked) {
+        return `${baseUrl}/avatars/masked?path=${encodeURIComponent(storagePath)}`;
+    }
+
+    return `${baseUrl}/storage/${storagePath}`;
 }
 
 function safeInt(value, fallback = 0) {
@@ -154,7 +170,8 @@ function tryBuildLocalAvatarAttachment(character) {
     const repoRoot = path.resolve(__dirname, '..', '..', '..');
     const publicStorageRoot = path.join(repoRoot, 'storage', 'app', 'public');
 
-    const normalized = raw.startsWith('/') ? raw.slice(1) : raw;
+    const normalized = normalizeStoragePath(raw);
+    if (!normalized) return null;
     const filePath = path.resolve(publicStorageRoot, normalized);
 
     if (!filePath.startsWith(publicStorageRoot)) return null;
@@ -232,7 +249,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking }) {
+function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked }) {
     const summary = new EmbedBuilder()
         .setTitle('Your Characters')
         .setColor(0x4f46e5)
@@ -242,8 +259,11 @@ function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking
                 : 'No characters yet. Create your first with **New**.',
         );
     summary.addFields({
-        name: 'Tracking',
-        value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)',
+        name: 'Settings',
+        value: [
+            `Tracking: ${simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)'}`,
+            `Token mask: ${avatarMasked ? 'On' : 'Off'}`,
+        ].join('\n'),
         inline: false,
     });
 
@@ -307,9 +327,11 @@ module.exports = {
 
         let characters;
         let simplifiedTracking = false;
+        let avatarMasked = true;
         try {
             characters = await listCharactersForDiscord(interaction.user);
             simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+            avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -322,6 +344,7 @@ module.exports = {
             ownerDiscordId: interaction.user.id,
             characters,
             simplifiedTracking,
+            avatarMasked,
         });
 
         if (interaction.deferred || interaction.replied) {

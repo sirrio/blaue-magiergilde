@@ -21,6 +21,8 @@ const {
     listCharactersForDiscord,
     getUserTrackingModeForDiscord,
     updateUserTrackingModeForDiscord,
+    getUserAvatarMaskedForDiscord,
+    updateUserAvatarMaskedForDiscord,
     updateCharacterManualLevelForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
@@ -144,7 +146,8 @@ function clearAvatarUpdateState(userId) {
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
     const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+    const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
     await interaction.update({
         ...listView,
         content: '',
@@ -566,16 +569,63 @@ function enableInsecureTlsIfNeeded(urlString) {
     console.warn('[bot] Local TLS verification disabled for bot HTTP requests.');
 }
 
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_ALLOWED_TYPES = new Set([
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+]);
+
+function describeAvatarUploadIssue(reason) {
+    if (reason === 'avatar_too_large') {
+        return 'Upload failed: file is too large (max 5 MB). Accepted: JPG, PNG, GIF, WEBP.';
+    }
+    if (reason === 'avatar_not_image') {
+        return 'Upload failed: file must be an image (JPG, PNG, GIF, WEBP).';
+    }
+    if (reason === 'avatar_fetch_failed') {
+        return 'Upload failed: could not download the file. Please try again.';
+    }
+    if (reason === 'config_missing') {
+        return 'Upload is temporarily unavailable. Please try again later.';
+    }
+    return 'Upload failed. Please try again.';
+}
+
+function validateAvatarAttachment(attachment) {
+    if (!attachment) {
+        return { ok: false, reason: 'avatar_not_image' };
+    }
+
+    const size = Number(attachment.size || 0);
+    if (Number.isFinite(size) && size > AVATAR_MAX_BYTES) {
+        return { ok: false, reason: 'avatar_too_large' };
+    }
+
+    const contentType = String(attachment.contentType || '').toLowerCase();
+    if (contentType && !contentType.startsWith('image/')) {
+        return { ok: false, reason: 'avatar_not_image' };
+    }
+
+    if (contentType && !AVATAR_ALLOWED_TYPES.has(contentType)) {
+        return { ok: false, reason: 'avatar_not_image' };
+    }
+
+    return { ok: true };
+}
+
 async function storeCharacterAvatar(characterId, avatarUrl) {
     const appUrl = resolveAppUrl();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!characterId || !avatarUrl) {
         console.warn('[bot] Avatar upload skipped: missing character id or avatar url.');
-        return false;
+        return { ok: false, reason: 'missing_input' };
     }
     if (!appUrl || !token) {
         console.warn('[bot] Avatar upload skipped: BOT_PUBLIC_APP_URL/APP_URL or BOT_HTTP_TOKEN missing.');
-        return false;
+        return { ok: false, reason: 'config_missing' };
     }
 
     try {
@@ -615,21 +665,34 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
             const text = await response.text().catch(() => '');
             const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
             console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentType} body=${preview}`);
-            return false;
+            if (response.status === 413) {
+                return { ok: false, reason: 'avatar_too_large', status: response.status };
+            }
+            if (contentType.includes('application/json')) {
+                try {
+                    const payload = JSON.parse(text);
+                    if (payload?.error) {
+                        return { ok: false, reason: payload.error, status: response.status };
+                    }
+                } catch {
+                    // ignore JSON parse error
+                }
+            }
+            return { ok: false, reason: 'upload_failed', status: response.status };
         }
 
         if (!contentType.includes('application/json')) {
             const text = await response.text().catch(() => '');
             const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
             console.warn(`[bot] Avatar upload unexpected response. content-type=${contentType} body=${preview}`);
-            return false;
+            return { ok: false, reason: 'upload_failed' };
         }
 
         const payload = await response.json().catch(() => null);
         if (payload?.avatar_path) {
-            return payload.avatar_path;
+            return { ok: true, avatarPath: payload.avatar_path };
         }
-        return true;
+        return { ok: true };
     } catch (error) {
         const code = error?.cause?.code || error?.code;
         if (code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
@@ -637,7 +700,7 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
         }
 
         console.warn('[bot] Avatar upload error.', error);
-        return false;
+        return { ok: false, reason: 'upload_failed' };
     }
 }
 
@@ -688,9 +751,9 @@ async function finalizeCharacterCreation(state) {
     }
 
     if (result.id && data.avatar && isHttpUrl(data.avatar)) {
-        const storedAvatar = await storeCharacterAvatar(result.id, data.avatar);
-        if (storedAvatar && typeof storedAvatar === 'string') {
-            data.avatar = storedAvatar;
+        const avatarResult = await storeCharacterAvatar(result.id, data.avatar);
+        if (avatarResult?.ok && typeof avatarResult.avatarPath === 'string') {
+            data.avatar = avatarResult.avatarPath;
         }
     }
 
@@ -721,6 +784,23 @@ async function handleCreationAvatarMessage(message) {
     const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
     if (!attachment?.url) return false;
 
+    const validation = validateAvatarAttachment(attachment);
+    if (!validation.ok) {
+        await message.delete().catch(() => {});
+
+        const payload = {
+            embeds: [buildAvatarStepEmbed(state, describeAvatarUploadIssue(validation.reason))],
+            components: [
+                buildAvatarUploadRow(ownerDiscordId),
+                ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
+            ],
+            content: '',
+        };
+
+        await updateCreationMessage(state, payload);
+        return true;
+    }
+
     state.data.avatar = attachment.url;
     await message.delete().catch(() => {});
 
@@ -750,19 +830,31 @@ async function handleAvatarUpdateMessage(message) {
 
     await message.delete().catch(() => {});
 
-    const storedAvatar = await storeCharacterAvatar(state.characterId, attachment.url);
-    clearAvatarUpdateState(message.author.id);
-
-    if (!state.promptMessage?.editable) {
+    const validation = validateAvatarAttachment(attachment);
+    if (!validation.ok) {
+        if (state.promptMessage?.editable) {
+            await state.promptMessage.edit({
+                content: describeAvatarUploadIssue(validation.reason),
+            }).catch(() => {});
+        }
         return true;
     }
 
-    if (!storedAvatar) {
+    const storedAvatar = await storeCharacterAvatar(state.characterId, attachment.url);
+
+    if (!state.promptMessage?.editable) {
+        clearAvatarUpdateState(message.author.id);
+        return true;
+    }
+
+    if (!storedAvatar?.ok) {
         await state.promptMessage.edit({
-            content: 'Avatar could not be saved.',
+            content: describeAvatarUploadIssue(storedAvatar?.reason),
         }).catch(() => {});
         return true;
     }
+
+    clearAvatarUpdateState(message.author.id);
 
     const character = await findCharacterForDiscord(message.author, state.characterId);
     if (!character) {
@@ -986,8 +1078,9 @@ async function handle(interaction) {
         await interaction.deferUpdate().catch(() => {});
 
         const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
         await updateManageMessage(interaction, {
-            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }),
+            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }),
             content: '',
         });
         return true;
@@ -1009,7 +1102,8 @@ async function handle(interaction) {
         if (action === 'back') {
             const characters = await listCharactersForDiscord(interaction.user);
             const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
             await updateManageMessage(interaction, { ...listView, content: '' });
             return true;
         }
@@ -1018,7 +1112,19 @@ async function handle(interaction) {
             const simplifiedTracking = action === 'simplified';
             await updateUserTrackingModeForDiscord(interaction.user, simplifiedTracking);
             const characters = await listCharactersForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
+            await updateManageMessage(interaction, { ...listView, content: '' });
+            return true;
+        }
+
+        if (action === 'avatar') {
+            const current = await getUserAvatarMaskedForDiscord(interaction.user);
+            await updateUserAvatarMaskedForDiscord(interaction.user, !current);
+            const characters = await listCharactersForDiscord(interaction.user);
+            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
             await updateManageMessage(interaction, { ...listView, content: '' });
             return true;
         }
@@ -1127,10 +1233,11 @@ async function handle(interaction) {
 
         clearCreationState(ownerDiscordId);
         try {
-            const characters = await listCharactersForDiscord(interaction.user);
-            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
-            await interaction.update({ ...listView, content: '' });
+        const characters = await listCharactersForDiscord(interaction.user);
+        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
+        await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({
@@ -1610,7 +1717,7 @@ async function handle(interaction) {
 
         const dm = await interaction.user.createDM();
         const sourceLink = state?.promptMessage?.url ? `\nBack to character dialog: ${state.promptMessage.url}` : '';
-        await dm.send(`Please send your avatar image here. I only store it for this character.${sourceLink}`);
+        await dm.send(`Please send your avatar image here (JPG, PNG, GIF, WEBP, max 5 MB). I only store it for this character.${sourceLink}`);
 
         await interaction.deferUpdate();
         await updateCreationMessage(state, {
@@ -1963,10 +2070,12 @@ async function handle(interaction) {
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
                 const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+                const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
                 const listView = buildCharacterListView({
                     ownerDiscordId,
                     characters,
                     simplifiedTracking,
+                    avatarMasked,
                 });
                 await interaction.editReply({
                     ...listView,
@@ -2056,7 +2165,7 @@ async function handle(interaction) {
         if (action === 'avatar') {
             const dm = await interaction.user.createDM();
             const sourceLink = interaction.message?.url ? `\nBack to character dialog: ${interaction.message.url}` : '';
-            await dm.send(`Please send your avatar image here. I only store it for this character.${sourceLink}`);
+            await dm.send(`Please send your avatar image here (JPG, PNG, GIF, WEBP, max 5 MB). I only store it for this character.${sourceLink}`);
 
             clearAvatarUpdateState(ownerDiscordId);
             setAvatarUpdateState(ownerDiscordId, {

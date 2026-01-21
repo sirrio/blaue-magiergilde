@@ -14,17 +14,22 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, Un
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
 import type { PageProps } from '@/types'
-import { Archive, BookUser, Copy, Plus, RefreshCw, SlidersHorizontal, Zap } from 'lucide-react'
+import { Archive, BookUser, CircleUser, Copy, Plus, RefreshCw, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const { features, auth } = usePage<PageProps>().props
   const [simplifiedTracking, setSimplifiedTracking] = useState(Boolean(auth.user?.simplified_tracking))
   const [isUpdatingTracking, setIsUpdatingTracking] = useState(false)
+  const [avatarMasked, setAvatarMasked] = useState(auth.user?.avatar_masked ?? true)
+  const [isUpdatingAvatarMasked, setIsUpdatingAvatarMasked] = useState(false)
   useEffect(() => {
     const nextValue = Boolean(auth.user?.simplified_tracking)
     setSimplifiedTracking(nextValue)
   }, [auth.user?.simplified_tracking])
+  useEffect(() => {
+    setAvatarMasked(auth.user?.avatar_masked ?? true)
+  }, [auth.user?.avatar_masked])
   const visibleCharacters = useMemo(() => characters.filter((char) => !char.deleted_at), [characters])
   const [chars, setChars] = useState([...visibleCharacters])
   useEffect(() => {
@@ -117,6 +122,21 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
       },
     )
   }
+  const updateAvatarMode = (value: boolean) => {
+    if (isUpdatingAvatarMasked) return
+    setAvatarMasked(value)
+    setIsUpdatingAvatarMasked(true)
+    router.patch(
+      route('characters.avatar-mode'),
+      { avatar_masked: value },
+      {
+        preserveScroll: true,
+        preserveState: true,
+        onError: () => setAvatarMasked(auth.user?.avatar_masked ?? true),
+        onFinish: () => setIsUpdatingAvatarMasked(false),
+      },
+    )
+  }
 
   return (
     <AppLayout>
@@ -141,18 +161,20 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <ActionMenu
               items={[
                 {
-                  label: 'Use standard tracking',
-                  onSelect: () => updateTrackingMode(false),
-                  disabled: isUpdatingTracking || !simplifiedTracking,
-                  active: !simplifiedTracking,
-                  icon: <SlidersHorizontal size={14} />,
+                  type: 'toggle',
+                  label: 'Simplified tracking',
+                  checked: simplifiedTracking,
+                  onToggle: updateTrackingMode,
+                  disabled: isUpdatingTracking,
+                  icon: <Zap size={14} />,
                 },
                 {
-                  label: 'Use simplified tracking',
-                  onSelect: () => updateTrackingMode(true),
-                  disabled: isUpdatingTracking || simplifiedTracking,
-                  active: simplifiedTracking,
-                  icon: <Zap size={14} />,
+                  type: 'toggle',
+                  label: 'Token mask',
+                  checked: avatarMasked,
+                  onToggle: updateAvatarMode,
+                  disabled: isUpdatingAvatarMasked,
+                  icon: <CircleUser size={14} />,
                 },
               ]}
             />
@@ -219,7 +241,13 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
-                  <CharacterCard key={char.id} character={char} guildCharacters={guildCharacters} simplifiedTrackingOverride={simplifiedTracking} />
+                  <CharacterCard
+                    key={char.id}
+                    character={char}
+                    guildCharacters={guildCharacters}
+                    simplifiedTrackingOverride={simplifiedTracking}
+                    avatarMaskedOverride={avatarMasked}
+                  />
                 ))}
               </SortableContext>
             </DndContext>

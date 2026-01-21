@@ -46,7 +46,7 @@ class StoreCharacterRequest extends FormRequest
             'dm_coins' => 'required|integer|min:0|max:1024',
             'is_filler' => 'required|boolean',
             'bubble_shop_spend' => 'required|integer|min:0|max:1024',
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ];
     }
 }
