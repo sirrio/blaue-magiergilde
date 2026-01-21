@@ -169,6 +169,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.is_filler,
                 c.guild_status,
                 u.simplified_tracking,
+                u.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -234,6 +235,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.bubble_shop_spend,
                 c.is_filler,
                 u.simplified_tracking,
+                u.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -298,6 +300,27 @@ async function updateUserTrackingModeForDiscord(discordUser, simplifiedTracking)
         [value ? 1 : 0, nowSql(), userId],
     );
     return { ok: true, simplifiedTracking: value };
+}
+
+async function getUserAvatarMaskedForDiscord(discordUser) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const [rows] = await db.execute('SELECT avatar_masked FROM users WHERE id = ? LIMIT 1', [userId]);
+    const value = rows[0]?.avatar_masked;
+    return value === null || value === undefined ? true : Boolean(value);
+}
+
+async function updateUserAvatarMaskedForDiscord(discordUser, avatarMasked) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const value = normalizeBoolean(avatarMasked, true);
+    await db.execute(
+        'UPDATE users SET avatar_masked = ?, updated_at = ? WHERE id = ?',
+        [value ? 1 : 0, nowSql(), userId],
+    );
+    return { ok: true, avatarMasked: value };
 }
 
 async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel) {
@@ -1176,6 +1199,8 @@ module.exports = {
     findCharacterForDiscord,
     getUserTrackingModeForDiscord,
     updateUserTrackingModeForDiscord,
+    getUserAvatarMaskedForDiscord,
+    updateUserAvatarMaskedForDiscord,
     updateCharacterManualLevelForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,

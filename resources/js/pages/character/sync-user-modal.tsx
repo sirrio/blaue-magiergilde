@@ -108,6 +108,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
           <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
             Avatar
           </FileInput>
+          <p className="text-xs text-base-content/60">Accepted: JPG, PNG, GIF, WEBP · Max. 5 MB</p>
           <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
             Notes
           </TextArea>

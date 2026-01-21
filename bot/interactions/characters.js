@@ -21,6 +21,8 @@ const {
     listCharactersForDiscord,
     getUserTrackingModeForDiscord,
     updateUserTrackingModeForDiscord,
+    getUserAvatarMaskedForDiscord,
+    updateUserAvatarMaskedForDiscord,
     updateCharacterManualLevelForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
@@ -144,7 +146,8 @@ function clearAvatarUpdateState(userId) {
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
     const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+    const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
     await interaction.update({
         ...listView,
         content: '',
@@ -986,8 +989,9 @@ async function handle(interaction) {
         await interaction.deferUpdate().catch(() => {});
 
         const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
         await updateManageMessage(interaction, {
-            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking }),
+            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }),
             content: '',
         });
         return true;
@@ -1009,7 +1013,8 @@ async function handle(interaction) {
         if (action === 'back') {
             const characters = await listCharactersForDiscord(interaction.user);
             const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
             await updateManageMessage(interaction, { ...listView, content: '' });
             return true;
         }
@@ -1018,7 +1023,19 @@ async function handle(interaction) {
             const simplifiedTracking = action === 'simplified';
             await updateUserTrackingModeForDiscord(interaction.user, simplifiedTracking);
             const characters = await listCharactersForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
+            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
+            await updateManageMessage(interaction, { ...listView, content: '' });
+            return true;
+        }
+
+        if (action === 'avatar') {
+            const current = await getUserAvatarMaskedForDiscord(interaction.user);
+            await updateUserAvatarMaskedForDiscord(interaction.user, !current);
+            const characters = await listCharactersForDiscord(interaction.user);
+            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
             await updateManageMessage(interaction, { ...listView, content: '' });
             return true;
         }
@@ -1127,10 +1144,11 @@ async function handle(interaction) {
 
         clearCreationState(ownerDiscordId);
         try {
-            const characters = await listCharactersForDiscord(interaction.user);
-            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking });
-            await interaction.update({ ...listView, content: '' });
+        const characters = await listCharactersForDiscord(interaction.user);
+        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
+        await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({
@@ -1610,7 +1628,7 @@ async function handle(interaction) {
 
         const dm = await interaction.user.createDM();
         const sourceLink = state?.promptMessage?.url ? `\nBack to character dialog: ${state.promptMessage.url}` : '';
-        await dm.send(`Please send your avatar image here. I only store it for this character.${sourceLink}`);
+        await dm.send(`Please send your avatar image here (JPG, PNG, GIF, WEBP, max 5 MB). I only store it for this character.${sourceLink}`);
 
         await interaction.deferUpdate();
         await updateCreationMessage(state, {
@@ -1963,10 +1981,12 @@ async function handle(interaction) {
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
                 const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
+                const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
                 const listView = buildCharacterListView({
                     ownerDiscordId,
                     characters,
                     simplifiedTracking,
+                    avatarMasked,
                 });
                 await interaction.editReply({
                     ...listView,
@@ -2056,7 +2076,7 @@ async function handle(interaction) {
         if (action === 'avatar') {
             const dm = await interaction.user.createDM();
             const sourceLink = interaction.message?.url ? `\nBack to character dialog: ${interaction.message.url}` : '';
-            await dm.send(`Please send your avatar image here. I only store it for this character.${sourceLink}`);
+            await dm.send(`Please send your avatar image here (JPG, PNG, GIF, WEBP, max 5 MB). I only store it for this character.${sourceLink}`);
 
             clearAvatarUpdateState(ownerDiscordId);
             setAvatarUpdateState(ownerDiscordId, {

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Character\AvatarMaskController;
+use App\Http\Controllers\Character\AvatarModeController;
 use App\Http\Controllers\Character\CharacterController;
 use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
@@ -17,6 +19,11 @@ Route::get('characters/deleted', DeletedCharacterController::class)
 Route::patch('characters/tracking', TrackingModeController::class)
     ->middleware(['auth'])
     ->name('characters.tracking');
+Route::patch('characters/avatar-mode', AvatarModeController::class)
+    ->middleware(['auth'])
+    ->name('characters.avatar-mode');
+Route::get('avatars/masked', AvatarMaskController::class)
+    ->name('avatars.masked');
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
     ->middleware(['auth'])
     ->name('characters.quick-level');

@@ -42,6 +42,7 @@ class User extends Authenticatable
         'password',
         'avatar',
         'simplified_tracking',
+        'avatar_masked',
     ];
 
     /**
@@ -64,6 +65,7 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'simplified_tracking' => 'boolean',
+            'avatar_masked' => 'boolean',
         ];
     }
 
