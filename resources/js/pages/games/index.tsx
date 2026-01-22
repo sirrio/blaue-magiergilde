@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout'
 import LogoTier from '@/components/logo-tier'
-import { Card, CardBody, CardTitle } from '@/components/ui/card'
+import { Card, CardBody } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
@@ -54,6 +54,13 @@ const formatGameDate = (value: string | null | undefined, includeTime: boolean) 
   return date
 }
 
+const formatCompactDate = (value: string | null | undefined) => {
+  const parts = parseGameDateParts(value)
+  if (!parts) return null
+  const padded = (item: number) => String(item).padStart(2, '0')
+  return `${padded(parts.day)}.${padded(parts.month)}`
+}
+
 const buildDateFromParts = (parts: ReturnType<typeof parseGameDateParts>) => {
   if (!parts) return null
   const hour = parts.hour ?? 12
@@ -68,7 +75,7 @@ const buildDateKey = (date: Date) => {
 
 const buildDateLabel = (date: Date) => {
   return {
-    weekday: date.toLocaleDateString(undefined, { weekday: 'long' }),
+    weekday: date.toLocaleDateString(undefined, { weekday: 'short' }),
     month: date.toLocaleDateString(undefined, { month: 'short' }),
     day: String(date.getDate()).padStart(2, '0'),
     year: String(date.getFullYear()),
@@ -93,7 +100,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
   const getInitials = useInitials()
   const [search, setSearch] = useState('')
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
-  const [onlyThisWeek, setOnlyThisWeek] = useState(false)
+  const [weekFilter, setWeekFilter] = useState<'all' | 'this_week' | 'next_week' | 'last_week'>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
 
   const enrichedGames = useMemo(() => {
@@ -127,9 +134,20 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
     })
   }, [games])
 
-  const { weekStart, weekEnd } = useMemo(() => {
+  const { weekStart, weekEnd, nextWeekStart, nextWeekEnd, lastWeekStart, lastWeekEnd } = useMemo(() => {
     const { start, end } = buildWeekBounds(new Date())
-    return { weekStart: start, weekEnd: end }
+    const nextStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
+    const nextEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 7)
+    const lastStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7)
+    const lastEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 7)
+    return {
+      weekStart: start,
+      weekEnd: end,
+      nextWeekStart: nextStart,
+      nextWeekEnd: nextEnd,
+      lastWeekStart: lastStart,
+      lastWeekEnd: lastEnd,
+    }
   }, [])
 
   const filteredGames = useMemo(() => {
@@ -139,16 +157,41 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
       const matchesTier = selectedTiers.length === 0 || (tierKey && selectedTiers.includes(tierKey))
       if (!matchesTier) return false
 
-      if (onlyThisWeek) {
+      if (weekFilter !== 'all') {
         if (!game.startsDate) return false
-        if (game.startsDate < weekStart || game.startsDate >= weekEnd) return false
+        if (weekFilter === 'this_week' && (game.startsDate < weekStart || game.startsDate >= weekEnd)) {
+          return false
+        }
+        if (
+          weekFilter === 'next_week' &&
+          (game.startsDate < nextWeekStart || game.startsDate >= nextWeekEnd)
+        ) {
+          return false
+        }
+        if (
+          weekFilter === 'last_week' &&
+          (game.startsDate < lastWeekStart || game.startsDate >= lastWeekEnd)
+        ) {
+          return false
+        }
       }
 
       if (!searchTerm) return true
       const haystack = `${game.title} ${game.content ?? ''} ${game.authorName}`.toLowerCase()
       return haystack.includes(searchTerm)
     })
-  }, [enrichedGames, onlyThisWeek, search, selectedTiers, weekEnd, weekStart])
+  }, [
+    enrichedGames,
+    lastWeekEnd,
+    lastWeekStart,
+    nextWeekEnd,
+    nextWeekStart,
+    search,
+    selectedTiers,
+    weekEnd,
+    weekFilter,
+    weekStart,
+  ])
 
   const { upcomingGames, pastGames } = useMemo(() => {
     const now = new Date()
@@ -220,98 +263,87 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
   const activeFilters = [
     search.trim() ? `Search: ${search.trim()}` : null,
     selectedTiers.length ? `Tier: ${selectedTiers.map((tier) => tier.toUpperCase()).join(', ')}` : null,
-    onlyThisWeek ? 'This week' : null,
+    weekFilter === 'this_week'
+      ? 'Week: This'
+      : weekFilter === 'next_week'
+        ? 'Week: Next'
+        : weekFilter === 'last_week'
+          ? 'Week: Last'
+          : null,
   ].filter(Boolean) as string[]
 
   return (
     <AppLayout>
       <Head title="Games" />
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-4 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Games</h1>
-            <p className="text-base-content/70">Recent game announcements from Discord.</p>
-            <p className="text-xs text-base-content/60">Timezone: {timeZoneLabel}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Games</h1>
+            <p className="text-sm text-base-content/70">Recent announcements from Discord.</p>
+            <p className="text-[11px] text-base-content/60">
+              {games.length} entries
+              {lastSyncedAt
+                ? (() => {
+                    const formatted = formatGameDate(lastSyncedAt, true)
+                    return formatted ? ` · Last sync ${formatted}` : ''
+                  })()
+                : ''}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 text-[10px] text-base-content/60">
+            <span>Timezone: {timeZoneLabel}</span>
+            <div role="tablist" className="tabs tabs-box tabs-xs">
+              <button
+                role="tab"
+                type="button"
+                className={cn('tab', viewMode === 'list' && 'tab-active')}
+                onClick={() => setViewMode('list')}
+              >
+                <ListIcon size={12} />
+                List
+              </button>
+              <button
+                role="tab"
+                type="button"
+                className={cn('tab', viewMode === 'calendar' && 'tab-active')}
+                onClick={() => setViewMode('calendar')}
+              >
+                <LayoutGrid size={12} />
+                Calendar
+              </button>
+            </div>
           </div>
         </div>
 
         <Card>
-          <CardBody className="gap-4">
-            <CardTitle className="flex flex-wrap items-center justify-between gap-3">
-              <span>Announcements</span>
-              <span className="text-sm font-normal text-base-content/60">
-                {games.length} entries
-                {lastSyncedAt
-                  ? (() => {
-                      const formatted = formatGameDate(lastSyncedAt, true)
-                      return formatted ? ` · Last sync ${formatted}` : ''
-                    })()
-                  : ''}
-              </span>
-            </CardTitle>
-
-            <div className="rounded-box border border-base-200 bg-base-100 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase text-base-content/50">Filters</p>
-                  <h2 className="text-lg font-semibold">Game filters</h2>
-                  <p className="text-xs text-base-content/60">Search, filter by tier, or switch views.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-                  <span className="badge badge-ghost">{filteredGames.length} of {games.length}</span>
-                  {activeFilters.length === 0 ? (
-                    <span className="text-base-content/50">No filters</span>
-                  ) : (
+          <CardBody className="gap-1.5">
+            <div className="rounded-box border border-base-200 bg-base-100 p-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-base-content/60">
+                <span className="badge badge-ghost badge-xs">{filteredGames.length} of {games.length}</span>
+                {activeFilters.length === 0 ? (
+                  <span className="text-base-content/50">No filters</span>
+                ) : (
                     activeFilters.map((filter) => (
-                      <span key={filter} className="badge badge-ghost">
+                      <span key={filter} className="badge badge-ghost badge-xs">
                         {filter}
                       </span>
                     ))
                   )}
-                </div>
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr,auto]">
+              <div className="mt-1.5 grid gap-1.5 lg:grid-cols-[1fr,auto]">
                 <Input
                   type="search"
                   placeholder="Search by title, author, or content..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
+                  hideLabel
+                  inputClassName="input-xs text-[11px]"
                 >
                   Search
                 </Input>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className={cn('btn btn-xs', onlyThisWeek ? 'btn-primary' : 'btn-ghost')}
-                    onClick={() => setOnlyThisWeek((current) => !current)}
-                  >
-                    <CalendarRange size={14} />
-                    This week
-                  </button>
-                  <div role="tablist" className="tabs tabs-box tabs-xs">
-                    <button
-                      role="tab"
-                      type="button"
-                      className={cn('tab', viewMode === 'list' && 'tab-active')}
-                      onClick={() => setViewMode('list')}
-                    >
-                      <ListIcon size={14} />
-                      List
-                    </button>
-                    <button
-                      role="tab"
-                      type="button"
-                      className={cn('tab', viewMode === 'calendar' && 'tab-active')}
-                      onClick={() => setViewMode('calendar')}
-                    >
-                      <LayoutGrid size={14} />
-                      Calendar
-                    </button>
-                  </div>
-                </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                <div className="flex flex-wrap items-center gap-1">
                   <span className="text-base-content/60">Tier:</span>
                   <div className="flex flex-wrap items-center gap-1">
                     <button
@@ -334,11 +366,35 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                             )
                           }
                         >
-                          <LogoTier tier={tier} width={14} />
+                          <LogoTier tier={tier} width={12} />
                           {tier.toUpperCase()}
                         </button>
                       )
                     })}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-base-content/60">Week:</span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {[
+                      { value: 'all', label: 'All' },
+                      { value: 'next_week', label: 'Next' },
+                      { value: 'this_week', label: 'This' },
+                      { value: 'last_week', label: 'Last' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={cn(
+                          'btn btn-xs',
+                          weekFilter === option.value ? 'btn-primary' : 'btn-ghost',
+                        )}
+                        onClick={() => setWeekFilter(option.value as typeof weekFilter)}
+                      >
+                        <CalendarRange size={12} />
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -354,19 +410,19 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
             ) : (
               <>
                 {viewMode === 'calendar' ? (
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">Calendar · {calendarData.monthLabel}</h3>
-                      <span className="text-xs text-base-content/60">Showing {filteredGames.length} games</span>
+                      <h3 className="text-sm font-semibold">Calendar · {calendarData.monthLabel}</h3>
+                      <span className="text-[11px] text-base-content/60">Showing {filteredGames.length} games</span>
                     </div>
-                    <div className="grid grid-cols-7 gap-2 text-xs text-base-content/50">
+                    <div className="grid grid-cols-7 gap-1 text-[10px] text-base-content/50">
                       {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
                         <div key={day} className="text-center uppercase tracking-wide">
                           {day}
                         </div>
                       ))}
                     </div>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-1">
                       {calendarData.weeks.flatMap((week, weekIndex) =>
                         week.map(({ date, key }) => {
                           const dayGames = calendarData.gamesByDate.get(key) ?? []
@@ -375,17 +431,17 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                             <div
                               key={`${key}-${weekIndex}`}
                               className={cn(
-                                'min-h-[120px] rounded-box border border-base-200 bg-base-100 p-2 text-xs',
+                                'min-h-[64px] rounded-box border border-base-200 bg-base-100 p-1 text-[9px]',
                                 !isCurrentMonth && 'bg-base-200/40 text-base-content/40',
                               )}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-semibold">{date.getDate()}</span>
                                 {dayGames.length ? (
-                                  <span className="badge badge-ghost">{dayGames.length}</span>
+                                  <span className="badge badge-ghost badge-xs">{dayGames.length}</span>
                                 ) : null}
                               </div>
-                              <div className="mt-2 flex flex-col gap-2">
+                              <div className="mt-1 flex flex-col gap-1">
                                 {dayGames.slice(0, 2).map((game) => (
                                   <div key={game.discord_message_id} className="flex items-center gap-1">
                                     {game.tier ? <LogoTier tier={game.tier.toLowerCase()} width={12} /> : null}
@@ -394,7 +450,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                                   </div>
                                 ))}
                                 {dayGames.length > 2 ? (
-                                  <span className="text-[11px] text-base-content/50">
+                                  <span className="text-[10px] text-base-content/50">
                                     +{dayGames.length - 2} more
                                   </span>
                                 ) : null}
@@ -406,118 +462,148 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-8">
+                  <div className="flex flex-col gap-3">
                     {[
                       { label: 'Upcoming', games: upcomingGames },
                       { label: 'Past', games: pastGames },
                     ].map((section) => (
-                      <div key={section.label} className="flex flex-col gap-4">
-                        <div className="sticky top-16 z-10 flex items-center justify-between rounded-box bg-base-100/90 px-2 py-2 backdrop-blur">
-                          <span className="text-sm font-semibold uppercase tracking-wide text-base-content/70">
+                      <div key={section.label} className="flex flex-col gap-2">
+                        <div className="sticky top-14 z-10 flex items-center justify-between rounded-box bg-base-100/90 px-2 py-0.5 backdrop-blur">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-base-content/70">
                             {section.label}
                           </span>
-                          <span className="text-xs text-base-content/60">{section.games.length} games</span>
+                          <span className="text-[10px] text-base-content/60">{section.games.length} games</span>
                         </div>
                         {section.games.length === 0 ? (
                           <div className="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-6 text-center text-sm text-base-content/70">
                             No {section.label.toLowerCase()} announcements yet.
                           </div>
                         ) : (
-                          buildGroupedGames(section.games).map((group) => (
-                            <div key={group.key} className="grid gap-4 md:grid-cols-[auto,1fr]">
-                              <div className="flex min-w-[140px] flex-col items-center justify-center rounded-box bg-base-200/60 px-4 py-3 text-center">
+                          buildGroupedGames(section.games).map((group) => {
+                            const isPastGroup = section.label === 'Past'
+
+                            return (
+                            <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
+                              <div
+                                className={cn(
+                                  'flex min-w-[88px] items-center justify-center rounded-md px-1.5 py-0.5 text-center text-[11px] leading-tight',
+                                  isPastGroup
+                                    ? 'bg-base-200/50 text-base-content/60'
+                                    : 'bg-primary/10 text-base-content/80',
+                                )}
+                              >
                                 {group.label ? (
-                                  <>
-                                    <span className="text-xs uppercase tracking-wide text-base-content/60">
-                                      {group.label.weekday}
-                                    </span>
-                                    <span className="text-2xl font-semibold">{group.label.day}</span>
-                                    <span className="text-xs text-base-content/60">
-                                      {group.label.month} {group.label.year}
-                                    </span>
-                                  </>
+                                  <span className="text-[11px] uppercase tracking-wide">
+                                    {group.label.weekday} {group.label.day} {group.label.month} {group.label.year}
+                                  </span>
                                 ) : (
-                                  <span className="text-sm text-base-content/60">Unknown date</span>
+                                  <span className="text-[11px] text-base-content/60">Unknown date</span>
                                 )}
                               </div>
-                              <div className="flex flex-col gap-3">
+                              <div className="flex flex-col gap-1">
                                 {group.entries.map((game) => {
                                   const tierKey = game.tier?.toLowerCase() ?? ''
-                                  const startsAt = formatGameDate(game.starts_at, true)
-                                  const postedAt = formatGameDate(game.posted_at, false)
+                                  const startsDate = formatCompactDate(game.starts_at)
+                                  const postedDate = formatCompactDate(game.posted_at)
                                   const confidence = Number(game.confidence ?? 0)
                                   const confidenceColor = getConfidenceColor(confidence)
+                                  const dateLine = startsDate
+                                    ? game.timeLabel
+                                      ? `${startsDate} · ${game.timeLabel}`
+                                      : startsDate
+                                    : 'TBD'
+                                  const isPast = section.label === 'Past'
 
-                                  return (
-                                    <div
+                                  return game.discordUrl ? (
+                                    <a
                                       key={game.discord_message_id}
-                                      className="group flex flex-col gap-3 rounded-box border border-base-200 bg-base-100/80 p-4 shadow-sm"
+                                      className={cn(
+                                        'group flex flex-col gap-1 rounded-box border border-base-200 bg-base-100/80 px-2 py-1 text-[11px] shadow-sm transition hover:border-base-300 hover:bg-base-100',
+                                        isPast && 'opacity-60 grayscale-[0.2]',
+                                      )}
+                                      title={game.content ?? undefined}
+                                      href={game.discordUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
                                     >
-                                      <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {tierKey ? (
+                                          <span className="flex items-center">
+                                            <LogoTier tier={tierKey} width={12} />
+                                          </span>
+                                        ) : null}
+                                        <span className="text-[12px] font-semibold">{game.title}</span>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-1 text-[10px] text-base-content/60">
+                                        <span>{dateLine}</span>
+                                        {postedDate ? <span>· posted {postedDate}</span> : null}
+                                        <span className="text-base-content/40">·</span>
+                                        <div className="flex items-center gap-1">
                                           <div className="avatar">
-                                            <div className="w-10 rounded-full bg-base-200">
+                                            <div className="w-4 rounded-full bg-base-200">
                                               {game.avatarUrl ? (
                                                 <img src={game.avatarUrl} alt={game.authorName} />
                                               ) : (
-                                                <span className="text-xs font-semibold text-base-content/70">
+                                                <span className="text-[10px] font-semibold text-base-content/70">
                                                   {getInitials(game.authorName)}
                                                 </span>
                                               )}
                                             </div>
                                           </div>
-                                          <div className="text-xs text-base-content/70">
-                                            <div className="font-semibold text-base-content">
-                                              {game.authorName}
-                                            </div>
-                                            <span className="text-base-content/50">Issuer</span>
-                                          </div>
+                                          <span className="text-base-content/70">{game.authorName}</span>
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className="badge badge-primary badge-sm">
-                                            {game.timeLabel ?? 'TBD'}
-                                          </span>
-                                          <span className="inline-flex items-center gap-1 text-xs text-base-content/60">
-                                            <span
-                                              className={cn('h-2 w-2 rounded-full', confidenceColor)}
-                                              title={`Parse confidence: ${confidence.toFixed(2)}`}
-                                            />
-                                          </span>
-                                          {tierKey ? (
-                                            <span className="flex items-center">
-                                              <LogoTier tier={tierKey} width={18} />
-                                            </span>
-                                          ) : null}
-                                          <span className="font-semibold">{game.title}</span>
-                                        </div>
+                                        <span
+                                          className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
+                                          title={`Parse confidence: ${confidence.toFixed(2)}`}
+                                        />
                                       </div>
-                                      <div className="text-sm text-base-content/70">
-                                        {startsAt ? `Starts: ${startsAt}` : 'Start time not detected'}
-                                        {postedAt ? ` · Posted ${postedAt}` : ''}
-                                      </div>
-                                      {game.content ? (
-                                        <p className="line-clamp-2 text-sm text-base-content/60 group-hover:line-clamp-none group-focus-within:line-clamp-none">
-                                          {game.content}
-                                        </p>
-                                      ) : null}
-                                      <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
-                                        {game.discordUrl ? (
-                                          <a
-                                            className="link link-hover opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
-                                            href={game.discordUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                          >
-                                            View on Discord
-                                          </a>
+                                    </a>
+                                  ) : (
+                                    <div
+                                      key={game.discord_message_id}
+                                      className={cn(
+                                        'flex flex-col gap-1 rounded-box border border-base-200 bg-base-100/80 px-2 py-1 text-[11px] shadow-sm',
+                                        isPast && 'opacity-60 grayscale-[0.2]',
+                                      )}
+                                      title={game.content ?? undefined}
+                                    >
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {tierKey ? (
+                                          <span className="flex items-center">
+                                            <LogoTier tier={tierKey} width={12} />
+                                          </span>
                                         ) : null}
+                                        <span className="text-[12px] font-semibold">{game.title}</span>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-1 text-[10px] text-base-content/60">
+                                        <span>{dateLine}</span>
+                                        {postedDate ? <span>· posted {postedDate}</span> : null}
+                                        <span className="text-base-content/40">·</span>
+                                        <div className="flex items-center gap-1">
+                                          <div className="avatar">
+                                            <div className="w-4 rounded-full bg-base-200">
+                                              {game.avatarUrl ? (
+                                                <img src={game.avatarUrl} alt={game.authorName} />
+                                              ) : (
+                                                <span className="text-[10px] font-semibold text-base-content/70">
+                                                  {getInitials(game.authorName)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <span className="text-base-content/70">{game.authorName}</span>
+                                        </div>
+                                        <span
+                                          className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
+                                          title={`Parse confidence: ${confidence.toFixed(2)}`}
+                                        />
                                       </div>
                                     </div>
                                   )
                                 })}
                               </div>
                             </div>
-                          ))
+                          )})
                         )}
                       </div>
                     ))}

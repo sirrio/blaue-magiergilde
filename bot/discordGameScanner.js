@@ -135,8 +135,12 @@ function formatDateTime(dateParts, timeParts) {
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
         return null;
     }
+    const normalized = new Date(year, month - 1, day, hour, minute);
+    if (Number.isNaN(normalized.getTime())) {
+        return null;
+    }
     const padded = (value) => String(value).padStart(2, '0');
-    return `${year}-${padded(month)}-${padded(day)} ${padded(hour)}:${padded(minute)}:00`;
+    return `${normalized.getFullYear()}-${padded(normalized.getMonth() + 1)}-${padded(normalized.getDate())} ${padded(normalized.getHours())}:${padded(normalized.getMinutes())}:00`;
 }
 
 function calculateConfidence({ hasTier, dateExplicit, timeExplicit }) {
