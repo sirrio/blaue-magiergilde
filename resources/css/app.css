@@ -27,6 +27,74 @@
 }
 
 @layer components {
+  .text-spell-abjuration {
+    color: #2563eb;
+  }
+
+  .text-spell-conjuration {
+    color: #d97706;
+  }
+
+  .text-spell-divination {
+    color: #475569;
+  }
+
+  .text-spell-enchantment {
+    color: #db2777;
+  }
+
+  .text-spell-evocation {
+    color: #dc2626;
+  }
+
+  .text-spell-illusion {
+    color: #7c3aed;
+  }
+
+  .text-spell-necromancy {
+    color: #16a34a;
+  }
+
+  .text-spell-transmutation {
+    color: #ea580c;
+  }
+
+  .text-rarity-common {
+    color: #9ca3af;
+  }
+
+  .text-rarity-uncommon {
+    color: #22c55e;
+  }
+
+  .text-rarity-rare {
+    color: #3b82f6;
+  }
+
+  .text-rarity-very-rare {
+    color: #a855f7;
+  }
+
+  .text-tier-bt {
+    color: #cd7f32;
+  }
+
+  .text-tier-lt {
+    color: #c0c0c0;
+  }
+
+  .text-tier-ht {
+    color: #d4af37;
+  }
+
+  .text-tier-et {
+    color: #8b5cf6;
+  }
+
+  .text-tier-filler {
+    color: #1f2937;
+  }
+
   .torn-mask {
     clip-path: polygon(
       0 0,

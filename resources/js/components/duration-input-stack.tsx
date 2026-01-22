@@ -93,7 +93,11 @@ const DurationInputStack = ({
             </Button>
           </div>
         </div>
-        {errors && <p className="fieldset-label text-error">{errors}</p>}
+        {errors ? (
+          <label className="label pt-1">
+            <span className="label-text-alt text-error">{errors}</span>
+          </label>
+        ) : null}
       </div>
     )
   }
@@ -123,7 +127,11 @@ const DurationInputStack = ({
       >
         Duration (hh:mm)
       </Input>
-      {errors && <p className="fieldset-label text-error">{errors}</p>}
+      {errors ? (
+        <label className="label pt-1">
+          <span className="label-text-alt text-error">{errors}</span>
+        </label>
+      ) : null}
     </div>
   )
 }

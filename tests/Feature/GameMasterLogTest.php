@@ -6,6 +6,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+test('users can view the game master log', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('game-master-log.index'));
+
+    $response->assertSuccessful();
+});
+
 test('users can update games without creating new records', function () {
     $user = User::factory()->create();
     $game = Game::factory()->create(['user_id' => $user->id]);

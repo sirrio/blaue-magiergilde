@@ -366,7 +366,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </main>
       {betaNoticeEnabled ? (
         <div className="toast toast-start toast-bottom z-40">
-          <div className="alert alert-warning text-xs">
+          <div role="alert" className="alert alert-warning text-xs">
             Beta: data is not live and can be used for testing.
           </div>
         </div>

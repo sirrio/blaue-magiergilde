@@ -20,10 +20,10 @@ const rarityLabels: Record<string, string> = {
 }
 
 const rarityColors: Record<string, string> = {
-  common: 'text-gray-700',
-  uncommon: 'text-green-700',
-  rare: 'text-blue-700',
-  very_rare: 'text-purple-700',
+  common: 'text-rarity-common',
+  uncommon: 'text-rarity-uncommon',
+  rare: 'text-rarity-rare',
+  very_rare: 'text-rarity-very-rare',
 }
 
 const typeIcons: Record<string, JSX.Element> = {

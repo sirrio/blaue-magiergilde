@@ -412,7 +412,9 @@ export default function DiscordChannelPickerModal({
                             <input
                               type={mode === 'single' ? 'radio' : 'checkbox'}
                               name={mode === 'single' ? 'discord-channel-picker' : undefined}
-                              className={cn('checkbox', mode === 'single' ? 'radio-xs' : 'checkbox-xs')}
+                              className={cn(
+                                mode === 'single' ? 'radio radio-xs' : 'checkbox checkbox-xs',
+                              )}
                               checked={checked}
                               onChange={() => {
                                 if (mode === 'single') {

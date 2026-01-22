@@ -264,13 +264,20 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     declined: 'Declined',
     retired: 'Retired',
   }
-  const tierLabelMap: Record<string, string> = {
-    bt: 'BT',
-    lt: 'LT',
-    ht: 'HT',
-    et: 'ET',
-    filler: 'Filler',
-  }
+const tierLabelMap: Record<string, string> = {
+  bt: 'BT',
+  lt: 'LT',
+  ht: 'HT',
+  et: 'ET',
+  filler: 'Filler',
+}
+const tierTextClassMap: Record<string, string> = {
+  bt: 'text-tier-bt',
+  lt: 'text-tier-lt',
+  ht: 'text-tier-ht',
+  et: 'text-tier-et',
+  filler: 'text-tier-filler',
+}
   const discordLabelMap: Record<string, string> = {
     only: 'Discord Only',
     none: 'No Discord',
@@ -395,11 +402,14 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
                             <div className="flex min-w-0 flex-col">
                               <a
                                 href={character.external_link}
-                                className="flex min-w-0 items-center gap-2 text-sm link"
+                                className="flex min-w-0 items-center gap-2 text-sm hover:text-primary"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                <span className="truncate">{character.name}</span>
+                                <span className={cn('truncate', tierTextClassMap[currentTier] ?? 'text-base-content')}>
+                                  {character.name}
+                                </span>
+                                <ExternalLink size={12} className="shrink-0 text-base-content/50" />
                               </a>
                               {characterNotes ? (
                                 <span className="max-w-xs truncate text-xs text-base-content/60" title={characterNotes}>
