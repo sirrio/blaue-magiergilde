@@ -234,6 +234,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_coins,
                 c.bubble_shop_spend,
                 c.is_filler,
+                c.guild_status,
                 u.simplified_tracking,
                 u.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
