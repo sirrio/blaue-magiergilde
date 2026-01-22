@@ -154,6 +154,14 @@ function parseAnnouncement(message) {
     const dateParts = extractDate(content, fallbackDate);
     const timeParts = extractTime(content, fallbackDate);
     const startsAt = formatDateTime(dateParts, timeParts);
+    const memberAvatar =
+        typeof message?.member?.displayAvatarURL === 'function'
+            ? message.member.displayAvatarURL({ extension: 'png', size: 128 })
+            : null;
+    const authorAvatar =
+        typeof message?.author?.displayAvatarURL === 'function'
+            ? message.author.displayAvatarURL({ extension: 'png', size: 128 })
+            : null;
 
     if (!tier || !startsAt) {
         return null;
@@ -164,6 +172,7 @@ function parseAnnouncement(message) {
         discord_message_id: String(message.id),
         discord_author_id: message.author?.id ? String(message.author.id) : null,
         discord_author_name: message.member?.displayName || message.author?.username || null,
+        discord_author_avatar_url: memberAvatar || authorAvatar,
         title: extractTitle(content),
         content,
         tier,

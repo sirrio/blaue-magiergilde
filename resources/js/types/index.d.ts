@@ -421,6 +421,7 @@ export interface GameAnnouncement {
   discord_message_id: string
   discord_author_id?: string | null
   discord_author_name?: string | null
+  discord_author_avatar_url?: string | null
   title?: string | null
   content?: string | null
   tier?: 'bt' | 'lt' | 'ht' | 'et' | string | null

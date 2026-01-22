@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class GameAnnouncement extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'discord_channel_id',
         'discord_message_id',
         'discord_author_id',
         'discord_author_name',
+        'discord_author_avatar_url',
         'title',
         'content',
         'tier',
