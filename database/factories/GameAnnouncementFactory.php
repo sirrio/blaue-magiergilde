@@ -18,6 +18,7 @@ class GameAnnouncementFactory extends Factory
     {
         return [
             'discord_channel_id' => (string) $this->faker->numberBetween(100000000000000000, 999999999999999999),
+            'discord_guild_id' => (string) $this->faker->numberBetween(100000000000000000, 999999999999999999),
             'discord_message_id' => (string) $this->faker->unique()->numberBetween(100000000000000000, 999999999999999999),
             'discord_author_id' => (string) $this->faker->numberBetween(100000000000000000, 999999999999999999),
             'discord_author_name' => $this->faker->userName(),

@@ -16,7 +16,10 @@ type InputProps = {
   max?: number,
   step?: number,
   ref?: React.RefObject<HTMLInputElement>,
-  className?: string
+  className?: string,
+  inputClassName?: string,
+  labelClassName?: string,
+  hideLabel?: boolean
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -34,7 +37,10 @@ export const Input: React.FC<InputProps> = ({
                                               max,
                                               step,
                                               ref,
-                                              className
+                                              className,
+                                              inputClassName,
+                                              labelClassName,
+                                              hideLabel
                                               }) => {
   const generatedId = useId()
   const inputId = id ?? generatedId
@@ -48,8 +54,10 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <div className={cn('w-full relative', className)}>
-      <label className={'label'} htmlFor={inputId}>{children}</label>
-      <input className={'input w-full'}
+      <label className={cn('label', hideLabel && 'sr-only', labelClassName)} htmlFor={inputId}>
+        {children}
+      </label>
+      <input className={cn('input w-full', inputClassName)}
              ref={ref}
              id={inputId}
              type={type}

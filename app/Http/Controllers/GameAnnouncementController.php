@@ -19,6 +19,7 @@ class GameAnnouncementController extends Controller
                 return [
                     'id' => $game->id,
                     'discord_channel_id' => $game->discord_channel_id,
+                    'discord_guild_id' => $game->discord_guild_id,
                     'discord_message_id' => $game->discord_message_id,
                     'discord_author_id' => $game->discord_author_id,
                     'discord_author_name' => $game->discord_author_name,
