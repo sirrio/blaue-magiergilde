@@ -418,6 +418,7 @@ export interface Game {
 export interface GameAnnouncement {
   id: number
   discord_channel_id: string
+  discord_guild_id?: string | null
   discord_message_id: string
   discord_author_id?: string | null
   discord_author_name?: string | null

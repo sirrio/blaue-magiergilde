@@ -169,6 +169,7 @@ function parseAnnouncement(message) {
 
     return {
         discord_channel_id: String(message.channelId),
+        discord_guild_id: message.guildId ? String(message.guildId) : null,
         discord_message_id: String(message.id),
         discord_author_id: message.author?.id ? String(message.author.id) : null,
         discord_author_name: message.member?.displayName || message.author?.username || null,

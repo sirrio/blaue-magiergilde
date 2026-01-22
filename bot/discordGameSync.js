@@ -41,6 +41,7 @@ async function syncGameAnnouncements(client) {
         .filter(game => game && game.discord_message_id)
         .map(game => ({
             discord_channel_id: String(game.discord_channel_id || channelId),
+            discord_guild_id: game.discord_guild_id || null,
             discord_message_id: String(game.discord_message_id),
             discord_author_id: game.discord_author_id || null,
             discord_author_name: game.discord_author_name || null,
@@ -60,10 +61,11 @@ async function syncGameAnnouncements(client) {
     }
 
     const placeholders = rows
-        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .join(', ');
     const values = rows.flatMap(row => [
         row.discord_channel_id,
+        row.discord_guild_id,
         row.discord_message_id,
         row.discord_author_id,
         row.discord_author_name,
@@ -81,6 +83,7 @@ async function syncGameAnnouncements(client) {
     const sql = `
         INSERT INTO game_announcements (
             discord_channel_id,
+            discord_guild_id,
             discord_message_id,
             discord_author_id,
             discord_author_name,
@@ -97,6 +100,7 @@ async function syncGameAnnouncements(client) {
         VALUES ${placeholders}
         ON DUPLICATE KEY UPDATE
             discord_channel_id = VALUES(discord_channel_id),
+            discord_guild_id = VALUES(discord_guild_id),
             discord_author_id = VALUES(discord_author_id),
             discord_author_name = VALUES(discord_author_name),
             discord_author_avatar_url = VALUES(discord_author_avatar_url),

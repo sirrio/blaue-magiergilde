@@ -11,6 +11,7 @@ class GameAnnouncement extends Model
 
     protected $fillable = [
         'discord_channel_id',
+        'discord_guild_id',
         'discord_message_id',
         'discord_author_id',
         'discord_author_name',
