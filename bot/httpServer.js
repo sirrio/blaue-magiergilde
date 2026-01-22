@@ -4,6 +4,7 @@ const { postAuctionToChannel } = require('./auctionPoster');
 const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
+const { scanGameAnnouncements } = require('./discordGameScanner');
 const { getSnapshot } = require('./voiceStateCache');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
 
@@ -110,6 +111,7 @@ function startHttpServer(client) {
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isDiscordOwnersStatus = path === '/discord-owners/status';
+        const isDiscordGames = path === '/discord-games';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isBackstockPost = path === '/backstock-post';
@@ -123,6 +125,7 @@ function startHttpServer(client) {
             isDiscordThreads ||
             isDiscordBackupStatus ||
             isDiscordBackupChannel ||
+            isDiscordGames ||
             isShopPost ||
             isShopUpdate ||
             isBackstockPost ||
@@ -249,6 +252,34 @@ function startHttpServer(client) {
             } catch (error) {
                 logReject(req, 'failed to list threads');
                 respondJson(res, 500, { error: 'Failed to list threads.' });
+            }
+            return;
+        }
+
+        if (isDiscordGames) {
+            const channelId = String(payload?.channel_id || '').trim();
+            if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+                logReject(req, 'invalid channel_id');
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            try {
+                const result = await scanGameAnnouncements(client, {
+                    channelId,
+                    since: payload?.since || null,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'games scan failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Failed to scan games.' });
+                    return;
+                }
+
+                respondJson(res, 200, { games: result.games });
+            } catch (error) {
+                logReject(req, 'games scan failed');
+                respondJson(res, 500, { error: 'Failed to scan games.' });
             }
             return;
         }

@@ -415,6 +415,20 @@ export interface Game {
   user_id: number
 }
 
+export interface GameAnnouncement {
+  id: number
+  discord_channel_id: string
+  discord_message_id: string
+  discord_author_id?: string | null
+  discord_author_name?: string | null
+  title?: string | null
+  content?: string | null
+  tier?: 'bt' | 'lt' | 'ht' | 'et' | string | null
+  starts_at?: string | null
+  posted_at?: string | null
+  confidence?: number
+}
+
 export interface SharedData {
   name: string
   quote: { message: string; author: string }

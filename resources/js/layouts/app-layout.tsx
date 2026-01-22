@@ -4,6 +4,7 @@ import { Link, usePage } from '@inertiajs/react'
 import {
   Archive,
   BookOpen,
+  CalendarDays,
   Gavel,
   Map,
   Menu,
@@ -29,6 +30,7 @@ const menuLinks = [
   { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
   { name: 'Game Master Log', route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
   { name: 'Rooms', route: 'rooms.index', method: 'get' as const, icon: Map },
+  { name: 'Games', route: 'games.index', method: 'get' as const, icon: CalendarDays },
   { name: 'Guild Handbook', route: 'handbook.index', method: 'get' as const, icon: BookOpen },
 ]
 
