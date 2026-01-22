@@ -106,9 +106,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
   const enrichedGames = useMemo(() => {
     return games.map((game) => {
       const startsParts = parseGameDateParts(game.starts_at)
-      const fallbackParts = parseGameDateParts(game.posted_at)
-      const effectiveParts = startsParts ?? fallbackParts
-      const startsDate = buildDateFromParts(effectiveParts)
+      const startsDate = buildDateFromParts(startsParts)
       const authorName = game.discord_author_name?.trim() || 'Unknown'
       const avatarUrl = game.discord_author_avatar_url?.trim() || null
       const title = game.title?.trim() || 'Untitled game'
@@ -123,7 +121,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
 
       return {
         ...game,
-        startsParts: effectiveParts,
+        startsParts,
         startsDate,
         authorName,
         avatarUrl,
@@ -193,13 +191,17 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
     weekStart,
   ])
 
-  const { upcomingGames, pastGames } = useMemo(() => {
-    const now = new Date()
-    const upcoming = filteredGames.filter((game) => game.startsDate && game.startsDate >= now)
-    const past = filteredGames.filter((game) => !game.startsDate || game.startsDate < now)
-    upcoming.sort((a, b) => (a.startsDate?.getTime() ?? 0) - (b.startsDate?.getTime() ?? 0))
-    past.sort((a, b) => (b.startsDate?.getTime() ?? 0) - (a.startsDate?.getTime() ?? 0))
-    return { upcomingGames: upcoming, pastGames: past }
+  const sortedGames = useMemo(() => {
+    const items = [...filteredGames]
+    items.sort((a, b) => {
+      const aTime = a.startsDate?.getTime()
+      const bTime = b.startsDate?.getTime()
+      if (aTime == null && bTime == null) return 0
+      if (aTime == null) return 1
+      if (bTime == null) return -1
+      return bTime - aTime
+    })
+    return items
   }, [filteredGames])
 
   const buildGroupedGames = (list: typeof filteredGames) => {
@@ -463,33 +465,13 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {[
-                      { label: 'Upcoming', games: upcomingGames },
-                      { label: 'Past', games: pastGames },
-                    ].map((section) => (
-                      <div key={section.label} className="flex flex-col gap-2">
-                        <div className="sticky top-14 z-10 flex items-center justify-between rounded-box bg-base-100/90 px-2 py-0.5 backdrop-blur">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-base-content/70">
-                            {section.label}
-                          </span>
-                          <span className="text-[10px] text-base-content/60">{section.games.length} games</span>
-                        </div>
-                        {section.games.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-6 text-center text-sm text-base-content/70">
-                            No {section.label.toLowerCase()} announcements yet.
-                          </div>
-                        ) : (
-                          buildGroupedGames(section.games).map((group) => {
-                            const isPastGroup = section.label === 'Past'
-
-                            return (
+                    {buildGroupedGames(sortedGames).map((group) => {
+                      return (
                             <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
                               <div
                                 className={cn(
                                   'flex min-w-[88px] items-center justify-center rounded-md px-1.5 py-0.5 text-center text-[11px] leading-tight',
-                                  isPastGroup
-                                    ? 'bg-base-200/50 text-base-content/60'
-                                    : 'bg-primary/10 text-base-content/80',
+                                  'bg-primary/10 text-base-content/80',
                                 )}
                               >
                                 {group.label ? (
@@ -502,6 +484,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                               </div>
                               <div className="flex flex-col gap-1">
                                 {group.entries.map((game) => {
+                                  const now = new Date()
                                   const tierKey = game.tier?.toLowerCase() ?? ''
                                   const startsDate = formatCompactDate(game.starts_at)
                                   const postedDate = formatCompactDate(game.posted_at)
@@ -512,7 +495,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                                       ? `${startsDate} · ${game.timeLabel}`
                                       : startsDate
                                     : 'TBD'
-                                  const isPast = section.label === 'Past'
+                                  const isPast = game.startsDate ? game.startsDate < now : true
 
                                   return game.discordUrl ? (
                                     <a
@@ -603,10 +586,8 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                                 })}
                               </div>
                             </div>
-                          )})
-                        )}
-                      </div>
-                    ))}
+                          )
+                    })}
                   </div>
                 )}
               </>
