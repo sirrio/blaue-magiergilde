@@ -43,32 +43,129 @@ function parseRelativeDate(content, fallbackDate) {
     return null;
 }
 
-function extractDate(content, fallbackDate) {
-    const isoMatch = String(content || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (isoMatch) {
-        return {
-            year: Number(isoMatch[1]),
-            month: Number(isoMatch[2]),
-            day: Number(isoMatch[3]),
-            explicit: true,
-        };
+function sanitizeDateInput(content) {
+    return String(content || '')
+        .replace(/https?:\/\/\S+/gi, ' ')
+        .replace(/<:MG_[A-Z0-9_]+:\d+>/gi, ' ')
+        .replace(/:MG_[A-Z0-9_]+~?\d*:/gi, ' ')
+        .replace(/<@&\d+>/g, ' ')
+        .replace(/<@\d+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
+    if (!Number.isFinite(day) || !Number.isFinite(month)) {
+        return null;
+    }
+    if (day < 1 || day > 31 || month < 1 || month > 12) {
+        return null;
     }
 
-    const dateMatch = String(content || '').match(/(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?/);
-    if (dateMatch) {
+    let resolvedYear = hasYear ? year : fallbackDate?.getFullYear();
+    if (!Number.isFinite(resolvedYear)) {
+        return null;
+    }
+    if (resolvedYear < 100) {
+        resolvedYear += 2000;
+    }
+
+    if (!hasYear && fallbackDate) {
+        const candidate = new Date(resolvedYear, month - 1, day);
+        const deltaDays = Math.round((candidate - fallbackDate) / (1000 * 60 * 60 * 24));
+        if (deltaDays > 14) {
+            resolvedYear -= 1;
+        }
+    }
+
+    return {
+        year: resolvedYear,
+        month,
+        day,
+        explicit: Boolean(hasYear),
+    };
+}
+
+function extractDate(content, fallbackDate) {
+    const sanitized = sanitizeDateInput(content);
+    const isoMatch = sanitized.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+        return resolveInferredYear(
+            {
+                day: Number(isoMatch[3]),
+                month: Number(isoMatch[2]),
+                year: Number(isoMatch[1]),
+                hasYear: true,
+            },
+            fallbackDate
+        );
+    }
+
+    const monthNameMatch = sanitized.match(
+        /(\d{1,2})\s*[.\-/]?\s*(januar|jänner|jan|februar|feb|märz|maerz|marz|april|mai|juni|juli|august|september|sept|oktober|okt|november|nov|dezember|dez)(?:\s*(\d{2,4}))?/i
+    );
+    if (monthNameMatch) {
+        const monthMap = {
+            januar: 1,
+            jänner: 1,
+            jan: 1,
+            februar: 2,
+            feb: 2,
+            märz: 3,
+            maerz: 3,
+            marz: 3,
+            april: 4,
+            mai: 5,
+            juni: 6,
+            juli: 7,
+            august: 8,
+            september: 9,
+            sept: 9,
+            oktober: 10,
+            okt: 10,
+            november: 11,
+            nov: 11,
+            dezember: 12,
+            dez: 12,
+        };
+        const day = Number(monthNameMatch[1]);
+        const monthKey = monthNameMatch[2].toLowerCase();
+        const month = monthMap[monthKey];
+        const year = monthNameMatch[3] ? Number(monthNameMatch[3]) : undefined;
+        return resolveInferredYear(
+            {
+                day,
+                month,
+                year,
+                hasYear: Boolean(monthNameMatch[3]),
+            },
+            fallbackDate
+        );
+    }
+
+    const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.\-]\s*(\d{1,2})(?:\s*[.\-]\s*(\d{2,4}))?/g);
+    for (const dateMatch of dateMatches) {
         const day = Number(dateMatch[1]);
         const month = Number(dateMatch[2]);
-        let year = dateMatch[3] ? Number(dateMatch[3]) : fallbackDate?.getFullYear();
-        if (!Number.isFinite(year)) {
-            return null;
+        let hasYear = Boolean(dateMatch[3]);
+        let year = dateMatch[3] ? Number(dateMatch[3]) : undefined;
+        if (hasYear && dateMatch.index != null) {
+            const tail = sanitized.slice(dateMatch.index + dateMatch[0].length).trimStart();
+            if (Number.isFinite(year) && year <= 24 && /^(:|uhr\b|Uhr\b)/.test(tail)) {
+                hasYear = false;
+                year = undefined;
+            }
         }
-        if (year < 100) {
-            year += 2000;
+        const resolved = resolveInferredYear(
+            { day, month, year, hasYear },
+            fallbackDate
+        );
+        if (resolved) {
+            return resolved;
         }
-        return { year, month, day, explicit: true };
     }
 
-    const relative = parseRelativeDate(content, fallbackDate);
+    const relative = parseRelativeDate(sanitized, fallbackDate);
     if (relative) {
         return {
             year: relative.getFullYear(),
@@ -91,7 +188,7 @@ function extractDate(content, fallbackDate) {
 }
 
 function extractTime(content, fallbackDate) {
-    const source = String(content || '');
+    const source = sanitizeDateInput(content);
     const sanitized = source
         .replace(/<:MG_[A-Z]+:\d+>/gi, ' ')
         .replace(/:MG_[A-Z]+~?\d*:/gi, ' ');
