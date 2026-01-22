@@ -19,6 +19,7 @@ require __DIR__.'/web/ally.php';
 require __DIR__.'/web/character.php';
 require __DIR__.'/web/downtime.php';
 require __DIR__.'/web/game.php';
+require __DIR__.'/web/games.php';
 require __DIR__.'/web/item.php';
 require __DIR__.'/web/spell.php';
 require __DIR__.'/web/shop.php';
