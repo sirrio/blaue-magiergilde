@@ -102,6 +102,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
   const [weekFilter, setWeekFilter] = useState<'all' | 'this_week' | 'next_week' | 'last_week'>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const todayKey = buildDateKey(new Date())
 
   const enrichedGames = useMemo(() => {
     return games.map((game) => {
@@ -210,6 +211,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
       {
         key: string
         label: ReturnType<typeof buildDateLabel> | null
+        isToday: boolean
         entries: typeof filteredGames
       }
     >()
@@ -220,6 +222,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
         groups.set(dateKey, {
           key: dateKey,
           label: game.startsDate ? buildDateLabel(game.startsDate) : null,
+          isToday: dateKey === todayKey,
           entries: [],
         })
       }
@@ -467,11 +470,13 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                   <div className="flex flex-col gap-3">
                     {buildGroupedGames(sortedGames).map((group) => {
                       return (
-                            <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
+                          <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
                               <div
                                 className={cn(
                                   'flex min-w-[88px] items-center justify-center rounded-md px-1.5 py-0.5 text-center text-[11px] leading-tight',
-                                  'bg-primary/10 text-base-content/80',
+                                  group.isToday
+                                    ? 'bg-primary text-primary-content shadow-sm'
+                                    : 'bg-primary/10 text-base-content/80',
                                 )}
                               >
                                 {group.label ? (
