@@ -1,12 +1,13 @@
 import AppLayout from '@/layouts/app-layout'
 import LogoTier from '@/components/logo-tier'
+import DiscordIcon from '@/components/discord-icon'
 import { Card, CardBody } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
 import type { GameAnnouncement } from '@/types'
 import { Head } from '@inertiajs/react'
-import { CalendarRange, LayoutGrid, List as ListIcon } from 'lucide-react'
+import { CalendarRange, LayoutGrid, List as ListIcon, SquareArrowOutUpRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 interface Props {
@@ -102,13 +103,12 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
   const [weekFilter, setWeekFilter] = useState<'all' | 'this_week' | 'next_week' | 'last_week'>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const todayKey = buildDateKey(new Date())
 
   const enrichedGames = useMemo(() => {
     return games.map((game) => {
       const startsParts = parseGameDateParts(game.starts_at)
-      const fallbackParts = parseGameDateParts(game.posted_at)
-      const effectiveParts = startsParts ?? fallbackParts
-      const startsDate = buildDateFromParts(effectiveParts)
+      const startsDate = buildDateFromParts(startsParts)
       const authorName = game.discord_author_name?.trim() || 'Unknown'
       const avatarUrl = game.discord_author_avatar_url?.trim() || null
       const title = game.title?.trim() || 'Untitled game'
@@ -120,16 +120,21 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
         game.discord_guild_id && game.discord_channel_id && game.discord_message_id
           ? `https://discord.com/channels/${game.discord_guild_id}/${game.discord_channel_id}/${game.discord_message_id}`
           : null
+      const discordAppUrl =
+        game.discord_guild_id && game.discord_channel_id && game.discord_message_id
+          ? `discord://-/channels/${game.discord_guild_id}/${game.discord_channel_id}/${game.discord_message_id}`
+          : null
 
       return {
         ...game,
-        startsParts: effectiveParts,
+        startsParts,
         startsDate,
         authorName,
         avatarUrl,
         title,
         timeLabel,
         discordUrl,
+        discordAppUrl,
       }
     })
   }, [games])
@@ -193,13 +198,17 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
     weekStart,
   ])
 
-  const { upcomingGames, pastGames } = useMemo(() => {
-    const now = new Date()
-    const upcoming = filteredGames.filter((game) => game.startsDate && game.startsDate >= now)
-    const past = filteredGames.filter((game) => !game.startsDate || game.startsDate < now)
-    upcoming.sort((a, b) => (a.startsDate?.getTime() ?? 0) - (b.startsDate?.getTime() ?? 0))
-    past.sort((a, b) => (b.startsDate?.getTime() ?? 0) - (a.startsDate?.getTime() ?? 0))
-    return { upcomingGames: upcoming, pastGames: past }
+  const sortedGames = useMemo(() => {
+    const items = [...filteredGames]
+    items.sort((a, b) => {
+      const aTime = a.startsDate?.getTime()
+      const bTime = b.startsDate?.getTime()
+      if (aTime == null && bTime == null) return 0
+      if (aTime == null) return 1
+      if (bTime == null) return -1
+      return bTime - aTime
+    })
+    return items
   }, [filteredGames])
 
   const buildGroupedGames = (list: typeof filteredGames) => {
@@ -208,6 +217,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
       {
         key: string
         label: ReturnType<typeof buildDateLabel> | null
+        isToday: boolean
         entries: typeof filteredGames
       }
     >()
@@ -218,6 +228,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
         groups.set(dateKey, {
           key: dateKey,
           label: game.startsDate ? buildDateLabel(game.startsDate) : null,
+          isToday: dateKey === todayKey,
           entries: [],
         })
       }
@@ -463,32 +474,14 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {[
-                      { label: 'Upcoming', games: upcomingGames },
-                      { label: 'Past', games: pastGames },
-                    ].map((section) => (
-                      <div key={section.label} className="flex flex-col gap-2">
-                        <div className="sticky top-14 z-10 flex items-center justify-between rounded-box bg-base-100/90 px-2 py-0.5 backdrop-blur">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-base-content/70">
-                            {section.label}
-                          </span>
-                          <span className="text-[10px] text-base-content/60">{section.games.length} games</span>
-                        </div>
-                        {section.games.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-6 text-center text-sm text-base-content/70">
-                            No {section.label.toLowerCase()} announcements yet.
-                          </div>
-                        ) : (
-                          buildGroupedGames(section.games).map((group) => {
-                            const isPastGroup = section.label === 'Past'
-
-                            return (
-                            <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
+                    {buildGroupedGames(sortedGames).map((group) => {
+                      return (
+                          <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
                               <div
                                 className={cn(
                                   'flex min-w-[88px] items-center justify-center rounded-md px-1.5 py-0.5 text-center text-[11px] leading-tight',
-                                  isPastGroup
-                                    ? 'bg-base-200/50 text-base-content/60'
+                                  group.isToday
+                                    ? 'bg-primary text-primary-content shadow-sm'
                                     : 'bg-primary/10 text-base-content/80',
                                 )}
                               >
@@ -502,6 +495,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                               </div>
                               <div className="flex flex-col gap-1">
                                 {group.entries.map((game) => {
+                                  const now = new Date()
                                   const tierKey = game.tier?.toLowerCase() ?? ''
                                   const startsDate = formatCompactDate(game.starts_at)
                                   const postedDate = formatCompactDate(game.posted_at)
@@ -512,101 +506,81 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                                       ? `${startsDate} · ${game.timeLabel}`
                                       : startsDate
                                     : 'TBD'
-                                  const isPast = section.label === 'Past'
+                                  const isPast = game.startsDate ? game.startsDate < now : true
 
-                                  return game.discordUrl ? (
-                                    <a
+                                  return (
+                                    <div
                                       key={game.discord_message_id}
                                       className={cn(
                                         'group flex flex-col gap-1 rounded-box border border-base-200 bg-base-100/80 px-2 py-1 text-[11px] shadow-sm transition hover:border-base-300 hover:bg-base-100',
                                         isPast && 'opacity-60 grayscale-[0.2]',
                                       )}
                                       title={game.content ?? undefined}
-                                      href={game.discordUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
                                     >
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {tierKey ? (
-                                          <span className="flex items-center">
-                                            <LogoTier tier={tierKey} width={12} />
-                                          </span>
-                                        ) : null}
-                                        <span className="text-[12px] font-semibold">{game.title}</span>
-                                      </div>
-                                      <div className="flex flex-wrap items-center gap-1 text-[10px] text-base-content/60">
-                                        <span>{dateLine}</span>
-                                        {postedDate ? <span>· posted {postedDate}</span> : null}
-                                        <span className="text-base-content/40">·</span>
-                                        <div className="flex items-center gap-1">
-                                          <div className="avatar">
-                                            <div className="w-4 rounded-full bg-base-200">
-                                              {game.avatarUrl ? (
-                                                <img src={game.avatarUrl} alt={game.authorName} />
-                                              ) : (
-                                                <span className="text-[10px] font-semibold text-base-content/70">
-                                                  {getInitials(game.authorName)}
-                                                </span>
-                                              )}
-                                            </div>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {tierKey ? (
+                                              <span className="flex items-center">
+                                                <LogoTier tier={tierKey} width={12} />
+                                              </span>
+                                            ) : null}
+                                            <span className="text-[12px] font-semibold">{game.title}</span>
                                           </div>
-                                          <span className="text-base-content/70">{game.authorName}</span>
-                                        </div>
-                                        <span
-                                          className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
-                                          title={`Parse confidence: ${confidence.toFixed(2)}`}
-                                        />
-                                      </div>
-                                    </a>
-                                  ) : (
-                                    <div
-                                      key={game.discord_message_id}
-                                      className={cn(
-                                        'flex flex-col gap-1 rounded-box border border-base-200 bg-base-100/80 px-2 py-1 text-[11px] shadow-sm',
-                                        isPast && 'opacity-60 grayscale-[0.2]',
-                                      )}
-                                      title={game.content ?? undefined}
-                                    >
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {tierKey ? (
-                                          <span className="flex items-center">
-                                            <LogoTier tier={tierKey} width={12} />
-                                          </span>
-                                        ) : null}
-                                        <span className="text-[12px] font-semibold">{game.title}</span>
-                                      </div>
-                                      <div className="flex flex-wrap items-center gap-1 text-[10px] text-base-content/60">
-                                        <span>{dateLine}</span>
-                                        {postedDate ? <span>· posted {postedDate}</span> : null}
-                                        <span className="text-base-content/40">·</span>
-                                        <div className="flex items-center gap-1">
-                                          <div className="avatar">
-                                            <div className="w-4 rounded-full bg-base-200">
-                                              {game.avatarUrl ? (
-                                                <img src={game.avatarUrl} alt={game.authorName} />
-                                              ) : (
-                                                <span className="text-[10px] font-semibold text-base-content/70">
-                                                  {getInitials(game.authorName)}
-                                                </span>
-                                              )}
+                                          <div className="flex flex-wrap items-center gap-1 text-[10px] text-base-content/60">
+                                            <span>{dateLine}</span>
+                                            {postedDate ? <span>· posted {postedDate}</span> : null}
+                                            <span className="text-base-content/40">·</span>
+                                            <div className="flex items-center gap-1">
+                                              <div className="avatar">
+                                                <div className="w-4 rounded-full bg-base-200">
+                                                  {game.avatarUrl ? (
+                                                    <img src={game.avatarUrl} alt={game.authorName} />
+                                                  ) : (
+                                                    <span className="text-[10px] font-semibold text-base-content/70">
+                                                      {getInitials(game.authorName)}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <span className="text-base-content/70">{game.authorName}</span>
                                             </div>
+                                            <span
+                                              className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
+                                              title={`Parse confidence: ${confidence.toFixed(2)}`}
+                                            />
                                           </div>
-                                          <span className="text-base-content/70">{game.authorName}</span>
                                         </div>
-                                        <span
-                                          className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
-                                          title={`Parse confidence: ${confidence.toFixed(2)}`}
-                                        />
+                                        <div className="flex items-center gap-1">
+                                          {game.discordAppUrl ? (
+                                            <a
+                                              href={game.discordAppUrl}
+                                              className="btn btn-ghost btn-xs px-1"
+                                              title="Open in Discord app"
+                                            >
+                                              <DiscordIcon width={14} />
+                                            </a>
+                                          ) : null}
+                                          {game.discordUrl ? (
+                                            <a
+                                              href={game.discordUrl}
+                                              className="btn btn-ghost btn-xs px-1"
+                                              title="Open in browser"
+                                              target="_blank"
+                                              rel="noreferrer"
+                                            >
+                                              <SquareArrowOutUpRight size={12} />
+                                            </a>
+                                          ) : null}
+                                        </div>
                                       </div>
                                     </div>
                                   )
                                 })}
                               </div>
                             </div>
-                          )})
-                        )}
-                      </div>
-                    ))}
+                          )
+                    })}
                   </div>
                 )}
               </>
