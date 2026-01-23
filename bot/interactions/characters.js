@@ -125,6 +125,9 @@ const {
     pendingDowntimeCreations,
 } = require('../state');
 
+const adventureCreationDefaults = new Map();
+const downtimeCreationDefaults = new Map();
+
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
 }
@@ -247,6 +250,14 @@ function clearAdventureCreationState(userId) {
     pendingAdventureCreations.delete(adventureCreationKey(userId));
 }
 
+function getAdventureCreationDefaults(userId) {
+    return adventureCreationDefaults.get(String(userId)) || {};
+}
+
+function setAdventureCreationDefaults(userId, defaults) {
+    adventureCreationDefaults.set(String(userId), defaults);
+}
+
 function downtimeCreationKey(userId) {
     return String(userId);
 }
@@ -263,7 +274,20 @@ function clearDowntimeCreationState(userId) {
     pendingDowntimeCreations.delete(downtimeCreationKey(userId));
 }
 
+function getDowntimeCreationDefaults(userId) {
+    return downtimeCreationDefaults.get(String(userId)) || {};
+}
+
+function setDowntimeCreationDefaults(userId, defaults) {
+    downtimeCreationDefaults.set(String(userId), defaults);
+}
+
 function createAdventureState({ ownerDiscordId, characterId, mode = 'create', adventureId = null }) {
+    const defaults = mode === 'create' ? getAdventureCreationDefaults(ownerDiscordId) : {};
+    const defaultDurationSeconds = Number.isFinite(defaults.durationSeconds) ? defaults.durationSeconds : 10800;
+    const defaultHasAdditionalBubble = typeof defaults.hasAdditionalBubble === 'boolean'
+        ? defaults.hasAdditionalBubble
+        : false;
     return {
         ownerDiscordId: String(ownerDiscordId),
         characterId: Number(characterId),
@@ -271,11 +295,11 @@ function createAdventureState({ ownerDiscordId, characterId, mode = 'create', ad
         adventureId: adventureId ? Number(adventureId) : null,
         step: 'duration',
         data: {
-            durationSeconds: 10800,
+            durationSeconds: defaultDurationSeconds,
             startDate: formatLocalIsoDate(),
             title: '',
             gameMaster: '',
-            hasAdditionalBubble: false,
+            hasAdditionalBubble: defaultHasAdditionalBubble,
             notes: '',
             allyIds: [],
             guildCharacterIds: [],
@@ -286,6 +310,9 @@ function createAdventureState({ ownerDiscordId, characterId, mode = 'create', ad
 }
 
 function createDowntimeState({ ownerDiscordId, characterId, mode = 'create', downtimeId = null }) {
+    const defaults = mode === 'create' ? getDowntimeCreationDefaults(ownerDiscordId) : {};
+    const defaultDurationSeconds = Number.isFinite(defaults.durationSeconds) ? defaults.durationSeconds : null;
+    const defaultType = typeof defaults.type === 'string' ? defaults.type : 'other';
     return {
         ownerDiscordId: String(ownerDiscordId),
         characterId: Number(characterId),
@@ -293,9 +320,9 @@ function createDowntimeState({ ownerDiscordId, characterId, mode = 'create', dow
         downtimeId: downtimeId ? Number(downtimeId) : null,
         step: 'duration',
         data: {
-            durationSeconds: null,
+            durationSeconds: defaultDurationSeconds,
             startDate: formatLocalIsoDate(),
-            type: 'other',
+            type: defaultType,
             notes: '',
         },
         promptMessage: null,
@@ -2768,6 +2795,12 @@ async function handle(interaction) {
             }
 
             const adventureId = isEdit ? Number(state.adventureId) : Number(result.id);
+            if (!isEdit) {
+                setAdventureCreationDefaults(ownerDiscordId, {
+                    durationSeconds: state.data.durationSeconds,
+                    hasAdditionalBubble: state.data.hasAdditionalBubble === true,
+                });
+            }
             clearAdventureCreationState(ownerDiscordId);
             setParticipantSearch(`create-${characterId}`, ownerDiscordId, '');
 
@@ -3341,6 +3374,12 @@ async function handle(interaction) {
             }
 
             const downtimeId = isEdit ? Number(state.downtimeId) : Number(result.id);
+            if (!isEdit) {
+                setDowntimeCreationDefaults(ownerDiscordId, {
+                    durationSeconds: state.data.durationSeconds,
+                    type: state.data.type,
+                });
+            }
             clearDowntimeCreationState(ownerDiscordId);
 
             await refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId });
