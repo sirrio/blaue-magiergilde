@@ -23,8 +23,11 @@ export const FileInput: React.FC<InputProps> = ({
              type={'file'}
              onChange={onChange}
       />
-      {errors && <p className={'fieldset-label text-error'}>{errors}</p>}
+      {errors ? (
+        <label className="label pt-1">
+          <span className="label-text-alt text-error">{errors}</span>
+        </label>
+      ) : null}
     </div>
   )
 }
-

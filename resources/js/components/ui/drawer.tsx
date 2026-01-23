@@ -65,7 +65,7 @@ export const Drawer = ({ children, isOpen: controlledOpen, onClose, wide = false
         ? ReactDOM.createPortal(
           <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
             <div
-              className="absolute inset-0 bg-black/30"
+              className="absolute inset-0 bg-base-300/70"
               onClick={(event) => {
                 if (event.target === event.currentTarget) {
                   closeDrawer()

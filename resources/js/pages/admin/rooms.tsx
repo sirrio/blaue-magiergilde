@@ -2051,8 +2051,8 @@ export default function Rooms({
                           isSelectedRoom
                             ? 'border-2 border-white shadow-[0_0_0_4px_rgba(255,255,255,0.35),0_0_12px_rgba(255,255,255,0.2),0_0_22px_rgba(255,255,255,0.12)]'
                             : isClickable
-                              ? 'border border-primary/40 text-foreground'
-                              : 'border border-base-200/40 text-muted-foreground/80',
+                              ? 'border border-primary/40 text-base-content'
+                              : 'border border-base-200/40 text-base-content/60',
                           isClickable ? 'cursor-pointer' : 'cursor-not-allowed',
                           'bg-transparent',
                         )}
@@ -2071,16 +2071,16 @@ export default function Rooms({
                       >
                         {isSelectedRoom ? (
                           <>
-                            <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-base-content shadow-md">
+                            <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-base-100 px-2 py-0.5 text-[10px] font-semibold text-base-content shadow-md">
                               <span className="flex items-center gap-1">
                                 {room.character?.avatar ? (
                                   <img
                                     src={resolveAvatarSrc(room.character?.avatar ?? undefined)}
                                     alt=""
-                                    className="h-4 w-4 rounded-full border border-white/70 object-cover"
+                                    className="h-4 w-4 rounded-full border border-base-200 object-cover"
                                   />
                                 ) : (
-                                  <span className="flex h-4 w-4 items-center justify-center rounded-full border border-white/70 bg-white/90 text-[9px] font-semibold text-primary">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full border border-base-200 bg-base-100 text-[9px] font-semibold text-primary">
                                     {getInitials(room.character?.name ?? room.name)}
                                   </span>
                                 )}

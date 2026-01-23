@@ -792,7 +792,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
               </List>
             </>
           ) : (
-            <p className="mt-4 text-center text-sm text-gray-500">
+            <p className="mt-4 text-center text-sm text-base-content/50">
               No games found{hasFilters ? ' for the current filters.' : '. Start by creating a new game!'}
             </p>
           )}

@@ -40,7 +40,11 @@ export const Select: React.FC<SelectProps> = ({
       <select className={cn('select w-full', className)} id={selectId} value={value} onChange={onChange}>
         {optionsElement}
       </select>
-      {errors && <p className={'fieldset-label text-error'}>{errors}</p>}
+      {errors ? (
+        <label className="label pt-1">
+          <span className="label-text-alt text-error">{errors}</span>
+        </label>
+      ) : null}
     </div>
   )
 }

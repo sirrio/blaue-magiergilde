@@ -41,7 +41,11 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         />
         <span className="label-text text-sm leading-5">{children}</span>
       </label>
-      {errors && <p className={'fieldset-label text-error'}>{errors}</p>}
+      {errors ? (
+        <label className="label pt-1">
+          <span className="label-text-alt text-error">{errors}</span>
+        </label>
+      ) : null}
     </div>
   )
 }

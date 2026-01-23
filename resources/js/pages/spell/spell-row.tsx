@@ -11,14 +11,14 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, Scale, Shield, XCircle } from 'lucide-react'
 
 const schoolColors: Record<string, string> = {
-  abjuration: 'text-[#007BFF]', // Blue
-  conjuration: 'text-[#FFC107]', // Yellow
-  divination: 'text-[#6C757D]', // Gray
-  enchantment: 'text-[#E83E8C]', // Pink
-  evocation: 'text-[#DC3545]', // Red
-  illusion: 'text-[#6F42C1]', // Purple
-  necromancy: 'text-[#28A745]', // Green
-  transmutation: 'text-[#FD7E14]', // Orange
+  abjuration: 'text-spell-abjuration',
+  conjuration: 'text-spell-conjuration',
+  divination: 'text-spell-divination',
+  enchantment: 'text-spell-enchantment',
+  evocation: 'text-spell-evocation',
+  illusion: 'text-spell-illusion',
+  necromancy: 'text-spell-necromancy',
+  transmutation: 'text-spell-transmutation',
 }
 
 const getSpellSchoolTextColor = (school: string): string => {

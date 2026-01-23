@@ -27,8 +27,11 @@ export const TextArea: React.FC<InputProps> = ({
                 value={value}
                 onChange={onChange}
       />
-      {errors && <p className={'fieldset-label text-error'}>{errors}</p>}
+      {errors ? (
+        <label className="label pt-1">
+          <span className="label-text-alt text-error">{errors}</span>
+        </label>
+      ) : null}
     </div>
   )
 }
-

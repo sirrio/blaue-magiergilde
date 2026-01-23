@@ -48,7 +48,11 @@ const CharacterClassToggle: React.FC<CharacterClassToggleProps> = ({ classes, da
           )
         })}
       </div>
-      {errors.class && <p className={'fieldset-label text-error'}>{errors.class}</p>}
+      {errors.class ? (
+        <label className="label pt-1">
+          <span className="label-text-alt text-error">{errors.class}</span>
+        </label>
+      ) : null}
     </>
   )
 }
