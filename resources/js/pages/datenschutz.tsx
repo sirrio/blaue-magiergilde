@@ -167,6 +167,49 @@ export default function Datenschutz() {
                 Bestimmungen dieser Datenschutzerklärung. Bitte stellen Sie keine sensiblen personenbezogenen Daten über
                 Ihr Benutzerkonto ein, die nicht unbedingt notwendig sind.
               </p>
+              <h2 className="font-bold">Discord-Bot und Automatisierungen</h2>
+              <p>
+                Für die Nutzung bestimmter Funktionen (z.B. Charakterverwaltung, Abenteuer/Downtime-Tracking oder
+                Einstellungen) stellen wir einen Discord-Bot bereit. Dabei werden Ihre Discord-ID, Ihr Benutzername,
+                ausgewählte Eingaben (z.B. Charakterdaten) sowie technische Identifikatoren (z.B. Message- und
+                Channel-IDs) verarbeitet, um die Bot-Funktionen bereitzustellen. Die Kommunikation mit Discord erfolgt
+                über die Discord-API. Es gelten die Datenschutzbestimmungen von Discord.
+              </p>
+              <p>
+                Rechtsgrundlage für die Verarbeitung ist Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der von Ihnen
+                gewünschten Funktionen innerhalb der Gilde) sowie Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
+                einem funktionsfähigen und sicheren Betrieb). Inhalte und Daten aus Bot-Interaktionen sind grundsätzlich
+                nur für Sie sichtbar; administrative Bereiche (z.B. Charakterfreigaben) sind nur für berechtigte
+                Admins einsehbar.
+              </p>
+              <h2 className="font-bold">Discord-Backup eigener Texte</h2>
+              <p>
+                Optional kann ein internes Backup für ausgewählte Discord-Kanäle aktiviert werden. Dabei sichern wir
+                ausschließlich eigene Regel- und Informationsbeiträge, die von der Gildenleitung erstellt wurden. Es
+                werden keine Nutzerunterhaltungen oder personenbezogenen Inhalte Dritter gesichert. Technisch fallen
+                dabei Kanal- und Thread-IDs sowie Zeitstempel an, um Inhalte korrekt zuzuordnen. Die Sicherungen können
+                jederzeit manuell gelöscht werden.
+              </p>
+              <h2 className="font-bold">Datei-Uploads (Avatare und Raum-Assets)</h2>
+              <p>
+                Sie können über die Website oder den Discord-Bot Bilder als Avatar oder als Raum-Assets hochladen. Diese
+                Dateien werden auf unserem Server gespeichert und Ihrem Benutzerkonto bzw. Charakter zugeordnet. Die
+                Verarbeitung erfolgt zur Darstellung Ihres Avatars bzw. zur Nutzung im Raum-Feature. Erlaubt sind die
+                Formate JPG, PNG, GIF und WEBP; die maximale Dateigröße beträgt 5 MB. Dateien bleiben gespeichert, bis
+                Sie sie löschen oder Ihr Konto entfernt wird.
+              </p>
+              <p>
+                Wenn Sie den Upload über den Discord-Bot nutzen, werden die übermittelten Bilder im Rahmen der
+                Verarbeitung kurzzeitig in einer Direktnachricht mit dem Bot verarbeitet und anschließend gespeichert.
+                Nachrichten können nach Abschluss der Verarbeitung gelöscht werden.
+              </p>
+              <h2 className="font-bold">Administrations- und Änderungsprotokolle</h2>
+              <p>
+                Zur Nachvollziehbarkeit von Änderungen (z.B. Freigaben oder Statusänderungen von Charakteren) speichern
+                wir administrative Änderungsprotokolle. Diese enthalten u.a. Zeitpunkt, Art der Änderung sowie die
+                beteiligten Benutzerkonten. Die Protokolle dienen der internen Nachvollziehbarkeit und Systemsicherheit
+                und sind nur für Admins einsehbar.
+              </p>
               <h2 className="font-bold">Keine weiteren Drittanbieterdienste</h2>
               <p>
                 Wir verwenden keine Analysetools wie Google Analytics oder ähnliche Tracking-Dienste. Es werden keine
@@ -219,7 +262,7 @@ export default function Datenschutz() {
               </p>
               <h2 className="font-bold">Aktualität und Änderungen dieser Erklärung</h2>
               <p>
-                Diese Datenschutzerklärung ist aktuell gültig (Stand: August 2025). Wir behalten uns vor, den Inhalt
+                Diese Datenschutzerklärung ist aktuell gültig (Stand: Januar 2026). Wir behalten uns vor, den Inhalt
                 dieser Erklärung bei Bedarf anzupassen, um sie an geänderte Rechtslagen oder technische Änderungen
                 unseres Angebots anzupassen. Die jeweils aktuelle Fassung der Datenschutzerklärung finden Sie auf dieser
                 Website. Auf wesentliche Änderungen weisen wir gegebenenfalls zusätzlich auf der Website hin.
@@ -235,4 +278,3 @@ export default function Datenschutz() {
     </>
   )
 }
-
