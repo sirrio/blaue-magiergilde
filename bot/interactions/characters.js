@@ -1343,7 +1343,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
+                buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1454,7 +1454,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
+                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1615,7 +1615,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
+                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
