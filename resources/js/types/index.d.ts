@@ -9,7 +9,7 @@ export interface PageProps {
   tiers: object
   versions: string[]
   factions: object
-  features: { discord: boolean; character_manager: boolean }
+  features: { games_calendar: boolean }
   discordConnected: boolean
   handbookChannels?: { id: string; name: string }[]
   activeChannelId?: string | null

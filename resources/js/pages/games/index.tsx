@@ -5,8 +5,8 @@ import { Card, CardBody } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import type { GameAnnouncement } from '@/types'
-import { Head } from '@inertiajs/react'
+import type { GameAnnouncement, PageProps } from '@/types'
+import { Head, usePage } from '@inertiajs/react'
 import { CalendarRange, LayoutGrid, List as ListIcon, SquareArrowOutUpRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -99,10 +99,13 @@ const getConfidenceColor = (confidence: number) => {
 
 export default function GamesIndex({ games, lastSyncedAt }: Props) {
   const getInitials = useInitials()
+  const { features } = usePage<PageProps>().props
   const [search, setSearch] = useState('')
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
   const [weekFilter, setWeekFilter] = useState<'all' | 'this_week' | 'next_week' | 'last_week'>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const calendarEnabled = features?.games_calendar ?? true
+  const activeViewMode = calendarEnabled ? viewMode : 'list'
   const todayKey = buildDateKey(new Date())
 
   const enrichedGames = useMemo(() => {
@@ -303,26 +306,28 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
           </div>
           <div className="flex flex-col items-end gap-1 text-[10px] text-base-content/60">
             <span>Timezone: {timeZoneLabel}</span>
-            <div role="tablist" className="tabs tabs-box tabs-xs">
-              <button
-                role="tab"
-                type="button"
-                className={cn('tab', viewMode === 'list' && 'tab-active')}
-                onClick={() => setViewMode('list')}
-              >
-                <ListIcon size={12} />
-                List
-              </button>
-              <button
-                role="tab"
-                type="button"
-                className={cn('tab', viewMode === 'calendar' && 'tab-active')}
-                onClick={() => setViewMode('calendar')}
-              >
-                <LayoutGrid size={12} />
-                Calendar
-              </button>
-            </div>
+            {calendarEnabled ? (
+              <div role="tablist" className="tabs tabs-box tabs-xs">
+                <button
+                  role="tab"
+                  type="button"
+                  className={cn('tab', viewMode === 'list' && 'tab-active')}
+                  onClick={() => setViewMode('list')}
+                >
+                  <ListIcon size={12} />
+                  List
+                </button>
+                <button
+                  role="tab"
+                  type="button"
+                  className={cn('tab', viewMode === 'calendar' && 'tab-active')}
+                  onClick={() => setViewMode('calendar')}
+                >
+                  <LayoutGrid size={12} />
+                  Calendar
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -420,7 +425,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
               </div>
             ) : (
               <>
-                {viewMode === 'calendar' ? (
+                {activeViewMode === 'calendar' ? (
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold">Calendar · {calendarData.monthLabel}</h3>

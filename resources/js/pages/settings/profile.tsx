@@ -5,7 +5,7 @@ import { PageProps } from '@/types'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
 
 export default function Profile() {
-  const { auth, discordConnected, features, status, error } = usePage<PageProps & { status?: string; error?: string }>().props
+  const { auth, discordConnected, status, error } = usePage<PageProps & { status?: string; error?: string }>().props
 
   const profileForm = useForm({
     name: auth.user.name,
@@ -45,11 +45,7 @@ export default function Profile() {
         <p>Edit your settings here</p>
         <div className="card bg-base-100 p-4 space-y-2">
           <p className="font-semibold">Discord</p>
-          {!features.discord ? (
-            <p className="text-sm opacity-80">
-              Discord-Integration ist aktuell deaktiviert. (FEATURE_DISCORD / DISCORD_* Konfiguration)
-            </p>
-          ) : discordConnected ? (
+          {discordConnected ? (
             <>
               <p className="text-sm opacity-80">Dein Account ist mit Discord verbunden.</p>
               <Link as="button" method="delete" href={route('discord.disconnect')} className="btn btn-outline btn-sm w-fit">

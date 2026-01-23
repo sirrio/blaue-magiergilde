@@ -4,12 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import type { PageProps } from '@/types'
-import { Head, Link, useForm, usePage } from '@inertiajs/react'
+import { Head, Link, useForm } from '@inertiajs/react'
 import type { ElementType } from 'react'
 
 export default function Login() {
-  const { features } = usePage<PageProps>().props
   const { data, setData, post, processing, errors } = useForm({
     email: '',
     password: '',
@@ -47,14 +45,12 @@ export default function Login() {
                 </div>
               </div>
 
-              {features.discord && (
-                <Button as="a" href={route('discord.login')} variant="outline" modifier="block" className={cn('gap-2', buttonOutlineDiscord)}>
-                  <DiscordIcon width={20} />
-                  Mit Discord fortfahren
-                </Button>
-              )}
+              <Button as="a" href={route('discord.login')} variant="outline" modifier="block" className={cn('gap-2', buttonOutlineDiscord)}>
+                <DiscordIcon width={20} />
+                Mit Discord fortfahren
+              </Button>
 
-              {features.discord && <div className="divider my-0 opacity-60">oder</div>}
+              <div className="divider my-0 opacity-60">oder</div>
 
               <form onSubmit={submit} className="space-y-4">
                 <Input
