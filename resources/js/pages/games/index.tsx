@@ -116,7 +116,7 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
       const avatarUrl = game.discord_author_avatar_url?.trim() || null
       const title = game.title?.trim() || 'Untitled game'
       const timeLabel =
-        startsParts?.hour !== null && startsParts?.minute !== null
+        startsParts && startsParts.hour !== null && startsParts.minute !== null
           ? `${String(startsParts.hour).padStart(2, '0')}:${String(startsParts.minute).padStart(2, '0')}`
           : null
       const discordUrl =

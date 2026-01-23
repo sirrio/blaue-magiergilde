@@ -150,7 +150,7 @@ const RoomFormModal = ({
     setCharacterSearch(selected ? buildCharacterLabel(selected) : '')
     setIsCharacterMenuOpen(false)
     setActiveCharacterIndex(0)
-  }, [open, initialValues, reset, setData])
+  }, [open, initialValues, reset, setData, characters])
 
   const selectedCharacter = useMemo(
     () => characters.find((character) => character.id === data.character_id) ?? null,
@@ -561,7 +561,7 @@ export default function Rooms({
     setDraftSelection(null)
     setSelectionStart(null)
     setSelectionEnd(null)
-  }, [activeMap?.id])
+  }, [activeMap])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -717,7 +717,7 @@ export default function Rooms({
 
   const gridColumns = activeMap?.grid_columns ?? 0
   const gridRows = activeMap?.grid_rows ?? 0
-  const roomList = activeMap?.rooms ?? []
+  const roomList = useMemo(() => activeMap?.rooms ?? [], [activeMap?.rooms])
   const selectedRoom = useMemo(
     () => roomList.find((room) => room.id === selectedRoomId) ?? null,
     [roomList, selectedRoomId],
@@ -2590,5 +2590,4 @@ export default function Rooms({
     </AppLayout>
   )
 }
-
 

@@ -773,11 +773,13 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
 
   useEffect(() => {
     if (!isOpen) return
-    const repairCurrent = getDefaultRepairCurrent(data.item_id, items)
+    const nextItemId = items[0]?.id ?? 0
+    const repairCurrent = getDefaultRepairCurrent(nextItemId, items)
+    setData('item_id', nextItemId)
     setData('repair_current', repairCurrent)
     setData('notes', '')
     setData('remaining_auctions', 3)
-  }, [isOpen])
+  }, [isOpen, items, setData])
 
   const handleSubmit = () => {
     if (!hasItems) return
@@ -1175,7 +1177,7 @@ export default function Index({
         },
       )
     },
-    [isSavingVoiceChannel, router],
+    [isSavingVoiceChannel],
   )
 
   useEffect(() => {
