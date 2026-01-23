@@ -114,7 +114,7 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking }) {
+function buildCharacterManageRows({ characterId, ownerDiscordId }) {
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -211,7 +211,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 
     return {
         embeds: [embed],
-        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId, simplifiedTracking }),
+        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId }),
     };
 }
 

@@ -163,7 +163,7 @@ async function handle(interaction) {
         await msg.startThread({ name: 'Game thread', autoArchiveDuration: 1440 });
 
         if (data.commandInteraction) {
-            await data.commandInteraction.deleteReply().catch(() => {});
+            await data.commandInteraction.deleteReply().catch(() => undefined);
         }
 
         await updateManageMessage(interaction, { content: 'Announcement created.', components: [] });

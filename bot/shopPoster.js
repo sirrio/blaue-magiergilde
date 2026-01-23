@@ -124,8 +124,8 @@ function parsePostPayload(value) {
 
     const itemMessageIds = {};
     if (parsed.item_message_ids && typeof parsed.item_message_ids === 'object') {
-        for (const [key, value] of Object.entries(parsed.item_message_ids)) {
-            const messageId = normalizeMessageId(value);
+        for (const [key, entryValue] of Object.entries(parsed.item_message_ids)) {
+            const messageId = normalizeMessageId(entryValue);
             if (messageId) {
                 itemMessageIds[String(key)] = messageId;
             }
@@ -253,7 +253,7 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
     try {
         await waitForDiscordRateLimit(client);
         target = await client.channels.fetch(channelId);
-    } catch (error) {
+    } catch {
         return { error: 'Channel not found.', status: 404 };
     }
 
@@ -310,7 +310,7 @@ async function resolveDestination({ client, channelId, shop, threadName }) {
         try {
             await waitForDiscordRateLimit(client);
             await target.members.fetch(botMember.id);
-        } catch (error) {
+        } catch {
             return {
                 error: 'Bot is not a member of the private thread.',
                 status: 403,
@@ -330,16 +330,6 @@ async function sendOneLine(destination, line) {
     await waitForDiscordRateLimit(destination.client);
     const message = await destination.send(String(line));
     return message?.id ?? null;
-}
-
-async function sendLines(destination, lines) {
-    const messageIds = [];
-    for (const line of lines) {
-         
-        const messageId = await sendOneLine(destination, line);
-        if (messageId) messageIds.push(messageId);
-    }
-    return messageIds;
 }
 
 async function sendItemLine(destination, row) {

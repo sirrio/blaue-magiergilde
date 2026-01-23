@@ -370,7 +370,6 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             [characterId],
         );
 
-        const totalAdventureBubbles = safeInt(bubbleTotals?.total_bubbles);
         const realAdventureBubbles = safeInt(bubbleTotals?.real_bubbles);
         const pseudoAdventureBubbles = safeInt(bubbleTotals?.pseudo_bubbles);
         const [[latestAdventure]] = await connection.execute(

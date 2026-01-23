@@ -5,8 +5,8 @@ function redactValue(value) {
     return 'REDACTED';
 }
 
-function redactConfig(config) {
-    const redacted = { ...config };
+function redactConfig(configInput) {
+    const redacted = { ...configInput };
 
     if ('token' in redacted) redacted.token = redactValue(redacted.token);
     if ('publicKey' in redacted) redacted.publicKey = redactValue(redacted.publicKey);

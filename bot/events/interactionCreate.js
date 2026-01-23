@@ -1,8 +1,6 @@
 const { Events } = require('discord.js');
 
 const { isOwner } = require('../commandConfig');
-const { updateManageMessage } = require('../utils/updateManageMessage');
-
 const appJoin = require('../interactions/appJoin');
 const characters = require('../interactions/characters');
 const newGame = require('../interactions/newGame');

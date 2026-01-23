@@ -15,7 +15,7 @@ function extractTier(rawContent) {
 
 function extractTitle(rawContent) {
     const content = String(rawContent || '');
-    const quoteMatch = content.match(/[\"„“”']([^\"„“”']{2,})[\"„“”']/);
+    const quoteMatch = content.match(/["„“”']([^"„“”']{2,})["„“”']/);
     if (quoteMatch) {
         return quoteMatch[1].trim();
     }
@@ -143,7 +143,7 @@ function extractDate(content, fallbackDate) {
         );
     }
 
-    const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.\-]\s*(\d{1,2})(?:\s*[.\-]\s*(\d{2,4}))?/g);
+    const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.-]\s*(\d{1,2})(?:\s*[.-]\s*(\d{2,4}))?/g);
     for (const dateMatch of dateMatches) {
         const day = Number(dateMatch[1]);
         const month = Number(dateMatch[2]);
