@@ -271,11 +271,11 @@ function createAdventureState({ ownerDiscordId, characterId, mode = 'create', ad
         adventureId: adventureId ? Number(adventureId) : null,
         step: 'duration',
         data: {
-            durationSeconds: null,
-            startDate: '',
+            durationSeconds: 10800,
+            startDate: formatLocalIsoDate(),
             title: '',
             gameMaster: '',
-            hasAdditionalBubble: null,
+            hasAdditionalBubble: false,
             notes: '',
             allyIds: [],
             guildCharacterIds: [],
@@ -294,7 +294,7 @@ function createDowntimeState({ ownerDiscordId, characterId, mode = 'create', dow
         step: 'duration',
         data: {
             durationSeconds: null,
-            startDate: '',
+            startDate: formatLocalIsoDate(),
             type: 'other',
             notes: '',
         },
