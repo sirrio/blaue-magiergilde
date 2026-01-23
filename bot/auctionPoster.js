@@ -181,7 +181,7 @@ async function resolveDestination({ client, channelId, auction }) {
     try {
         await waitForDiscordRateLimit(client);
         target = await client.channels.fetch(channelId);
-    } catch (error) {
+    } catch {
         return { error: 'Channel not found.', status: 404 };
     }
 
@@ -237,7 +237,7 @@ async function resolveDestination({ client, channelId, auction }) {
         try {
             await waitForDiscordRateLimit(client);
             await target.members.fetch(botMember.id);
-        } catch (error) {
+        } catch {
             return {
                 error: 'Bot is not a member of the private thread.',
                 status: 403,

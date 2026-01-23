@@ -71,6 +71,9 @@ Logging defaults to a stack of channels with daily file logs and optional Slack 
 ## 14. Coordination Rule
 When implementing new features, always update both the Laravel app and the Discord bot as needed so they stay in sync.
 
+## 15. Git Safety
+- Never push changes without an explicit user prompt.
+
 ===
 
 <laravel-boost-guidelines>

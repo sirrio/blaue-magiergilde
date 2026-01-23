@@ -90,7 +90,7 @@ async function updateManageMessage(interaction, payload, options = {}) {
     }
 
     if (isModalSubmit && (interaction?.deferred || interaction?.replied)) {
-        await interaction.deleteReply().catch(() => {});
+        await interaction.deleteReply().catch(() => undefined);
     }
 }
 

@@ -366,7 +366,7 @@ export default function Settings({
         setSyncingChannelId(null)
       }
     },
-    [fetchBackupStatus, getCsrfToken, syncingChannelId, router],
+    [fetchBackupStatus, syncingChannelId],
   )
 
   const selectedChannelsFlat = useMemo(() => {

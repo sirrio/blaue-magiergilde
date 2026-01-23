@@ -225,7 +225,7 @@ export default function DiscordChannelPickerModal({
     } finally {
       setIsRefreshingChannels(false)
     }
-  }, [channelsRouteName, includeThreads, isRefreshingChannels])
+  }, [channelsRouteName, includeThreads, includeArchivedThreads, includePrivateThreads, isRefreshingChannels])
 
   const handleLoadThreads = useCallback(async () => {
     if (!pendingSingle) {
@@ -300,14 +300,7 @@ export default function DiscordChannelPickerModal({
     } finally {
       setThreadLoadingId(null)
     }
-  }, [
-    getCsrfToken,
-    pendingSingle,
-    threadLoadingId,
-    threadLoadIncludeArchived,
-    threadLoadIncludePrivate,
-    threadsRouteName,
-  ])
+  }, [pendingSingle, threadLoadingId, threadLoadIncludeArchived, threadLoadIncludePrivate, threadsRouteName])
 
   const togglePendingChannel = (guildId: string, channelId: string) => {
     setPendingByGuild((current) => {

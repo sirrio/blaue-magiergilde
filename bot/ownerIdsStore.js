@@ -35,7 +35,7 @@ async function refreshOwnerIds() {
             updateOwnerIds(payload.owner_ids);
             return true;
         }
-    } catch (error) {
+    } catch {
         return false;
     }
 

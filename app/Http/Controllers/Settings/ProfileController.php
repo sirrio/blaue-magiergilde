@@ -21,7 +21,7 @@ class ProfileController extends Controller
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
-            'discordConnected' => config('features.discord') && (bool) $request->user()->discord_id,
+            'discordConnected' => (bool) $request->user()->discord_id,
             'error' => $request->session()->get('error'),
         ]);
     }

@@ -6,8 +6,6 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder,
     EmbedBuilder,
 } = require('discord.js');
 const { Agent } = require('undici');
@@ -203,7 +201,6 @@ function parseDurationToSeconds(input) {
 }
 
 const allowedStartTiers = new Set(['bt', 'lt', 'ht']);
-const allowedVersions = new Set(['2014', '2024']);
 function parseManageIds(customId) {
     const parts = String(customId || '').split('_');
     if (parts.length < 5) return null;
@@ -447,7 +444,7 @@ async function updateAdventureMessage(state, payload) {
         try {
             await state.promptMessage.edit(payload);
             if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
-                await activeInteraction.deleteReply().catch(() => {});
+                await activeInteraction.deleteReply().catch(() => undefined);
             }
             return true;
         } catch {
@@ -464,7 +461,7 @@ async function updateAdventureMessage(state, payload) {
                     state.promptMessage = message;
                     await message.edit(payload);
                     if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
-                        await activeInteraction.deleteReply().catch(() => {});
+                        await activeInteraction.deleteReply().catch(() => undefined);
                     }
                     return true;
                 }
@@ -496,7 +493,7 @@ async function updateAdventureMessage(state, payload) {
         try {
             await state.promptInteraction.editReply(payload);
             if (isModalSubmit && (activeInteraction?.deferred || activeInteraction?.replied)) {
-                await activeInteraction.deleteReply().catch(() => {});
+                await activeInteraction.deleteReply().catch(() => undefined);
             }
             return true;
         } catch {
@@ -712,7 +709,7 @@ async function showCreationError(interaction, state, ownerDiscordId, message) {
     };
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await updateCreationMessage(state, payload);
-    await interaction.deleteReply().catch(() => {});
+    await interaction.deleteReply().catch(() => undefined);
 }
 
 async function finalizeCharacterCreation(state) {
@@ -786,7 +783,7 @@ async function handleCreationAvatarMessage(message) {
 
     const validation = validateAvatarAttachment(attachment);
     if (!validation.ok) {
-        await message.delete().catch(() => {});
+        await message.delete().catch(() => undefined);
 
         const payload = {
             embeds: [buildAvatarStepEmbed(state, describeAvatarUploadIssue(validation.reason))],
@@ -802,7 +799,7 @@ async function handleCreationAvatarMessage(message) {
     }
 
     state.data.avatar = attachment.url;
-    await message.delete().catch(() => {});
+    await message.delete().catch(() => undefined);
 
     const payload = {
         embeds: [buildAvatarStepEmbed(state, 'Avatar saved. You can continue.')],
@@ -828,14 +825,14 @@ async function handleAvatarUpdateMessage(message) {
     const attachment = attachments.find(item => String(item.contentType || '').startsWith('image/')) || attachments[0];
     if (!attachment?.url) return false;
 
-    await message.delete().catch(() => {});
+    await message.delete().catch(() => undefined);
 
     const validation = validateAvatarAttachment(attachment);
     if (!validation.ok) {
         if (state.promptMessage?.editable) {
             await state.promptMessage.edit({
                 content: describeAvatarUploadIssue(validation.reason),
-            }).catch(() => {});
+            }).catch(() => undefined);
         }
         return true;
     }
@@ -850,7 +847,7 @@ async function handleAvatarUpdateMessage(message) {
     if (!storedAvatar?.ok) {
         await state.promptMessage.edit({
             content: describeAvatarUploadIssue(storedAvatar?.reason),
-        }).catch(() => {});
+        }).catch(() => undefined);
         return true;
     }
 
@@ -858,14 +855,14 @@ async function handleAvatarUpdateMessage(message) {
 
     const character = await findCharacterForDiscord(message.author, state.characterId);
     if (!character) {
-        await state.promptMessage.edit({ content: 'Character not found.' }).catch(() => {});
+        await state.promptMessage.edit({ content: 'Character not found.' }).catch(() => undefined);
         return true;
     }
 
     await state.promptMessage.edit({
         ...buildCharacterManageView(character, { ownerDiscordId: state.ownerDiscordId }),
         content: '',
-    }).catch(() => {});
+    }).catch(() => undefined);
     return true;
 }
 
@@ -882,7 +879,7 @@ async function updateDowntimeMessage(state, payload) {
         try {
             await state.promptMessage.edit(payload);
             if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
-                await activeInteraction.deleteReply().catch(() => {});
+                await activeInteraction.deleteReply().catch(() => undefined);
             }
             return true;
         } catch {
@@ -899,7 +896,7 @@ async function updateDowntimeMessage(state, payload) {
                     state.promptMessage = message;
                     await message.edit(payload);
                     if (isModalSubmit && (activeInteraction.deferred || activeInteraction.replied)) {
-                        await activeInteraction.deleteReply().catch(() => {});
+                        await activeInteraction.deleteReply().catch(() => undefined);
                     }
                     return true;
                 }
@@ -921,7 +918,7 @@ async function updateDowntimeMessage(state, payload) {
     if (state?.promptInteraction?.isRepliable?.()) {
         await state.promptInteraction.editReply(payload);
         if (isModalSubmit && (activeInteraction?.deferred || activeInteraction?.replied)) {
-            await activeInteraction.deleteReply().catch(() => {});
+            await activeInteraction.deleteReply().catch(() => undefined);
         }
         return true;
     }
@@ -929,7 +926,7 @@ async function updateDowntimeMessage(state, payload) {
     return false;
 }
 
-async function buildDowntimeStepPayload({ interaction, state, message }) {
+async function buildDowntimeStepPayload({ state, message }) {
     const step = state.step;
     const descriptionMap = {
         duration: 'Choose the downtime duration.',
@@ -1075,7 +1072,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.deferUpdate().catch(() => {});
+        await interaction.deferUpdate().catch(() => undefined);
 
         const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
         const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
@@ -1097,7 +1094,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.deferUpdate().catch(() => {});
+        await interaction.deferUpdate().catch(() => undefined);
 
         if (action === 'back') {
             const characters = await listCharactersForDiscord(interaction.user);
@@ -1137,7 +1134,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.deferUpdate().catch(() => {});
+        await interaction.deferUpdate().catch(() => undefined);
 
         const selectedId = Number(interaction.values[0]);
         if (!Number.isFinite(selectedId) || selectedId < 1) {
@@ -1216,7 +1213,7 @@ async function handle(interaction) {
         if (hadPrompt) {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             await updateCreationMessage(state, payload);
-            await interaction.deleteReply().catch(() => {});
+            await interaction.deleteReply().catch(() => undefined);
             return true;
         }
 
@@ -3081,7 +3078,7 @@ async function handle(interaction) {
 
         state.data.durationSeconds = duration;
         ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ state }));
         return true;
     }
 
@@ -3134,7 +3131,7 @@ async function handle(interaction) {
 
         state.data.startDate = startDate;
         ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ state }));
         return true;
     }
 
@@ -3154,7 +3151,7 @@ async function handle(interaction) {
 
         state.data.type = interaction.values?.[0] === 'faction' ? 'faction' : 'other';
         ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ state }));
         return true;
     }
 
@@ -3163,6 +3160,7 @@ async function handle(interaction) {
         if (!match) return false;
         const characterId = Number(match[1]);
         const ownerDiscordId = match[2];
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -3193,7 +3191,7 @@ async function handle(interaction) {
 
         state.data.notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
         ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ state }));
         return true;
     }
 
@@ -3219,7 +3217,7 @@ async function handle(interaction) {
 
         state.step = getDowntimePreviousStep(state.step);
         ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ state }));
         return true;
     }
 
@@ -3244,6 +3242,7 @@ async function handle(interaction) {
         if (!match) return false;
         const characterId = Number(match[1]);
         const ownerDiscordId = match[2];
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
@@ -3273,7 +3272,7 @@ async function handle(interaction) {
 
         state.step = getDowntimeNextStep(state.step);
         ensurePromptMessage(state, interaction);
-        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ interaction, state }));
+        await updateDowntimeMessage(state, await buildDowntimeStepPayload({ state }));
         return true;
     }
 

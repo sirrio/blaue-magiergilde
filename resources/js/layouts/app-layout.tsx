@@ -79,7 +79,7 @@ const adminSections = [
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, features, handbookChannels, activeChannelId, betaNoticeEnabled } = usePage<PageProps>().props
+  const { auth, discordConnected, handbookChannels, activeChannelId, betaNoticeEnabled } = usePage<PageProps>().props
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   const handbookDesktopRef = useRef<HTMLDetailsElement>(null)
@@ -349,7 +349,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </nav>
       <main>
-        {features.discord && !discordConnected && (
+        {!discordConnected && (
           <div className="container mx-auto max-w-5xl px-4 pt-4">
             <div className="alert alert-warning">
               <div>

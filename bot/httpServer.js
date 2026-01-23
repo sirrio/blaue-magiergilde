@@ -190,7 +190,7 @@ function startHttpServer(client) {
                         display_name: user.globalName || null,
                         avatar_url: user.displayAvatarURL({ size: 96 }),
                     });
-                } catch (error) {
+                } catch {
                     owners.push({ id: String(id) });
                 }
             }
@@ -215,7 +215,7 @@ function startHttpServer(client) {
                     includePrivateThreads,
                 });
                 respondJson(res, 200, { guilds });
-            } catch (error) {
+            } catch {
                 logReject(req, 'failed to list channels');
                 respondJson(res, 500, { error: 'Failed to list channels.' });
             }
@@ -246,7 +246,7 @@ function startHttpServer(client) {
                 }
 
                 respondJson(res, 200, { threads: result.threads });
-            } catch (error) {
+            } catch {
                 logReject(req, 'failed to list threads');
                 respondJson(res, 500, { error: 'Failed to list threads.' });
             }
@@ -367,7 +367,7 @@ function startHttpServer(client) {
                     destination_name: result.destinationName,
                 });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'shop post failed');
                 respondJson(res, 500, { error: 'Shop post failed.' });
                 return;
@@ -396,7 +396,7 @@ function startHttpServer(client) {
                     destination_name: result.destinationName,
                 });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'shop update failed');
                 respondJson(res, 500, { error: 'Shop update failed.' });
                 return;
@@ -430,7 +430,7 @@ function startHttpServer(client) {
                     destination_name: result.destinationName,
                 });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'backstock post failed');
                 respondJson(res, 500, { error: 'Backstock post failed.' });
                 return;
@@ -472,7 +472,7 @@ function startHttpServer(client) {
                     destination_name: result.destinationName,
                 });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'auction post failed');
                 respondJson(res, 500, { error: 'Auction post failed.' });
                 return;
@@ -527,7 +527,7 @@ function startHttpServer(client) {
                     message_id: result.message_id ?? null,
                 });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'auction voice bid failed');
                 respondJson(res, 500, { error: 'Auction voice bid failed.' });
                 return;

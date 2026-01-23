@@ -18,7 +18,7 @@ import { Archive, BookUser, CircleUser, Copy, Plus, RefreshCw, Zap } from 'lucid
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
-  const { features, auth } = usePage<PageProps>().props
+  const { auth } = usePage<PageProps>().props
   const [simplifiedTracking, setSimplifiedTracking] = useState(Boolean(auth.user?.simplified_tracking))
   const [isUpdatingTracking, setIsUpdatingTracking] = useState(false)
   const [avatarMasked, setAvatarMasked] = useState(auth.user?.avatar_masked ?? true)
@@ -103,7 +103,6 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   const [password, setPassword] = useState('')
 
   const test = () => {
-    if (!features.discord) return
     return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
   }
 
@@ -205,32 +204,30 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                   <span>Create Character</span>
                 </Button>
               </StoreCharacterModal>
-              {features.discord && (
-                <Modal>
-                  <ModalTrigger>
-                    <Button variant={'outline'} className="flex items-center space-x-2">
-                      <RefreshCw size={16} />
-                      <span>Sync Characters</span>
-                    </Button>
-                  </ModalTrigger>
-                  <ModalTitle>Sync characters</ModalTitle>
-                  <ModalContent>
-                    <Input type="email" placeholder="Enter your email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)}>
-                      Email
-                    </Input>
-                    <Input
-                      type="password"
-                      placeholder="Enter your password"
-                      className="w-full"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    >
-                      Password
-                    </Input>
-                  </ModalContent>
-                  <ModalAction onClick={() => test()}>Sync now</ModalAction>
-                </Modal>
-              )}
+              <Modal>
+                <ModalTrigger>
+                  <Button variant={'outline'} className="flex items-center space-x-2">
+                    <RefreshCw size={16} />
+                    <span>Sync Characters</span>
+                  </Button>
+                </ModalTrigger>
+                <ModalTitle>Sync characters</ModalTitle>
+                <ModalContent>
+                  <Input type="email" placeholder="Enter your email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)}>
+                    Email
+                  </Input>
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    className="w-full"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  >
+                    Password
+                  </Input>
+                </ModalContent>
+                <ModalAction onClick={() => test()}>Sync now</ModalAction>
+              </Modal>
               <Button as="a" href={route('characters.deleted')} variant="outline" modifier="square">
                 <Archive size={16} />
               </Button>

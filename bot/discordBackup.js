@@ -232,7 +232,7 @@ async function listChannelThreads(client, channelId, options = {}) {
     try {
         await waitForDiscordRateLimit(client);
         channel = await client.channels.fetch(channelId);
-    } catch (error) {
+    } catch {
         return { ok: false, status: 404, error: 'Channel not found.' };
     }
 
