@@ -143,14 +143,25 @@ class CharacterApprovalController extends Controller
 
         $character->save();
 
-        if ($statusChange && in_array($statusChange, ['approved', 'declined'], true)) {
-            $result = $notificationService->notifyStatusChange($character, $statusChange);
-            if (! $result['ok']) {
-                Log::warning('Character approval DM failed.', [
+        if ($statusChange) {
+            $syncResult = $notificationService->syncAnnouncement($character);
+            if (! $syncResult['ok'] && $syncResult['status'] !== 204) {
+                Log::warning('Character approval announcement update failed.', [
                     'character_id' => $character->id,
                     'status' => $statusChange,
-                    'error' => $result['error'] ?? null,
+                    'error' => $syncResult['error'] ?? null,
                 ]);
+            }
+
+            if (in_array($statusChange, ['approved', 'declined'], true)) {
+                $result = $notificationService->notifyStatusChange($character, $statusChange);
+                if (! $result['ok']) {
+                    Log::warning('Character approval DM failed.', [
+                        'character_id' => $character->id,
+                        'status' => $statusChange,
+                        'error' => $result['error'] ?? null,
+                    ]);
+                }
             }
         }
 

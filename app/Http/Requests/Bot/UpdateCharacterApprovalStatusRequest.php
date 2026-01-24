@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Http\Requests\Bot;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateCharacterApprovalStatusRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'character_id' => ['required', 'integer', 'exists:characters,id'],
+            'status' => ['required', 'string', 'in:approved,declined'],
+            'actor_discord_id' => ['required', 'string', 'regex:/^[0-9]{5,}$/', 'max:32'],
+        ];
+    }
+}

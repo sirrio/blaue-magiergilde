@@ -85,7 +85,7 @@ class CharacterController extends Controller
         $character->characterClasses()->sync($classIds);
 
         if ($character->guild_status === 'pending') {
-            $result = $notificationService->announcePending($character);
+            $result = $notificationService->syncAnnouncement($character);
             if (! $result['ok']) {
                 Log::warning('Character approval channel notification failed.', [
                     'character_id' => $character->id,
@@ -156,8 +156,13 @@ class CharacterController extends Controller
         $classIds = array_values(array_unique($request->class));
         $character->characterClasses()->sync($classIds);
 
-        if ($previousStatus === 'draft' && $character->guild_status === 'pending') {
-            $result = $notificationService->announcePending($character);
+        $shouldSyncAnnouncement = $previousStatus !== $character->guild_status;
+        if (! $shouldSyncAnnouncement && $character->guild_status === 'pending') {
+            $shouldSyncAnnouncement = true;
+        }
+
+        if ($shouldSyncAnnouncement) {
+            $result = $notificationService->syncAnnouncement($character);
             if (! $result['ok']) {
                 Log::warning('Character approval channel notification failed.', [
                     'character_id' => $character->id,
@@ -172,14 +177,24 @@ class CharacterController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Character $character): RedirectResponse
-    {
+    public function destroy(
+        Character $character,
+        CharacterApprovalNotificationService $notificationService,
+    ): RedirectResponse {
         $this->ensureCharacterOwner($character);
 
         if ($character->guild_status === 'approved') {
             $character->guild_status = 'retired';
         }
         $character->save();
+
+        $result = $notificationService->syncAnnouncement($character);
+        if (! $result['ok']) {
+            Log::warning('Character approval channel notification failed.', [
+                'character_id' => $character->id,
+                'error' => $result['error'] ?? null,
+            ]);
+        }
 
         $character->adventures()->update([
             'deleted_by_character' => true,

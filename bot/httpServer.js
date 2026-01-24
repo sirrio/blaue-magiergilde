@@ -6,7 +6,11 @@ const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
-const { postCharacterApprovalAnnouncement, sendCharacterApprovalDm } = require('./characterApprovalNotifier');
+const {
+    postCharacterApprovalAnnouncement,
+    sendCharacterApprovalDm,
+    updateCharacterApprovalAnnouncement,
+} = require('./characterApprovalNotifier');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
 const MAX_BODY_SIZE = 10 * 1024;
@@ -113,6 +117,7 @@ function startHttpServer(client) {
         const isDiscordOwnersStatus = path === '/discord-owners/status';
         const isCharacterApprovalNotify = path === '/character-approval/notify';
         const isCharacterApprovalPending = path === '/character-approval/pending';
+        const isCharacterApprovalUpdate = path === '/character-approval/update';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isBackstockPost = path === '/backstock-post';
@@ -128,6 +133,7 @@ function startHttpServer(client) {
             isDiscordBackupChannel ||
             isCharacterApprovalNotify ||
             isCharacterApprovalPending ||
+            isCharacterApprovalUpdate ||
             isShopPost ||
             isShopUpdate ||
             isBackstockPost ||
@@ -236,22 +242,11 @@ function startHttpServer(client) {
 
         if (isCharacterApprovalPending) {
             const channelId = String(payload?.channel_id || '').trim();
-            const characterName = String(payload?.character_name || '').trim();
-            const characterTier = payload?.character_tier ? String(payload.character_tier).trim() : '';
-            const userName = String(payload?.user_name || '').trim();
-            const userDiscordId = payload?.user_discord_id ? String(payload.user_discord_id).trim() : '';
-            const approvalUrl = typeof payload?.approval_url === 'string' ? payload.approval_url.trim() : '';
-            const characterUrl = typeof payload?.character_url === 'string' ? payload.character_url.trim() : '';
 
             const result = await postCharacterApprovalAnnouncement({
                 client,
                 channelId,
-                characterName,
-                characterTier,
-                userName,
-                userDiscordId,
-                approvalUrl,
-                characterUrl,
+                payload,
             });
 
             if (!result.ok) {
@@ -260,7 +255,32 @@ function startHttpServer(client) {
                 return;
             }
 
-            respondJson(res, 200, { status: 'posted' });
+            respondJson(res, 200, {
+                status: 'posted',
+                channel_id: result.channel_id,
+                message_id: result.message_id,
+            });
+            return;
+        }
+
+        if (isCharacterApprovalUpdate) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const messageId = String(payload?.message_id || '').trim();
+
+            const result = await updateCharacterApprovalAnnouncement({
+                client,
+                channelId,
+                messageId,
+                payload,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval update failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement update failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'updated' });
             return;
         }
 

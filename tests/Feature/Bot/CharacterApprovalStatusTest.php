@@ -1,0 +1,50 @@
+<?php
+
+use App\Models\Character;
+use App\Models\User;
+use App\Services\CharacterApprovalNotificationService;
+use Illuminate\Support\Facades\Config;
+
+use function Pest\Laravel\mock;
+
+it('accepts character approval actions from the discord bot', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    expect(config('services.bot.http_url'))->toBe('http://bot.test');
+    expect(config('services.bot.http_token'))->toBe('token');
+
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
+    $notificationService->shouldReceive('notifyStatusChange')->once()->andReturn(['ok' => true, 'status' => 200]);
+
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '1234567890',
+    ]);
+
+    $character = Character::factory()->create([
+        'guild_status' => 'pending',
+    ]);
+    $character->approval_discord_channel_id = '555555';
+    $character->approval_discord_message_id = '666666';
+    $character->save();
+    $character->refresh();
+    expect($character->approval_discord_channel_id)->toBe('555555');
+    expect($character->approval_discord_message_id)->toBe('666666');
+
+    $this->withHeader('X-Bot-Token', 'token')
+        ->post(route('bot.character-approvals.status'), [
+            'character_id' => $character->id,
+            'status' => 'approved',
+            'actor_discord_id' => $admin->discord_id,
+        ])
+        ->assertOk()
+        ->assertJson(['status' => 'updated']);
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('approved');
+
+    $notificationService->shouldHaveReceived('syncAnnouncement')->once();
+    $notificationService->shouldHaveReceived('notifyStatusChange')->once();
+});
