@@ -71,6 +71,7 @@ class CharacterController extends Controller
         $character->user_id = Auth::user()->getAuthIdentifier();
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
+        $character->guild_status = $request->guild_status ?? 'pending';
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }
@@ -126,6 +127,9 @@ class CharacterController extends Controller
         $character->dm_coins = $request->dm_coins;
         $character->bubble_shop_spend = $request->bubble_shop_spend;
         $character->external_link = $request->external_link;
+        if ($request->filled('guild_status')) {
+            $character->guild_status = $request->guild_status;
+        }
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }

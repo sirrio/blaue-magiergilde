@@ -32,7 +32,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInitials } from '@/hooks/use-initials'
 
 type RoomCharacterEntry = RoomCharacter & {
-  guild_status?: 'pending' | 'approved' | 'declined' | 'retired'
+  guild_status?: 'pending' | 'approved' | 'declined' | 'retired' | 'draft'
   user_name?: string | null
 }
 
@@ -2590,4 +2590,3 @@ export default function Rooms({
     </AppLayout>
   )
 }
-

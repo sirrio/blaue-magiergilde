@@ -272,7 +272,7 @@ export interface Character {
   downtimes: Downtime[]
   allies: Ally[]
   deleted_at: string
-  guild_status?: 'pending' | 'approved' | 'declined' | 'retired'
+  guild_status?: 'pending' | 'approved' | 'declined' | 'retired' | 'draft'
   room_count?: number
   admin_notes?: string | null
   faction:

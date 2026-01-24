@@ -24,6 +24,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
     external_link: '',
     is_filler: false,
     start_tier: 'bt',
+    guild_status: 'pending',
     avatar: undefined,
   }
 
@@ -96,6 +97,17 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                       {version}
                     </option>
                   ))}
+                </SelectOptions>
+              </Select>
+              <Select
+                errors={errors.guild_status}
+                value={data.guild_status}
+                onChange={(e) => setData('guild_status', e.target.value)}
+              >
+                <SelectLabel>Approval status</SelectLabel>
+                <SelectOptions>
+                  <option value="pending">Pending review</option>
+                  <option value="draft">Draft (hidden)</option>
                 </SelectOptions>
               </Select>
               <Input

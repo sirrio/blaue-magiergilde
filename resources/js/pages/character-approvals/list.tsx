@@ -9,7 +9,7 @@ import { calculateTier } from '@/helper/calculateTier'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { Archive, CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, StickyNote, UserX, XCircle } from 'lucide-react'
+import { Archive, CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, Pencil, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 interface FilterOption {
@@ -47,6 +47,7 @@ const getStatusLabel = (status?: string | null) => {
   if (status === 'approved') return 'Approved'
   if (status === 'declined') return 'Declined'
   if (status === 'retired') return 'Retired'
+  if (status === 'draft') return 'Draft'
   return 'Pending'
 }
 
@@ -181,6 +182,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
 
   const statusFilters: FilterOption[] = [
     { label: 'Pending', value: 'pending' },
+    { label: 'Draft', value: 'draft' },
     { label: 'Approved', value: 'approved' },
     { label: 'Declined', value: 'declined' },
     { label: 'Retired', value: 'retired' },
@@ -260,6 +262,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
   const totalUsers = groups.length
   const statusLabelMap: Record<string, string> = {
     pending: 'Pending',
+    draft: 'Draft',
     approved: 'Approved',
     declined: 'Declined',
     retired: 'Retired',
@@ -389,11 +392,12 @@ const tierTextClassMap: Record<string, string> = {
                   {group.characters.map((character) => {
                     const status = character.guild_status ?? 'pending'
                     const statusLabel = getStatusLabel(status)
+                    const isDraft = status === 'draft'
                     const currentTier = calculateTier(character)
                     const characterNotes = character.notes?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
                     return (
-                      <ListRow key={character.id} className="grid-cols-1">
+                      <ListRow key={character.id} className={cn('grid-cols-1', isDraft && 'opacity-60')}>
                         <div className="col-span-full flex flex-wrap items-center gap-3 md:flex-nowrap">
                           <div className="flex min-w-0 flex-1 items-center gap-3">
                             <div className="flex w-6 justify-center" title="Current tier">
@@ -437,12 +441,14 @@ const tierTextClassMap: Record<string, string> = {
                                 status === 'approved' && 'text-success',
                                 status === 'declined' && 'text-error',
                                 status === 'pending' && 'text-warning',
+                                status === 'draft' && 'text-base-content/60',
                                 status === 'retired' && 'text-base-content/50',
                               )}
                             >
                               {status === 'approved' && <CheckCircle2 size={12} />}
                               {status === 'declined' && <XCircle size={12} />}
                               {status === 'pending' && <Clock size={12} />}
+                              {status === 'draft' && <Pencil size={12} />}
                               {status === 'retired' && <Archive size={12} />}
                               <span>{statusLabel}</span>
                             </span>
@@ -454,7 +460,7 @@ const tierTextClassMap: Record<string, string> = {
                               modifier="square"
                               variant="ghost"
                               color="warning"
-                              disabled={status === 'pending' || status === 'retired'}
+                              disabled={status === 'pending' || status === 'retired' || status === 'draft'}
                               onClick={() =>
                                 router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'pending',
@@ -468,7 +474,7 @@ const tierTextClassMap: Record<string, string> = {
                               modifier="square"
                               variant="ghost"
                               color="success"
-                              disabled={status === 'approved' || status === 'retired'}
+                              disabled={status === 'approved' || status === 'retired' || status === 'draft'}
                               onClick={() =>
                                 router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'approved',
@@ -482,7 +488,7 @@ const tierTextClassMap: Record<string, string> = {
                               modifier="square"
                               variant="ghost"
                               color="error"
-                              disabled={status === 'declined' || status === 'retired'}
+                              disabled={status === 'declined' || status === 'retired' || status === 'draft'}
                               onClick={() =>
                                 router.patch(route('admin.character-approvals.update', { character: character.id }), {
                                   guild_status: 'declined',

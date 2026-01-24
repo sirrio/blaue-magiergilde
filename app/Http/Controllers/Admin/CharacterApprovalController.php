@@ -43,7 +43,7 @@ class CharacterApprovalController extends Controller
             });
         }
 
-        if (in_array($status, ['pending', 'approved', 'declined', 'retired'], true)) {
+        if (in_array($status, ['pending', 'approved', 'declined', 'retired', 'draft'], true)) {
             $charactersQuery->where('guild_status', $status);
         }
 
@@ -97,6 +97,11 @@ class CharacterApprovalController extends Controller
             if ($character->guild_status === 'retired') {
                 return redirect()->back()->withErrors([
                     'guild_status' => 'Retired characters cannot change status.',
+                ]);
+            }
+            if ($character->guild_status === 'draft') {
+                return redirect()->back()->withErrors([
+                    'guild_status' => 'Draft characters must be submitted by their owner.',
                 ]);
             }
             $previousStatus = $character->guild_status;

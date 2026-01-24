@@ -79,6 +79,7 @@ const {
     buildCharacterClassesView,
     buildCharacterFactionView,
     buildCharacterManageView,
+    buildCharacterStatusView,
     buildClassesRow,
     buildCreationBasicModal,
     buildCreationBasicsEmbed,
@@ -110,6 +111,7 @@ const {
     buildFactionRow,
     buildStartTierRow,
     buildVersionRow,
+    buildStatusRow,
     allowedFactions,
     formatParticipantList,
     getParticipantSearch,
@@ -714,7 +716,7 @@ async function showCreationError(interaction, state, ownerDiscordId, message) {
 
 async function finalizeCharacterCreation(state) {
     const { data, ownerDiscordId } = state;
-    if (!data.name || !data.externalLink || !data.startTier || !data.version || !Array.isArray(data.classIds) || data.classIds.length === 0) {
+    if (!data.name || !data.externalLink || !data.startTier || !data.version || !data.guildStatus || !Array.isArray(data.classIds) || data.classIds.length === 0) {
         await updateCreationMessage(state, {
             content: 'Character data incomplete. Please start again.',
             embeds: [],
@@ -733,6 +735,7 @@ async function finalizeCharacterCreation(state) {
         faction: data.faction ?? 'none',
         version: data.version ?? '2024',
         isFiller: data.isFiller,
+        guildStatus: data.guildStatus,
         classIds: data.classIds,
     });
 
@@ -1052,6 +1055,7 @@ async function handle(interaction) {
                 startTier: 'bt',
                 version: '2024',
                 faction: 'none',
+                guildStatus: 'pending',
             },
             promptInteraction: interaction,
             promptMessage: interaction.message ?? null,
@@ -1384,6 +1388,36 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_status_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersCreate_status_', '');
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        const state = getCreationState(ownerDiscordId);
+        if (!state) {
+            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        ensurePromptMessage(state, interaction);
+        state.data.guildStatus = interaction.values[0];
+        state.step = 'status';
+
+        await interaction.update({
+            embeds: [
+                buildCreationEmbed(7, 'Choose status', 'Pick whether this character is ready for review.'),
+            ],
+            components: [
+                buildStatusRow(ownerDiscordId, state.data.guildStatus),
+                ...buildCreationStepActionRows(ownerDiscordId, 'status'),
+            ],
+            content: '',
+        });
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_confirm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_confirm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -1421,6 +1455,21 @@ async function handle(interaction) {
         state.promptInteraction = interaction;
 
         if (state.step === 'finalize') {
+            state.step = 'status';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(7, 'Choose status', 'Pick whether this character is ready for review.'),
+                ],
+                components: [
+                    buildStatusRow(ownerDiscordId, state.data.guildStatus),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'status'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (state.step === 'status') {
             state.step = 'version';
             await interaction.update({
                 embeds: [
@@ -1670,11 +1719,40 @@ async function handle(interaction) {
                 return true;
             }
 
+            state.step = 'status';
+            await interaction.update({
+                embeds: [
+                    buildCreationEmbed(7, 'Choose status', 'Pick whether this character is ready for review.'),
+                ],
+                components: [
+                    buildStatusRow(ownerDiscordId, state.data.guildStatus),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'status'),
+                ],
+                content: '',
+            });
+            return true;
+        }
+
+        if (stepKey === 'status') {
+            if (!state.data.guildStatus) {
+                await interaction.update({
+                    embeds: [
+                        buildCreationEmbed(7, 'Choose status', 'Please choose a status.'),
+                    ],
+                    components: [
+                        buildStatusRow(ownerDiscordId, state.data.guildStatus),
+                        ...buildCreationStepActionRows(ownerDiscordId, 'status'),
+                    ],
+                    content: '',
+                });
+                return true;
+            }
+
             state.step = 'finalize';
             const summary = await buildCreationSummaryEmbed(state);
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(7, 'Finalize', 'Please confirm the details.'),
+                    buildCreationEmbed(8, 'Finalize', 'Please confirm the details.'),
                     summary,
                 ],
                 components: buildCreationConfirmRows(ownerDiscordId),
@@ -1790,6 +1868,41 @@ async function handle(interaction) {
         }
 
         const result = await updateCharacterForDiscord(interaction.user, characterId, { faction });
+        if (!result.ok) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterManageView(character, { ownerDiscordId }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterStatusSelect_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const guildStatus = String(interaction.values[0] || '').trim().toLowerCase();
+        if (!['pending', 'draft'].includes(guildStatus)) {
+            await updateManageMessage(interaction, { content: 'Invalid status.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await updateCharacterForDiscord(interaction.user, characterId, { guildStatus });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -2063,6 +2176,7 @@ async function handle(interaction) {
                     ownerDiscordId,
                     isFiller: character.is_filler,
                     simplifiedTracking: Boolean(character.simplified_tracking),
+                    guildStatus: character.guild_status,
                 }),
                 content: '',
             });
@@ -2208,6 +2322,16 @@ async function handle(interaction) {
             await interaction.update({
                 embeds: [factionView.embed],
                 components: factionView.components,
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'status') {
+            const statusView = buildCharacterStatusView({ character, ownerDiscordId });
+            await interaction.update({
+                embeds: [statusView.embed],
+                components: statusView.components,
                 content: '',
             });
             return true;
