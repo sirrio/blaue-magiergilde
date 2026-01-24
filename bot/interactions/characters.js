@@ -698,6 +698,50 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
     }
 }
 
+async function syncCharacterApprovalAnnouncement(characterId) {
+    const appUrl = resolveAppUrl();
+    const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    if (!appUrl || !token) {
+        console.warn('[bot] Character approval sync skipped: BOT_APP_URL or BOT_HTTP_TOKEN missing.');
+        return { ok: false, reason: 'config_missing' };
+    }
+
+    const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/sync`;
+    enableInsecureTlsIfNeeded(endpoint);
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Bot-Token': token,
+            },
+            body: JSON.stringify({ character_id: characterId }),
+            dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
+        });
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+            console.warn(`[bot] Character approval sync failed (${response.status}). ${preview}`);
+            return { ok: false, status: response.status };
+        }
+
+        return { ok: true };
+    } catch (error) {
+        console.warn('[bot] Character approval sync error.', error);
+        return { ok: false, reason: 'sync_failed' };
+    }
+}
+
+async function updateCharacterForDiscordAndSync(discordUser, characterId, payload) {
+    const result = await updateCharacterForDiscord(discordUser, characterId, payload);
+    if (result.ok) {
+        await syncCharacterApprovalAnnouncement(characterId);
+    }
+    return result;
+}
+
 async function showCreationError(interaction, state, ownerDiscordId, message) {
     state.step = 'basic';
     const payload = {
@@ -750,6 +794,10 @@ async function finalizeCharacterCreation(state) {
         if (avatarResult?.ok && typeof avatarResult.avatarPath === 'string') {
             data.avatar = avatarResult.avatarPath;
         }
+    }
+
+    if (result.id) {
+        await syncCharacterApprovalAnnouncement(result.id);
     }
 
     const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
@@ -848,6 +896,8 @@ async function handleAvatarUpdateMessage(message) {
         }).catch(() => undefined);
         return true;
     }
+
+    await syncCharacterApprovalAnnouncement(state.characterId);
 
     clearAvatarUpdateState(message.author.id);
 
@@ -1818,6 +1868,8 @@ async function handle(interaction) {
             return true;
         }
 
+        await interaction.deferUpdate();
+
         const classIds = interaction.values.map(value => Number(value)).filter(value => Number.isFinite(value));
         try {
             const result = await syncCharacterClassesForDiscord(interaction.user, characterId, classIds);
@@ -1825,6 +1877,8 @@ async function handle(interaction) {
                 await updateManageMessage(interaction, { content: 'Classes konnten nicht gespeichert werden.', flags: MessageFlags.Ephemeral });
                 return true;
             }
+
+            await syncCharacterApprovalAnnouncement(characterId);
 
             const character = await findCharacterForDiscord(interaction.user, characterId);
             if (!character) {
@@ -1856,13 +1910,15 @@ async function handle(interaction) {
             return true;
         }
 
+        await interaction.deferUpdate();
+
         const faction = String(interaction.values[0] || '').trim().toLowerCase();
         if (!allowedFactions.has(faction)) {
             await updateManageMessage(interaction, { content: 'Invalid faction.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        const result = await updateCharacterForDiscord(interaction.user, characterId, { faction });
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { faction });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -1874,7 +1930,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.update({
+        await updateManageMessage(interaction, {
             ...buildCharacterManageView(character, { ownerDiscordId }),
             content: '',
         });
@@ -1891,13 +1947,15 @@ async function handle(interaction) {
             return true;
         }
 
+        await interaction.deferUpdate();
+
         const guildStatus = String(interaction.values[0] || '').trim().toLowerCase();
         if (!['pending', 'draft'].includes(guildStatus)) {
             await updateManageMessage(interaction, { content: 'Invalid status.', flags: MessageFlags.Ephemeral });
             return true;
         }
 
-        const result = await updateCharacterForDiscord(interaction.user, characterId, { guildStatus });
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -1909,7 +1967,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.update({
+        await updateManageMessage(interaction, {
             ...buildCharacterManageView(character, { ownerDiscordId }),
             content: '',
         });
@@ -1939,7 +1997,7 @@ async function handle(interaction) {
             return true;
         }
 
-        const result = await updateCharacterForDiscord(interaction.user, characterId, {
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, {
             name,
             externalLink: url,
             notes,
@@ -1974,7 +2032,7 @@ async function handle(interaction) {
         }
 
         const dmBubbles = interaction.fields.getTextInputValue('dmBubbles');
-        const result = await updateCharacterForDiscord(interaction.user, characterId, { dmBubbles });
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { dmBubbles });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -2004,7 +2062,7 @@ async function handle(interaction) {
         }
 
         const dmCoins = interaction.fields.getTextInputValue('dmCoins');
-        const result = await updateCharacterForDiscord(interaction.user, characterId, { dmCoins });
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { dmCoins });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -2034,7 +2092,7 @@ async function handle(interaction) {
         }
 
         const bubbleShopSpend = interaction.fields.getTextInputValue('bubbleSpend');
-        const result = await updateCharacterForDiscord(interaction.user, characterId, { bubbleShopSpend });
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { bubbleShopSpend });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -2435,6 +2493,7 @@ async function handle(interaction) {
                 await interaction.update({ content: 'Character not found or already deleted.', components: [] });
                 return true;
             }
+            await syncCharacterApprovalAnnouncement(characterId);
             await updateCharacterListMessage(interaction, ownerDiscordId);
         } catch (error) {
              

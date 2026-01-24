@@ -8,7 +8,8 @@ async function updateManageMessage(interaction, payload, options = {}) {
     }
 
     const isModalSubmit = interaction?.isModalSubmit?.();
-    if (interaction?.isMessageComponent?.()) {
+    const canUpdateInteraction = interaction?.isMessageComponent?.() && !interaction.deferred && !interaction.replied;
+    if (canUpdateInteraction) {
         try {
             await interaction.update(sanitizedPayload);
             return;

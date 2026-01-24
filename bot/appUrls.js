@@ -2,10 +2,13 @@ function normalizeUrl(raw) {
     const value = String(raw || '').trim();
     if (!value) return '';
 
+    const trimmed = value.replace(/\/$/, '');
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+
     try {
-        return new URL(value).toString().replace(/\/$/, '');
+        return new URL(withScheme).toString().replace(/\/$/, '');
     } catch {
-        return value.replace(/\/$/, '');
+        return withScheme.replace(/\/$/, '');
     }
 }
 

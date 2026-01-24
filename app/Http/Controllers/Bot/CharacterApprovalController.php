@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Bot;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Bot\SyncCharacterApprovalRequest;
 use App\Http\Requests\Bot\UpdateCharacterApprovalStatusRequest;
 use App\Models\AdminAuditLog;
 use App\Models\Character;
@@ -85,6 +86,52 @@ class CharacterApprovalController extends Controller
         }
 
         return response()->json(['status' => 'updated']);
+    }
+
+    public function sync(
+        SyncCharacterApprovalRequest $request,
+        CharacterApprovalNotificationService $notificationService,
+    ): JsonResponse {
+        $this->ensureBotToken($request);
+
+        $data = $request->validated();
+        $character = Character::withTrashed()->find($data['character_id']);
+        if (! $character) {
+            return response()->json(['error' => 'Character not found.'], 404);
+        }
+
+        if ($character->trashed()) {
+            $result = $notificationService->removeAnnouncement($character);
+            if (! $result['ok']) {
+                Log::warning('Character approval announcement removal failed.', [
+                    'character_id' => $character->id,
+                    'error' => $result['error'] ?? null,
+                ]);
+            } else {
+                $deleted = (bool) ($result['deleted'] ?? false);
+                if (! $deleted && ($result['status'] ?? null) === 'deleted') {
+                    $deleted = true;
+                }
+                $noMessage = (int) ($result['status'] ?? 0) === 204;
+                if ($deleted || $noMessage) {
+                    $character->approval_discord_channel_id = null;
+                    $character->approval_discord_message_id = null;
+                    $character->save();
+                }
+            }
+
+            return response()->json(['status' => 'deleted']);
+        }
+
+        $syncResult = $notificationService->syncAnnouncement($character);
+        if (! $syncResult['ok']) {
+            Log::warning('Character approval announcement sync failed.', [
+                'character_id' => $character->id,
+                'error' => $syncResult['error'] ?? null,
+            ]);
+        }
+
+        return response()->json(['status' => 'synced']);
     }
 
     private function ensureBotToken(Request $request): void

@@ -901,8 +901,8 @@ function buildStatusRow(ownerDiscordId, selectedValue) {
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions([
-            { label: 'Pending review', value: 'pending' },
-            { label: 'Draft (hidden)', value: 'draft' },
+            { label: 'Active', value: 'pending' },
+            { label: 'Draft', value: 'draft' },
         ].map(option =>
             new StringSelectMenuOptionBuilder()
                 .setLabel(option.label)
@@ -1161,8 +1161,8 @@ function buildCharacterStatusView({ character, ownerDiscordId }) {
             .setMinValues(1)
             .setMaxValues(1)
             .addOptions([
-                { label: 'Pending review', value: 'pending' },
-                { label: 'Draft (hidden)', value: 'draft' },
+                { label: 'Active', value: 'pending' },
+                { label: 'Draft', value: 'draft' },
             ].map(option =>
                 new StringSelectMenuOptionBuilder()
                     .setLabel(option.label)

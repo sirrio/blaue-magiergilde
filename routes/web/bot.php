@@ -28,6 +28,9 @@ Route::prefix('bot')
         Route::post('character-approvals/status', [CharacterApprovalController::class, 'updateStatus'])
             ->name('bot.character-approvals.status');
 
+        Route::post('character-approvals/sync', [CharacterApprovalController::class, 'sync'])
+            ->name('bot.character-approvals.sync');
+
         Route::get('discord-owners', [DiscordBotSettingsController::class, 'ownerIds'])
             ->name('bot.discord-owners');
     });
