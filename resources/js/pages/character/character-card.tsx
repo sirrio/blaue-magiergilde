@@ -152,20 +152,22 @@ export function CharacterCard({
             <DestroyCharacterModal character={character} />
           </CardAction>
           <CardTitle className={cn('pb-0 flex items-center gap-2')}>
+            <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
+              {statusIcon}
+            </span>
             <span>{character.name}</span>
             {hasRoom ? (
               <span className="text-primary/70" title="Room assigned">
                 <MapPin size={14} />
               </span>
             ) : null}
-            <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
-              {statusIcon}
-            </span>
-            <LogoTier tier={tier} />
           </CardTitle>
           <CardContent>
-            <div className={cn('text-xs')}>
-              Level {level} {calculateClassString(character)}
+            <div className={cn('flex items-center gap-1 text-xs')}>
+              <LogoTier tier={tier} width={12} />
+              <span>
+                Level {level} {calculateClassString(character)}
+              </span>
             </div>
             <CharacterImage className="mt-4 mb-2" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
