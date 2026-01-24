@@ -60,7 +60,7 @@ class CharacterApprovalNotificationService
 
     public function notifyStatusChange(Character $character, string $status): array
     {
-        $character->load('user');
+        $character->load(['user', 'characterClasses']);
         $discordId = $character->user?->discord_id;
 
         if (! $discordId) {
@@ -71,6 +71,8 @@ class CharacterApprovalNotificationService
             ];
         }
 
+        $payload = $this->buildAnnouncementPayload($character);
+
         return $this->request('/character-approval/notify', [
             'discord_user_id' => (string) $discordId,
             'status' => $status,
@@ -78,6 +80,12 @@ class CharacterApprovalNotificationService
             'character_name' => $character->name,
             'character_url' => route('characters.show', $character),
             'characters_url' => route('characters.index'),
+            'character_tier' => $payload['character_tier'] ?? null,
+            'character_version' => $payload['character_version'] ?? null,
+            'character_faction' => $payload['character_faction'] ?? null,
+            'character_classes' => $payload['character_classes'] ?? [],
+            'character_avatar_url' => $payload['character_avatar_url'] ?? null,
+            'external_link' => $payload['external_link'] ?? null,
         ]);
     }
 

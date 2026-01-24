@@ -175,7 +175,20 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     };
 }
 
-async function sendCharacterApprovalDm({ client, discordUserId, status, characterName, characterUrl, charactersUrl }) {
+async function sendCharacterApprovalDm({
+    client,
+    discordUserId,
+    status,
+    characterName,
+    characterUrl,
+    charactersUrl,
+    characterTier,
+    characterVersion,
+    characterFaction,
+    characterClasses,
+    characterAvatarUrl,
+    externalLink,
+}) {
     if (!discordUserId || !/^[0-9]{5,}$/.test(String(discordUserId))) {
         return { ok: false, status: 422, error: 'Invalid discord_user_id.' };
     }
@@ -187,17 +200,91 @@ async function sendCharacterApprovalDm({ client, discordUserId, status, characte
         return { ok: false, status: 404, error: 'Discord user not found.' };
     }
 
-    const { label } = buildStatusInfo(status);
-    let message = `Your character **${characterName || 'Unknown'}** has been ${label.toLowerCase()}.`;
-    if (characterUrl) {
-        message += `\nCharacter: <${characterUrl}>`;
+    const { label, color } = buildStatusInfo(status);
+    const safeName = characterName || 'Unknown';
+    const tierBadge = characterTier ? String(characterTier).toUpperCase() : '';
+    const versionValue = characterVersion ? String(characterVersion).trim() : '';
+    const rawFaction = characterFaction ? String(characterFaction).trim() : '';
+    const faction = rawFaction.toLowerCase() === 'none' ? '' : rawFaction;
+    const classes = formatClasses(characterClasses);
+
+    let description = '';
+    if (label.toLowerCase() === 'approved') {
+        description = 'Your character is now approved and ready to play.';
+    } else if (label.toLowerCase() === 'declined') {
+        description = 'Your character was declined. Please review the details and update if needed.';
+    } else {
+        description = `Your character status is now **${label}**.`;
+    }
+
+    const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(`${label} · ${tierBadge ? `${tierBadge} ` : ''}${safeName}`)
+        .setDescription(description);
+
+    const fields = [];
+    if (tierBadge) {
+        fields.push({ name: 'Tier', value: tierBadge, inline: true });
+    }
+    if (versionValue) {
+        fields.push({ name: 'Version', value: versionValue, inline: true });
+    }
+    if (faction) {
+        fields.push({ name: 'Faction', value: faction, inline: true });
+    }
+    fields.push({ name: 'Classes', value: trimField(classes), inline: false });
+
+    if (fields.length > 0) {
+        embed.addFields(fields);
+    }
+
+    let avatarAttachment = null;
+    let avatarOverride = null;
+    if (characterAvatarUrl) {
+        if (shouldAllowInsecure(characterAvatarUrl)) {
+            try {
+                avatarAttachment = await fetchAvatarAttachment(characterAvatarUrl);
+                avatarOverride = `attachment://${avatarAttachment.name}`;
+            } catch (error) {
+                console.warn('[bot] Character approval DM avatar fetch failed.', error);
+            }
+        } else {
+            avatarOverride = characterAvatarUrl;
+        }
+    }
+
+    if (avatarOverride) {
+        embed.setThumbnail(avatarOverride);
+    }
+
+    const buttons = new ActionRowBuilder();
+    if (externalLink) {
+        buttons.addComponents(
+            new ButtonBuilder()
+                .setLabel('Open external link')
+                .setStyle(ButtonStyle.Link)
+                .setURL(externalLink),
+        );
     }
     if (charactersUrl) {
-        message += `\nYour characters: <${charactersUrl}>`;
+        buttons.addComponents(
+            new ButtonBuilder()
+                .setLabel('Your characters')
+                .setStyle(ButtonStyle.Link)
+                .setURL(charactersUrl),
+        );
+    }
+
+    const payload = { embeds: [embed] };
+    if (buttons.components.length > 0) {
+        payload.components = [buttons];
+    }
+    if (avatarAttachment) {
+        payload.files = [avatarAttachment];
     }
 
     try {
-        await user.send(message);
+        await user.send(payload);
         return { ok: true, status: 200 };
     } catch {
         return { ok: false, status: 500, error: 'Failed to send DM.' };

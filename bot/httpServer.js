@@ -223,6 +223,12 @@ function startHttpServer(client) {
             const characterName = String(payload?.character_name || '').trim();
             const characterUrl = typeof payload?.character_url === 'string' ? payload.character_url.trim() : '';
             const charactersUrl = typeof payload?.characters_url === 'string' ? payload.characters_url.trim() : '';
+            const characterTier = payload?.character_tier ? String(payload.character_tier).trim() : '';
+            const characterVersion = payload?.character_version ? String(payload.character_version).trim() : '';
+            const characterFaction = payload?.character_faction ? String(payload.character_faction).trim() : '';
+            const characterClasses = Array.isArray(payload?.character_classes) ? payload.character_classes : [];
+            const characterAvatarUrl = payload?.character_avatar_url ? String(payload.character_avatar_url).trim() : '';
+            const externalLink = typeof payload?.external_link === 'string' ? payload.external_link.trim() : '';
 
             const result = await sendCharacterApprovalDm({
                 client,
@@ -231,6 +237,12 @@ function startHttpServer(client) {
                 characterName,
                 characterUrl,
                 charactersUrl,
+                characterTier,
+                characterVersion,
+                characterFaction,
+                characterClasses,
+                characterAvatarUrl,
+                externalLink,
             });
 
             if (!result.ok) {
