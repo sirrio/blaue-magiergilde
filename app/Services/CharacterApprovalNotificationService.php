@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Character;
 use App\Models\DiscordBotSetting;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 
 class CharacterApprovalNotificationService
 {
@@ -89,11 +88,26 @@ class CharacterApprovalNotificationService
     {
         $avatarUrl = null;
         if ($character->avatar) {
-            $avatarUrl = Storage::disk('public')->url($character->avatar);
-            if (! str_starts_with($avatarUrl, 'http://') && ! str_starts_with($avatarUrl, 'https://')) {
-                $baseUrl = rtrim((string) config('app.url', ''), '/');
+            $avatarValue = trim((string) $character->avatar);
+            if (str_starts_with($avatarValue, 'http://') || str_starts_with($avatarValue, 'https://')) {
+                $avatarUrl = $avatarValue;
+            } else {
+                $baseUrl = rtrim((string) config('services.bot.public_url', ''), '/');
+                if ($baseUrl === '') {
+                    $baseUrl = rtrim((string) config('app.url', ''), '/');
+                }
+
                 if ($baseUrl !== '') {
-                    $avatarUrl = $baseUrl.'/'.ltrim($avatarUrl, '/');
+                    $path = ltrim($avatarValue, '/');
+                    if (str_starts_with($path, 'storage/')) {
+                        $path = substr($path, strlen('storage/'));
+                    }
+
+                    if ($character->user?->avatar_masked) {
+                        $avatarUrl = $baseUrl.'/avatars/masked?path='.urlencode($path);
+                    } else {
+                        $avatarUrl = $baseUrl.'/storage/'.$path;
+                    }
                 }
             }
         }

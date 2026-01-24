@@ -26,6 +26,7 @@ return [
 
     'bot' => [
         'app_url' => env('BOT_APP_URL'),
+        'public_url' => env('BOT_PUBLIC_APP_URL'),
         'http_url' => env('BOT_HTTP_URL'),
         'http_token' => env('BOT_HTTP_TOKEN'),
         'http_timeout' => env('BOT_HTTP_TIMEOUT', 10),

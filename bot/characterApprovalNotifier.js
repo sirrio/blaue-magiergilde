@@ -1,4 +1,30 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { withInsecureDispatcher, shouldAllowInsecure } = require('./httpClient');
+
+function resolveAvatarExtension(contentType, fallback) {
+    if (!contentType) return fallback;
+    const normalized = String(contentType).toLowerCase();
+    if (normalized.includes('image/jpeg')) return 'jpg';
+    if (normalized.includes('image/png')) return 'png';
+    if (normalized.includes('image/webp')) return 'webp';
+    if (normalized.includes('image/gif')) return 'gif';
+    return fallback;
+}
+
+async function fetchAvatarAttachment(url) {
+    const fallbackExtension = 'png';
+    const response = await fetch(url, withInsecureDispatcher(url));
+    if (!response.ok) {
+        throw new Error(`Avatar fetch failed (${response.status}).`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const extension = resolveAvatarExtension(contentType, fallbackExtension);
+    const filename = `character-avatar.${extension}`;
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    return new AttachmentBuilder(buffer, { name: filename });
+}
 
 const STATUS_STYLES = {
     pending: { label: 'Pending', color: 0xf59e0b },
@@ -23,6 +49,14 @@ function formatList(values) {
     return values.filter(Boolean).join(', ');
 }
 
+function formatClasses(values, limit = 3) {
+    if (!Array.isArray(values) || values.length === 0) return '—';
+    const trimmed = values.filter(Boolean);
+    if (trimmed.length <= limit) return trimmed.join(', ');
+    const visible = trimmed.slice(0, limit).join(', ');
+    return `${visible} +${trimmed.length - limit}`;
+}
+
 function trimField(value, max = 1024) {
     if (!value) return '—';
     const text = String(value).trim();
@@ -38,39 +72,53 @@ function isMeaningful(value) {
     return true;
 }
 
-function buildCharacterApprovalMessage(payload) {
+function buildCharacterApprovalMessage(payload, options = {}) {
     const statusRaw = payload?.character_status || 'pending';
     const { label, color } = buildStatusInfo(statusRaw);
     const name = payload?.character_name || 'Unknown character';
-    const tier = payload?.character_tier ? String(payload.character_tier).toUpperCase() : '—';
-    const version = payload?.character_version || '—';
-    const faction = payload?.character_faction || '—';
-    const classes = formatList(payload?.character_classes);
+    const tier = payload?.character_tier ? String(payload.character_tier).toUpperCase() : '';
+    const tierBadge = tier ? `[${tier}]` : '';
+    const versionValue = payload?.character_version ? String(payload.character_version).trim() : '';
+    const version = versionValue !== '' ? versionValue : null;
+    const rawFaction = payload?.character_faction;
+    const factionValue = rawFaction && String(rawFaction).trim() !== '' ? String(rawFaction) : '';
+    const faction = factionValue.toLowerCase() === 'none' ? '' : factionValue;
+    const classes = formatClasses(payload?.character_classes);
     const filler = payload?.character_is_filler ? 'Yes' : 'No';
     const dmBubbles = payload?.character_dm_bubbles ?? '—';
     const dmCoins = payload?.character_dm_coins ?? '—';
-    const shopSpend = payload?.character_shop_spend ?? '—';
+    const rawShopSpend = payload?.character_shop_spend ?? null;
+    const numericShopSpend = Number(rawShopSpend);
+    const shopSpend = Number.isFinite(numericShopSpend) ? numericShopSpend : null;
     const notes = trimField(payload?.character_notes || '');
     const externalLink = payload?.external_link || '';
     const approvalUrl = payload?.approval_url || '';
-    const avatarUrl = payload?.character_avatar_url || '';
+    const avatarUrl = options.avatarUrlOverride || payload?.character_avatar_url || '';
     const userName = payload?.user_name || 'Unknown';
     const userMention = buildUserMention(payload?.user_discord_id);
     const userLine = userMention ? `${userName} (${userMention})` : userName;
+    const dmSummary = `${dmBubbles} bubbles · ${dmCoins} coins`;
 
     const embed = new EmbedBuilder()
         .setColor(color)
-        .setTitle(`${label.toUpperCase()} · ${name}`)
-        .addFields(
-            { name: 'Tier', value: tier, inline: true },
-            { name: 'Version', value: version, inline: true },
-            { name: 'Faction', value: String(faction || '—'), inline: true },
-            { name: 'Classes', value: trimField(classes), inline: false },
-            { name: 'Filler', value: filler, inline: true },
-            { name: 'DM bubbles', value: String(dmBubbles), inline: true },
-            { name: 'DM coins', value: String(dmCoins), inline: true },
-            { name: 'Shop spend', value: String(shopSpend), inline: true },
-        );
+        .setTitle(`${label.toUpperCase()} · ${tierBadge ? `${tierBadge} ` : ''}${name}`);
+
+    const fields = [];
+    if (version) {
+        fields.push({ name: 'Version', value: version, inline: true });
+    }
+    if (faction) {
+        fields.push({ name: 'Faction', value: faction, inline: true });
+    }
+    fields.push({ name: 'Classes', value: trimField(classes), inline: false });
+    fields.push({ name: 'User', value: trimField(userLine, 1024), inline: false });
+    fields.push({ name: 'DM', value: dmSummary, inline: true });
+    fields.push({ name: 'Filler', value: filler, inline: true });
+    if (shopSpend !== null && shopSpend > 0) {
+        fields.push({ name: 'Shop spend', value: String(shopSpend), inline: true });
+    }
+
+    embed.addFields(fields);
 
     if (avatarUrl) {
         embed.setThumbnail(avatarUrl);
@@ -81,11 +129,7 @@ function buildCharacterApprovalMessage(payload) {
     }
 
     if (payload?.character_id) {
-        const footerParts = [`Character #${payload.character_id}`];
-        if (isMeaningful(userLine) && userLine !== 'Unknown') {
-            footerParts.push(`User: ${userLine}`);
-        }
-        embed.setFooter({ text: footerParts.join(' · ') });
+        embed.setFooter({ text: `Character #${payload.character_id}` });
     }
 
     const buttons = new ActionRowBuilder();
@@ -176,7 +220,22 @@ async function postCharacterApprovalAnnouncement({ client, channelId, payload })
         return { ok: false, status: 422, error: 'Channel must be text-based.' };
     }
 
-    const messagePayload = buildCharacterApprovalMessage(payload);
+    let avatarAttachment = null;
+    let avatarOverride = null;
+    const avatarUrl = payload?.character_avatar_url || '';
+    if (avatarUrl && shouldAllowInsecure(avatarUrl)) {
+        try {
+            avatarAttachment = await fetchAvatarAttachment(avatarUrl);
+            avatarOverride = `attachment://${avatarAttachment.name}`;
+        } catch (error) {
+            console.warn('[bot] Character approval avatar fetch failed.', error);
+        }
+    }
+
+    const messagePayload = buildCharacterApprovalMessage(payload, { avatarUrlOverride: avatarOverride });
+    if (avatarAttachment) {
+        messagePayload.files = [avatarAttachment];
+    }
 
     try {
         const message = await channel.send(messagePayload);
@@ -212,7 +271,22 @@ async function updateCharacterApprovalAnnouncement({ client, channelId, messageI
             return { ok: false, status: 404, error: 'Message not found.' };
         }
 
-        const messagePayload = buildCharacterApprovalMessage(payload);
+        let avatarAttachment = null;
+        let avatarOverride = null;
+        const avatarUrl = payload?.character_avatar_url || '';
+        if (avatarUrl && shouldAllowInsecure(avatarUrl)) {
+            try {
+                avatarAttachment = await fetchAvatarAttachment(avatarUrl);
+                avatarOverride = `attachment://${avatarAttachment.name}`;
+            } catch (error) {
+                console.warn('[bot] Character approval avatar fetch failed.', error);
+            }
+        }
+
+        const messagePayload = buildCharacterApprovalMessage(payload, { avatarUrlOverride: avatarOverride });
+        if (avatarAttachment) {
+            messagePayload.files = [avatarAttachment];
+        }
         await message.edit(messagePayload);
         return { ok: true, status: 200 };
     } catch {
@@ -221,6 +295,7 @@ async function updateCharacterApprovalAnnouncement({ client, channelId, messageI
 }
 
 module.exports = {
+    buildCharacterApprovalMessage,
     sendCharacterApprovalDm,
     postCharacterApprovalAnnouncement,
     updateCharacterApprovalAnnouncement,
