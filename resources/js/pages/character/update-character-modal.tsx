@@ -15,8 +15,8 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
   const currentStatus = character.guild_status ?? 'pending'
   const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
   const statusLabelMap: Record<string, string> = {
-    pending: 'Pending review',
-    draft: 'Draft (hidden)',
+    pending: 'Active',
+    draft: 'Draft',
     approved: 'Approved',
     declined: 'Declined',
     retired: 'Retired',
@@ -113,14 +113,14 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
                 disabled={!canEditStatus}
                 onChange={(e) => setData('guild_status', e.target.value)}
               >
-                <SelectLabel>Approval status</SelectLabel>
+                <SelectLabel>Visibility</SelectLabel>
                 <SelectOptions>
                   {!canEditStatus ? (
                     <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
                   ) : (
                     <>
-                      <option value="pending">Pending review</option>
-                      <option value="draft">Draft (hidden)</option>
+                      <option value="pending">Active</option>
+                      <option value="draft">Draft</option>
                     </>
                   )}
                 </SelectOptions>

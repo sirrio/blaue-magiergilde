@@ -104,10 +104,10 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                 value={data.guild_status}
                 onChange={(e) => setData('guild_status', e.target.value)}
               >
-                <SelectLabel>Approval status</SelectLabel>
+                <SelectLabel>Visibility</SelectLabel>
                 <SelectOptions>
-                  <option value="pending">Pending review</option>
-                  <option value="draft">Draft (hidden)</option>
+                  <option value="pending">Active</option>
+                  <option value="draft">Draft</option>
                 </SelectOptions>
               </Select>
               <Input

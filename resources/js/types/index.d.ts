@@ -186,6 +186,9 @@ export interface DiscordBackupStatus {
 
 export interface DiscordBotSettings {
   owner_ids: string[]
+  character_approval_channel_id?: string | null
+  character_approval_channel_name?: string | null
+  character_approval_channel_guild_id?: string | null
 }
 
 export interface DiscordBotOwner {

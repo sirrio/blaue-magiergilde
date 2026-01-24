@@ -8,6 +8,9 @@ class DiscordBotSetting extends Model
 {
     protected $fillable = [
         'owner_ids',
+        'character_approval_channel_id',
+        'character_approval_channel_name',
+        'character_approval_channel_guild_id',
     ];
 
     protected $casts = [

@@ -6,6 +6,7 @@ const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
+const { postCharacterApprovalAnnouncement, sendCharacterApprovalDm } = require('./characterApprovalNotifier');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
 const MAX_BODY_SIZE = 10 * 1024;
@@ -110,6 +111,8 @@ function startHttpServer(client) {
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isDiscordOwnersStatus = path === '/discord-owners/status';
+        const isCharacterApprovalNotify = path === '/character-approval/notify';
+        const isCharacterApprovalPending = path === '/character-approval/pending';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isBackstockPost = path === '/backstock-post';
@@ -123,6 +126,8 @@ function startHttpServer(client) {
             isDiscordThreads ||
             isDiscordBackupStatus ||
             isDiscordBackupChannel ||
+            isCharacterApprovalNotify ||
+            isCharacterApprovalPending ||
             isShopPost ||
             isShopUpdate ||
             isBackstockPost ||
@@ -200,6 +205,62 @@ function startHttpServer(client) {
                 updated_at: ownerIdsUpdatedAt() ? ownerIdsUpdatedAt().toISOString() : null,
                 owners,
             });
+            return;
+        }
+
+        if (isCharacterApprovalNotify) {
+            const discordUserId = String(payload?.discord_user_id || '').trim();
+            const status = String(payload?.status || '').trim();
+            const characterName = String(payload?.character_name || '').trim();
+            const characterUrl = typeof payload?.character_url === 'string' ? payload.character_url.trim() : '';
+            const charactersUrl = typeof payload?.characters_url === 'string' ? payload.characters_url.trim() : '';
+
+            const result = await sendCharacterApprovalDm({
+                client,
+                discordUserId,
+                status,
+                characterName,
+                characterUrl,
+                charactersUrl,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval DM failed');
+                respondJson(res, result.status || 500, { error: result.error || 'DM failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'sent' });
+            return;
+        }
+
+        if (isCharacterApprovalPending) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const characterName = String(payload?.character_name || '').trim();
+            const characterTier = payload?.character_tier ? String(payload.character_tier).trim() : '';
+            const userName = String(payload?.user_name || '').trim();
+            const userDiscordId = payload?.user_discord_id ? String(payload.user_discord_id).trim() : '';
+            const approvalUrl = typeof payload?.approval_url === 'string' ? payload.approval_url.trim() : '';
+            const characterUrl = typeof payload?.character_url === 'string' ? payload.character_url.trim() : '';
+
+            const result = await postCharacterApprovalAnnouncement({
+                client,
+                channelId,
+                characterName,
+                characterTier,
+                userName,
+                userDiscordId,
+                approvalUrl,
+                characterUrl,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval announcement failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'posted' });
             return;
         }
 

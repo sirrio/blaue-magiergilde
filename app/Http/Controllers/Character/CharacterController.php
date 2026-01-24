@@ -7,8 +7,10 @@ use App\Http\Requests\Character\StoreCharacterRequest;
 use App\Http\Requests\Character\UpdateCharacterRequest;
 use App\Models\Character;
 use App\Models\Game;
+use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -57,8 +59,10 @@ class CharacterController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreCharacterRequest $request): RedirectResponse
-    {
+    public function store(
+        StoreCharacterRequest $request,
+        CharacterApprovalNotificationService $notificationService,
+    ): RedirectResponse {
         $character = new Character;
         $character->name = $request->name;
         $character->faction = $request->faction;
@@ -79,6 +83,16 @@ class CharacterController extends Controller
 
         $classIds = array_values(array_unique($request->class));
         $character->characterClasses()->sync($classIds);
+
+        if ($character->guild_status === 'pending') {
+            $result = $notificationService->announcePending($character);
+            if (! $result['ok']) {
+                Log::warning('Character approval channel notification failed.', [
+                    'character_id' => $character->id,
+                    'error' => $result['error'] ?? null,
+                ]);
+            }
+        }
 
         return to_route('characters.index');
     }
@@ -115,10 +129,14 @@ class CharacterController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateCharacterRequest $request, Character $character): RedirectResponse
-    {
+    public function update(
+        UpdateCharacterRequest $request,
+        Character $character,
+        CharacterApprovalNotificationService $notificationService,
+    ): RedirectResponse {
         $this->ensureCharacterOwner($character);
 
+        $previousStatus = $character->guild_status;
         $character->name = $request->name;
         $character->faction = $request->faction;
         $character->notes = $request->notes;
@@ -137,6 +155,16 @@ class CharacterController extends Controller
 
         $classIds = array_values(array_unique($request->class));
         $character->characterClasses()->sync($classIds);
+
+        if ($previousStatus === 'draft' && $character->guild_status === 'pending') {
+            $result = $notificationService->announcePending($character);
+            if (! $result['ok']) {
+                Log::warning('Character approval channel notification failed.', [
+                    'character_id' => $character->id,
+                    'error' => $result['error'] ?? null,
+                ]);
+            }
+        }
 
         return to_route('characters.index');
     }

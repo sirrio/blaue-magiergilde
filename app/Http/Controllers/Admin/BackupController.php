@@ -59,6 +59,9 @@ class BackupController extends Controller
             ],
             'discordBotSettings' => [
                 'owner_ids' => DiscordBotSetting::current()->owner_ids ?? [],
+                'character_approval_channel_id' => DiscordBotSetting::current()->character_approval_channel_id,
+                'character_approval_channel_name' => DiscordBotSetting::current()->character_approval_channel_name,
+                'character_approval_channel_guild_id' => DiscordBotSetting::current()->character_approval_channel_guild_id,
             ],
         ]);
     }
