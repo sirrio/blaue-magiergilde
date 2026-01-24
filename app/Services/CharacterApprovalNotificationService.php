@@ -90,6 +90,12 @@ class CharacterApprovalNotificationService
         $avatarUrl = null;
         if ($character->avatar) {
             $avatarUrl = Storage::disk('public')->url($character->avatar);
+            if (! str_starts_with($avatarUrl, 'http://') && ! str_starts_with($avatarUrl, 'https://')) {
+                $baseUrl = rtrim((string) config('app.url', ''), '/');
+                if ($baseUrl !== '') {
+                    $avatarUrl = $baseUrl.'/'.ltrim($avatarUrl, '/');
+                }
+            }
         }
 
         $classes = $character->characterClasses

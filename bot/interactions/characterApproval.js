@@ -27,7 +27,7 @@ async function handle(interaction) {
 
     if (!appUrl || !token) {
         await interaction.reply({
-            content: 'Bot HTTP is not configured.',
+            content: 'Bot HTTP is not configured. Set BOT_PUBLIC_APP_URL/APP_URL and BOT_HTTP_TOKEN.',
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -51,7 +51,9 @@ async function handle(interaction) {
             }),
         });
     } catch (error) {
-        await interaction.editReply({ content: 'Failed to reach the app.' });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[bot] Character approval request failed.', { endpoint, error: message });
+        await interaction.editReply({ content: `Failed to reach the app (${endpoint}).` });
         return true;
     }
 

@@ -30,6 +30,14 @@ function trimField(value, max = 1024) {
     return `${text.slice(0, max - 3)}...`;
 }
 
+function isMeaningful(value) {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') {
+        return value.trim() !== '' && value.trim() !== '—';
+    }
+    return true;
+}
+
 function buildCharacterApprovalMessage(payload) {
     const statusRaw = payload?.character_status || 'pending';
     const { label, color } = buildStatusInfo(statusRaw);
@@ -53,27 +61,31 @@ function buildCharacterApprovalMessage(payload) {
     const embed = new EmbedBuilder()
         .setColor(color)
         .setTitle(`${label.toUpperCase()} · ${name}`)
-        .setDescription(`**Status:** ${label}`)
         .addFields(
             { name: 'Tier', value: tier, inline: true },
             { name: 'Version', value: version, inline: true },
-            { name: 'Faction', value: String(faction), inline: true },
+            { name: 'Faction', value: String(faction || '—'), inline: true },
             { name: 'Classes', value: trimField(classes), inline: false },
             { name: 'Filler', value: filler, inline: true },
             { name: 'DM bubbles', value: String(dmBubbles), inline: true },
             { name: 'DM coins', value: String(dmCoins), inline: true },
             { name: 'Shop spend', value: String(shopSpend), inline: true },
-            { name: 'User', value: trimField(userLine, 512), inline: true },
-            { name: 'Notes', value: notes, inline: false },
-            { name: 'External link', value: trimField(externalLink || '—', 512), inline: false },
         );
 
     if (avatarUrl) {
         embed.setThumbnail(avatarUrl);
     }
 
+    if (isMeaningful(notes) && notes !== '—') {
+        embed.addFields({ name: 'Notes', value: notes, inline: false });
+    }
+
     if (payload?.character_id) {
-        embed.setFooter({ text: `Character #${payload.character_id}` });
+        const footerParts = [`Character #${payload.character_id}`];
+        if (isMeaningful(userLine) && userLine !== 'Unknown') {
+            footerParts.push(`User: ${userLine}`);
+        }
+        embed.setFooter({ text: footerParts.join(' · ') });
     }
 
     const buttons = new ActionRowBuilder();
