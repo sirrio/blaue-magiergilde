@@ -271,11 +271,11 @@ function createAdventureState({ ownerDiscordId, characterId, mode = 'create', ad
         adventureId: adventureId ? Number(adventureId) : null,
         step: 'duration',
         data: {
-            durationSeconds: null,
-            startDate: '',
+            durationSeconds: 10800,
+            startDate: formatLocalIsoDate(),
             title: '',
             gameMaster: '',
-            hasAdditionalBubble: null,
+            hasAdditionalBubble: false,
             notes: '',
             allyIds: [],
             guildCharacterIds: [],
@@ -294,7 +294,7 @@ function createDowntimeState({ ownerDiscordId, characterId, mode = 'create', dow
         step: 'duration',
         data: {
             durationSeconds: null,
-            startDate: '',
+            startDate: formatLocalIsoDate(),
             type: 'other',
             notes: '',
         },
@@ -1043,8 +1043,15 @@ async function handle(interaction) {
             channelId: interaction.channelId,
             step: 'basic',
             data: {
+                name: '',
+                externalLink: '',
+                notes: '',
+                avatar: '',
                 classIds: [],
                 isFiller: false,
+                startTier: 'bt',
+                version: '2024',
+                faction: 'none',
             },
             promptInteraction: interaction,
             promptMessage: interaction.message ?? null,
@@ -1336,7 +1343,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
+                buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1447,7 +1454,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
+                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1608,7 +1615,7 @@ async function handle(interaction) {
             state.step = 'faction';
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction.'),
+                    buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
                 ],
                 components: [
                     buildFactionRow(ownerDiscordId, state.data.faction),
