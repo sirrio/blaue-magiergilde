@@ -81,6 +81,24 @@ class CharacterApprovalNotificationService
         ]);
     }
 
+    public function removeAnnouncement(Character $character): array
+    {
+        $channelId = $character->approval_discord_channel_id;
+        $messageId = $character->approval_discord_message_id;
+
+        if (! $channelId || ! $messageId) {
+            return [
+                'ok' => true,
+                'status' => 204,
+            ];
+        }
+
+        return $this->request('/character-approval/delete', [
+            'channel_id' => $channelId,
+            'message_id' => $messageId,
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */

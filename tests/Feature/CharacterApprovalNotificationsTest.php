@@ -117,3 +117,31 @@ it('posts a discord announcement when a draft character is submitted for review'
             && $request['character_name'] === $character->name;
     });
 });
+
+it('removes the discord announcement when a character is deleted', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/character-approval/delete' => Http::response(['status' => 'deleted'], 200),
+    ]);
+
+    $owner = User::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'pending',
+        'approval_discord_channel_id' => '9876543210',
+        'approval_discord_message_id' => '1234567890',
+    ]);
+
+    $this->actingAs($owner)->delete(route('characters.destroy', $character))->assertRedirect();
+
+    Http::assertSent(function ($request) use ($character) {
+        return $request->url() === 'http://bot.test/character-approval/delete'
+            && $request['channel_id'] === '9876543210'
+            && $request['message_id'] === '1234567890';
+    });
+
+    $character->refresh();
+    expect($character->approval_discord_channel_id)->toBeNull()
+        ->and($character->approval_discord_message_id)->toBeNull();
+});

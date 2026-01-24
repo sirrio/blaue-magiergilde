@@ -10,6 +10,7 @@ const {
     postCharacterApprovalAnnouncement,
     sendCharacterApprovalDm,
     updateCharacterApprovalAnnouncement,
+    deleteCharacterApprovalAnnouncement,
 } = require('./characterApprovalNotifier');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
@@ -118,6 +119,7 @@ function startHttpServer(client) {
         const isCharacterApprovalNotify = path === '/character-approval/notify';
         const isCharacterApprovalPending = path === '/character-approval/pending';
         const isCharacterApprovalUpdate = path === '/character-approval/update';
+        const isCharacterApprovalDelete = path === '/character-approval/delete';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isBackstockPost = path === '/backstock-post';
@@ -134,6 +136,7 @@ function startHttpServer(client) {
             isCharacterApprovalNotify ||
             isCharacterApprovalPending ||
             isCharacterApprovalUpdate ||
+            isCharacterApprovalDelete ||
             isShopPost ||
             isShopUpdate ||
             isBackstockPost ||
@@ -281,6 +284,26 @@ function startHttpServer(client) {
             }
 
             respondJson(res, 200, { status: 'updated' });
+            return;
+        }
+
+        if (isCharacterApprovalDelete) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const messageId = String(payload?.message_id || '').trim();
+
+            const result = await deleteCharacterApprovalAnnouncement({
+                client,
+                channelId,
+                messageId,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval delete failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement delete failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'deleted', deleted: result.deleted ?? false });
             return;
         }
 

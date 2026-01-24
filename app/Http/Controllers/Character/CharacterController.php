@@ -183,18 +183,30 @@ class CharacterController extends Controller
     ): RedirectResponse {
         $this->ensureCharacterOwner($character);
 
+        if ($character->approval_discord_channel_id && $character->approval_discord_message_id) {
+            $result = $notificationService->removeAnnouncement($character);
+            if (! $result['ok']) {
+                Log::warning('Character approval channel removal failed.', [
+                    'character_id' => $character->id,
+                    'error' => $result['error'] ?? null,
+                ]);
+            } else {
+                $deleted = (bool) ($result['deleted'] ?? false);
+                if (! $deleted && ($result['status'] ?? null) === 'deleted') {
+                    $deleted = true;
+                }
+                $noMessage = (int) ($result['status'] ?? 0) === 204;
+                if ($deleted || $noMessage) {
+                    $character->approval_discord_channel_id = null;
+                    $character->approval_discord_message_id = null;
+                }
+            }
+        }
+
         if ($character->guild_status === 'approved') {
             $character->guild_status = 'retired';
         }
         $character->save();
-
-        $result = $notificationService->syncAnnouncement($character);
-        if (! $result['ok']) {
-            Log::warning('Character approval channel notification failed.', [
-                'character_id' => $character->id,
-                'error' => $result['error'] ?? null,
-            ]);
-        }
 
         $character->adventures()->update([
             'deleted_by_character' => true,

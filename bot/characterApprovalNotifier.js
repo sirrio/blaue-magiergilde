@@ -294,9 +294,43 @@ async function updateCharacterApprovalAnnouncement({ client, channelId, messageI
     }
 }
 
+async function deleteCharacterApprovalAnnouncement({ client, channelId, messageId }) {
+    if (!channelId || !/^[0-9]{5,}$/.test(String(channelId))) {
+        return { ok: false, status: 422, error: 'Invalid channel_id.' };
+    }
+
+    if (!messageId || !/^[0-9]{5,}$/.test(String(messageId))) {
+        return { ok: false, status: 422, error: 'Invalid message_id.' };
+    }
+
+    let channel;
+    try {
+        channel = await client.channels.fetch(String(channelId));
+    } catch {
+        return { ok: true, status: 200, deleted: false, reason: 'Channel not found.' };
+    }
+
+    if (!channel?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Channel must be text-based.' };
+    }
+
+    try {
+        const message = await channel.messages.fetch(String(messageId));
+        if (!message) {
+            return { ok: true, status: 200, deleted: false, reason: 'Message not found.' };
+        }
+
+        await message.delete();
+        return { ok: true, status: 200, deleted: true };
+    } catch {
+        return { ok: true, status: 200, deleted: false, reason: 'Message not found.' };
+    }
+}
+
 module.exports = {
     buildCharacterApprovalMessage,
     sendCharacterApprovalDm,
     postCharacterApprovalAnnouncement,
     updateCharacterApprovalAnnouncement,
+    deleteCharacterApprovalAnnouncement,
 };
