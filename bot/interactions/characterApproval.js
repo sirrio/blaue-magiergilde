@@ -1,4 +1,6 @@
 const { MessageFlags } = require('discord.js');
+const { resolveApiBaseUrl } = require('../appUrls');
+const { withInsecureDispatcher } = require('../httpClient');
 
 function parseApprovalAction(customId) {
     if (!customId || !customId.startsWith('character-approval:')) return null;
@@ -22,12 +24,12 @@ async function handle(interaction) {
     const action = parseApprovalAction(interaction.customId);
     if (!action) return false;
 
-    const appUrl = String(process.env.BOT_PUBLIC_APP_URL || process.env.APP_URL || '').trim();
+    const appUrl = resolveApiBaseUrl();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
 
     if (!appUrl || !token) {
         await interaction.reply({
-            content: 'Bot HTTP is not configured. Set BOT_PUBLIC_APP_URL/APP_URL and BOT_HTTP_TOKEN.',
+            content: 'Bot HTTP is not configured. Set BOT_APP_URL and BOT_HTTP_TOKEN.',
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -38,7 +40,7 @@ async function handle(interaction) {
     const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/status`;
     let response;
     try {
-        response = await fetch(endpoint, {
+        response = await fetch(endpoint, withInsecureDispatcher(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -49,7 +51,7 @@ async function handle(interaction) {
                 status: action.status,
                 actor_discord_id: String(interaction.user.id),
             }),
-        });
+        }));
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error('[bot] Character approval request failed.', { endpoint, error: message });

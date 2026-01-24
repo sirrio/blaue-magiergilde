@@ -52,7 +52,8 @@ Set these in the root `.env`:
 - `DISCORD_GUILD_IDS` - comma-separated list (for guild commands, visible immediately)
 - `DISCORD_COMMAND_PREFIX` - for example `mg`
 - `DISCORD_OWNER_IDS` - fallback list of Discord user IDs (owner-only commands). The app can override this list.
-- `BOT_PUBLIC_APP_URL` - optional public base URL for links/avatars in Discord (for example `https://blaue-magiergilde.de`). Overrides `APP_URL` for the bot only.
+- `BOT_APP_URL` - internal base URL for bot → app API calls (for example `http://127.0.0.1:8000` or a private hostname).
+- `BOT_PUBLIC_APP_URL` - optional public base URL for links/avatars in Discord (for example `https://blaue-magiergilde.de`). Overrides `APP_URL` for links only.
 
 - `BOT_HTTP_TOKEN` - shared secret for bot HTTP control (voice sync + shop/auction posting + backup)
 - `BOT_HTTP_URL` - base URL for the bot HTTP server (no path, for example `http://127.0.0.1:3125`)

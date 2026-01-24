@@ -46,12 +46,14 @@ class DiscordBackupController extends Controller
 
         $timeout = max(1, (int) config('services.bot.http_timeout', 10));
 
+        $appUrl = trim((string) config('services.bot.app_url', '')) ?: config('app.url');
+
         try {
             $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup', [
-                    'app_url' => config('app.url'),
+                    'app_url' => $appUrl,
                     'guilds' => $guildSelections,
                 ]);
         } catch (\Throwable $error) {
@@ -166,12 +168,14 @@ class DiscordBackupController extends Controller
 
         $timeout = max(1, (int) config('services.bot.http_timeout', 10));
 
+        $appUrl = trim((string) config('services.bot.app_url', '')) ?: config('app.url');
+
         try {
             $response = Http::timeout($timeout)
                 ->acceptJson()
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup/channel', [
-                    'app_url' => config('app.url'),
+                    'app_url' => $appUrl,
                     'channel_id' => $discordChannel->id,
                     'guild_id' => $discordChannel->guild_id,
                     'guilds' => [[

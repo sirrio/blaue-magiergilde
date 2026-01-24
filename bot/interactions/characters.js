@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const { Agent } = require('undici');
 const { updateCreationReply } = require('./interactionReplies');
+const { resolveApiBaseUrl } = require('../appUrls');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
@@ -534,13 +535,7 @@ async function updateCreationMessage(state, payload) {
 }
 
 function resolveAppUrl() {
-    const direct = String(process.env.BOT_PUBLIC_APP_URL || process.env.APP_URL || '').trim();
-    if (!direct) return '';
-    try {
-        return new URL(direct).toString().replace(/\/$/, '');
-    } catch {
-        return direct.replace(/\/$/, '');
-    }
+    return resolveApiBaseUrl();
 }
 
 const insecureAgent = new Agent({
@@ -623,7 +618,7 @@ async function storeCharacterAvatar(characterId, avatarUrl) {
         return { ok: false, reason: 'missing_input' };
     }
     if (!appUrl || !token) {
-        console.warn('[bot] Avatar upload skipped: BOT_PUBLIC_APP_URL/APP_URL or BOT_HTTP_TOKEN missing.');
+        console.warn('[bot] Avatar upload skipped: BOT_APP_URL or BOT_HTTP_TOKEN missing.');
         return { ok: false, reason: 'config_missing' };
     }
 

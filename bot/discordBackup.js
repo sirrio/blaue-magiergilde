@@ -1,6 +1,8 @@
 const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const { guildIds } = require('./config');
+const { resolveApiBaseUrl } = require('./appUrls');
+const { withInsecureDispatcher } = require('./httpClient');
 
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_DELAY_MS = 1200;
@@ -30,11 +32,11 @@ function sleep(ms) {
 }
 
 function resolveAppUrl(appUrl) {
-    const direct = String(appUrl || '').trim();
-    if (direct) return direct.replace(/\/$/, '');
+    const internal = resolveApiBaseUrl();
+    if (internal) return internal;
 
-    const fallback = String(process.env.BOT_PUBLIC_APP_URL || process.env.APP_URL || '').trim();
-    return fallback ? fallback.replace(/\/$/, '') : '';
+    const direct = String(appUrl || '').trim();
+    return direct ? direct.replace(/\/$/, '') : '';
 }
 
 function resolveGuildIds(client) {
@@ -85,9 +87,10 @@ async function fetchChannelState(appUrl, token, guildId) {
     const url = new URL('/bot/discord-backups/channels', appUrl);
     url.searchParams.set('guild_id', guildId);
 
-    const response = await fetch(url.toString(), {
+    const endpoint = url.toString();
+    const response = await fetch(endpoint, withInsecureDispatcher(endpoint, {
         headers: { 'X-Bot-Token': token },
-    });
+    }));
 
     if (!response.ok) {
         console.warn('[bot] Discord backup: failed to fetch channel state.');
@@ -264,14 +267,15 @@ async function listChannelThreads(client, channelId, options = {}) {
 }
 
 async function postJson(appUrl, token, path, payload) {
-    const response = await fetch(`${appUrl}${path}`, {
+    const endpoint = `${appUrl}${path}`;
+    const response = await fetch(endpoint, withInsecureDispatcher(endpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Bot-Token': token,
         },
         body: JSON.stringify(payload),
-    });
+    }));
 
     if (!response.ok) {
         const errorBody = await response.text();
@@ -303,13 +307,14 @@ async function uploadAttachment(appUrl, token, messageId, attachment) {
     form.append('url', attachment.url);
     form.append('file', new Blob([buffer], { type: contentType }));
 
-    const uploadResponse = await fetch(`${appUrl}/bot/discord-backups/attachments`, {
+    const uploadEndpoint = `${appUrl}/bot/discord-backups/attachments`;
+    const uploadResponse = await fetch(uploadEndpoint, withInsecureDispatcher(uploadEndpoint, {
         method: 'POST',
         headers: {
             'X-Bot-Token': token,
         },
         body: form,
-    });
+    }));
 
     if (!uploadResponse.ok) {
         const errorBody = await uploadResponse.text();
