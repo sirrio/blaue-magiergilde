@@ -10,7 +10,7 @@ class CharacterApprovalNotificationService
 {
     public function syncAnnouncement(Character $character): array
     {
-        $character->loadMissing(['user', 'characterClasses']);
+        $character->load(['user', 'characterClasses']);
 
         $channelId = $character->approval_discord_channel_id;
         $messageId = $character->approval_discord_message_id;
@@ -60,7 +60,7 @@ class CharacterApprovalNotificationService
 
     public function notifyStatusChange(Character $character, string $status): array
     {
-        $character->loadMissing('user');
+        $character->load('user');
         $discordId = $character->user?->discord_id;
 
         if (! $discordId) {
