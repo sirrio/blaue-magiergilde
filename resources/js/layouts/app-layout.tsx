@@ -63,13 +63,14 @@ const adminSections = [
       { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
     ],
   },
-      {
-        label: 'Administration',
-        links: [
-          { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
-          { name: 'Manage Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
-        ],
-      },
+  {
+    label: 'Administration',
+    links: [
+      { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
+      { name: 'Games', route: 'admin.games', method: 'get' as const, icon: CalendarDays },
+      { name: 'Manage Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
+    ],
+  },
   {
     label: 'System',
     links: [

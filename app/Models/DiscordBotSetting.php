@@ -11,6 +11,9 @@ class DiscordBotSetting extends Model
         'character_approval_channel_id',
         'character_approval_channel_name',
         'character_approval_channel_guild_id',
+        'games_channel_id',
+        'games_channel_name',
+        'games_channel_guild_id',
     ];
 
     protected $casts = [
