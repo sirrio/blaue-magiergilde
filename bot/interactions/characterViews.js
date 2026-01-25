@@ -44,6 +44,8 @@ const allowedFactions = new Set([
     'waffenmeister',
     'arkanisten',
 ]);
+const allowedGuildStatuses = new Set(['pending', 'draft', 'approved', 'declined', 'retired']);
+const editableGuildStatuses = new Set(['pending', 'draft']);
 const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
 const downtimeCreationSteps = ['duration', 'date', 'type', 'notes', 'confirm'];
 
@@ -109,6 +111,25 @@ function formatFactionLabel(value) {
         .join(' ');
 }
 
+function normalizeGuildStatus(value, fallback = 'pending') {
+    const status = String(value || '').trim().toLowerCase();
+    return allowedGuildStatuses.has(status) ? status : fallback;
+}
+
+function formatGuildStatusLabel(value) {
+    const status = normalizeGuildStatus(value);
+    if (status === 'approved') return 'Approved';
+    if (status === 'declined') return 'Declined';
+    if (status === 'retired') return 'Retired';
+    if (status === 'draft') return 'Draft';
+    return 'Pending';
+}
+
+function canEditGuildStatus(value) {
+    const status = normalizeGuildStatus(value);
+    return editableGuildStatuses.has(status);
+}
+
 function safeInt(value, fallback = 0) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
@@ -147,6 +168,10 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
                 .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
                 .setLabel('Bubble Shop')
                 .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_status_${characterId}_${ownerDiscordId}`)
+                .setLabel('Status')
+                .setStyle(ButtonStyle.Secondary),
         ),
     ];
 
@@ -183,6 +208,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const dmBubbles = String(safeInt(character.dm_bubbles));
     const dmCoins = String(safeInt(character.dm_coins));
     const bubbleSpend = String(safeInt(character.bubble_shop_spend));
+    const statusLabel = formatGuildStatusLabel(character.guild_status);
 
     const descriptionParts = [name];
     if (currentTier !== '-') {
@@ -200,6 +226,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Level', value: String(level), inline: true },
             { name: 'Current tier', value: currentTier, inline: true },
             { name: 'Tracking', value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard', inline: true },
+            { name: 'Status', value: statusLabel, inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
             { name: 'External Link', value: linkValue, inline: false },
@@ -235,6 +262,7 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
             characterId: character.id,
             isFiller: character.is_filler,
             simplifiedTracking,
+            guildStatus: character.guild_status,
         }),
         files,
     };
@@ -760,7 +788,7 @@ function buildCreationEmbed(step, title, description) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
-        .setFooter({ text: `Step ${step}/7` });
+        .setFooter({ text: `Step ${step}/8` });
 }
 
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
@@ -856,6 +884,25 @@ function buildVersionRow(ownerDiscordId, selectedValue) {
         .addOptions([
             { label: '2014', value: '2014' },
             { label: '2024', value: '2024' },
+        ].map(option =>
+            new StringSelectMenuOptionBuilder()
+                .setLabel(option.label)
+                .setValue(option.value)
+                .setDefault(option.value === selectedValue),
+        ));
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+function buildStatusRow(ownerDiscordId, selectedValue) {
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`charactersCreate_status_${ownerDiscordId}`)
+        .setPlaceholder('Select status...')
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions([
+            { label: 'Active', value: 'pending' },
+            { label: 'Draft', value: 'draft' },
         ].map(option =>
             new StringSelectMenuOptionBuilder()
                 .setLabel(option.label)
@@ -965,6 +1012,7 @@ async function buildCreationSummaryEmbed(state) {
         .filter(Boolean);
 
     const tierLabel = state.data.isFiller ? 'Filler' : String(state.data.startTier || '').toUpperCase();
+    const statusLabel = formatGuildStatusLabel(state.data.guildStatus);
     const embed = new EmbedBuilder()
         .setTitle('Zusammenfassung')
         .setColor(0x4f46e5)
@@ -976,6 +1024,7 @@ async function buildCreationSummaryEmbed(state) {
             { name: 'Starting tier', value: tierLabel || '-', inline: true },
             { name: 'Faction', value: state.data.faction || 'none', inline: true },
             { name: 'Version', value: state.data.version || '2024', inline: true },
+            { name: 'Status', value: statusLabel, inline: true },
             { name: 'Notes', value: state.data.notes ? state.data.notes : '-', inline: false },
         );
 
@@ -1089,6 +1138,53 @@ function buildCharacterFactionView({ character, ownerDiscordId }) {
     return { embed, components };
 }
 
+function buildCharacterStatusView({ character, ownerDiscordId }) {
+    const status = normalizeGuildStatus(character.guild_status);
+    const statusLabel = formatGuildStatusLabel(status);
+    const editable = canEditGuildStatus(status);
+
+    const embed = new EmbedBuilder()
+        .setTitle('Status')
+        .setColor(0x4f46e5)
+        .setDescription(
+            editable
+                ? `Choose the approval status for ${character.name}.`
+                : `${character.name} is **${statusLabel}**. This status cannot be changed here.`,
+        );
+
+    const components = [];
+
+    if (editable) {
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`characterStatusSelect_${character.id}_${ownerDiscordId}`)
+            .setPlaceholder('Select status...')
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions([
+                { label: 'Active', value: 'pending' },
+                { label: 'Draft', value: 'draft' },
+            ].map(option =>
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(option.label)
+                    .setValue(option.value)
+                    .setDefault(option.value === status),
+            ));
+
+        components.push(new ActionRowBuilder().addComponents(select));
+    }
+
+    components.push(
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    );
+
+    return { embed, components };
+}
+
 function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -1128,9 +1224,10 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking }) {
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
     const primaryRow = new ActionRowBuilder();
-    if (!simplifiedTracking) {
+    const canLogActivity = guildStatus !== 'draft';
+    if (!simplifiedTracking && canLogActivity) {
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
@@ -1970,6 +2067,7 @@ module.exports = {
     getStartTierSelection,
     buildFactionRow,
     buildVersionRow,
+    buildStatusRow,
     buildCreationConfirmRows,
     buildCreationBasicsRows,
     buildCreationStepActionRows,
@@ -1980,6 +2078,7 @@ module.exports = {
     buildCreationBasicModal,
     buildCharacterClassesView,
     buildCharacterFactionView,
+    buildCharacterStatusView,
     buildDeleteConfirmRow,
     buildAdventureDeleteConfirmRow,
     buildDowntimeDeleteConfirmRow,
@@ -2018,6 +2117,8 @@ module.exports = {
     buildAdventureParticipantsView,
     allowedFactions,
     formatFactionLabel,
+    formatGuildStatusLabel,
+    canEditGuildStatus,
     safeInt,
     participantSearchKey,
     setParticipantSearch,

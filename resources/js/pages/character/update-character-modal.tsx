@@ -12,6 +12,15 @@ import { Settings } from 'lucide-react'
 import React, { useState } from 'react'
 
 const UpdateCharacterModal = ({ character }: { character: Character }) => {
+  const currentStatus = character.guild_status ?? 'pending'
+  const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
+  const statusLabelMap: Record<string, string> = {
+    pending: 'Active',
+    draft: 'Draft',
+    approved: 'Approved',
+    declined: 'Declined',
+    retired: 'Retired',
+  }
   const formData = {
     name: character.name,
     class: character.character_classes.map((cc) => cc.id),
@@ -23,6 +32,7 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
     bubble_shop_spend: character.bubble_shop_spend,
     external_link: character.external_link,
     is_filler: character.is_filler,
+    ...(canEditStatus ? { guild_status: currentStatus } : {}),
     avatar: undefined,
   }
 
@@ -95,6 +105,23 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
                       {version}
                     </option>
                   ))}
+                </SelectOptions>
+              </Select>
+              <Select
+                errors={errors.guild_status}
+                value={canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
+                onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
+              >
+                <SelectLabel>Visibility</SelectLabel>
+                <SelectOptions>
+                  {!canEditStatus ? (
+                    <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
+                  ) : (
+                    <>
+                      <option value="pending">Active</option>
+                      <option value="draft">Draft</option>
+                    </>
+                  )}
                 </SelectOptions>
               </Select>
               <Input

@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
+use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -43,7 +45,7 @@ class CharacterApprovalController extends Controller
             });
         }
 
-        if (in_array($status, ['pending', 'approved', 'declined', 'retired'], true)) {
+        if (in_array($status, ['pending', 'approved', 'declined', 'retired', 'draft'], true)) {
             $charactersQuery->where('guild_status', $status);
         }
 
@@ -83,8 +85,11 @@ class CharacterApprovalController extends Controller
         ]);
     }
 
-    public function update(Request $request, Character $character): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        Character $character,
+        CharacterApprovalNotificationService $notificationService,
+    ): RedirectResponse {
         $user = $request->user();
         abort_unless($user && $user->is_admin, 403);
 
@@ -92,11 +97,17 @@ class CharacterApprovalController extends Controller
             'guild_status' => ['sometimes', 'required', 'in:pending,approved,declined'],
             'admin_notes' => ['nullable', 'string'],
         ]);
+        $statusChange = null;
 
         if (array_key_exists('guild_status', $data)) {
             if ($character->guild_status === 'retired') {
                 return redirect()->back()->withErrors([
                     'guild_status' => 'Retired characters cannot change status.',
+                ]);
+            }
+            if ($character->guild_status === 'draft') {
+                return redirect()->back()->withErrors([
+                    'guild_status' => 'Draft characters must be submitted by their owner.',
                 ]);
             }
             $previousStatus = $character->guild_status;
@@ -111,6 +122,7 @@ class CharacterApprovalController extends Controller
                     'to' => $data['guild_status'],
                 ],
             ]);
+            $statusChange = $data['guild_status'];
         }
 
         if (array_key_exists('admin_notes', $data)) {
@@ -130,6 +142,28 @@ class CharacterApprovalController extends Controller
         }
 
         $character->save();
+
+        if ($statusChange) {
+            $syncResult = $notificationService->syncAnnouncement($character);
+            if (! $syncResult['ok'] && $syncResult['status'] !== 204) {
+                Log::warning('Character approval announcement update failed.', [
+                    'character_id' => $character->id,
+                    'status' => $statusChange,
+                    'error' => $syncResult['error'] ?? null,
+                ]);
+            }
+
+            if (in_array($statusChange, ['approved', 'declined'], true)) {
+                $result = $notificationService->notifyStatusChange($character, $statusChange);
+                if (! $result['ok']) {
+                    Log::warning('Character approval DM failed.', [
+                        'character_id' => $character->id,
+                        'status' => $statusChange,
+                        'error' => $result['error'] ?? null,
+                    ]);
+                }
+            }
+        }
 
         return redirect()->back();
     }

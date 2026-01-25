@@ -46,6 +46,8 @@ const allowedFactions = new Set([
     'waffenmeister',
     'arkanisten',
 ]);
+const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'retired', 'draft']);
+const allowedUserGuildStatuses = new Set(['pending', 'draft']);
 
 function normalizeTier(value, fallback = 'bt') {
     const tier = String(value || '').trim().toLowerCase();
@@ -60,6 +62,16 @@ function normalizeVersion(value, fallback = '2024') {
 function normalizeFaction(value, fallback = 'none') {
     const faction = String(value || '').trim().toLowerCase();
     return allowedFactions.has(faction) ? faction : fallback;
+}
+
+function normalizeGuildStatus(value, fallback = 'pending') {
+    const status = String(value || '').trim().toLowerCase();
+    return allowedGuildStatuses.has(status) ? status : fallback;
+}
+
+function normalizeUserGuildStatus(value, fallback = 'pending') {
+    const status = normalizeGuildStatus(value, fallback);
+    return allowedUserGuildStatuses.has(status) ? status : fallback;
 }
 
 function normalizeBoolean(value, fallback = false) {
@@ -483,6 +495,7 @@ async function createCharacterForDiscord(
         dmCoins,
         bubbleShopSpend,
         isFiller,
+        guildStatus,
         classIds = [],
     },
 ) {
@@ -502,6 +515,7 @@ async function createCharacterForDiscord(
     const safeDmCoins = normalizeNumber(dmCoins, 0);
     const safeBubbleShop = normalizeNumber(bubbleShopSpend, 0);
     const safeIsFiller = normalizeBoolean(isFiller, false);
+    const safeGuildStatus = normalizeUserGuildStatus(guildStatus, 'pending');
 
     const connection = await db.getConnection();
     try {
@@ -512,7 +526,7 @@ async function createCharacterForDiscord(
             INSERT INTO characters
                     (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, created_at, updated_at)
             VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 safeName,
@@ -526,6 +540,7 @@ async function createCharacterForDiscord(
                 safeVersion,
                 safeIsFiller ? 1 : 0,
                 userId,
+                safeGuildStatus,
                 createdAt,
                 createdAt,
             ],
@@ -578,7 +593,7 @@ async function createCharacterForDiscord(
 async function updateCharacterForDiscord(
     discordUser,
     characterId,
-    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller },
+    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus },
 ) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
@@ -599,11 +614,14 @@ async function updateCharacterForDiscord(
         ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
         : existing.bubble_shop_spend;
     const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
+    const newGuildStatus = typeof guildStatus !== 'undefined'
+        ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
+        : existing.guild_status;
 
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
         [
@@ -618,6 +636,7 @@ async function updateCharacterForDiscord(
             newDmCoins,
             newBubbleShopSpend,
             newIsFiller ? 1 : 0,
+            newGuildStatus,
             updatedAt,
             characterId,
             userId,

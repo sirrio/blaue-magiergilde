@@ -47,7 +47,8 @@ class DiscordBotSettingsController extends Controller
 
     public function update(UpdateDiscordBotSettingsRequest $request): RedirectResponse
     {
-        $raw = (string) ($request->validated()['owner_ids'] ?? '');
+        $validated = $request->validated();
+        $raw = (string) ($validated['owner_ids'] ?? '');
 
         $ownerIds = collect(explode(',', $raw))
             ->map(fn ($id) => trim($id))
@@ -55,9 +56,26 @@ class DiscordBotSettingsController extends Controller
             ->values()
             ->all();
 
-        DiscordBotSetting::current()->update([
+        $updates = [
             'owner_ids' => $ownerIds,
-        ]);
+        ];
+
+        if (array_key_exists('character_approval_channel_id', $validated)) {
+            $channelId = trim((string) ($validated['character_approval_channel_id'] ?? ''));
+            $updates['character_approval_channel_id'] = $channelId !== '' ? $channelId : null;
+        }
+
+        if (array_key_exists('character_approval_channel_name', $validated)) {
+            $channelName = trim((string) ($validated['character_approval_channel_name'] ?? ''));
+            $updates['character_approval_channel_name'] = $channelName !== '' ? $channelName : null;
+        }
+
+        if (array_key_exists('character_approval_channel_guild_id', $validated)) {
+            $guildId = trim((string) ($validated['character_approval_channel_guild_id'] ?? ''));
+            $updates['character_approval_channel_guild_id'] = $guildId !== '' ? $guildId : null;
+        }
+
+        DiscordBotSetting::current()->update($updates);
 
         return redirect()->back();
     }

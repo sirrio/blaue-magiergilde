@@ -2,6 +2,7 @@ const { Events } = require('discord.js');
 
 const { isOwner } = require('../commandConfig');
 const appJoin = require('../interactions/appJoin');
+const characterApproval = require('../interactions/characterApproval');
 const characters = require('../interactions/characters');
 const newGame = require('../interactions/newGame');
 
@@ -10,6 +11,7 @@ module.exports = {
     async execute(interaction) {
         try {
             if (await appJoin.handle(interaction)) return;
+            if (await characterApproval.handle(interaction)) return;
             if (await characters.handle(interaction)) return;
             if (await newGame.handle(interaction)) return;
 

@@ -6,6 +6,12 @@ const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
+const {
+    postCharacterApprovalAnnouncement,
+    sendCharacterApprovalDm,
+    updateCharacterApprovalAnnouncement,
+    deleteCharacterApprovalAnnouncement,
+} = require('./characterApprovalNotifier');
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.BOT_HTTP_RATE_LIMIT_MS || 3000);
 const MAX_BODY_SIZE = 10 * 1024;
@@ -110,6 +116,10 @@ function startHttpServer(client) {
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isDiscordOwnersStatus = path === '/discord-owners/status';
+        const isCharacterApprovalNotify = path === '/character-approval/notify';
+        const isCharacterApprovalPending = path === '/character-approval/pending';
+        const isCharacterApprovalUpdate = path === '/character-approval/update';
+        const isCharacterApprovalDelete = path === '/character-approval/delete';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isBackstockPost = path === '/backstock-post';
@@ -123,6 +133,10 @@ function startHttpServer(client) {
             isDiscordThreads ||
             isDiscordBackupStatus ||
             isDiscordBackupChannel ||
+            isCharacterApprovalNotify ||
+            isCharacterApprovalPending ||
+            isCharacterApprovalUpdate ||
+            isCharacterApprovalDelete ||
             isShopPost ||
             isShopUpdate ||
             isBackstockPost ||
@@ -200,6 +214,108 @@ function startHttpServer(client) {
                 updated_at: ownerIdsUpdatedAt() ? ownerIdsUpdatedAt().toISOString() : null,
                 owners,
             });
+            return;
+        }
+
+        if (isCharacterApprovalNotify) {
+            const discordUserId = String(payload?.discord_user_id || '').trim();
+            const status = String(payload?.status || '').trim();
+            const characterName = String(payload?.character_name || '').trim();
+            const characterUrl = typeof payload?.character_url === 'string' ? payload.character_url.trim() : '';
+            const charactersUrl = typeof payload?.characters_url === 'string' ? payload.characters_url.trim() : '';
+            const characterTier = payload?.character_tier ? String(payload.character_tier).trim() : '';
+            const characterVersion = payload?.character_version ? String(payload.character_version).trim() : '';
+            const characterFaction = payload?.character_faction ? String(payload.character_faction).trim() : '';
+            const characterClasses = Array.isArray(payload?.character_classes) ? payload.character_classes : [];
+            const characterAvatarUrl = payload?.character_avatar_url ? String(payload.character_avatar_url).trim() : '';
+            const externalLink = typeof payload?.external_link === 'string' ? payload.external_link.trim() : '';
+
+            const result = await sendCharacterApprovalDm({
+                client,
+                discordUserId,
+                status,
+                characterName,
+                characterUrl,
+                charactersUrl,
+                characterTier,
+                characterVersion,
+                characterFaction,
+                characterClasses,
+                characterAvatarUrl,
+                externalLink,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval DM failed');
+                respondJson(res, result.status || 500, { error: result.error || 'DM failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'sent' });
+            return;
+        }
+
+        if (isCharacterApprovalPending) {
+            const channelId = String(payload?.channel_id || '').trim();
+
+            const result = await postCharacterApprovalAnnouncement({
+                client,
+                channelId,
+                payload,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval announcement failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement failed.' });
+                return;
+            }
+
+            respondJson(res, 200, {
+                status: 'posted',
+                channel_id: result.channel_id,
+                message_id: result.message_id,
+            });
+            return;
+        }
+
+        if (isCharacterApprovalUpdate) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const messageId = String(payload?.message_id || '').trim();
+
+            const result = await updateCharacterApprovalAnnouncement({
+                client,
+                channelId,
+                messageId,
+                payload,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval update failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement update failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'updated' });
+            return;
+        }
+
+        if (isCharacterApprovalDelete) {
+            const channelId = String(payload?.channel_id || '').trim();
+            const messageId = String(payload?.message_id || '').trim();
+
+            const result = await deleteCharacterApprovalAnnouncement({
+                client,
+                channelId,
+                messageId,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character approval delete failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement delete failed.' });
+                return;
+            }
+
+            respondJson(res, 200, { status: 'deleted', deleted: result.deleted ?? false });
             return;
         }
 

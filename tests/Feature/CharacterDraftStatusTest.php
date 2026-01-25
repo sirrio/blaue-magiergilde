@@ -1,0 +1,78 @@
+<?php
+
+use App\Models\Character;
+use App\Models\CharacterClass;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('allows owners to create draft characters', function () {
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('characters.store'), [
+            'name' => 'Draft Mage',
+            'class' => [$class->id],
+            'external_link' => 'https://example.com',
+            'start_tier' => 'bt',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+            'guild_status' => 'draft',
+        ])
+        ->assertRedirect(route('characters.index'));
+
+    $this->assertDatabaseHas('characters', [
+        'user_id' => $user->id,
+        'name' => 'Draft Mage',
+        'guild_status' => 'draft',
+    ]);
+});
+
+it('lets owners switch between pending and draft', function () {
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'guild_status' => 'pending',
+        'is_filler' => false,
+    ]);
+
+    $this->actingAs($user)
+        ->put(route('characters.update', $character), [
+            'name' => $character->name,
+            'class' => [$class->id],
+            'external_link' => $character->external_link,
+            'version' => $character->version,
+            'dm_bubbles' => $character->dm_bubbles,
+            'dm_coins' => $character->dm_coins,
+            'bubble_shop_spend' => $character->bubble_shop_spend,
+            'is_filler' => $character->is_filler,
+            'faction' => $character->faction,
+            'notes' => $character->notes,
+            'guild_status' => 'draft',
+        ])
+        ->assertRedirect(route('characters.index'));
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
+it('prevents admins from approving draft characters', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $character = Character::factory()->create(['guild_status' => 'draft']);
+
+    $this->actingAs($admin)
+        ->patch('/admin/character-approvals/characters/'.$character->id, [
+            'guild_status' => 'approved',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});

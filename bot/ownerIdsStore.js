@@ -1,4 +1,6 @@
 const { ownerIds: envOwnerIds } = require('./config');
+const { resolveApiBaseUrl } = require('./appUrls');
+const { withInsecureDispatcher } = require('./httpClient');
 
 let cachedOwnerIds = new Set((envOwnerIds || []).map(String));
 let lastUpdatedAt = null;
@@ -17,17 +19,18 @@ function updateOwnerIds(list) {
 }
 
 async function refreshOwnerIds() {
-    const appUrl = String(process.env.APP_URL || '').trim();
+    const appUrl = resolveApiBaseUrl();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!appUrl || !token) return false;
 
     try {
-        const response = await fetch(`${appUrl.replace(/\/$/, '')}/bot/discord-owners`, {
+        const endpoint = `${appUrl.replace(/\/$/, '')}/bot/discord-owners`;
+        const response = await fetch(endpoint, withInsecureDispatcher(endpoint, {
             headers: {
                 Accept: 'application/json',
                 'X-Bot-Token': token,
             },
-        });
+        }));
 
         if (!response.ok) return false;
         const payload = await response.json();

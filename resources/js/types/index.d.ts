@@ -186,6 +186,9 @@ export interface DiscordBackupStatus {
 
 export interface DiscordBotSettings {
   owner_ids: string[]
+  character_approval_channel_id?: string | null
+  character_approval_channel_name?: string | null
+  character_approval_channel_guild_id?: string | null
 }
 
 export interface DiscordBotOwner {
@@ -272,7 +275,7 @@ export interface Character {
   downtimes: Downtime[]
   allies: Ally[]
   deleted_at: string
-  guild_status?: 'pending' | 'approved' | 'declined' | 'retired'
+  guild_status?: 'pending' | 'approved' | 'declined' | 'retired' | 'draft'
   room_count?: number
   admin_notes?: string | null
   faction:

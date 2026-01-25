@@ -26,7 +26,7 @@ import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import { Character } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Swords, Download, XCircle } from 'lucide-react'
+import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Pencil, Swords, Download, XCircle } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -80,6 +80,7 @@ export function CharacterCard({
   const earnedBubbles = calculateBubble(character) + additionalBubbles
   const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
+  const canLogActivity = guildStatus !== 'draft'
   const hasRoom = (character.room_count ?? 0) > 0
   const statusLabel = guildStatus === 'approved'
     ? 'Approved'
@@ -87,21 +88,27 @@ export function CharacterCard({
       ? 'Declined'
       : guildStatus === 'retired'
         ? 'Retired'
-        : 'Pending'
+        : guildStatus === 'draft'
+          ? 'Draft'
+          : 'Pending'
   const statusIcon = guildStatus === 'approved'
     ? <CheckCircle2 size={14} />
     : guildStatus === 'declined'
       ? <XCircle size={14} />
       : guildStatus === 'retired'
         ? <Archive size={14} />
-        : <Clock size={14} />
+        : guildStatus === 'draft'
+          ? <Pencil size={14} />
+          : <Clock size={14} />
   const statusClass = guildStatus === 'approved'
     ? 'text-success'
     : guildStatus === 'declined'
       ? 'text-error'
       : guildStatus === 'retired'
-    ? 'text-base-content/50'
-    : 'text-warning'
+        ? 'text-base-content/50'
+        : guildStatus === 'draft'
+          ? 'text-base-content/60'
+          : 'text-warning'
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
@@ -145,20 +152,22 @@ export function CharacterCard({
             <DestroyCharacterModal character={character} />
           </CardAction>
           <CardTitle className={cn('pb-0 flex items-center gap-2')}>
+            <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
+              {statusIcon}
+            </span>
             <span>{character.name}</span>
             {hasRoom ? (
               <span className="text-primary/70" title="Room assigned">
                 <MapPin size={14} />
               </span>
             ) : null}
-            <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
-              {statusIcon}
-            </span>
-            <LogoTier tier={tier} />
           </CardTitle>
           <CardContent>
-            <div className={cn('text-xs')}>
-              Level {level} {calculateClassString(character)}
+            <div className={cn('flex items-center gap-1 text-xs')}>
+              <LogoTier tier={tier} width={12} />
+              <span>
+                Level {level} {calculateClassString(character)}
+              </span>
             </div>
             <CharacterImage className="mt-4 mb-2" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
@@ -260,8 +269,10 @@ export function CharacterCard({
                   <BookOpen size={14} />
                   Details
                 </Button>
-                <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
-                <StoreDowntimeModal character={character}></StoreDowntimeModal>
+                {canLogActivity ? (
+                  <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
+                ) : null}
+                {canLogActivity ? <StoreDowntimeModal character={character}></StoreDowntimeModal> : null}
                 <AlliesModal character={character} guildCharacters={guildCharacters} />
                 <Button
                   as="a"

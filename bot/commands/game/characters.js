@@ -142,7 +142,7 @@ function humanFactionName(faction) {
 
 function normalizeGuildStatus(value) {
     const status = String(value || '').trim().toLowerCase();
-    if (status === 'approved' || status === 'declined' || status === 'pending' || status === 'retired') {
+    if (status === 'approved' || status === 'declined' || status === 'pending' || status === 'retired' || status === 'draft') {
         return status;
     }
     return 'pending';
@@ -153,6 +153,7 @@ function guildStatusLabel(value) {
     if (status === 'approved') return 'Approved';
     if (status === 'declined') return 'Declined';
     if (status === 'retired') return 'Retired';
+    if (status === 'draft') return 'Draft';
     return 'Pending';
 }
 
@@ -161,6 +162,7 @@ function guildStatusEmoji(value) {
     if (status === 'approved') return '✅';
     if (status === 'declined') return '❌';
     if (status === 'retired') return '🪦';
+    if (status === 'draft') return '📝';
     return '⏳';
 }
 

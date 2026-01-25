@@ -39,6 +39,9 @@ export default function Settings({
   })
   const ownerIdsForm = useForm({
     owner_ids: (discordBotSettings.owner_ids ?? []).join(', '),
+    character_approval_channel_id: discordBotSettings.character_approval_channel_id ?? '',
+    character_approval_channel_name: discordBotSettings.character_approval_channel_name ?? '',
+    character_approval_channel_guild_id: discordBotSettings.character_approval_channel_guild_id ?? '',
   })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
@@ -423,6 +426,40 @@ export default function Settings({
   const ownerEntries = ownerStatus?.owners ?? []
   const ownerIdsFallback = ownerStatus?.owner_ids ?? discordBotSettings.owner_ids ?? []
 
+  const approvalChannelLabel = useMemo(() => {
+    if (ownerIdsForm.data.character_approval_channel_name) {
+      return ownerIdsForm.data.character_approval_channel_name
+    }
+    if (ownerIdsForm.data.character_approval_channel_id) {
+      return ownerIdsForm.data.character_approval_channel_id
+    }
+    return 'Not configured'
+  }, [
+    ownerIdsForm.data.character_approval_channel_id,
+    ownerIdsForm.data.character_approval_channel_name,
+  ])
+
+  type ApprovalChannelSelection =
+    | DiscordBackupChannel
+    | null
+    | { guild_id: string; channel_ids: string[] }[]
+
+  const handleApprovalChannelSelect = useCallback(
+    (selection: ApprovalChannelSelection) => {
+      if (!selection || Array.isArray(selection)) return
+      ownerIdsForm.setData('character_approval_channel_id', selection.id)
+      ownerIdsForm.setData('character_approval_channel_name', selection.name)
+      ownerIdsForm.setData('character_approval_channel_guild_id', selection.guild_id)
+    },
+    [ownerIdsForm],
+  )
+
+  const handleApprovalChannelClear = useCallback(() => {
+    ownerIdsForm.setData('character_approval_channel_id', '')
+    ownerIdsForm.setData('character_approval_channel_name', '')
+    ownerIdsForm.setData('character_approval_channel_guild_id', '')
+  }, [ownerIdsForm])
+
   return (
     <AppLayout>
       <Head title="Settings" />
@@ -571,6 +608,47 @@ export default function Settings({
         <div className="rounded-box bg-base-100 shadow-md p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">
+              <h2 className="text-sm font-semibold">Character approvals</h2>
+              <p className="text-xs text-base-content/60">
+                Send pending character announcements to a Discord channel.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <DiscordChannelPickerModal
+                title="Character approval channel"
+                description="Select a text channel to receive pending character announcements."
+                confirmLabel="Use channel"
+                channelsRouteName="admin.settings.backup.channels.refresh"
+                mode="single"
+                allowedChannelTypes={['GuildText', 'GuildAnnouncement']}
+                onConfirm={handleApprovalChannelSelect}
+              >
+                Select channel
+              </DiscordChannelPickerModal>
+              {ownerIdsForm.data.character_approval_channel_id ? (
+                <Button size="sm" variant="ghost" onClick={handleApprovalChannelClear}>
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
+            <span>
+              Current: <span className="font-semibold text-base-content">{approvalChannelLabel}</span>
+            </span>
+            {ownerIdsForm.errors.character_approval_channel_id ? (
+              <span className="text-error">{ownerIdsForm.errors.character_approval_channel_id}</span>
+            ) : null}
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>
+              Save bot settings
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-box bg-base-100 shadow-md p-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
               <h2 className="text-sm font-semibold">Bot access</h2>
               <p className="text-xs text-base-content/60">
                 Add Discord user IDs allowed to use owner-only bot commands.
@@ -621,7 +699,7 @@ export default function Settings({
             )}
             <div className="flex justify-end">
               <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>
-                Save owner list
+                Save bot settings
               </Button>
             </div>
           </div>
