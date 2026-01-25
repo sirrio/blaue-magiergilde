@@ -2,10 +2,20 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
+import LogoTier from '@/components/logo-tier'
 import { DiscordBotSettings } from '@/types'
 import { Head, useForm } from '@inertiajs/react'
 import { CalendarDays } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
+import { cn } from '@/lib/utils'
+
+const monthLabel = (value: string) => {
+  const [year, month] = value.split('-')
+  const index = Number(month) - 1
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const label = names[index] ?? '???'
+  return `${label} ${year}`
+}
 
 type GamesSettingsProps = {
   discordBotSettings: Pick<
@@ -128,10 +138,30 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
               <thead>
                 <tr>
                   <th className="text-xs font-semibold text-base-content/70">Month</th>
-                  <th className="text-xs font-semibold text-base-content/70">BT</th>
-                  <th className="text-xs font-semibold text-base-content/70">LT</th>
-                  <th className="text-xs font-semibold text-base-content/70">HT</th>
-                  <th className="text-xs font-semibold text-base-content/70">ET</th>
+                  <th className="text-xs font-semibold text-base-content/70">
+                    <span className="flex items-center gap-1">
+                      <LogoTier tier="bt" width={12} />
+                      BT
+                    </span>
+                  </th>
+                  <th className="text-xs font-semibold text-base-content/70">
+                    <span className="flex items-center gap-1">
+                      <LogoTier tier="lt" width={12} />
+                      LT
+                    </span>
+                  </th>
+                  <th className="text-xs font-semibold text-base-content/70">
+                    <span className="flex items-center gap-1">
+                      <LogoTier tier="ht" width={12} />
+                      HT
+                    </span>
+                  </th>
+                  <th className="text-xs font-semibold text-base-content/70">
+                    <span className="flex items-center gap-1">
+                      <LogoTier tier="et" width={12} />
+                      ET
+                    </span>
+                  </th>
                   <th className="text-xs font-semibold text-base-content/70">?</th>
                   <th className="text-xs font-semibold text-base-content/70">Total</th>
                 </tr>
@@ -146,11 +176,19 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                 ) : (
                   stats.monthly.map((row) => (
                     <tr key={row.month}>
-                      <td className="text-sm font-semibold">{row.month}</td>
-                      <td className="text-sm">{row.counts.bt}</td>
-                      <td className="text-sm">{row.counts.lt}</td>
-                      <td className="text-sm">{row.counts.ht}</td>
-                      <td className="text-sm">{row.counts.et}</td>
+                      <td className="text-sm font-semibold">{monthLabel(row.month)}</td>
+                      <td className={cn('text-sm', row.counts.bt ? 'text-tier-bt font-semibold' : 'text-base-content/60')}>
+                        {row.counts.bt}
+                      </td>
+                      <td className={cn('text-sm', row.counts.lt ? 'text-tier-lt font-semibold' : 'text-base-content/60')}>
+                        {row.counts.lt}
+                      </td>
+                      <td className={cn('text-sm', row.counts.ht ? 'text-tier-ht font-semibold' : 'text-base-content/60')}>
+                        {row.counts.ht}
+                      </td>
+                      <td className={cn('text-sm', row.counts.et ? 'text-tier-et font-semibold' : 'text-base-content/60')}>
+                        {row.counts.et}
+                      </td>
                       <td className="text-sm">{row.counts.unknown}</td>
                       <td className="text-sm font-semibold">{row.total}</td>
                     </tr>
@@ -161,10 +199,18 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                 <tfoot>
                   <tr>
                     <th>Total</th>
-                    <th className="text-sm font-semibold">{stats.totals.bt}</th>
-                    <th className="text-sm font-semibold">{stats.totals.lt}</th>
-                    <th className="text-sm font-semibold">{stats.totals.ht}</th>
-                    <th className="text-sm font-semibold">{stats.totals.et}</th>
+                    <th className={cn('text-sm font-semibold', stats.totals.bt ? 'text-tier-bt' : 'text-base-content/60')}>
+                      {stats.totals.bt}
+                    </th>
+                    <th className={cn('text-sm font-semibold', stats.totals.lt ? 'text-tier-lt' : 'text-base-content/60')}>
+                      {stats.totals.lt}
+                    </th>
+                    <th className={cn('text-sm font-semibold', stats.totals.ht ? 'text-tier-ht' : 'text-base-content/60')}>
+                      {stats.totals.ht}
+                    </th>
+                    <th className={cn('text-sm font-semibold', stats.totals.et ? 'text-tier-et' : 'text-base-content/60')}>
+                      {stats.totals.et}
+                    </th>
                     <th className="text-sm font-semibold">{stats.totals.unknown}</th>
                     <th className="text-sm font-semibold">{stats.totals.total}</th>
                   </tr>
