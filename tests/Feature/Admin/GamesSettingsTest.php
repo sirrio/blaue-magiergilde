@@ -1,0 +1,40 @@
+<?php
+
+use App\Models\GameAnnouncement;
+use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
+
+it('shows game stats on the admin games page', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+
+    GameAnnouncement::factory()->create([
+        'tier' => 'bt',
+        'starts_at' => '2026-01-10 19:00:00',
+    ]);
+    GameAnnouncement::factory()->create([
+        'tier' => 'ht',
+        'starts_at' => '2026-01-15 20:00:00',
+    ]);
+    GameAnnouncement::factory()->create([
+        'tier' => null,
+        'starts_at' => '2025-12-20 19:00:00',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('admin.games'));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('admin/games')
+        ->has('stats.monthly', 2)
+        ->where('stats.monthly.0.month', '2026-01')
+        ->where('stats.monthly.0.counts.bt', 1)
+        ->where('stats.monthly.0.counts.ht', 1)
+        ->where('stats.monthly.1.month', '2025-12')
+        ->where('stats.monthly.1.counts.unknown', 1)
+        ->where('stats.totals.bt', 1)
+        ->where('stats.totals.ht', 1)
+        ->where('stats.totals.unknown', 1)
+        ->where('stats.totals.total', 3)
+    );
+});

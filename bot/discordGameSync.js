@@ -12,10 +12,22 @@ function toSqlDateTime(value) {
     return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+async function fetchGamesChannelId() {
+    try {
+        const [rows] = await db.execute(
+            'SELECT games_channel_id FROM discord_bot_settings ORDER BY id LIMIT 1',
+        );
+        const channelId = rows?.[0]?.games_channel_id;
+        return String(channelId || '').trim();
+    } catch {
+        return '';
+    }
+}
+
 async function syncGameAnnouncements(client) {
-    const channelId = String(process.env.DISCORD_GAMES_CHANNEL_ID || '').trim();
+    const channelId = await fetchGamesChannelId();
     if (!channelId) {
-        console.warn('[bot] Game sync skipped: DISCORD_GAMES_CHANNEL_ID missing.');
+        console.warn('[bot] Game sync skipped: games channel not configured.');
         return;
     }
 

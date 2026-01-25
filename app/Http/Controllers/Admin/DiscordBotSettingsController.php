@@ -48,17 +48,19 @@ class DiscordBotSettingsController extends Controller
     public function update(UpdateDiscordBotSettingsRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $raw = (string) ($validated['owner_ids'] ?? '');
+        $updates = [];
 
-        $ownerIds = collect(explode(',', $raw))
-            ->map(fn ($id) => trim($id))
-            ->filter(fn (string $id) => preg_match('/^[0-9]{5,}$/', $id))
-            ->values()
-            ->all();
+        if (array_key_exists('owner_ids', $validated)) {
+            $raw = (string) ($validated['owner_ids'] ?? '');
 
-        $updates = [
-            'owner_ids' => $ownerIds,
-        ];
+            $ownerIds = collect(explode(',', $raw))
+                ->map(fn ($id) => trim($id))
+                ->filter(fn (string $id) => preg_match('/^[0-9]{5,}$/', $id))
+                ->values()
+                ->all();
+
+            $updates['owner_ids'] = $ownerIds;
+        }
 
         if (array_key_exists('character_approval_channel_id', $validated)) {
             $channelId = trim((string) ($validated['character_approval_channel_id'] ?? ''));
@@ -75,7 +77,24 @@ class DiscordBotSettingsController extends Controller
             $updates['character_approval_channel_guild_id'] = $guildId !== '' ? $guildId : null;
         }
 
-        DiscordBotSetting::current()->update($updates);
+        if (array_key_exists('games_channel_id', $validated)) {
+            $channelId = trim((string) ($validated['games_channel_id'] ?? ''));
+            $updates['games_channel_id'] = $channelId !== '' ? $channelId : null;
+        }
+
+        if (array_key_exists('games_channel_name', $validated)) {
+            $channelName = trim((string) ($validated['games_channel_name'] ?? ''));
+            $updates['games_channel_name'] = $channelName !== '' ? $channelName : null;
+        }
+
+        if (array_key_exists('games_channel_guild_id', $validated)) {
+            $guildId = trim((string) ($validated['games_channel_guild_id'] ?? ''));
+            $updates['games_channel_guild_id'] = $guildId !== '' ? $guildId : null;
+        }
+
+        if ($updates !== []) {
+            DiscordBotSetting::current()->update($updates);
+        }
 
         return redirect()->back();
     }

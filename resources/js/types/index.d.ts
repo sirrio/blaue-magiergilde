@@ -189,6 +189,9 @@ export interface DiscordBotSettings {
   character_approval_channel_id?: string | null
   character_approval_channel_name?: string | null
   character_approval_channel_guild_id?: string | null
+  games_channel_id?: string | null
+  games_channel_name?: string | null
+  games_channel_guild_id?: string | null
 }
 
 export interface DiscordBotOwner {
