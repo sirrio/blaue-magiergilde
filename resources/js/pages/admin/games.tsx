@@ -12,9 +12,17 @@ type GamesSettingsProps = {
     DiscordBotSettings,
     'games_channel_id' | 'games_channel_name' | 'games_channel_guild_id'
   >
+  stats: {
+    monthly: Array<{
+      month: string
+      counts: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown', number>
+      total: number
+    }>
+    totals: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown' | 'total', number>
+  }
 }
 
-export default function GamesSettings({ discordBotSettings }: GamesSettingsProps) {
+export default function GamesSettings({ discordBotSettings, stats }: GamesSettingsProps) {
   const form = useForm({
     games_channel_id: discordBotSettings.games_channel_id ?? '',
     games_channel_name: discordBotSettings.games_channel_name ?? '',
@@ -101,6 +109,68 @@ export default function GamesSettings({ discordBotSettings }: GamesSettingsProps
                 Save
               </Button>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Monthly stats</h2>
+              <p className="text-sm text-base-content/70">
+                Games grouped by month and tier (based on start date).
+              </p>
+            </div>
+            <span className="badge badge-ghost badge-sm">Total {stats.totals.total}</span>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="table table-sm">
+              <thead>
+                <tr>
+                  <th className="text-xs font-semibold text-base-content/70">Month</th>
+                  <th className="text-xs font-semibold text-base-content/70">BT</th>
+                  <th className="text-xs font-semibold text-base-content/70">LT</th>
+                  <th className="text-xs font-semibold text-base-content/70">HT</th>
+                  <th className="text-xs font-semibold text-base-content/70">ET</th>
+                  <th className="text-xs font-semibold text-base-content/70">?</th>
+                  <th className="text-xs font-semibold text-base-content/70">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.monthly.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-sm text-base-content/60">
+                      No games recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  stats.monthly.map((row) => (
+                    <tr key={row.month}>
+                      <td className="text-sm font-semibold">{row.month}</td>
+                      <td className="text-sm">{row.counts.bt}</td>
+                      <td className="text-sm">{row.counts.lt}</td>
+                      <td className="text-sm">{row.counts.ht}</td>
+                      <td className="text-sm">{row.counts.et}</td>
+                      <td className="text-sm">{row.counts.unknown}</td>
+                      <td className="text-sm font-semibold">{row.total}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {stats.monthly.length ? (
+                <tfoot>
+                  <tr>
+                    <th>Total</th>
+                    <th className="text-sm font-semibold">{stats.totals.bt}</th>
+                    <th className="text-sm font-semibold">{stats.totals.lt}</th>
+                    <th className="text-sm font-semibold">{stats.totals.ht}</th>
+                    <th className="text-sm font-semibold">{stats.totals.et}</th>
+                    <th className="text-sm font-semibold">{stats.totals.unknown}</th>
+                    <th className="text-sm font-semibold">{stats.totals.total}</th>
+                  </tr>
+                </tfoot>
+              ) : null}
+            </table>
           </div>
         </div>
       </div>
