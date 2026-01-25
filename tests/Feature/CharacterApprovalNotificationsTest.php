@@ -135,7 +135,7 @@ it('removes the discord announcement when a character is deleted', function () {
 
     $this->actingAs($owner)->delete(route('characters.destroy', $character))->assertRedirect();
 
-    Http::assertSent(function ($request) use ($character) {
+    Http::assertSent(function ($request) {
         return $request->url() === 'http://bot.test/character-approval/delete'
             && $request['channel_id'] === '9876543210'
             && $request['message_id'] === '1234567890';

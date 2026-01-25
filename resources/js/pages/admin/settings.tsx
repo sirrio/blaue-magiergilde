@@ -439,9 +439,14 @@ export default function Settings({
     ownerIdsForm.data.character_approval_channel_name,
   ])
 
+  type ApprovalChannelSelection =
+    | DiscordBackupChannel
+    | null
+    | { guild_id: string; channel_ids: string[] }[]
+
   const handleApprovalChannelSelect = useCallback(
-    (selection: DiscordBackupChannel | null) => {
-      if (!selection) return
+    (selection: ApprovalChannelSelection) => {
+      if (!selection || Array.isArray(selection)) return
       ownerIdsForm.setData('character_approval_channel_id', selection.id)
       ownerIdsForm.setData('character_approval_channel_name', selection.name)
       ownerIdsForm.setData('character_approval_channel_guild_id', selection.guild_id)

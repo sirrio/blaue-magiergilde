@@ -109,9 +109,8 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
               </Select>
               <Select
                 errors={errors.guild_status}
-                value={canEditStatus ? data.guild_status : currentStatus}
-                disabled={!canEditStatus}
-                onChange={(e) => setData('guild_status', e.target.value)}
+                value={canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
+                onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
               >
                 <SelectLabel>Visibility</SelectLabel>
                 <SelectOptions>
