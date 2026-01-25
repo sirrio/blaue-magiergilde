@@ -65,9 +65,11 @@ const buildGroupedList = (
   includeThreads: boolean,
   allowedTypes?: Set<string>,
   threadParentAllowlist?: Set<string>,
+  searchTerm?: string,
 ) => {
   const channelLookup = new Map<string, DiscordBackupChannel>()
   const categories = new Map<string, string>()
+  const normalizedSearch = searchTerm?.trim().toLowerCase() ?? ''
 
   channels.forEach((channel) => {
     channelLookup.set(channel.id, channel)
@@ -84,6 +86,10 @@ const buildGroupedList = (
     }
     if (allowedTypes && !allowedTypes.has(channel.type)) return false
     if (excludedSet.has(channel.id)) return false
+    if (normalizedSearch) {
+      const label = buildChannelLabel(channel, channelLookup).toLowerCase()
+      if (!label.includes(normalizedSearch)) return false
+    }
     return true
   })
 
@@ -157,6 +163,7 @@ export default function DiscordChannelPickerModal({
   const [isRefreshingChannels, setIsRefreshingChannels] = useState(false)
   const [pendingByGuild, setPendingByGuild] = useState<Record<string, string[]>>({})
   const [pendingSingle, setPendingSingle] = useState<SingleSelection>(null)
+  const [searchText, setSearchText] = useState('')
   const [threadLoadingId, setThreadLoadingId] = useState<string | null>(null)
   const [loadedThreadParents, setLoadedThreadParents] = useState<string[]>([])
 
@@ -170,6 +177,7 @@ export default function DiscordChannelPickerModal({
     if (!isOpen) return
     setPendingByGuild({})
     setPendingSingle(null)
+    setSearchText('')
     setLoadedThreadParents([])
     setThreadLoadingId(null)
   }, [isOpen])
@@ -318,18 +326,26 @@ export default function DiscordChannelPickerModal({
     return (Object.entries(availableChannelGroups) as [string, DiscordBackupChannel[]][])
       .map(([guildId, channels]) => {
         const excludedSet = new Set(excludedByGuild?.[guildId] ?? [])
-        const availableCount = channels.filter((channel) => {
-          if (channel.type === 'GuildCategory') return false
-          if (!includeThreads && channel.is_thread) {
-            if (!channel.parent_id || !threadParentAllowlist.has(channel.parent_id)) return false
-          }
-          if (allowedTypes && !allowedTypes.has(channel.type)) return false
-          return !excludedSet.has(channel.id)
-        }).length
+        const { groups } = buildGroupedList(
+          channels,
+          excludedSet,
+          includeThreads,
+          allowedTypes,
+          threadParentAllowlist,
+          searchText,
+        )
+        const availableCount = groups.reduce((sum, group) => sum + group.channels.length, 0)
         return availableCount > 0 ? [guildId, channels] : null
       })
       .filter(Boolean) as [string, DiscordBackupChannel[]][]
-  }, [allowedTypes, availableChannelGroups, excludedByGuild, includeThreads, threadParentAllowlist])
+  }, [
+    allowedTypes,
+    availableChannelGroups,
+    excludedByGuild,
+    includeThreads,
+    searchText,
+    threadParentAllowlist,
+  ])
 
   const handleConfirm = () => {
     if (mode === 'single') {
@@ -369,6 +385,7 @@ export default function DiscordChannelPickerModal({
             includeThreads,
             allowedTypes,
             threadParentAllowlist,
+            searchText,
           )
           const summaryCount = groups.reduce((sum, group) => sum + group.channels.length, 0)
 
@@ -458,6 +475,15 @@ export default function DiscordChannelPickerModal({
       <ModalContent>
         <div className="max-h-[70vh] overflow-y-auto pr-1">
           {description ? <p className="text-xs text-base-content/70">{description}</p> : null}
+          <div className="mt-3">
+            <input
+              type="text"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search channels"
+              className="input input-bordered input-sm w-full"
+            />
+          </div>
           <div className="sticky top-0 z-20 mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-base-200 bg-base-100/95 py-2 backdrop-blur">
             <p className="text-sm font-semibold">Available channels</p>
             <div className="flex flex-wrap gap-2">
@@ -479,7 +505,9 @@ export default function DiscordChannelPickerModal({
           <div className="pb-4">
             {availableGuildEntries.length === 0 ? (
               <p className="mt-3 text-xs text-base-content/70">
-                No channels loaded yet. Click &quot;Load channels&quot;.
+                {Object.keys(availableChannelGroups).length === 0
+                  ? 'No channels loaded yet. Click "Load channels".'
+                  : 'No channels match the current search.'}
               </p>
             ) : (
               renderGuildGroups(availableGuildEntries)
