@@ -216,7 +216,7 @@ const AdminCharacterModal = ({
 
   const handleSubmit = () => {
     const options = {
-      preserveState: 'errors',
+      preserveState: 'errors' as const,
       preserveScroll: true,
       forceFormData: true,
       onSuccess: () => {
@@ -266,8 +266,12 @@ const AdminCharacterModal = ({
               <Input placeholder="Mordenkainen" errors={errors.name} type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}>
                 Name
               </Input>
-              <CharacterClassToggle classes={classes} data={data} errors={errors} setData={(key, value) => setData(key, value)}></CharacterClassToggle>
-              <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
+              <CharacterClassToggle classes={classes} data={data} errors={errors} setData={(_, value) => setData('class', value)}></CharacterClassToggle>
+              <Select
+                errors={errors.start_tier}
+                value={data.start_tier}
+                onChange={(e) => setData('start_tier', e.target.value as Character['start_tier'])}
+              >
                 <SelectLabel>Start tier</SelectLabel>
                 <SelectOptions>
                   {Object.entries(tiers).map(([key, value]: [string, string]) => (
@@ -277,7 +281,11 @@ const AdminCharacterModal = ({
                   ))}
                 </SelectOptions>
               </Select>
-              <Select errors={errors.faction} value={data.faction} onChange={(e) => setData('faction', e.target.value)}>
+              <Select
+                errors={errors.faction}
+                value={data.faction}
+                onChange={(e) => setData('faction', e.target.value as Character['faction'])}
+              >
                 <SelectLabel>Factions</SelectLabel>
                 <SelectOptions>
                   {Object.entries(factions).map(([key, value]: [string, string]) => (
@@ -287,7 +295,11 @@ const AdminCharacterModal = ({
                   ))}
                 </SelectOptions>
               </Select>
-              <Select errors={errors.version} value={data.version} onChange={(e) => setData('version', e.target.value)}>
+              <Select
+                errors={errors.version}
+                value={data.version}
+                onChange={(e) => setData('version', e.target.value as Character['version'])}
+              >
                 <SelectLabel>Versions</SelectLabel>
                 <SelectOptions>
                   {versions.map((version) => (
@@ -300,7 +312,7 @@ const AdminCharacterModal = ({
               <Select
                 errors={errors.guild_status}
                 value={canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
-                onChange={(e) => setData('guild_status', e.target.value)}
+                onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
               >
                 <SelectLabel>Visibility</SelectLabel>
                 <SelectOptions>
