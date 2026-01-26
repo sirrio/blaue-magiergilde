@@ -218,6 +218,24 @@ function parseManageIds(customId) {
     return { recordId, characterId, ownerDiscordId };
 }
 
+async function loadEditableAdventure(interaction, adventureId, characterId) {
+    const adventure = await findAdventureForDiscord(interaction.user, adventureId);
+    if (!adventure || Number(adventure.character_id) !== characterId) {
+        await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+        return null;
+    }
+
+    if (adventure.is_pseudo) {
+        await updateManageMessage(interaction, {
+            content: 'Simplified tracking adventures are auto-generated and cannot be edited.',
+            flags: MessageFlags.Ephemeral,
+        });
+        return null;
+    }
+
+    return adventure;
+}
+
 function creationStateKey(userId) {
     return String(userId);
 }
@@ -3678,6 +3696,9 @@ async function handle(interaction) {
             return true;
         }
 
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         const modal = new ModalBuilder()
             .setCustomId(`advParticipantsSearchModal_${adventureId}_${characterId}_${ownerDiscordId}`)
             .setTitle('Search participants');
@@ -3705,6 +3726,9 @@ async function handle(interaction) {
             return true;
         }
 
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         setParticipantSearch(adventureId, ownerDiscordId, interaction.fields.getTextInputValue('participantSearch'));
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
@@ -3726,6 +3750,9 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
+
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         const [participants, allies, guildCharacters] = await Promise.all([
             listAdventureParticipantsForDiscord(interaction.user, adventureId),
@@ -3795,6 +3822,9 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
+
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         await syncAdventureParticipantsForDiscord(interaction.user, adventureId, {
             characterId,
@@ -3866,11 +3896,8 @@ async function handle(interaction) {
             return true;
         }
 
-        const adventure = await findAdventureForDiscord(interaction.user, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         await interaction.showModal(buildAdventureManageDurationModal({
             adventureId,
@@ -3897,6 +3924,9 @@ async function handle(interaction) {
             return true;
         }
 
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { duration });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
@@ -3917,11 +3947,8 @@ async function handle(interaction) {
             return true;
         }
 
-        const adventure = await findAdventureForDiscord(interaction.user, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         await interaction.showModal(buildAdventureManageDateModal({
             adventureId,
@@ -3948,6 +3975,9 @@ async function handle(interaction) {
             return true;
         }
 
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { startDate });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
@@ -3968,11 +3998,8 @@ async function handle(interaction) {
             return true;
         }
 
-        const adventure = await findAdventureForDiscord(interaction.user, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         await interaction.showModal(buildAdventureManageTitleModal({
             adventureId,
@@ -3995,6 +4022,9 @@ async function handle(interaction) {
 
         const title = (interaction.fields.getTextInputValue('advTitle') || '').trim();
         const gameMaster = (interaction.fields.getTextInputValue('advGm') || '').trim();
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { title, gameMaster });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
@@ -4015,11 +4045,8 @@ async function handle(interaction) {
             return true;
         }
 
-        const adventure = await findAdventureForDiscord(interaction.user, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         await interaction.showModal(buildAdventureManageNotesModal({
             adventureId,
@@ -4041,6 +4068,9 @@ async function handle(interaction) {
         }
 
         const notes = (interaction.fields.getTextInputValue('advNotes') || '').trim();
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         const result = await updateAdventureForDiscord(interaction.user, adventureId, { notes });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
@@ -4061,11 +4091,8 @@ async function handle(interaction) {
             return true;
         }
 
-        const adventure = await findAdventureForDiscord(interaction.user, adventureId);
-        if (!adventure || Number(adventure.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         const view = buildAdventureQuestManageView({ adventure, ownerDiscordId, characterId });
         await interaction.update({ content: '', embeds: [view.embed], components: view.components });
@@ -4081,6 +4108,9 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
+
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         const value = String(interaction.values?.[0] || '').toLowerCase();
         const hasAdditionalBubble = value === 'yes';
@@ -4104,6 +4134,9 @@ async function handle(interaction) {
             return true;
         }
 
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
+
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
             await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
@@ -4124,6 +4157,9 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
             return true;
         }
+
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         await interaction.update({
             content: 'Delete adventure?',
@@ -4149,6 +4185,9 @@ async function handle(interaction) {
         }
 
         if (action !== 'deleteAdventureConfirm') return false;
+
+        const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
+        if (!adventure) return true;
 
         try {
             const result = await softDeleteAdventureForDiscord(interaction.user, adventureId);

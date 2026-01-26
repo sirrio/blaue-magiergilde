@@ -461,9 +461,9 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                     0,
                     1,
                     characterId,
-                    'Quick mode adjustment',
-                    'Quick mode',
-                    'Auto-generated to align quick mode level.',
+                    'Simplified tracking adjustment',
+                    'Simplified tracking',
+                    'Auto-generated to align simplified tracking level.',
                     now,
                     now,
                 ],
@@ -708,7 +708,7 @@ async function listAdventuresForDiscord(discordUser, characterId, limit = 25) {
     const safeLimit = Math.max(1, Math.min(25, Number(limit) || 25));
     const [rows] = await db.execute(
         `
-            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id, a.is_pseudo
             FROM adventures a
             INNER JOIN characters c ON c.id = a.character_id
             WHERE a.character_id = ?

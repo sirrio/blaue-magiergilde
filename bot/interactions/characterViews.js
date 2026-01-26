@@ -225,7 +225,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Version', value: version, inline: true },
             { name: 'Level', value: String(level), inline: true },
             { name: 'Current tier', value: currentTier, inline: true },
-            { name: 'Tracking', value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard', inline: true },
+            { name: 'Tracking', value: simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking', inline: true },
             { name: 'Status', value: statusLabel, inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
@@ -276,7 +276,7 @@ function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarM
         .addFields(
             {
                 name: 'Tracking mode',
-                value: simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)',
+                value: simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking',
                 inline: false,
             },
             {
@@ -289,7 +289,7 @@ function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarM
     const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersTracking_standard_${ownerDiscordId}`)
-            .setLabel('Standard tracking')
+            .setLabel('Adventure-based tracking')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(!simplifiedTracking),
         new ButtonBuilder()
@@ -1634,39 +1634,48 @@ function buildAdventureManageNotesModal({ adventureId, characterId, ownerDiscord
     return modal;
 }
 
-function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId }) {
+function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId, isPseudo }) {
+    const disabled = Boolean(isPseudo);
+
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advManage_duration_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Duration')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_date_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Date')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_title_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Title & GM')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_quest_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Character quest')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_notes_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Notes')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advManage_participants_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Participants')
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel('Delete')
-                .setStyle(ButtonStyle.Danger),
+                .setStyle(ButtonStyle.Danger)
+                .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
                 .setLabel('Back')
@@ -1682,7 +1691,7 @@ function buildAdventureManageEmbed(adventure, participants) {
     const gameMasterValue = String(adventure.game_master || '').trim() || '-';
     const participantValue = participants.length > 0 ? formatParticipantList(participants) : '-';
 
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
         .setTitle('Manage adventure')
         .setColor(0x4f46e5)
         .addFields(
@@ -1694,12 +1703,23 @@ function buildAdventureManageEmbed(adventure, participants) {
             { name: 'Notes', value: notesValue.slice(0, 1024), inline: false },
             { name: 'Participants', value: participantValue, inline: false },
         );
+
+    if (adventure.is_pseudo) {
+        embed.setDescription('Auto-generated for simplified tracking. Editing is disabled.');
+    }
+
+    return embed;
 }
 
 function buildAdventureManageView({ adventure, participants, ownerDiscordId, characterId }) {
     return {
         embed: buildAdventureManageEmbed(adventure, participants),
-        components: buildAdventureManageRows({ adventureId: adventure.id, characterId, ownerDiscordId }),
+        components: buildAdventureManageRows({
+            adventureId: adventure.id,
+            characterId,
+            ownerDiscordId,
+            isPseudo: adventure.is_pseudo,
+        }),
     };
 }
 

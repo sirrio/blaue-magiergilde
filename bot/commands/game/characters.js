@@ -265,7 +265,7 @@ function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking
     summary.addFields({
         name: 'Settings',
         value: [
-            `Tracking: ${simplifiedTracking ? 'Simplified (quick mode)' : 'Standard (adventures + downtime)'}`,
+            `Tracking: ${simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking'}`,
             `Token mask: ${avatarMasked ? 'On' : 'Off'}`,
         ].join('\n'),
         inline: false,
