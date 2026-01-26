@@ -190,10 +190,12 @@ export default function Show({ character, guildCharacters }: { character: Charac
     )
   }, [shopPurchases])
 
+  const skillUsed = shopPurchaseCounts.skill_prof ?? 0
+  const rareUsed = shopPurchaseCounts.rare_language ?? 0
+  const normalUsed = (shopPurchaseCounts.language ?? 0) + (shopPurchaseCounts.tool ?? 0)
+
   const shopUnlocked = !character.is_filler && currentLevel >= 5
   const shopOptions = useMemo(() => {
-    const normalCount = (shopPurchaseCounts.language ?? 0) + (shopPurchaseCounts.tool ?? 0)
-
     const buildOption = ({
       value,
       label,
@@ -226,10 +228,6 @@ export default function Show({ character, guildCharacters }: { character: Charac
       }
     }
 
-    const skillUsed = shopPurchaseCounts.skill_prof ?? 0
-    const rareUsed = shopPurchaseCounts.rare_language ?? 0
-    const normalUsed = normalCount
-
     return [
       buildOption({
         value: 'skill_prof',
@@ -260,7 +258,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
         usageText: `${normalUsed}/3 used (shared)`,
       }),
     ]
-  }, [availableBubbles, shopPurchaseCounts, shopUnlocked])
+  }, [availableBubbles, normalUsed, rareUsed, shopUnlocked, skillUsed])
 
   const adventureNotesMap = useMemo(() => {
     const map = new Map<number, string>()
@@ -792,6 +790,11 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     character={character}
                     options={shopOptions}
                     availableBubbles={availableBubbles}
+                    summary={{
+                      skillUsed,
+                      rareUsed,
+                      sharedUsed: normalUsed,
+                    }}
                   />
                 </div>
                 {!shopUnlocked ? (

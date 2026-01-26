@@ -18,11 +18,17 @@ const StoreBubbleShopPurchaseModal = ({
   character,
   options,
   availableBubbles,
+  summary,
   trigger,
 }: {
   character: Character
   options: PurchaseOption[]
   availableBubbles: number
+  summary?: {
+    skillUsed: number
+    rareUsed: number
+    sharedUsed: number
+  }
   trigger?: React.ReactNode
 }) => {
   const { errors } = usePage<PageProps>().props
@@ -38,7 +44,7 @@ const StoreBubbleShopPurchaseModal = ({
       route('characters.shop-purchases.store', { character: character.id }),
       { type: option.value },
       {
-        preserveState: 'errors',
+        preserveState: true,
         preserveScroll: true,
         onFinish: () => setPendingType(null),
       },
@@ -65,6 +71,22 @@ const StoreBubbleShopPurchaseModal = ({
           <p className="text-xs text-base-content/60">
             Limits: 1 skill proficiency, 1 rare language, 3 combined languages/tools.
           </p>
+          {summary ? (
+            <div className="grid grid-cols-3 gap-2 rounded-box border border-base-200 bg-base-200/30 px-3 py-2 text-xs">
+              <div className="space-y-1">
+                <div className="font-semibold text-base-content">Skill prof</div>
+                <div className="text-base-content/60">{summary.skillUsed}/1 used</div>
+              </div>
+              <div className="space-y-1">
+                <div className="font-semibold text-base-content">Rare lang</div>
+                <div className="text-base-content/60">{summary.rareUsed}/1 used</div>
+              </div>
+              <div className="space-y-1">
+                <div className="font-semibold text-base-content">Shared</div>
+                <div className="text-base-content/60">{summary.sharedUsed}/3 used</div>
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-2">
             {options.map((option) => {
               const isPending = pendingType === option.value

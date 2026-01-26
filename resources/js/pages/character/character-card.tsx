@@ -349,6 +349,11 @@ export function CharacterCard({
                   character={character}
                   options={shopOptions}
                   availableBubbles={availableBubbles}
+                  summary={{
+                    skillUsed,
+                    rareUsed,
+                    sharedUsed: normalUsed,
+                  }}
                   trigger={
                     <Button size="sm" className="w-full" aria-label="Bubble shop purchase">
                       <Coins size={14} />
@@ -372,6 +377,11 @@ export function CharacterCard({
                   character={character}
                   options={shopOptions}
                   availableBubbles={availableBubbles}
+                  summary={{
+                    skillUsed,
+                    rareUsed,
+                    sharedUsed: normalUsed,
+                  }}
                   trigger={
                     <Button size="sm" aria-label="Bubble shop purchase">
                       <Coins size={14} />
