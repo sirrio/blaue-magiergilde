@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const MAX_SESSION_MINUTES = 24 * 60
 const DEFAULT_SESSION_MINUTES = 3 * 60
@@ -31,6 +31,61 @@ const parseLongTime = (value: string) => {
   return Math.max(0, Math.round(parsedHours * 60 + parsedMinutes))
 }
 
+const usePressRepeat = (action: () => void) => {
+  const repeatRef = useRef<{ timeoutId: number | null; intervalId: number | null; didRepeat: boolean }>({
+    timeoutId: null,
+    intervalId: null,
+    didRepeat: false,
+  })
+
+  const clearRepeat = useCallback(() => {
+    if (repeatRef.current.timeoutId !== null) {
+      window.clearTimeout(repeatRef.current.timeoutId)
+      repeatRef.current.timeoutId = null
+    }
+    if (repeatRef.current.intervalId !== null) {
+      window.clearInterval(repeatRef.current.intervalId)
+      repeatRef.current.intervalId = null
+    }
+  }, [])
+
+  useEffect(() => clearRepeat, [clearRepeat])
+
+  const onPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return
+      clearRepeat()
+      repeatRef.current.didRepeat = false
+      repeatRef.current.timeoutId = window.setTimeout(() => {
+        repeatRef.current.didRepeat = true
+        action()
+        repeatRef.current.intervalId = window.setInterval(action, 120)
+      }, 300)
+    },
+    [action, clearRepeat],
+  )
+
+  const stop = useCallback(() => {
+    clearRepeat()
+  }, [clearRepeat])
+
+  const onClick = useCallback(() => {
+    if (repeatRef.current.didRepeat) {
+      repeatRef.current.didRepeat = false
+      return
+    }
+    action()
+  }, [action])
+
+  return {
+    onPointerDown,
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    onClick,
+  }
+}
+
 type DurationMode = 'session' | 'downtime'
 
 type DurationInputStackProps = {
@@ -50,12 +105,23 @@ const DurationInputStack = ({
   const isSession = mode === 'session'
   const sessionMinutes = clamp(totalMinutes || DEFAULT_SESSION_MINUTES, MAX_SESSION_MINUTES)
   const sessionDisplay = useMemo(() => formatLongTime(sessionMinutes), [sessionMinutes])
+  const sessionMinutesRef = useRef(sessionMinutes)
   const [downtimeInput, setDowntimeInput] = useState(formatLongTime(totalMinutes))
   const [downtimeFocused, setDowntimeFocused] = useState(false)
 
-  const setMinutes = (next: number) => {
-    onChange(clamp(next, MAX_SESSION_MINUTES) * 60)
-  }
+  const setMinutes = useCallback(
+    (next: number) => {
+      onChange(clamp(next, MAX_SESSION_MINUTES) * 60)
+    },
+    [onChange],
+  )
+
+  const adjustMinutes = useCallback(
+    (delta: number) => {
+      setMinutes(sessionMinutesRef.current + delta)
+    },
+    [setMinutes],
+  )
 
   useEffect(() => {
     if (!isSession) return
@@ -65,19 +131,28 @@ const DurationInputStack = ({
   }, [isSession, value, onChange])
 
   useEffect(() => {
+    sessionMinutesRef.current = sessionMinutes
+  }, [sessionMinutes])
+
+  useEffect(() => {
     if (isSession || downtimeFocused) return
     setDowntimeInput(formatLongTime(totalMinutes))
   }, [isSession, totalMinutes, downtimeFocused])
+
+  const minusQuarterHandlers = usePressRepeat(() => adjustMinutes(-15))
+  const minusHourHandlers = usePressRepeat(() => adjustMinutes(-60))
+  const plusQuarterHandlers = usePressRepeat(() => adjustMinutes(15))
+  const plusHourHandlers = usePressRepeat(() => adjustMinutes(60))
 
   if (isSession) {
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-2">
-            <Button type="button" size="xs" color="error" onClick={() => setMinutes(sessionMinutes - 15)}>
+            <Button type="button" size="xs" color="error" {...minusQuarterHandlers}>
               -15m
             </Button>
-            <Button type="button" size="xs" color="error" onClick={() => setMinutes(sessionMinutes - 60)}>
+            <Button type="button" size="xs" color="error" {...minusHourHandlers}>
               -1h
             </Button>
           </div>
@@ -85,10 +160,10 @@ const DurationInputStack = ({
             {sessionDisplay}
           </div>
           <div className="flex gap-2">
-            <Button type="button" size="xs" color="success" onClick={() => setMinutes(sessionMinutes + 15)}>
+            <Button type="button" size="xs" color="success" {...plusQuarterHandlers}>
               +15m
             </Button>
-            <Button type="button" size="xs" color="success" onClick={() => setMinutes(sessionMinutes + 60)}>
+            <Button type="button" size="xs" color="success" {...plusHourHandlers}>
               +1h
             </Button>
           </div>
