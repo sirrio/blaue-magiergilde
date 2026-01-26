@@ -46,7 +46,7 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
   }, [form.data.games_channel_id, form.data.games_channel_name])
 
   const handleChannelSelect = useCallback(
-    (selection: { id: string; name: string; guild_id: string } | { guild_id: string; channel_ids: string[] }[]) => {
+    (selection: { id: string; name: string; guild_id: string } | { guild_id: string; channel_ids: string[] }[] | null) => {
       if (Array.isArray(selection) || !selection) return
       form.setData('games_channel_id', selection.id)
       form.setData('games_channel_name', selection.name)
