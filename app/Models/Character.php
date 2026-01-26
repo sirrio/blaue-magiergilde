@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property mixed $is_filler
  * @property mixed $faction
  * @property mixed $notes
+ * @property bool $admin_managed
  */
 class Character extends Model
 {
@@ -39,6 +40,7 @@ class Character extends Model
 
     protected $casts = [
         'is_filler' => 'boolean',
+        'admin_managed' => 'boolean',
     ];
 
     protected $appends = ['faction_rank'];

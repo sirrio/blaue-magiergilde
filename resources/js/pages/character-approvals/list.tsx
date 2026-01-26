@@ -1,15 +1,19 @@
 import LogoTier from '@/components/logo-tier'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { FileInput } from '@/components/ui/file-input'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
 import { calculateTier } from '@/helper/calculateTier'
 import { cn } from '@/lib/utils'
-import { Character } from '@/types'
-import { Head, router, useForm } from '@inertiajs/react'
-import { Archive, CheckCircle2, Clock, ExternalLink, MapPin, MapPinOff, Pencil, StickyNote, UserX, XCircle } from 'lucide-react'
+import { Character, PageProps } from '@/types'
+import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
+import { Head, router, useForm, usePage } from '@inertiajs/react'
+import { Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 interface FilterOption {
@@ -27,12 +31,18 @@ type AdminCharacter = Pick<
   | 'guild_status'
   | 'user'
   | 'admin_notes'
+  | 'admin_managed'
   | 'notes'
   | 'adventures'
   | 'dm_bubbles'
+  | 'dm_coins'
   | 'bubble_shop_spend'
   | 'is_filler'
   | 'room_count'
+  | 'faction'
+  | 'version'
+  | 'character_classes'
+  | 'avatar'
 >
 
 type CharacterGroup = {
@@ -148,6 +158,275 @@ const DeleteUserModal = ({
       </ModalContent>
       <ModalAction onClick={handleDelete} disabled={!canDelete || processing} variant="error">
         Delete account
+      </ModalAction>
+    </Modal>
+  )
+}
+
+const AdminCharacterModal = ({
+  userId,
+  userName,
+  character,
+  children,
+}: React.PropsWithChildren<{
+  userId: number
+  userName: string
+  character?: AdminCharacter
+}>) => {
+  const { classes, factions, versions, tiers, errors } = usePage<PageProps>().props
+  const isEdit = Boolean(character)
+  const currentStatus = character?.guild_status ?? 'pending'
+  const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
+  const statusLabelMap: Record<string, string> = {
+    pending: 'Active',
+    draft: 'Draft',
+    approved: 'Approved',
+    declined: 'Declined',
+    retired: 'Retired',
+  }
+  const initialFormData = {
+    name: character?.name ?? '',
+    class: character?.character_classes?.map((cc) => cc.id) ?? [],
+    faction: character?.faction ?? 'none',
+    version: character?.version ?? '2024',
+    start_tier: character?.start_tier ?? 'bt',
+    dm_bubbles: character?.dm_bubbles ?? 0,
+    dm_coins: character?.dm_coins ?? 0,
+    notes: character?.notes ?? '',
+    bubble_shop_spend: character?.bubble_shop_spend ?? 0,
+    external_link: character?.external_link ?? '',
+    is_filler: character?.is_filler ?? false,
+    guild_status: canEditStatus ? currentStatus : null,
+    avatar: undefined,
+  }
+  const { data, setData, post, patch, processing, reset, clearErrors } = useForm(initialFormData)
+  const [activeTab, setActiveTab] = useState<'basics' | 'details'>('basics')
+  const [isOpen, setIsOpen] = useState(false)
+
+  const handleOpen = () => {
+    reset()
+    clearErrors()
+    setIsOpen(true)
+  }
+
+  const handleClose = () => {
+    setIsOpen(false)
+    reset()
+  }
+
+  const handleSubmit = () => {
+    const options = {
+      preserveState: 'errors',
+      preserveScroll: true,
+      forceFormData: true,
+      onSuccess: () => {
+        handleClose()
+      },
+    }
+
+    if (isEdit && character) {
+      patch(route('admin.character-approvals.characters.update', { character: character.id }), options)
+      return
+    }
+
+    post(route('admin.character-approvals.characters.store', { user: userId }), options)
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose}>
+      <ModalTrigger>
+        <span onClick={handleOpen}>{children}</span>
+      </ModalTrigger>
+      <ModalTitle>{isEdit ? 'Edit character' : 'Add character'}</ModalTitle>
+      <ModalContent>
+        <form>
+          <div className="mb-3 text-xs text-base-content/70">
+            {isEdit ? `Character owner: ${userName}` : `New character for: ${userName}`}
+          </div>
+          <div role="tablist" className="tabs tabs-border mb-2">
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${activeTab === 'basics' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('basics')}
+            >
+              Basics
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${activeTab === 'details' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('details')}
+            >
+              Details
+            </button>
+          </div>
+          {activeTab === 'basics' ? (
+            <div className="space-y-3">
+              <Input placeholder="Mordenkainen" errors={errors.name} type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+                Name
+              </Input>
+              <CharacterClassToggle classes={classes} data={data} errors={errors} setData={(key, value) => setData(key, value)}></CharacterClassToggle>
+              <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
+                <SelectLabel>Start tier</SelectLabel>
+                <SelectOptions>
+                  {Object.entries(tiers).map(([key, value]: [string, string]) => (
+                    <option key={key} value={key}>
+                      {value}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+              <Select errors={errors.faction} value={data.faction} onChange={(e) => setData('faction', e.target.value)}>
+                <SelectLabel>Factions</SelectLabel>
+                <SelectOptions>
+                  {Object.entries(factions).map(([key, value]: [string, string]) => (
+                    <option key={key} value={key}>
+                      {value}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+              <Select errors={errors.version} value={data.version} onChange={(e) => setData('version', e.target.value)}>
+                <SelectLabel>Versions</SelectLabel>
+                <SelectOptions>
+                  {versions.map((version) => (
+                    <option key={version} value={version}>
+                      {version}
+                    </option>
+                  ))}
+                </SelectOptions>
+              </Select>
+              <Select
+                errors={errors.guild_status}
+                value={canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
+                onChange={(e) => setData('guild_status', e.target.value)}
+              >
+                <SelectLabel>Visibility</SelectLabel>
+                <SelectOptions>
+                  {!canEditStatus ? (
+                    <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
+                  ) : (
+                    <>
+                      <option value="pending">Active</option>
+                      <option value="draft">Draft</option>
+                    </>
+                  )}
+                </SelectOptions>
+              </Select>
+              <Input
+                placeholder="https://..."
+                errors={errors.external_link}
+                type="url"
+                value={data.external_link}
+                onChange={(e) => setData('external_link', e.target.value)}
+              >
+                External Link
+              </Input>
+              <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
+                Avatar
+              </FileInput>
+              <p className="text-xs text-base-content/60">Accepted: JPG, PNG, GIF, WEBP · Max. 5 MB</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className={cn('grid grid-cols-2 gap-2')}>
+                <Input
+                  errors={errors.dm_bubbles}
+                  type="number"
+                  min={0}
+                  max={1024}
+                  value={data.dm_bubbles}
+                  onChange={(e) => setData('dm_bubbles', Number(e.target.value))}
+                >
+                  DM Bubbles
+                </Input>
+                <Input
+                  errors={errors.dm_coins}
+                  type="number"
+                  min={0}
+                  max={1024}
+                  value={data.dm_coins}
+                  onChange={(e) => setData('dm_coins', Number(e.target.value))}
+                >
+                  DM Coins
+                </Input>
+              </div>
+              <Input
+                errors={errors.bubble_shop_spend}
+                type="number"
+                min={0}
+                max={1024}
+                value={data.bubble_shop_spend}
+                onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
+              >
+                Bubble Shop Spend
+              </Input>
+              <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+                Notes
+              </TextArea>
+              <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
+                This character is a filler character.
+              </Checkbox>
+            </div>
+          )}
+        </form>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
+      </ModalAction>
+    </Modal>
+  )
+}
+
+const AdminQuickLevelModal = ({ character }: { character: AdminCharacter }) => {
+  const { errors } = usePage<PageProps>().props
+  const { data, setData, post, processing, reset, clearErrors } = useForm({ level: 1 })
+  const [isOpen, setIsOpen] = useState(false)
+
+  const handleOpen = () => {
+    reset()
+    clearErrors()
+    setIsOpen(true)
+  }
+
+  const handleClose = () => {
+    setIsOpen(false)
+    reset()
+  }
+
+  const handleSubmit = () => {
+    post(route('admin.character-approvals.characters.quick-level', { character: character.id }), {
+      preserveScroll: true,
+      preserveState: 'errors',
+      onSuccess: () => {
+        handleClose()
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={handleOpen}>
+          <Gauge size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Set level</ModalTitle>
+      <ModalContent>
+        <Input
+          type="number"
+          min={1}
+          max={20}
+          errors={errors.level}
+          value={data.level}
+          onChange={(e) => setData('level', Number(e.target.value))}
+        >
+          Level
+        </Input>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        Save
       </ModalAction>
     </Modal>
   )
@@ -385,6 +664,12 @@ const tierTextClassMap: Record<string, string> = {
                         Simplified tracking
                       </span>
                     ) : null}
+                    <AdminCharacterModal userId={Number(group.key)} userName={group.label}>
+                      <Button size="xs" variant="ghost">
+                        <Plus size={14} />
+                        Add character
+                      </Button>
+                    </AdminCharacterModal>
                     <DeleteUserModal userId={Number(group.key)} userLabel={group.label} />
                   </span>
                 </div>
@@ -394,6 +679,7 @@ const tierTextClassMap: Record<string, string> = {
                     const statusLabel = getStatusLabel(status)
                     const isDraft = status === 'draft'
                     const currentTier = calculateTier(character)
+                    const isAdminManaged = Boolean(character.admin_managed)
                     const characterNotes = character.notes?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
                     return (
@@ -452,8 +738,20 @@ const tierTextClassMap: Record<string, string> = {
                               {status === 'retired' && <Archive size={12} />}
                               <span>{statusLabel}</span>
                             </span>
+                            {isAdminManaged ? (
+                              <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/70">
+                                <Shield size={12} />
+                                <span>Admin</span>
+                              </span>
+                            ) : null}
                           </div>
                           <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-base-200/60 pt-3 md:w-auto md:border-t-0 md:border-l-2 md:border-base-300/70 md:pt-0 md:pl-4">
+                            <AdminQuickLevelModal character={character} />
+                            <AdminCharacterModal userId={Number(group.key)} userName={group.label} character={character}>
+                              <Button size="xs" variant="ghost" modifier="square">
+                                <Pencil size={14} />
+                              </Button>
+                            </AdminCharacterModal>
                             <AdminNoteModal character={character} />
                             <Button
                               size="xs"
