@@ -33,6 +33,7 @@ class CharacterApprovalController extends Controller
             ->with([
                 'user:id,name,discord_id,simplified_tracking',
                 'adventures:id,character_id,duration,has_additional_bubble',
+                'characterClasses:id,name',
             ]);
 
         if ($search->isNotEmpty()) {
@@ -72,12 +73,17 @@ class CharacterApprovalController extends Controller
                 'user_id',
                 'external_link',
                 'start_tier',
+                'version',
+                'faction',
                 'guild_status',
                 'notes',
                 'admin_notes',
                 'dm_bubbles',
+                'dm_coins',
                 'bubble_shop_spend',
                 'is_filler',
+                'admin_managed',
+                'avatar',
             ]);
 
         return Inertia::render('character-approvals/list', [

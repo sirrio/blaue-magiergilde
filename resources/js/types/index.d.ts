@@ -278,6 +278,7 @@ export interface Character {
   guild_status?: 'pending' | 'approved' | 'declined' | 'retired' | 'draft'
   room_count?: number
   admin_notes?: string | null
+  admin_managed?: boolean
   faction:
     | 'none'
     | 'heiler'
