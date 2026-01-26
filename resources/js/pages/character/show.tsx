@@ -256,7 +256,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                 </h3>
                                 {adv.is_pseudo ? (
                                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                    Quick mode
+                                    Simplified tracking
                                   </span>
                                 ) : null}
                               </div>
