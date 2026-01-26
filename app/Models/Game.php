@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property mixed $user_id
  * @property mixed $start_date
  * @property mixed $has_additional_bubble
+ * @property mixed $coins_disabled
  * @property mixed $tier_of_month_reward
  * @property mixed $sessions
  * @property mixed $notes
@@ -32,5 +33,6 @@ class Game extends Model
 
     protected $casts = [
         'has_additional_bubble' => 'boolean',
+        'coins_disabled' => 'boolean',
     ];
 }

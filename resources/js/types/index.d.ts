@@ -416,6 +416,7 @@ export interface Game {
   duration: number
   start_date: string
   has_additional_bubble: boolean
+  coins_disabled: boolean
   tier_of_month_reward?: 'bubble' | 'coin' | null
   sessions: number
   notes: string

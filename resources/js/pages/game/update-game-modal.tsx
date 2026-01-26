@@ -26,6 +26,7 @@ const UpdateGameModal = ({
     start_date: game.start_date ?? new Date().toISOString().slice(0, 10),
     sessions: game.sessions ?? 1,
     has_additional_bubble: game.has_additional_bubble ?? false,
+    coins_disabled: game.coins_disabled ?? false,
     tier_of_month_reward: game.tier_of_month_reward ?? '',
     notes: game.notes ?? '',
   }
@@ -33,6 +34,22 @@ const UpdateGameModal = ({
   const { data, setData, put } = useForm(initialFormData)
   const { tiers, errors } = usePage<PageProps>().props
   const bubbleCount = Math.trunc(data.duration / 10800)
+  const adventureType = data.coins_disabled ? 'moderated' : data.has_additional_bubble ? 'charquest' : 'standard'
+
+  const handleAdventureTypeChange = (value: string) => {
+    if (value === 'charquest') {
+      setData('has_additional_bubble', true)
+      setData('coins_disabled', false)
+      return
+    }
+    if (value === 'moderated') {
+      setData('has_additional_bubble', false)
+      setData('coins_disabled', true)
+      return
+    }
+    setData('has_additional_bubble', false)
+    setData('coins_disabled', false)
+  }
 
   const handleFormSubmit = () => {
     put(route('game-master-log.update', { game_master_log: game.id }), {
@@ -73,6 +90,18 @@ const UpdateGameModal = ({
             Reward: {bubbleCount}
             {data.has_additional_bubble ? '+1' : ''} bubbles
           </p>
+          <Select
+            errors={errors.coins_disabled || errors.has_additional_bubble}
+            value={adventureType}
+            onChange={(e) => handleAdventureTypeChange(e.target.value)}
+          >
+            <SelectLabel>Adventure type</SelectLabel>
+            <SelectOptions>
+              <option value="standard">Standard</option>
+              <option value="charquest">CharQuest (-1 coin, +1 bubble)</option>
+              <option value="moderated">Moderated RP (no coins)</option>
+            </SelectOptions>
+          </Select>
           <Input
             placeholder="Sessions"
             errors={errors.sessions}
@@ -95,13 +124,6 @@ const UpdateGameModal = ({
             Notes
           </TextArea>
           <div className="space-y-2">
-            <Checkbox
-              errors={errors.has_additional_bubble}
-              checked={data.has_additional_bubble}
-              onChange={(e) => setData('has_additional_bubble', e.target.checked)}
-            >
-              Character quest reward (+1 bubble, -1 coin)
-            </Checkbox>
             <Checkbox
               errors={errors.tier_of_month_reward}
               checked={data.tier_of_month_reward !== ''}

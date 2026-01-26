@@ -21,6 +21,7 @@ class GameFactory extends Factory
             'title' => $this->faker->sentence(3),
             'start_date' => $this->faker->date(),
             'has_additional_bubble' => $this->faker->boolean(),
+            'coins_disabled' => $this->faker->boolean(10),
             'sessions' => $this->faker->numberBetween(1, 5),
             'notes' => $this->faker->paragraph(),
             'tier' => $this->faker->randomElement(['bt', 'lt', 'ht']),

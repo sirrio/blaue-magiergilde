@@ -284,7 +284,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
       },
       games_coins: {
         title: 'Games — Coins',
-        description: 'Calculated from sessions. Additional Bubble reduces coins by 1.',
+        description: 'Calculated from sessions. CharQuest reduces coins by 1. Moderated RP grants no coins.',
         editable: false,
       },
       filler_bubbles: {

@@ -60,6 +60,7 @@ class GameController extends Controller
         $game->user_id = $userId;
         $game->start_date = $request->start_date;
         $game->has_additional_bubble = $request->has_additional_bubble;
+        $game->coins_disabled = $request->coins_disabled;
         $game->tier_of_month_reward = $request->tier_of_month_reward ?: null;
         $game->sessions = $request->sessions;
         $game->notes = $request->notes;
@@ -94,6 +95,7 @@ class GameController extends Controller
         $gameMasterLog->title = $request->title;
         $gameMasterLog->tier = $request->tier;
         $gameMasterLog->has_additional_bubble = $request->has_additional_bubble;
+        $gameMasterLog->coins_disabled = $request->coins_disabled;
         $gameMasterLog->tier_of_month_reward = $request->tier_of_month_reward ?: null;
         $gameMasterLog->sessions = $request->sessions;
         $gameMasterLog->notes = $request->notes;
