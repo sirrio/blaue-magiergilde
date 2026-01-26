@@ -19,7 +19,10 @@ class GameController extends Controller
     {
         $characters = Character::query()
             ->where('user_id', Auth::user()->getAuthIdentifier())
-            ->with(['adventures' => fn ($q) => $q->withTrashed()])
+            ->with([
+                'adventures' => fn ($q) => $q->withTrashed(),
+                'shopPurchases',
+            ])
             ->withTrashed()
             ->orderBy('position')
             ->get();

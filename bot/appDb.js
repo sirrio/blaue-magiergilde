@@ -178,6 +178,8 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                COALESCE(sp.shop_purchase_spend, 0) AS shop_purchase_spend,
+                COALESCE(c.bubble_shop_spend, 0) + COALESCE(sp.shop_purchase_spend, 0) AS bubble_shop_total_spend,
                 c.is_filler,
                 c.guild_status,
                 u.simplified_tracking,
@@ -211,6 +213,14 @@ async function listCharactersForDiscord(discordUser) {
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
             ) dt ON dt.character_id = c.id
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    SUM(cost) AS shop_purchase_spend
+                FROM character_shop_purchases
+                WHERE deleted_at IS NULL
+                GROUP BY character_id
+            ) sp ON sp.character_id = c.id
             LEFT JOIN (
                 SELECT
                     ccc.character_id,
@@ -245,6 +255,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                COALESCE(sp.shop_purchase_spend, 0) AS shop_purchase_spend,
+                COALESCE(c.bubble_shop_spend, 0) + COALESCE(sp.shop_purchase_spend, 0) AS bubble_shop_total_spend,
                 c.is_filler,
                 c.guild_status,
                 u.simplified_tracking,
@@ -278,6 +290,14 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
             ) dt ON dt.character_id = c.id
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    SUM(cost) AS shop_purchase_spend
+                FROM character_shop_purchases
+                WHERE deleted_at IS NULL
+                GROUP BY character_id
+            ) sp ON sp.character_id = c.id
             LEFT JOIN (
                 SELECT
                     ccc.character_id,
@@ -352,9 +372,23 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
 
         const [[character]] = await connection.execute(
             `
-                SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler
-                FROM characters
-                WHERE id = ? AND user_id = ?
+                SELECT
+                    c.id,
+                    c.start_tier,
+                    c.dm_bubbles,
+                    c.bubble_shop_spend,
+                    COALESCE(sp.shop_purchase_spend, 0) AS shop_purchase_spend,
+                    c.is_filler
+                FROM characters c
+                LEFT JOIN (
+                    SELECT
+                        character_id,
+                        SUM(cost) AS shop_purchase_spend
+                    FROM character_shop_purchases
+                    WHERE deleted_at IS NULL
+                    GROUP BY character_id
+                ) sp ON sp.character_id = c.id
+                WHERE c.id = ? AND c.user_id = ?
                 LIMIT 1
             `,
             [characterId, userId],
@@ -367,7 +401,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
 
         const additional = additionalBubblesForStartTier(character.start_tier);
         const dmBubbles = safeInt(character.dm_bubbles);
-        const bubbleSpend = safeInt(character.bubble_shop_spend);
+        const bubbleSpend = safeInt(character.bubble_shop_spend) + safeInt(character.shop_purchase_spend);
 
         const [[bubbleTotals]] = await connection.execute(
             `

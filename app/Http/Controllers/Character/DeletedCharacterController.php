@@ -18,6 +18,7 @@ class DeletedCharacterController extends Controller
                 'adventures' => fn ($q) => $q->withTrashed(),
                 'downtimes' => fn ($q) => $q->withTrashed(),
                 'characterClasses',
+                'shopPurchases',
             ])
             ->where('user_id', Auth::id())
             ->orderBy('deleted_at', 'desc')

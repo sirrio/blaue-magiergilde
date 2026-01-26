@@ -21,7 +21,7 @@ function calculateLevel(character) {
 
     const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const spend = safeInt(character.bubble_shop_spend);
+    const spend = safeInt(character.bubble_shop_total_spend ?? character.bubble_shop_spend);
 
     const effective = Math.max(0, bubbles + additional - spend);
     const level = Math.floor(1 + (Math.sqrt(8 * effective + 1) - 1) / 2);

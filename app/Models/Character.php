@@ -60,6 +60,11 @@ class Character extends Model
         return $this->hasMany(Downtime::class);
     }
 
+    public function shopPurchases(): HasMany
+    {
+        return $this->hasMany(CharacterShopPurchase::class)->latest();
+    }
+
     public function characterClasses(): BelongsToMany
     {
         return $this->belongsToMany(CharacterClass::class);

@@ -2,16 +2,21 @@ import { List, ListRow } from '@/components/ui/list'
 import { Button } from '@/components/ui/button'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
+import StoreBubbleShopPurchaseModal from '@/pages/character/store-bubble-shop-purchase-modal'
 import AppLayout from '@/layouts/app-layout'
+import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { calculateBubble } from '@/helper/calculateBubble'
+import { calculateBubbleShopSpend } from '@/helper/calculateBubbleShopSpend'
+import { calculateLevel } from '@/helper/calculateLevel'
 import { Character, Ally, PageProps } from '@/types'
 import { Head, Link, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Pencil, Trash } from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 
 function CharacterPortrait({
   character,
@@ -70,6 +75,15 @@ const formatParticipantSummary = (names: string[]) => {
   return remaining > 0 ? `${visible} +${remaining} more` : visible
 }
 
+const SHOP_TYPE_LABELS: Record<string, string> = {
+  skill_prof: 'Skill proficiency',
+  rare_language: 'Rare language',
+  language: 'Language',
+  tool: 'Tool',
+}
+
+type SectionKey = 'adventures' | 'downtimes' | 'allies' | 'shop'
+
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
   const { auth } = usePage<PageProps>().props
   const avatarMasked = auth.user?.avatar_masked ?? true
@@ -89,6 +103,164 @@ export default function Show({ character, guildCharacters }: { character: Charac
     character.downtimes.length > 0 && character.downtimes.length <= 6,
   )
   const [alliesOpen, setAlliesOpen] = useState(character.allies.length > 0 && character.allies.length <= 12)
+  const [shopOpen, setShopOpen] = useState((character.shop_purchases?.length ?? 0) > 0)
+  const [activeSection, setActiveSection] = useState<SectionKey>('adventures')
+  const activeSectionRef = useRef(activeSection)
+
+  const adventuresRef = useRef<HTMLDivElement | null>(null)
+  const downtimesRef = useRef<HTMLDivElement | null>(null)
+  const alliesRef = useRef<HTMLDivElement | null>(null)
+  const shopRef = useRef<HTMLDivElement | null>(null)
+
+  const sectionRefs = useMemo<Record<SectionKey, React.MutableRefObject<HTMLDivElement | null>>>(
+    () => ({
+      adventures: adventuresRef,
+      downtimes: downtimesRef,
+      allies: alliesRef,
+      shop: shopRef,
+    }),
+    [],
+  )
+
+  const handleSectionSelect = (section: SectionKey) => {
+    setActiveSection(section)
+    if (section === 'adventures') setAdventuresOpen(true)
+    if (section === 'downtimes') setDowntimesOpen(true)
+    if (section === 'allies') setAlliesOpen(true)
+    if (section === 'shop') setShopOpen(true)
+    sectionRefs[section]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  useEffect(() => {
+    activeSectionRef.current = activeSection
+  }, [activeSection])
+
+  useEffect(() => {
+    const targets = Object.entries(sectionRefs)
+      .map(([key, ref]) => ({ key, element: ref.current }))
+      .filter((entry): entry is { key: SectionKey; element: HTMLDivElement } => Boolean(entry.element))
+
+    if (targets.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+
+        if (visible.length === 0) return
+
+        const key = visible[0].target.getAttribute('data-section') as SectionKey | null
+        if (!key || key === activeSectionRef.current) return
+
+        setActiveSection(key)
+      },
+      {
+        rootMargin: '-30% 0px -60% 0px',
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+      },
+    )
+
+    targets.forEach(({ element }) => observer.observe(element))
+
+    return () => observer.disconnect()
+  }, [sectionRefs])
+
+  const shopPurchases = useMemo(() => {
+    const entries = character.shop_purchases ?? []
+    return [...entries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [character.shop_purchases])
+
+  const bubbleShopSpendTotal = calculateBubbleShopSpend(character)
+  const manualBubbleShopSpend = Number(character.bubble_shop_spend ?? 0)
+  const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
+  const availableBubbles = Math.max(
+    0,
+    calculateBubble(character) + additionalBubbles - bubbleShopSpendTotal,
+  )
+  const currentLevel = calculateLevel(character)
+
+  const shopPurchaseCounts = useMemo(() => {
+    return shopPurchases.reduce(
+      (counts, purchase) => {
+        counts[purchase.type] = (counts[purchase.type] ?? 0) + 1
+        return counts
+      },
+      {} as Record<string, number>,
+    )
+  }, [shopPurchases])
+
+  const shopUnlocked = !character.is_filler && currentLevel >= 5
+  const shopOptions = useMemo(() => {
+    const normalCount = (shopPurchaseCounts.language ?? 0) + (shopPurchaseCounts.tool ?? 0)
+
+    const buildOption = ({
+      value,
+      label,
+      cost,
+      limitReached,
+      usageText,
+    }: {
+      value: 'skill_prof' | 'rare_language' | 'language' | 'tool'
+      label: string
+      cost: number
+      limitReached: boolean
+      usageText: string
+    }) => {
+      let disabledReason = ''
+      if (!shopUnlocked) {
+        disabledReason = 'Unlocks at level 5.'
+      } else if (limitReached) {
+        disabledReason = `Limit reached (${usageText}).`
+      } else if (availableBubbles < cost) {
+        disabledReason = `Need ${cost} bubbles (have ${availableBubbles}).`
+      }
+
+      return {
+        value,
+        label,
+        cost,
+        disabled: Boolean(disabledReason),
+        disabledReason: disabledReason || undefined,
+        usageText,
+      }
+    }
+
+    const skillUsed = shopPurchaseCounts.skill_prof ?? 0
+    const rareUsed = shopPurchaseCounts.rare_language ?? 0
+    const normalUsed = normalCount
+
+    return [
+      buildOption({
+        value: 'skill_prof',
+        label: 'Skill proficiency',
+        cost: 6,
+        limitReached: skillUsed >= 1,
+        usageText: `${skillUsed}/1 used`,
+      }),
+      buildOption({
+        value: 'rare_language',
+        label: 'Rare language',
+        cost: 4,
+        limitReached: rareUsed >= 1,
+        usageText: `${rareUsed}/1 used`,
+      }),
+      buildOption({
+        value: 'language',
+        label: 'Language',
+        cost: 2,
+        limitReached: normalUsed >= 3,
+        usageText: `${normalUsed}/3 used (shared)`,
+      }),
+      buildOption({
+        value: 'tool',
+        label: 'Tool',
+        cost: 2,
+        limitReached: normalUsed >= 3,
+        usageText: `${normalUsed}/3 used (shared)`,
+      }),
+    ]
+  }, [availableBubbles, shopPurchaseCounts, shopUnlocked])
 
   const adventureNotesMap = useMemo(() => {
     const map = new Map<number, string>()
@@ -178,6 +350,16 @@ export default function Show({ character, guildCharacters }: { character: Charac
     setActiveDowntimeModalId((current) => (current === downtimeId ? null : current))
   }
 
+  const handleShopPurchaseDelete = (purchaseId: number) => {
+    if (!window.confirm('Delete this bubble shop purchase?')) return
+    router.delete(
+      route('characters.shop-purchases.destroy', { character: character.id, purchase: purchaseId }),
+      {
+        preserveScroll: true,
+      },
+    )
+  }
+
   return (
     <AppLayout>
       <Head title={character.name + ' Details'} />
@@ -192,14 +374,40 @@ export default function Show({ character, guildCharacters }: { character: Charac
           <CharacterPortrait character={character} className="h-32 w-32" masked={avatarMasked} />
         </div>
 
+        <div role="tablist" className="tabs tabs-boxed tabs-sm justify-center">
+          {(
+            [
+              { key: 'adventures', label: 'Adventures' },
+              { key: 'downtimes', label: 'Downtime' },
+              { key: 'allies', label: 'Allies' },
+              { key: 'shop', label: 'Bubble Shop' },
+            ] satisfies Array<{ key: SectionKey; label: string }>
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              role="tab"
+              type="button"
+              className={cn('tab', activeSection === tab.key && 'tab-active')}
+              onClick={() => handleSectionSelect(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+          <div
+            ref={adventuresRef}
+            data-section="adventures"
+            className="rounded-box border border-base-200 bg-base-100 scroll-mt-6"
+          >
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() =>
+              onClick={() => {
+                setActiveSection('adventures')
                 startAdventuresTransition(() => setAdventuresOpen((current) => !current))
-              }
+              }}
               aria-expanded={adventuresOpen}
               disabled={character.adventures.length === 0}
             >
@@ -340,13 +548,18 @@ export default function Show({ character, guildCharacters }: { character: Charac
         </div>
 
         <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+          <div
+            ref={downtimesRef}
+            data-section="downtimes"
+            className="rounded-box border border-base-200 bg-base-100 scroll-mt-6"
+          >
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() =>
+              onClick={() => {
+                setActiveSection('downtimes')
                 startDowntimesTransition(() => setDowntimesOpen((current) => !current))
-              }
+              }}
               aria-expanded={downtimesOpen}
               disabled={character.downtimes.length === 0}
             >
@@ -466,13 +679,18 @@ export default function Show({ character, guildCharacters }: { character: Charac
         </div>
 
         <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+          <div
+            ref={alliesRef}
+            data-section="allies"
+            className="rounded-box border border-base-200 bg-base-100 scroll-mt-6"
+          >
             <button
               type="button"
               className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() =>
+              onClick={() => {
+                setActiveSection('allies')
                 startAlliesTransition(() => setAlliesOpen((current) => !current))
-              }
+              }}
               aria-expanded={alliesOpen}
               disabled={character.allies.length === 0}
             >
@@ -530,6 +748,97 @@ export default function Show({ character, guildCharacters }: { character: Charac
                   </>
                 ) : (
                   <p className="text-center text-sm text-base-content/70">No allies</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div>
+          <div
+            ref={shopRef}
+            data-section="shop"
+            className="rounded-box border border-base-200 bg-base-100 scroll-mt-6"
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+              onClick={() => {
+                setActiveSection('shop')
+                setShopOpen((current) => !current)
+              }}
+              aria-expanded={shopOpen}
+            >
+              <div className="flex items-center gap-2">
+                {shopOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                <div>
+                  <h2 className="text-base font-semibold">Bubble Shop</h2>
+                  <p className="text-xs text-base-content/60">
+                    {shopPurchases.length === 0
+                      ? 'No purchases yet'
+                      : `${shopPurchases.length} purchases • ${bubbleShopSpendTotal} bubbles spent`}
+                  </p>
+                </div>
+              </div>
+            </button>
+            {shopOpen ? (
+              <div className="border-t border-base-200 px-4 pb-4 pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 text-xs text-base-content/60">
+                  <div>
+                    Available bubbles: {availableBubbles}
+                    {manualBubbleShopSpend > 0 ? ` · Manual adjustments: ${manualBubbleShopSpend}` : ''}
+                  </div>
+                  <StoreBubbleShopPurchaseModal
+                    character={character}
+                    options={shopOptions}
+                    availableBubbles={availableBubbles}
+                  />
+                </div>
+                {!shopUnlocked ? (
+                  <p className="text-xs text-warning/80">Bubble Shop unlocks at level 5.</p>
+                ) : null}
+                {shopPurchases.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-[minmax(0,1fr)_90px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                      <span>Purchase</span>
+                      <span className="text-right">Cost</span>
+                      <span className="text-right">Date</span>
+                      <span className="text-right">Actions</span>
+                    </div>
+                    <List className="shadow-none">
+                      {shopPurchases.map((purchase) => (
+                        <ListRow
+                          key={purchase.id}
+                          className="grid w-full grid-cols-[minmax(0,1fr)_90px_110px_64px] items-center gap-4"
+                        >
+                          <div className="min-w-0">
+                            <span className="truncate text-sm font-medium">
+                              {SHOP_TYPE_LABELS[purchase.type] ?? purchase.type}
+                            </span>
+                          </div>
+                          <span className="text-right text-xs font-medium">{purchase.cost}</span>
+                          <span className="text-right text-xs text-base-content/70">
+                            {format(new Date(purchase.created_at), 'dd.MM.yyyy')}
+                          </span>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              color="error"
+                              aria-label="Delete purchase"
+                              title="Delete purchase"
+                              onClick={() => handleShopPurchaseDelete(purchase.id)}
+                            >
+                              <Trash size={14} />
+                            </Button>
+                          </div>
+                        </ListRow>
+                      ))}
+                    </List>
+                  </>
+                ) : (
+                  <p className="text-center text-sm text-base-content/70">No purchases</p>
                 )}
               </div>
             ) : null}

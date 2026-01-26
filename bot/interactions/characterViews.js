@@ -207,7 +207,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
         : '-';
     const dmBubbles = String(safeInt(character.dm_bubbles));
     const dmCoins = String(safeInt(character.dm_coins));
-    const bubbleSpend = String(safeInt(character.bubble_shop_spend));
+    const bubbleSpend = String(safeInt(character.bubble_shop_total_spend ?? character.bubble_shop_spend));
     const statusLabel = formatGuildStatusLabel(character.guild_status);
 
     const descriptionParts = [name];

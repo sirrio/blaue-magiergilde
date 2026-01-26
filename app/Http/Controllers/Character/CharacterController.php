@@ -28,7 +28,7 @@ class CharacterController extends Controller
             ->where('user_id', $user?->getAuthIdentifier())
             ->withTrashed()
             ->withCount('room')
-            ->with('adventures')
+            ->with(['adventures', 'shopPurchases'])
             ->orderBy('position')
             ->get();
         $characters->each(function (Character $character) use ($simplifiedTracking): void {
@@ -113,7 +113,7 @@ class CharacterController extends Controller
             ->get(['id', 'name', 'avatar', 'guild_status']);
 
         return Inertia::render('character/show', [
-            'character' => $character->load('adventures.allies.linkedCharacter'),
+            'character' => $character->load(['adventures.allies.linkedCharacter', 'shopPurchases']),
             'guildCharacters' => $guildCharacters,
         ]);
     }

@@ -79,6 +79,10 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+function bubbleShopSpendTotal(character) {
+    return safeInt(character.bubble_shop_total_spend ?? character.bubble_shop_spend);
+}
+
 function secondsToHourMinuteString(seconds) {
     return formatDurationSeconds(safeInt(seconds, 0));
 }
@@ -93,7 +97,7 @@ function calculateTotalBubblesToNextLevel(character, level) {
 function calculateBubblesInCurrentLevel(character, level) {
     const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const spend = safeInt(character.bubble_shop_spend);
+    const spend = bubbleShopSpendTotal(character);
     const currentTotal = ((level - 1) * level) / 2 - additional;
     return Math.max(0, bubbles - currentTotal - spend);
 }
@@ -232,7 +236,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
             { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },
             { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
-            { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
+            { name: 'Bubble Shop', value: `Spend: **${bubbleShopSpendTotal(character)}**`, inline: true },
         );
 
     const externalLink = String(character.external_link || '').trim();

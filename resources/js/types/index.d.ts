@@ -271,12 +271,22 @@ export interface CharacterClass {
   src: string
 }
 
+export interface CharacterShopPurchase {
+  id: number
+  character_id: number
+  type: 'skill_prof' | 'rare_language' | 'language' | 'tool'
+  cost: number
+  created_at: string
+  deleted_at?: string | null
+}
+
 export interface Character {
   position: number
   character_classes: CharacterClass[]
   adventures: Adventure[]
   downtimes: Downtime[]
   allies: Ally[]
+  shop_purchases?: CharacterShopPurchase[]
   deleted_at: string
   guild_status?: 'pending' | 'approved' | 'declined' | 'retired' | 'draft'
   room_count?: number

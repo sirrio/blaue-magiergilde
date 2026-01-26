@@ -13,6 +13,7 @@ import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calcu
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
 import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
+import { calculateBubbleShopSpend } from '@/helper/calculateBubbleShopSpend'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { AlliesModal } from '@/pages/character/allies-modal'
 import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
+import StoreBubbleShopPurchaseModal from '@/pages/character/store-bubble-shop-purchase-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
@@ -78,7 +80,9 @@ export function CharacterCard({
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
   const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
   const earnedBubbles = calculateBubble(character) + additionalBubbles
-  const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
+  const bubbleShopSpendTotal = calculateBubbleShopSpend(character)
+  const isBubbleOverspent = bubbleShopSpendTotal > earnedBubbles
+  const availableBubbles = Math.max(0, earnedBubbles - bubbleShopSpendTotal)
   const guildStatus = character.guild_status ?? 'pending'
   const canLogActivity = guildStatus !== 'draft'
   const hasRoom = (character.room_count ?? 0) > 0
@@ -121,6 +125,83 @@ export function CharacterCard({
   }
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
 
+  const shopPurchases = character.shop_purchases ?? []
+  const shopPurchaseCounts = shopPurchases.reduce(
+    (counts, purchase) => {
+      counts[purchase.type] = (counts[purchase.type] ?? 0) + 1
+      return counts
+    },
+    {} as Record<string, number>,
+  )
+  const normalShopCount = (shopPurchaseCounts.language ?? 0) + (shopPurchaseCounts.tool ?? 0)
+  const shopUnlocked = !character.is_filler && level >= 5
+  const buildShopOption = ({
+    value,
+    label,
+    cost,
+    limitReached,
+    usageText,
+  }: {
+    value: 'skill_prof' | 'rare_language' | 'language' | 'tool'
+    label: string
+    cost: number
+    limitReached: boolean
+    usageText: string
+  }) => {
+    let disabledReason = ''
+    if (!shopUnlocked) {
+      disabledReason = 'Unlocks at level 5.'
+    } else if (limitReached) {
+      disabledReason = `Limit reached (${usageText}).`
+    } else if (availableBubbles < cost) {
+      disabledReason = `Need ${cost} bubbles (have ${availableBubbles}).`
+    }
+
+    return {
+      value,
+      label,
+      cost,
+      disabled: Boolean(disabledReason),
+      disabledReason: disabledReason || undefined,
+      usageText,
+    }
+  }
+
+  const skillUsed = shopPurchaseCounts.skill_prof ?? 0
+  const rareUsed = shopPurchaseCounts.rare_language ?? 0
+  const normalUsed = normalShopCount
+
+  const shopOptions = [
+    buildShopOption({
+      value: 'skill_prof',
+      label: 'Skill proficiency',
+      cost: 6,
+      limitReached: skillUsed >= 1,
+      usageText: `${skillUsed}/1 used`,
+    }),
+    buildShopOption({
+      value: 'rare_language',
+      label: 'Rare language',
+      cost: 4,
+      limitReached: rareUsed >= 1,
+      usageText: `${rareUsed}/1 used`,
+    }),
+    buildShopOption({
+      value: 'language',
+      label: 'Language',
+      cost: 2,
+      limitReached: normalUsed >= 3,
+      usageText: `${normalUsed}/3 used (shared)`,
+    }),
+    buildShopOption({
+      value: 'tool',
+      label: 'Tool',
+      cost: 2,
+      limitReached: normalUsed >= 3,
+      usageText: `${normalUsed}/3 used (shared)`,
+    }),
+  ]
+
   return (
     <div ref={setNodeRef} style={dragStyle}>
       <Card className={cn('group')}>
@@ -155,7 +236,21 @@ export function CharacterCard({
             <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
               {statusIcon}
             </span>
-            <span>{character.name}</span>
+            {character.external_link ? (
+              <a
+                className="inline-flex items-center gap-1 text-base-content hover:text-primary"
+                href={character.external_link}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${character.name} external link`}
+                title="Open external link"
+              >
+                <span>{character.name}</span>
+                <ExternalLink size={14} />
+              </a>
+            ) : (
+              <span>{character.name}</span>
+            )}
             {hasRoom ? (
               <span className="text-primary/70" title="Room assigned">
                 <MapPin size={14} />
@@ -199,7 +294,7 @@ export function CharacterCard({
                         Started in: <LogoTier width={13} tier={character.start_tier} />
                       </InfoBoxLine>
                       <InfoBoxLine>
-                        Bubble Shop: {character.bubble_shop_spend}
+                        Bubble Shop: {bubbleShopSpendTotal}
                         <Droplets size={13} />
                       </InfoBoxLine>
                     </InfoBox>
@@ -250,18 +345,17 @@ export function CharacterCard({
             {simplifiedTracking ? (
               <div className={cn('mt-4 grid gap-2')}>
                 <SetCharacterLevelModal character={character} />
-                <Button
-                  as="a"
-                  size="sm"
-                  href={character.external_link}
-                  target="_blank"
-                  className="w-full"
-                  aria-label="Open external link"
-                  title="Open external link"
-                >
-                  <ExternalLink size={14} />
-                  Open link
-                </Button>
+                <StoreBubbleShopPurchaseModal
+                  character={character}
+                  options={shopOptions}
+                  availableBubbles={availableBubbles}
+                  trigger={
+                    <Button size="sm" className="w-full" aria-label="Bubble shop purchase">
+                      <Coins size={14} />
+                      Bubble Shop
+                    </Button>
+                  }
+                />
               </div>
             ) : (
               <div className={cn('mt-4 grid grid-cols-4 gap-1')}>
@@ -274,16 +368,16 @@ export function CharacterCard({
                 ) : null}
                 {canLogActivity ? <StoreDowntimeModal character={character}></StoreDowntimeModal> : null}
                 <AlliesModal character={character} guildCharacters={guildCharacters} />
-                <Button
-                  as="a"
-                  size="sm"
-                  href={character.external_link}
-                  target="_blank"
-                  aria-label="Open external link"
-                  title="Open external link"
-                >
-                  <ExternalLink size={14} />
-                </Button>
+                <StoreBubbleShopPurchaseModal
+                  character={character}
+                  options={shopOptions}
+                  availableBubbles={availableBubbles}
+                  trigger={
+                    <Button size="sm" aria-label="Bubble shop purchase">
+                      <Coins size={14} />
+                    </Button>
+                  }
+                />
               </div>
             )}
           </CardContent>

@@ -4,6 +4,7 @@ namespace App\Actions\Character;
 
 use App\Models\Adventure;
 use App\Models\Character;
+use App\Support\BubbleShopSpendCalculator;
 use Illuminate\Support\Facades\DB;
 
 class SetQuickLevel
@@ -13,7 +14,7 @@ class SetQuickLevel
         return DB::transaction(function () use ($character, $level): array {
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
             $dmBubbles = $this->safeInt($character->dm_bubbles);
-            $bubbleSpend = $this->safeInt($character->bubble_shop_spend);
+            $bubbleSpend = (new BubbleShopSpendCalculator)->total($character);
 
             $durationBubbleSql = $this->durationBubbleSql();
 

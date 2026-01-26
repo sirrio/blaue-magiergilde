@@ -3,6 +3,7 @@
 use App\Http\Controllers\Character\AvatarMaskController;
 use App\Http\Controllers\Character\AvatarModeController;
 use App\Http\Controllers\Character\CharacterController;
+use App\Http\Controllers\Character\CharacterShopPurchaseController;
 use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
 use App\Http\Controllers\Character\PermanentDeleteCharacterController;
@@ -27,6 +28,12 @@ Route::get('avatars/masked', AvatarMaskController::class)
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
     ->middleware(['auth'])
     ->name('characters.quick-level');
+Route::post('characters/{character}/shop-purchases', [CharacterShopPurchaseController::class, 'store'])
+    ->middleware(['auth'])
+    ->name('characters.shop-purchases.store');
+Route::delete('characters/{character}/shop-purchases/{purchase}', [CharacterShopPurchaseController::class, 'destroy'])
+    ->middleware(['auth'])
+    ->name('characters.shop-purchases.destroy');
 
 Route::resource('characters', CharacterController::class)->only([
     'index',

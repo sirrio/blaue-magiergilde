@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Character;
 use App\Models\DiscordBotSetting;
+use App\Support\BubbleShopSpendCalculator;
 use Illuminate\Support\Facades\Http;
 
 class CharacterApprovalNotificationService
@@ -144,6 +145,8 @@ class CharacterApprovalNotificationService
             ->values()
             ->all();
 
+        $bubbleShopSpend = (new BubbleShopSpendCalculator)->total($character);
+
         return array_merge([
             'character_id' => $character->id,
             'character_name' => $character->name,
@@ -155,7 +158,7 @@ class CharacterApprovalNotificationService
             'character_is_filler' => $character->is_filler,
             'character_dm_bubbles' => $character->dm_bubbles,
             'character_dm_coins' => $character->dm_coins,
-            'character_shop_spend' => $character->bubble_shop_spend,
+            'character_shop_spend' => $bubbleShopSpend,
             'character_classes' => $classes,
             'character_avatar_url' => $avatarUrl,
             'external_link' => $character->external_link,

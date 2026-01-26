@@ -6,10 +6,11 @@ const level = calculateLevel({
     adventure_bubbles: 10,
     dm_bubbles: 0,
     bubble_shop_spend: 0,
+    bubble_shop_total_spend: 2,
     is_filler: 0,
 });
 
-assert.equal(level, 5);
-assert.equal(calculateTierFromLevel(level), 'LT');
+assert.equal(level, 4);
+assert.equal(calculateTierFromLevel(level), 'BT');
 
 console.log('character-tier.test.js passed');
