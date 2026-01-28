@@ -1,5 +1,6 @@
 const db = require('./db');
 const { scanGameAnnouncements } = require('./discordGameScanner');
+const { getGamesScanSinceDate } = require('./gameScanWindow');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -31,8 +32,7 @@ async function syncGameAnnouncements(client) {
         return;
     }
 
-    const since = new Date();
-    since.setMonth(since.getMonth() - 6);
+    const since = getGamesScanSinceDate();
 
     const result = await scanGameAnnouncements(client, {
         channelId,
