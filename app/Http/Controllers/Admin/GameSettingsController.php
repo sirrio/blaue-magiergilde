@@ -57,6 +57,17 @@ class GameSettingsController extends Controller
         }
         $totals['total'] = array_sum($totals);
 
+        $gmRows = GameAnnouncement::query()
+            ->selectRaw('discord_author_id, discord_author_name, COUNT(*) as total')
+            ->groupBy('discord_author_id', 'discord_author_name')
+            ->orderByDesc('total')
+            ->get();
+        $gmStats = $gmRows->map(fn ($row) => [
+            'discord_author_id' => $row->discord_author_id,
+            'discord_author_name' => $row->discord_author_name,
+            'total' => (int) $row->total,
+        ])->values();
+
         return Inertia::render('admin/games', [
             'discordBotSettings' => [
                 'games_channel_id' => $settings->games_channel_id,
@@ -67,6 +78,7 @@ class GameSettingsController extends Controller
             'stats' => [
                 'monthly' => $monthly,
                 'totals' => $totals,
+                'gms' => $gmStats,
             ],
         ]);
     }

@@ -29,6 +29,11 @@ type GamesSettingsProps = {
       total: number
     }>
     totals: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown' | 'total', number>
+    gms: Array<{
+      discord_author_id?: string | null
+      discord_author_name?: string | null
+      total: number
+    }>
   }
 }
 
@@ -244,6 +249,47 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                   </tr>
                 </tfoot>
               ) : null}
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">GM activity</h2>
+              <p className="text-sm text-base-content/70">
+                How often each Discord GM posted a game announcement.
+              </p>
+            </div>
+            <span className="badge badge-ghost badge-sm">Total {stats.totals.total}</span>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="table table-sm">
+              <thead>
+                <tr>
+                  <th className="text-xs font-semibold text-base-content/70">GM</th>
+                  <th className="text-xs font-semibold text-base-content/70">Announcements</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.gms.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="text-sm text-base-content/60">
+                      No announcements recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  stats.gms.map((gm) => (
+                    <tr key={`${gm.discord_author_id ?? 'unknown'}-${gm.discord_author_name ?? 'unknown'}`}>
+                      <td className="text-sm font-semibold">
+                        {gm.discord_author_name || gm.discord_author_id || 'Unknown'}
+                      </td>
+                      <td className="text-sm">{gm.total}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
         </div>
