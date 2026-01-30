@@ -38,4 +38,19 @@ const isoCheck = parseAnnouncement(
 );
 assert.equal(isoCheck.starts_at, '2026-01-22 21:00:00');
 
+const forwardYearCheck = parseAnnouncement(
+    makeMessage(':MG_BT~1: 05.01. - 19:00 Uhr - "Neujahrsrunde"', new Date('2025-12-20T12:00:00Z')),
+);
+assert.equal(forwardYearCheck.starts_at, '2026-01-05 19:00:00');
+
+const backwardYearCheck = parseAnnouncement(
+    makeMessage(':MG_BT~1: 15.12. - 19:00 Uhr - "Winterrunde"', new Date('2026-01-20T12:00:00Z')),
+);
+assert.equal(backwardYearCheck.starts_at, '2025-12-15 19:00:00');
+
+const explicitYearCheck = parseAnnouncement(
+    makeMessage(':MG_BT~1: 15.12.2026 - 19:00 Uhr - "Winterrunde"', new Date('2026-01-20T12:00:00Z')),
+);
+assert.equal(explicitYearCheck.starts_at, '2025-12-15 19:00:00');
+
 console.log('discord-game-scanner.test.js passed');

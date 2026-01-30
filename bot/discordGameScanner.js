@@ -70,11 +70,27 @@ function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
         resolvedYear += 2000;
     }
 
-    if (!hasYear && fallbackDate) {
+    if (fallbackDate) {
         const candidate = new Date(resolvedYear, month - 1, day);
         const deltaDays = Math.round((candidate - fallbackDate) / (1000 * 60 * 60 * 24));
-        if (deltaDays > 14) {
+        const futureLimitDays = 31;
+
+        if (deltaDays > futureLimitDays) {
             resolvedYear -= 1;
+        } else if (deltaDays < -futureLimitDays) {
+            resolvedYear += 1;
+        }
+
+        if (hasYear) {
+            const adjustedCandidate = new Date(resolvedYear, month - 1, day);
+            const adjustedDelta = Math.round((adjustedCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
+            const alternateYear = resolvedYear + (adjustedDelta > 0 ? -1 : 1);
+            const alternateCandidate = new Date(alternateYear, month - 1, day);
+            const alternateDelta = Math.round((alternateCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
+
+            if (Math.abs(adjustedDelta) > futureLimitDays && Math.abs(alternateDelta) < Math.abs(adjustedDelta)) {
+                resolvedYear = alternateYear;
+            }
         }
     }
 
