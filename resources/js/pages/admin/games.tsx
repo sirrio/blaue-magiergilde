@@ -20,7 +20,11 @@ const monthLabel = (value: string) => {
 type GamesSettingsProps = {
   discordBotSettings: Pick<
     DiscordBotSettings,
-    'games_channel_id' | 'games_channel_name' | 'games_channel_guild_id'
+    | 'games_channel_id'
+    | 'games_channel_name'
+    | 'games_channel_guild_id'
+    | 'games_scan_years'
+    | 'games_scan_interval_minutes'
   >
   stats: {
     monthly: Array<{
@@ -29,6 +33,11 @@ type GamesSettingsProps = {
       total: number
     }>
     totals: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown' | 'total', number>
+    gms: Array<{
+      discord_author_id?: string | null
+      discord_author_name?: string | null
+      total: number
+    }>
   }
 }
 
@@ -37,6 +46,8 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
     games_channel_id: discordBotSettings.games_channel_id ?? '',
     games_channel_name: discordBotSettings.games_channel_name ?? '',
     games_channel_guild_id: discordBotSettings.games_channel_guild_id ?? '',
+    games_scan_years: discordBotSettings.games_scan_years ?? 10,
+    games_scan_interval_minutes: discordBotSettings.games_scan_interval_minutes ?? 60,
   })
 
   const channelLabel = useMemo(() => {
@@ -68,6 +79,8 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
       onError: () => toast.show('Games channel could not be saved.', 'error'),
     })
   }, [form])
+
+  const scanError = (form.errors as Record<string, string | undefined>).scan
 
   return (
     <AppLayout>
@@ -110,13 +123,81 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
               Current: <span className="font-semibold text-base-content">{channelLabel}</span>
             </div>
 
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Scan window</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input input-sm input-bordered w-24"
+                    type="number"
+                    min={1}
+                    max={25}
+                    value={form.data.games_scan_years}
+                    onChange={(event) => {
+                      const value = Number(event.target.value)
+                      const clamped = Number.isFinite(value) ? Math.min(25, Math.max(1, value)) : 1
+                      form.setData('games_scan_years', clamped)
+                    }}
+                  />
+                  <span className="text-xs text-base-content/70">years</span>
+                </div>
+              </label>
+              <span className="text-xs text-base-content/60">
+                Controls how far back the bot scans for announcements (1–25 years).
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Scan interval</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input input-sm input-bordered w-28"
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={form.data.games_scan_interval_minutes}
+                    onChange={(event) => {
+                      const value = Number(event.target.value)
+                      const clamped = Number.isFinite(value) ? Math.min(1440, Math.max(1, value)) : 1
+                      form.setData('games_scan_interval_minutes', clamped)
+                    }}
+                  />
+                  <span className="text-xs text-base-content/70">minutes</span>
+                </div>
+              </label>
+              <span className="text-xs text-base-content/60">
+                How often the bot refreshes announcements (1–1440 minutes).
+              </span>
+            </div>
+
             {form.errors.games_channel_id ? (
               <span className="text-sm text-error">{form.errors.games_channel_id}</span>
             ) : null}
+            {form.errors.games_scan_years ? (
+              <span className="text-sm text-error">{form.errors.games_scan_years}</span>
+            ) : null}
+            {form.errors.games_scan_interval_minutes ? (
+              <span className="text-sm text-error">{form.errors.games_scan_interval_minutes}</span>
+            ) : null}
+            {scanError ? <span className="text-sm text-error">{scanError}</span> : null}
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button onClick={handleSave} disabled={form.processing}>
                 Save
+              </Button>
+              <Button
+                variant="soft"
+                onClick={() => {
+                  form.post(route('admin.games.scan'), {
+                    preserveScroll: true,
+                    onSuccess: () => toast.show('Scan started.', 'info'),
+                    onError: () => toast.show('Scan could not be started.', 'error'),
+                  })
+                }}
+                disabled={form.processing}
+              >
+                Scan now
               </Button>
             </div>
           </div>
@@ -216,6 +297,47 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                   </tr>
                 </tfoot>
               ) : null}
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">GM activity</h2>
+              <p className="text-sm text-base-content/70">
+                How often each Discord GM posted a game announcement.
+              </p>
+            </div>
+            <span className="badge badge-ghost badge-sm">Total {stats.totals.total}</span>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="table table-sm">
+              <thead>
+                <tr>
+                  <th className="text-xs font-semibold text-base-content/70">GM</th>
+                  <th className="text-xs font-semibold text-base-content/70">Announcements</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.gms.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="text-sm text-base-content/60">
+                      No announcements recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  stats.gms.map((gm) => (
+                    <tr key={`${gm.discord_author_id ?? 'unknown'}-${gm.discord_author_name ?? 'unknown'}`}>
+                      <td className="text-sm font-semibold">
+                        {gm.discord_author_name || gm.discord_author_id || 'Unknown'}
+                      </td>
+                      <td className="text-sm">{gm.total}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
         </div>

@@ -14,10 +14,14 @@ class DiscordBotSetting extends Model
         'games_channel_id',
         'games_channel_name',
         'games_channel_guild_id',
+        'games_scan_years',
+        'games_scan_interval_minutes',
     ];
 
     protected $casts = [
         'owner_ids' => 'array',
+        'games_scan_years' => 'integer',
+        'games_scan_interval_minutes' => 'integer',
     ];
 
     public static function current(): self
@@ -29,6 +33,8 @@ class DiscordBotSetting extends Model
 
         return static::query()->create([
             'owner_ids' => static::parseIds(env('DISCORD_OWNER_IDS')),
+            'games_scan_years' => 10,
+            'games_scan_interval_minutes' => 60,
         ]);
     }
 

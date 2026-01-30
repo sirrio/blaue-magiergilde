@@ -5,6 +5,7 @@ const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
+const { runGameAnnouncementSync } = require('./discordGameSync');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
 const {
     postCharacterApprovalAnnouncement,
@@ -125,6 +126,7 @@ function startHttpServer(client) {
         const isBackstockPost = path === '/backstock-post';
         const isAuctionPost = path === '/auction-post';
         const isAuctionVoiceBid = path === '/auction-voice-bid';
+        const isGamesSync = path === '/games-sync';
 
         const allowedPost =
             isVoiceSync ||
@@ -141,7 +143,8 @@ function startHttpServer(client) {
             isShopUpdate ||
             isBackstockPost ||
             isAuctionPost ||
-            isAuctionVoiceBid;
+            isAuctionVoiceBid ||
+            isGamesSync;
 
         if (
             (req.method !== 'POST' && !(req.method === 'GET' && isDiscordOwnersStatus)) ||
@@ -655,6 +658,18 @@ function startHttpServer(client) {
             logReject(req, 'invalid channel_id');
             respondJson(res, 422, { error: 'Invalid channel_id.' });
             return;
+        }
+
+        if (isGamesSync) {
+            try {
+                await runGameAnnouncementSync(client);
+                respondJson(res, 200, { status: 'synced' });
+                return;
+            } catch (error) {
+                logReject(req, 'games sync failed');
+                respondJson(res, 500, { error: 'Games sync failed.' });
+                return;
+            }
         }
 
         const { snapshot, error } = await getSnapshot(channelId, client);

@@ -40,5 +40,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     Route::get('/admin/games', [GameSettingsController::class, 'index'])->name('admin.games');
     Route::patch('/admin/games', [DiscordBotSettingsController::class, 'update'])->name('admin.games.update');
+    Route::post('/admin/games/scan', [GameSettingsController::class, 'scan'])->name('admin.games.scan');
 
 });

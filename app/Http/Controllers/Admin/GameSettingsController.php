@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordBotSetting;
 use App\Models\GameAnnouncement;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -57,16 +60,64 @@ class GameSettingsController extends Controller
         }
         $totals['total'] = array_sum($totals);
 
+        $gmRows = GameAnnouncement::query()
+            ->selectRaw('discord_author_id, discord_author_name, COUNT(*) as total')
+            ->groupBy('discord_author_id', 'discord_author_name')
+            ->orderByDesc('total')
+            ->get();
+        $gmStats = $gmRows->map(fn ($row) => [
+            'discord_author_id' => $row->discord_author_id,
+            'discord_author_name' => $row->discord_author_name,
+            'total' => (int) $row->total,
+        ])->values();
+
         return Inertia::render('admin/games', [
             'discordBotSettings' => [
                 'games_channel_id' => $settings->games_channel_id,
                 'games_channel_name' => $settings->games_channel_name,
                 'games_channel_guild_id' => $settings->games_channel_guild_id,
+                'games_scan_years' => $settings->games_scan_years ?? 10,
+                'games_scan_interval_minutes' => $settings->games_scan_interval_minutes ?? 60,
             ],
             'stats' => [
                 'monthly' => $monthly,
                 'totals' => $totals,
+                'gms' => $gmStats,
             ],
         ]);
+    }
+
+    public function scan(): RedirectResponse
+    {
+        $user = request()->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $botUrl = trim((string) config('services.bot.http_url', ''));
+        $botToken = trim((string) config('services.bot.http_token', ''));
+
+        if ($botUrl === '' || $botToken === '') {
+            throw ValidationException::withMessages([
+                'scan' => 'Bot HTTP is not configured.',
+            ]);
+        }
+
+        try {
+            $response = Http::timeout((int) config('services.bot.http_timeout', 10))
+                ->acceptJson()
+                ->withHeaders(['X-Bot-Token' => $botToken])
+                ->post(rtrim($botUrl, '/').'/games-sync');
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages([
+                'scan' => 'Bot is not reachable.',
+            ]);
+        }
+
+        if (! $response->ok()) {
+            throw ValidationException::withMessages([
+                'scan' => 'Games scan failed.',
+            ]);
+        }
+
+        return redirect()->back();
     }
 }
