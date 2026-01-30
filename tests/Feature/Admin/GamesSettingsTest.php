@@ -16,7 +16,7 @@ it('shows game stats on the admin games page', function () {
     ]);
     GameAnnouncement::factory()->create([
         'tier' => 'ht',
-        'starts_at' => '2026-01-15 20:00:00',
+        'starts_at' => '2026-01-10 20:30:00',
         'discord_author_id' => '123',
         'discord_author_name' => 'Test GM',
     ]);
@@ -25,6 +25,7 @@ it('shows game stats on the admin games page', function () {
         'starts_at' => '2025-12-20 19:00:00',
         'discord_author_id' => '456',
         'discord_author_name' => 'Other GM',
+        'content' => 'Runde abgesagt.',
     ]);
 
     $response = $this->actingAs($admin)->get(route('admin.games'));
@@ -37,15 +38,18 @@ it('shows game stats on the admin games page', function () {
         ->has('stats.monthly', 2)
         ->where('stats.monthly.0.month', '2026-01')
         ->where('stats.monthly.0.counts.bt', 1)
-        ->where('stats.monthly.0.counts.ht', 1)
+        ->where('stats.monthly.0.counts.ht', 0)
         ->where('stats.monthly.1.month', '2025-12')
-        ->where('stats.monthly.1.counts.unknown', 1)
+        ->where('stats.monthly.1.counts.unknown', 0)
+        ->where('stats.monthly.1.cancelled_total', 1)
         ->where('stats.totals.bt', 1)
-        ->where('stats.totals.ht', 1)
-        ->where('stats.totals.unknown', 1)
-        ->where('stats.totals.total', 3)
+        ->where('stats.totals.ht', 0)
+        ->where('stats.totals.unknown', 0)
+        ->where('stats.totals.total', 1)
+        ->where('stats.cancelled_totals.total', 1)
+        ->where('stats.duplicate_count', 1)
         ->has('stats.gms', 2)
         ->where('stats.gms.0.discord_author_name', 'Test GM')
-        ->where('stats.gms.0.total', 2)
+        ->where('stats.gms.0.total', 1)
     );
 });

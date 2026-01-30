@@ -30,13 +30,18 @@ type GamesSettingsProps = {
     monthly: Array<{
       month: string
       counts: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown', number>
+      cancelled: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown', number>
       total: number
+      cancelled_total: number
     }>
     totals: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown' | 'total', number>
+    cancelled_totals: Record<'bt' | 'lt' | 'ht' | 'et' | 'unknown' | 'total', number>
+    duplicate_count: number
     gms: Array<{
       discord_author_id?: string | null
       discord_author_name?: string | null
       total: number
+      cancelled: number
     }>
   }
 }
@@ -211,7 +216,11 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                 Games grouped by month and tier (based on start date).
               </p>
             </div>
-            <span className="badge badge-ghost badge-sm">Total {stats.totals.total}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="badge badge-ghost badge-sm">Total {stats.totals.total}</span>
+              <span className="badge badge-ghost badge-sm">Cancelled {stats.cancelled_totals.total}</span>
+              <span className="badge badge-ghost badge-sm">Duplicates {stats.duplicate_count}</span>
+            </div>
           </div>
 
           <div className="mt-4 overflow-x-auto">
@@ -245,12 +254,13 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                   </th>
                   <th className="text-xs font-semibold text-base-content/70">?</th>
                   <th className="text-xs font-semibold text-base-content/70">Total</th>
+                  <th className="text-xs font-semibold text-base-content/70">Cancelled</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.monthly.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-sm text-base-content/60">
+                    <td colSpan={8} className="text-sm text-base-content/60">
                       No games recorded yet.
                     </td>
                   </tr>
@@ -272,6 +282,7 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                       </td>
                       <td className="text-sm">{row.counts.unknown}</td>
                       <td className="text-sm font-semibold">{row.total}</td>
+                      <td className="text-sm text-base-content/70">{row.cancelled_total}</td>
                     </tr>
                   ))
                 )}
@@ -294,6 +305,7 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                     </th>
                     <th className="text-sm font-semibold">{stats.totals.unknown}</th>
                     <th className="text-sm font-semibold">{stats.totals.total}</th>
+                    <th className="text-sm font-semibold">{stats.cancelled_totals.total}</th>
                   </tr>
                 </tfoot>
               ) : null}
@@ -318,12 +330,13 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                 <tr>
                   <th className="text-xs font-semibold text-base-content/70">GM</th>
                   <th className="text-xs font-semibold text-base-content/70">Announcements</th>
+                  <th className="text-xs font-semibold text-base-content/70">Cancelled</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.gms.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className="text-sm text-base-content/60">
+                    <td colSpan={3} className="text-sm text-base-content/60">
                       No announcements recorded yet.
                     </td>
                   </tr>
@@ -334,6 +347,7 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                         {gm.discord_author_name || gm.discord_author_id || 'Unknown'}
                       </td>
                       <td className="text-sm">{gm.total}</td>
+                      <td className="text-sm text-base-content/70">{gm.cancelled}</td>
                     </tr>
                   ))
                 )}
