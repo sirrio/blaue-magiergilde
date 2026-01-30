@@ -19,6 +19,8 @@ const samples = [
     [':MG_BT~1: Di 20.01.26 - 19:30 - "Zwergenausgrabung" @Magiergilde', 'bt'],
     ['Besteht heute Abend (19.01.) ca 18:30 Uhr Interesse an dieser LT-Runde?', 'lt'],
     [':MG_LT~1: 25.01. - 17:00 Uhr - "Die lange Nacht in Yharnam"', 'lt'],
+    [':MG_LT: 16.01.26 // 18.00 // D HARD', 'lt'],
+    [':MG_LT: 24.10.2025, ca. 19h Start - Runde', 'lt'],
 ];
 
 for (const [content, tier] of samples) {

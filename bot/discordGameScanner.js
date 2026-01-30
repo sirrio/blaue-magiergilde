@@ -104,9 +104,10 @@ function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
 
 function extractDate(content, fallbackDate) {
     const sanitized = sanitizeDateInput(content);
-    const isoMatch = sanitized.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (isoMatch) {
-        return resolveInferredYear(
+    const candidates = [];
+    const isoMatches = sanitized.matchAll(/(\d{4})-(\d{1,2})-(\d{1,2})/g);
+    for (const isoMatch of isoMatches) {
+        const resolved = resolveInferredYear(
             {
                 day: Number(isoMatch[3]),
                 month: Number(isoMatch[2]),
@@ -115,6 +116,9 @@ function extractDate(content, fallbackDate) {
             },
             fallbackDate
         );
+        if (resolved) {
+            candidates.push(resolved);
+        }
     }
 
     const monthNameMatch = sanitized.match(
@@ -148,7 +152,7 @@ function extractDate(content, fallbackDate) {
         const monthKey = monthNameMatch[2].toLowerCase();
         const month = monthMap[monthKey];
         const year = monthNameMatch[3] ? Number(monthNameMatch[3]) : undefined;
-        return resolveInferredYear(
+        const resolved = resolveInferredYear(
             {
                 day,
                 month,
@@ -157,6 +161,9 @@ function extractDate(content, fallbackDate) {
             },
             fallbackDate
         );
+        if (resolved) {
+            candidates.push(resolved);
+        }
     }
 
     const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.-]\s*(\d{1,2})(?:\s*[.-]\s*(\d{2,4}))?/g);
@@ -177,21 +184,21 @@ function extractDate(content, fallbackDate) {
             fallbackDate
         );
         if (resolved) {
-            return resolved;
+            candidates.push(resolved);
         }
     }
 
     const relative = parseRelativeDate(sanitized, fallbackDate);
     if (relative) {
-        return {
+        candidates.push({
             year: relative.getFullYear(),
             month: relative.getMonth() + 1,
             day: relative.getDate(),
             explicit: false,
-        };
+        });
     }
 
-    if (fallbackDate) {
+    if (!candidates.length && fallbackDate) {
         return {
             year: fallbackDate.getFullYear(),
             month: fallbackDate.getMonth() + 1,
@@ -200,7 +207,34 @@ function extractDate(content, fallbackDate) {
         };
     }
 
-    return null;
+    if (!candidates.length) {
+        return null;
+    }
+
+    if (!fallbackDate) {
+        return candidates[0];
+    }
+
+    const scored = candidates.map(candidate => {
+        const date = new Date(candidate.year, candidate.month - 1, candidate.day);
+        const deltaDays = Math.round((date - fallbackDate) / (1000 * 60 * 60 * 24));
+        return { ...candidate, deltaDays };
+    });
+    const windowed = scored.filter(candidate => Math.abs(candidate.deltaDays) <= 31);
+    const pool = windowed.length ? windowed : scored;
+    pool.sort((a, b) => {
+        const delta = Math.abs(a.deltaDays) - Math.abs(b.deltaDays);
+        if (delta !== 0) {
+            return delta;
+        }
+        if (a.explicit === b.explicit) {
+            return 0;
+        }
+        return a.explicit ? -1 : 1;
+    });
+
+    const { deltaDays, ...best } = pool[0];
+    return best;
 }
 
 function extractTime(content, fallbackDate) {
@@ -219,9 +253,19 @@ function extractTime(content, fallbackDate) {
         return { hour: Number(dotMatch[1]), minute: Number(dotMatch[2]), explicit: true };
     }
 
+    const looseDotMatch = sanitized.match(/(?:\/\/|\s\/\s|\s-\s|\s\|\s)\s*(\d{1,2})\.(\d{2})\b/);
+    if (looseDotMatch) {
+        return { hour: Number(looseDotMatch[1]), minute: Number(looseDotMatch[2]), explicit: true };
+    }
+
     const rangeMatch = sanitized.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(?:uhr|Uhr)\b/);
     if (rangeMatch) {
         return { hour: Number(rangeMatch[1]), minute: 0, explicit: true };
+    }
+
+    const hMatch = sanitized.match(/\b(\d{1,2})\s*h\s*(\d{2})?\b/i);
+    if (hMatch) {
+        return { hour: Number(hMatch[1]), minute: Number(hMatch[2] || 0), explicit: true };
     }
 
     const hourMatch = sanitized.match(/\b(\d{1,2})\s*(?:uhr|Uhr)\b/);
