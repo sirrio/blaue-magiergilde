@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { router, usePage } from '@inertiajs/react'
 import { Coins } from 'lucide-react'
-import React, { useState } from 'react'
+import { format } from 'date-fns'
+import React, { useMemo, useState } from 'react'
 
 type PurchaseOption = {
   value: 'skill_prof' | 'rare_language' | 'language' | 'tool'
@@ -14,20 +15,33 @@ type PurchaseOption = {
   usageText?: string
 }
 
+const SHOP_TYPE_LABELS: Record<string, string> = {
+  skill_prof: 'Skill proficiency',
+  rare_language: 'Rare language',
+  language: 'Language',
+  tool: 'Tool',
+}
+
+type ShopPurchase = NonNullable<Character['shop_purchases']>[number]
+
 const StoreBubbleShopPurchaseModal = ({
   character,
   options,
   availableBubbles,
+  purchases,
   summary,
   trigger,
 }: {
   character: Character
   options: PurchaseOption[]
   availableBubbles: number
+  purchases?: ShopPurchase[]
   summary?: {
     skillUsed: number
     rareUsed: number
     sharedUsed: number
+    languageUsed?: number
+    toolUsed?: number
   }
   trigger?: React.ReactNode
 }) => {
@@ -35,6 +49,9 @@ const StoreBubbleShopPurchaseModal = ({
   const [pendingType, setPendingType] = useState<PurchaseOption['value'] | null>(null)
   const hasEnabledOption = options.some((option) => !option.disabled)
   const isSubmitting = pendingType !== null
+  const sortedPurchases = useMemo(() => {
+    return [...(purchases ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [purchases])
 
   const handlePurchase = (option: PurchaseOption) => {
     if (option.disabled || isSubmitting) return
@@ -49,6 +66,14 @@ const StoreBubbleShopPurchaseModal = ({
         onFinish: () => setPendingType(null),
       },
     )
+  }
+
+  const handleDelete = (purchaseId: number) => {
+    if (!window.confirm('Remove this purchase?')) return
+    router.delete(route('characters.shop-purchases.destroy', { character: character.id, purchase: purchaseId }), {
+      preserveState: true,
+      preserveScroll: true,
+    })
   }
 
   return (
@@ -84,6 +109,11 @@ const StoreBubbleShopPurchaseModal = ({
               <div className="space-y-1">
                 <div className="font-semibold text-base-content">Shared</div>
                 <div className="text-base-content/60">{summary.sharedUsed}/3 used</div>
+                {summary.languageUsed !== undefined || summary.toolUsed !== undefined ? (
+                  <div className="text-base-content/50">
+                    Lang {summary.languageUsed ?? 0} · Tool {summary.toolUsed ?? 0}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -131,6 +161,32 @@ const StoreBubbleShopPurchaseModal = ({
           ) : null}
           {errors.type ? <div className="text-xs text-error">{errors.type}</div> : null}
         </form>
+        {sortedPurchases.length > 0 ? (
+          <div className="mt-4 border-t border-base-200 pt-3">
+            <div className="text-xs font-semibold uppercase text-base-content/50">Recent purchases</div>
+            <div className="mt-2 space-y-2">
+              {sortedPurchases.map((purchase) => (
+                <div key={purchase.id} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">
+                      {SHOP_TYPE_LABELS[purchase.type] ?? purchase.type}
+                    </div>
+                    <div className="text-xs text-base-content/60">
+                      {format(new Date(purchase.created_at), 'dd.MM.yyyy')} · {purchase.cost} bubbles
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs text-error"
+                    onClick={() => handleDelete(purchase.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </ModalContent>
     </Modal>
   )

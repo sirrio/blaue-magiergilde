@@ -349,10 +349,13 @@ export function CharacterCard({
                   character={character}
                   options={shopOptions}
                   availableBubbles={availableBubbles}
+                  purchases={shopPurchases}
                   summary={{
                     skillUsed,
                     rareUsed,
                     sharedUsed: normalUsed,
+                    languageUsed: shopPurchaseCounts.language ?? 0,
+                    toolUsed: shopPurchaseCounts.tool ?? 0,
                   }}
                   trigger={
                     <Button size="sm" className="w-full" aria-label="Bubble shop purchase">
@@ -377,10 +380,13 @@ export function CharacterCard({
                   character={character}
                   options={shopOptions}
                   availableBubbles={availableBubbles}
+                  purchases={shopPurchases}
                   summary={{
                     skillUsed,
                     rareUsed,
                     sharedUsed: normalUsed,
+                    languageUsed: shopPurchaseCounts.language ?? 0,
+                    toolUsed: shopPurchaseCounts.tool ?? 0,
                   }}
                   trigger={
                     <Button size="sm" aria-label="Bubble shop purchase">

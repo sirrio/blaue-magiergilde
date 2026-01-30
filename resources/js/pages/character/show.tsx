@@ -790,10 +790,13 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     character={character}
                     options={shopOptions}
                     availableBubbles={availableBubbles}
+                    purchases={shopPurchases}
                     summary={{
                       skillUsed,
                       rareUsed,
                       sharedUsed: normalUsed,
+                      languageUsed: shopPurchaseCounts.language ?? 0,
+                      toolUsed: shopPurchaseCounts.tool ?? 0,
                     }}
                   />
                 </div>
