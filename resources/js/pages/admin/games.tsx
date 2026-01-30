@@ -20,7 +20,11 @@ const monthLabel = (value: string) => {
 type GamesSettingsProps = {
   discordBotSettings: Pick<
     DiscordBotSettings,
-    'games_channel_id' | 'games_channel_name' | 'games_channel_guild_id' | 'games_scan_years'
+    | 'games_channel_id'
+    | 'games_channel_name'
+    | 'games_channel_guild_id'
+    | 'games_scan_years'
+    | 'games_scan_interval_minutes'
   >
   stats: {
     monthly: Array<{
@@ -43,6 +47,7 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
     games_channel_name: discordBotSettings.games_channel_name ?? '',
     games_channel_guild_id: discordBotSettings.games_channel_guild_id ?? '',
     games_scan_years: discordBotSettings.games_scan_years ?? 10,
+    games_scan_interval_minutes: discordBotSettings.games_scan_interval_minutes ?? 60,
   })
 
   const channelLabel = useMemo(() => {
@@ -140,16 +145,57 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
               </span>
             </div>
 
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">Scan interval</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input input-sm input-bordered w-28"
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={form.data.games_scan_interval_minutes}
+                    onChange={(event) => {
+                      const value = Number(event.target.value)
+                      const clamped = Number.isFinite(value) ? Math.min(1440, Math.max(1, value)) : 1
+                      form.setData('games_scan_interval_minutes', clamped)
+                    }}
+                  />
+                  <span className="text-xs text-base-content/70">minutes</span>
+                </div>
+              </label>
+              <span className="text-xs text-base-content/60">
+                How often the bot refreshes announcements (1–1440 minutes).
+              </span>
+            </div>
+
             {form.errors.games_channel_id ? (
               <span className="text-sm text-error">{form.errors.games_channel_id}</span>
             ) : null}
             {form.errors.games_scan_years ? (
               <span className="text-sm text-error">{form.errors.games_scan_years}</span>
             ) : null}
+            {form.errors.games_scan_interval_minutes ? (
+              <span className="text-sm text-error">{form.errors.games_scan_interval_minutes}</span>
+            ) : null}
+            {form.errors.scan ? <span className="text-sm text-error">{form.errors.scan}</span> : null}
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button onClick={handleSave} disabled={form.processing}>
                 Save
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  form.post(route('admin.games.scan'), {
+                    preserveScroll: true,
+                    onSuccess: () => toast.show('Scan started.', 'info'),
+                    onError: () => toast.show('Scan could not be started.', 'error'),
+                  })
+                }}
+                disabled={form.processing}
+              >
+                Scan now
               </Button>
             </div>
           </div>

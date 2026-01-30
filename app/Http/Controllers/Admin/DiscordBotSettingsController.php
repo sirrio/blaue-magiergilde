@@ -97,6 +97,11 @@ class DiscordBotSettingsController extends Controller
             $updates['games_scan_years'] = $years !== null ? (int) $years : null;
         }
 
+        if (array_key_exists('games_scan_interval_minutes', $validated)) {
+            $minutes = $validated['games_scan_interval_minutes'];
+            $updates['games_scan_interval_minutes'] = $minutes !== null ? (int) $minutes : null;
+        }
+
         if ($updates !== []) {
             DiscordBotSetting::current()->update($updates);
         }
