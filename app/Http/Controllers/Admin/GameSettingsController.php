@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\DiscordBotSetting;
 use App\Models\GameAnnouncement;
 use Illuminate\Http\RedirectResponse;
-use Inertia\Inertia;
-use Inertia\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class GameSettingsController extends Controller
 {

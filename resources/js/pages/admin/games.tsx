@@ -80,6 +80,8 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
     })
   }, [form])
 
+  const scanError = (form.errors as Record<string, string | undefined>).scan
+
   return (
     <AppLayout>
       <Head title="Games settings" />
@@ -178,14 +180,14 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
             {form.errors.games_scan_interval_minutes ? (
               <span className="text-sm text-error">{form.errors.games_scan_interval_minutes}</span>
             ) : null}
-            {form.errors.scan ? <span className="text-sm text-error">{form.errors.scan}</span> : null}
+            {scanError ? <span className="text-sm text-error">{scanError}</span> : null}
 
             <div className="flex flex-wrap justify-end gap-2">
               <Button onClick={handleSave} disabled={form.processing}>
                 Save
               </Button>
               <Button
-                variant="secondary"
+                variant="soft"
                 onClick={() => {
                   form.post(route('admin.games.scan'), {
                     preserveScroll: true,
