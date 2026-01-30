@@ -60,16 +60,19 @@ class GameSettingsController extends Controller
         $entries->groupBy('author_key')->each(function ($group) use (&$deduped, &$duplicateCount) {
             $sorted = $group->sortBy(fn ($entry) => $entry['starts_at']->timestamp);
             $lastTime = null;
+            $lastDate = null;
 
             foreach ($sorted as $entry) {
                 $currentTime = $entry['starts_at'];
-                if ($lastTime && $currentTime->diffInMinutes($lastTime) < 180) {
+                $currentDate = $currentTime->toDateString();
+                if ($lastTime && $lastDate === $currentDate && $currentTime->diffInMinutes($lastTime) < 180) {
                     $duplicateCount++;
 
                     continue;
                 }
                 $deduped->push($entry);
                 $lastTime = $currentTime;
+                $lastDate = $currentDate;
             }
         });
 
