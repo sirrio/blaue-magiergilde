@@ -26,6 +26,7 @@ it('shows game stats on the admin games page', function () {
     $response->assertSuccessful();
     $response->assertInertia(fn (Assert $page) => $page
         ->component('admin/games')
+        ->where('discordBotSettings.games_scan_years', 10)
         ->has('stats.monthly', 2)
         ->where('stats.monthly.0.month', '2026-01')
         ->where('stats.monthly.0.counts.bt', 1)

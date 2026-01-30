@@ -192,6 +192,7 @@ export interface DiscordBotSettings {
   games_channel_id?: string | null
   games_channel_name?: string | null
   games_channel_guild_id?: string | null
+  games_scan_years?: number | null
 }
 
 export interface DiscordBotOwner {

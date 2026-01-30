@@ -62,6 +62,7 @@ class GameSettingsController extends Controller
                 'games_channel_id' => $settings->games_channel_id,
                 'games_channel_name' => $settings->games_channel_name,
                 'games_channel_guild_id' => $settings->games_channel_guild_id,
+                'games_scan_years' => $settings->games_scan_years ?? 10,
             ],
             'stats' => [
                 'monthly' => $monthly,

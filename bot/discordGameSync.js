@@ -13,26 +13,29 @@ function toSqlDateTime(value) {
     return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-async function fetchGamesChannelId() {
+async function fetchGameSyncSettings() {
     try {
         const [rows] = await db.execute(
-            'SELECT games_channel_id FROM discord_bot_settings ORDER BY id LIMIT 1',
+            'SELECT games_channel_id, games_scan_years FROM discord_bot_settings ORDER BY id LIMIT 1',
         );
-        const channelId = rows?.[0]?.games_channel_id;
-        return String(channelId || '').trim();
+        const row = rows?.[0] ?? {};
+        const channelId = String(row.games_channel_id || '').trim();
+        const rawYears = Number(row.games_scan_years);
+        const scanYears = Number.isFinite(rawYears) && rawYears > 0 ? rawYears : 10;
+        return { channelId, scanYears };
     } catch {
-        return '';
+        return { channelId: '', scanYears: 10 };
     }
 }
 
 async function syncGameAnnouncements(client) {
-    const channelId = await fetchGamesChannelId();
+    const { channelId, scanYears } = await fetchGameSyncSettings();
     if (!channelId) {
         console.warn('[bot] Game sync skipped: games channel not configured.');
         return;
     }
 
-    const since = getGamesScanSinceDate();
+    const since = getGamesScanSinceDate({ years: scanYears });
 
     const result = await scanGameAnnouncements(client, {
         channelId,

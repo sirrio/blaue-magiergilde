@@ -92,6 +92,11 @@ class DiscordBotSettingsController extends Controller
             $updates['games_channel_guild_id'] = $guildId !== '' ? $guildId : null;
         }
 
+        if (array_key_exists('games_scan_years', $validated)) {
+            $years = $validated['games_scan_years'];
+            $updates['games_scan_years'] = $years !== null ? (int) $years : null;
+        }
+
         if ($updates !== []) {
             DiscordBotSetting::current()->update($updates);
         }
