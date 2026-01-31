@@ -21,6 +21,11 @@ const samples = [
     [':MG_LT~1: 25.01. - 17:00 Uhr - "Die lange Nacht in Yharnam"', 'lt'],
     [':MG_LT: 16.01.26 // 18.00 // D HARD', 'lt'],
     [':MG_LT: 24.10.2025, ca. 19h Start - Runde', 'lt'],
+    [':MG_LT: 08.01.2026- so gegen 19/20 Uhr', 'lt'],
+    [':MG_LT: Dienstag 11.11.2025 - 19:30/20:00', 'lt'],
+    [':MG_LT: 24.01.2026 Start gegen 1/4 nach 9', 'lt'],
+    [':MG_LT: 17.06.2023 - gegen halb 9', 'lt'],
+    [':MG_LT: 07.01.2024 um 20', 'lt'],
 ];
 
 for (const [content, tier] of samples) {
@@ -54,5 +59,14 @@ const explicitYearCheck = parseAnnouncement(
     makeMessage(':MG_BT~1: 15.12.2026 - 19:00 Uhr - "Winterrunde"', new Date('2026-01-20T12:00:00Z')),
 );
 assert.equal(explicitYearCheck.starts_at, '2025-12-15 19:00:00');
+
+const timestampEpoch = 1766253600;
+const timestampCheck = parseAnnouncement(
+    makeMessage(`<t:${timestampEpoch}:F> - :MG_LT: 20.12.2025 - 20:00 Uhr - "Timestamp Test"`),
+);
+const timestampDate = new Date(timestampEpoch * 1000);
+const pad = (value) => String(value).padStart(2, '0');
+const expectedTimestamp = `${timestampDate.getFullYear()}-${pad(timestampDate.getMonth() + 1)}-${pad(timestampDate.getDate())} ${pad(timestampDate.getHours())}:${pad(timestampDate.getMinutes())}:00`;
+assert.equal(timestampCheck.starts_at, expectedTimestamp);
 
 console.log('discord-game-scanner.test.js passed');

@@ -48,6 +48,7 @@ function sanitizeDateInput(content) {
         .replace(/https?:\/\/\S+/gi, ' ')
         .replace(/<:MG_[A-Z0-9_]+:\d+>/gi, ' ')
         .replace(/:MG_[A-Z0-9_]+~?\d*:/gi, ' ')
+        .replace(/<t:\d{9,12}(?::[tTdDfFR])?>/g, ' ')
         .replace(/<@&\d+>/g, ' ')
         .replace(/<@\d+>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -242,35 +243,74 @@ function extractTime(content, fallbackDate) {
     const sanitized = source
         .replace(/<:MG_[A-Z]+:\d+>/gi, ' ')
         .replace(/:MG_[A-Z]+~?\d*:/gi, ' ');
+    const timeSource = sanitized
+        .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
+        .replace(/\b\d{1,2}\s*[.-]\s*\d{1,2}(?:\s*[.-]\s*\d{2,4})?\b/g, ' ');
 
-    const colonMatch = sanitized.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
+    const colonMatch = timeSource.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
     if (colonMatch) {
         return { hour: Number(colonMatch[1]), minute: Number(colonMatch[2]), explicit: true };
     }
 
-    const dotMatch = sanitized.match(/\b(\d{1,2})\s*[.]\s*(\d{2})\s*(?:uhr|Uhr)\b/);
+    const slashRangeMatch = timeSource.match(/\b(\d{1,2})(?::(\d{2}))?\s*\/\s*(\d{1,2})(?::(\d{2}))?\s*(?:uhr|Uhr)?\b/);
+    if (slashRangeMatch) {
+        const hour = Number(slashRangeMatch[1]);
+        const minute = Number(slashRangeMatch[2] || 0);
+        const hasMinutes = slashRangeMatch[2] || slashRangeMatch[4];
+        const hasUhr = /uhr/i.test(slashRangeMatch[0]);
+        if (hasMinutes || hasUhr || hour >= 5) {
+            return { hour, minute, explicit: true };
+        }
+    }
+
+    const dotMatch = timeSource.match(/\b(\d{1,2})\s*[.]\s*(\d{2})\s*(?:uhr|Uhr)?\b/);
     if (dotMatch) {
         return { hour: Number(dotMatch[1]), minute: Number(dotMatch[2]), explicit: true };
     }
 
-    const looseDotMatch = sanitized.match(/(?:\/\/|\s\/\s|\s-\s|\s\|\s)\s*(\d{1,2})\.(\d{2})\b/);
+    const looseDotMatch = timeSource.match(/(?:\/\/|\s\/\s|\s-\s|\s\|\s)\s*(\d{1,2})\.(\d{2})\b/);
     if (looseDotMatch) {
         return { hour: Number(looseDotMatch[1]), minute: Number(looseDotMatch[2]), explicit: true };
     }
 
-    const rangeMatch = sanitized.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(?:uhr|Uhr)\b/);
+    const rangeMatch = timeSource.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(?:uhr|Uhr)\b/);
     if (rangeMatch) {
         return { hour: Number(rangeMatch[1]), minute: 0, explicit: true };
     }
 
-    const hMatch = sanitized.match(/\b(\d{1,2})\s*h\s*(\d{2})?\b/i);
+    const quarterMatch = timeSource.match(/\b(1\/4|3\/4)\s*(nach|vor)\s*(\d{1,2})\b/i);
+    if (quarterMatch) {
+        const fraction = quarterMatch[1];
+        const direction = quarterMatch[2].toLowerCase();
+        const baseHour = Number(quarterMatch[3]);
+        const minutes = fraction === '1/4' ? 15 : 45;
+        if (direction === 'nach') {
+            return { hour: baseHour, minute: minutes, explicit: true };
+        }
+        const hour = baseHour === 0 ? 23 : baseHour - 1;
+        return { hour, minute: minutes === 15 ? 45 : 15, explicit: true };
+    }
+
+    const halfMatch = timeSource.match(/\bhalb\s*(\d{1,2})\b/i);
+    if (halfMatch) {
+        const baseHour = Number(halfMatch[1]);
+        const hour = baseHour === 0 ? 23 : baseHour - 1;
+        return { hour, minute: 30, explicit: true };
+    }
+
+    const hMatch = timeSource.match(/\b(\d{1,2})\s*h\s*(\d{2})?\b/i);
     if (hMatch) {
         return { hour: Number(hMatch[1]), minute: Number(hMatch[2] || 0), explicit: true };
     }
 
-    const hourMatch = sanitized.match(/\b(\d{1,2})\s*(?:uhr|Uhr)\b/);
+    const hourMatch = timeSource.match(/\b(\d{1,2})\s*(?:uhr|Uhr)\b/);
     if (hourMatch) {
         return { hour: Number(hourMatch[1]), minute: 0, explicit: true };
+    }
+
+    const umMatch = timeSource.match(/\bum\s*(\d{1,2})(?![:.\d])\b/i);
+    if (umMatch) {
+        return { hour: Number(umMatch[1]), minute: 0, explicit: true };
     }
 
     if (fallbackDate) {
@@ -278,6 +318,36 @@ function extractTime(content, fallbackDate) {
     }
 
     return null;
+}
+
+function extractDiscordTimestamp(content) {
+    const match = String(content || '').match(/<t:(\d{9,12})(?::[tTdDfFR])?>/);
+    if (!match) {
+        return null;
+    }
+
+    const epoch = Number(match[1]);
+    if (!Number.isFinite(epoch)) {
+        return null;
+    }
+    const date = new Date(epoch * 1000);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return {
+        dateParts: {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            day: date.getDate(),
+            explicit: true,
+        },
+        timeParts: {
+            hour: date.getHours(),
+            minute: date.getMinutes(),
+            explicit: true,
+        },
+    };
 }
 
 function formatDateTime(dateParts, timeParts) {
@@ -312,8 +382,9 @@ function parseAnnouncement(message) {
     const content = message?.content ?? '';
     const tier = extractTier(content);
     const fallbackDate = message?.createdAt ?? null;
-    const dateParts = extractDate(content, fallbackDate);
-    const timeParts = extractTime(content, fallbackDate);
+    const timestampParts = extractDiscordTimestamp(content);
+    const dateParts = timestampParts?.dateParts || extractDate(content, fallbackDate);
+    const timeParts = timestampParts?.timeParts || extractTime(content, fallbackDate);
     const startsAt = formatDateTime(dateParts, timeParts);
     const memberAvatar =
         typeof message?.member?.displayAvatarURL === 'function'
