@@ -202,6 +202,12 @@ function extractDate(content, fallbackDate) {
         const month = Number(dateMatch[2]);
         let hasYear = Boolean(dateMatch[3]);
         let year = dateMatch[3] ? Number(dateMatch[3]) : undefined;
+        if (!hasYear && dateMatch.index != null && String(dateMatch[0]).includes('-')) {
+            const tail = sanitized.slice(dateMatch.index + dateMatch[0].length).trimStart();
+            if (/^(?:uhr|h\b)/i.test(tail)) {
+                continue;
+            }
+        }
         if (hasYear && dateMatch.index != null) {
             const tail = sanitized.slice(dateMatch.index + dateMatch[0].length).trimStart();
             if (Number.isFinite(year) && year <= 24 && /^(:|uhr\b|Uhr\b)/.test(tail)) {
@@ -426,6 +432,17 @@ function parseAnnouncement(message) {
 
     if (!tier || !startsAt) {
         return null;
+    }
+
+    if (message?.createdAt) {
+        const createdAt = message.createdAt instanceof Date ? message.createdAt : new Date(message.createdAt);
+        const startCandidate = new Date(startsAt.replace(' ', 'T'));
+        if (!Number.isNaN(createdAt.getTime()) && !Number.isNaN(startCandidate.getTime())) {
+            const deltaDays = Math.abs((startCandidate - createdAt) / (1000 * 60 * 60 * 24));
+            if (deltaDays > 31) {
+                return null;
+            }
+        }
     }
 
     return {
