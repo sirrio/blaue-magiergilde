@@ -1,13 +1,16 @@
 const assert = require('node:assert/strict');
 const { parseAnnouncement } = require('../discordGameScanner');
 
-const makeMessage = (content, createdAt = new Date('2026-01-22T12:00:00Z')) => ({
+const makeMessage = (content, createdAt = new Date('2026-01-22T12:00:00Z'), reactions = []) => ({
     content,
     channelId: '123',
     id: '999',
     createdAt,
     author: { id: '1', username: 'Tester' },
     member: { displayName: 'Tester' },
+    reactions: {
+        cache: reactions,
+    },
 });
 
 const samples = [
@@ -94,5 +97,14 @@ const timestampDate = new Date(timestampEpoch * 1000);
 const pad = (value) => String(value).padStart(2, '0');
 const expectedTimestamp = `${timestampDate.getFullYear()}-${pad(timestampDate.getMonth() + 1)}-${pad(timestampDate.getDate())} ${pad(timestampDate.getHours())}:${pad(timestampDate.getMinutes())}:00`;
 assert.equal(timestampCheck.starts_at, expectedTimestamp);
+
+const cancelledReactionCheck = parseAnnouncement(
+    makeMessage(
+        ':MG_LT: 24.01.2026 - 19:00 Uhr - "Cancelled Test"',
+        new Date('2026-01-10T12:00:00Z'),
+        [{ emoji: { name: '❌' } }],
+    ),
+);
+assert.equal(cancelledReactionCheck.cancelled, true);
 
 console.log('discord-game-scanner.test.js passed');
