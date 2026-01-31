@@ -69,6 +69,7 @@ async function syncGameAnnouncements(client) {
             starts_at: game.starts_at || null,
             posted_at: toSqlDateTime(game.posted_at),
             confidence: Number(game.confidence || 0),
+            cancelled: game.cancelled ? 1 : 0,
             created_at: timestamp,
             updated_at: timestamp,
         }));
@@ -78,7 +79,7 @@ async function syncGameAnnouncements(client) {
     }
 
     const placeholders = rows
-        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .join(', ');
     const values = rows.flatMap(row => [
         row.discord_channel_id,
@@ -93,6 +94,7 @@ async function syncGameAnnouncements(client) {
         row.starts_at,
         row.posted_at,
         row.confidence,
+        row.cancelled,
         row.created_at,
         row.updated_at,
     ]);
@@ -111,6 +113,7 @@ async function syncGameAnnouncements(client) {
             starts_at,
             posted_at,
             confidence,
+            cancelled,
             created_at,
             updated_at
         )
@@ -127,6 +130,7 @@ async function syncGameAnnouncements(client) {
             starts_at = VALUES(starts_at),
             posted_at = VALUES(posted_at),
             confidence = VALUES(confidence),
+            cancelled = VALUES(cancelled),
             updated_at = VALUES(updated_at)
     `;
 

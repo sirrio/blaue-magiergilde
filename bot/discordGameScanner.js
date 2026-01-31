@@ -202,6 +202,12 @@ function extractDate(content, fallbackDate) {
         const month = Number(dateMatch[2]);
         let hasYear = Boolean(dateMatch[3]);
         let year = dateMatch[3] ? Number(dateMatch[3]) : undefined;
+        if (!hasYear && dateMatch.index != null && String(dateMatch[0]).includes('-')) {
+            const tail = sanitized.slice(dateMatch.index + dateMatch[0].length).trimStart();
+            if (/^(?:uhr|h\b)/i.test(tail)) {
+                continue;
+            }
+        }
         if (hasYear && dateMatch.index != null) {
             const tail = sanitized.slice(dateMatch.index + dateMatch[0].length).trimStart();
             if (Number.isFinite(year) && year <= 24 && /^(:|uhr\b|Uhr\b)/.test(tail)) {
@@ -407,6 +413,33 @@ function calculateConfidence({ hasTier, dateExplicit, timeExplicit }) {
     return Math.min(1, Number(confidence.toFixed(2)));
 }
 
+const CANCELLED_REGEX = /\b(abgesagt|abgesage|entfällt|faellt\s+aus|fällt\s+aus|cancel(?:led|ed))\b/ui;
+
+function hasCancelReaction(message) {
+    const cache = message?.reactions?.cache;
+    if (!cache) return false;
+    const reactions = Array.isArray(cache)
+        ? cache
+        : typeof cache.values === 'function'
+            ? Array.from(cache.values())
+            : [];
+
+    return reactions.some((reaction) => {
+        const name = reaction?.emoji?.name;
+        return name === '❌' || name === '✖️' || name === '✖';
+    });
+}
+
+function hasCancelledText(content) {
+    if (CANCELLED_REGEX.test(String(content || ''))) {
+        return true;
+    }
+    const normalized = String(content || '').trim();
+    const hasStrike = /~~[^~]+~~/s.test(normalized);
+    if (!hasStrike) return false;
+    return extractTier(normalized) !== null;
+}
+
 function parseAnnouncement(message) {
     const content = message?.content ?? '';
     const tier = extractTier(content);
@@ -428,6 +461,19 @@ function parseAnnouncement(message) {
         return null;
     }
 
+    if (message?.createdAt) {
+        const createdAt = message.createdAt instanceof Date ? message.createdAt : new Date(message.createdAt);
+        const startCandidate = new Date(startsAt.replace(' ', 'T'));
+        if (!Number.isNaN(createdAt.getTime()) && !Number.isNaN(startCandidate.getTime())) {
+            const deltaDays = Math.abs((startCandidate - createdAt) / (1000 * 60 * 60 * 24));
+            if (deltaDays > 31) {
+                return null;
+            }
+        }
+    }
+
+    const cancelled = hasCancelReaction(message) || hasCancelledText(content);
+
     return {
         discord_channel_id: String(message.channelId),
         discord_guild_id: message.guildId ? String(message.guildId) : null,
@@ -445,6 +491,7 @@ function parseAnnouncement(message) {
             dateExplicit: Boolean(dateParts?.explicit),
             timeExplicit: Boolean(timeParts?.explicit),
         }),
+        cancelled,
     };
 }
 

@@ -22,11 +22,13 @@ class GameAnnouncement extends Model
         'starts_at',
         'posted_at',
         'confidence',
+        'cancelled',
     ];
 
     protected $casts = [
         'starts_at' => 'datetime',
         'posted_at' => 'datetime',
         'confidence' => 'decimal:2',
+        'cancelled' => 'boolean',
     ];
 }

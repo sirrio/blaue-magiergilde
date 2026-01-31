@@ -38,10 +38,13 @@ class GameSettingsController extends Controller
                 ? 'id:'.$announcement->discord_author_id
                 : ($announcement->discord_author_name ? 'name:'.$announcement->discord_author_name : 'unknown');
             $content = $announcement->content ?? '';
-            $cancelled = (bool) preg_match(
-                '/\b(abgesagt|abgesage|abgesagt|entfällt|faellt\s+aus|fällt\s+aus|cancel(?:led|ed))\b/ui',
-                $content
-            );
+            $cancelled = (bool) $announcement->cancelled;
+            if (! $cancelled) {
+                $cancelled = (bool) preg_match(
+                    '/\b(abgesagt|abgesage|abgesagt|entfällt|faellt\s+aus|fällt\s+aus|cancel(?:led|ed))\b/ui',
+                    $content
+                );
+            }
 
             return [
                 'author_key' => $authorKey,

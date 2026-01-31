@@ -1,13 +1,16 @@
 const assert = require('node:assert/strict');
 const { parseAnnouncement } = require('../discordGameScanner');
 
-const makeMessage = (content, createdAt = new Date('2026-01-22T12:00:00Z')) => ({
+const makeMessage = (content, createdAt = new Date('2026-01-22T12:00:00Z'), reactions = []) => ({
     content,
     channelId: '123',
     id: '999',
     createdAt,
     author: { id: '1', username: 'Tester' },
     member: { displayName: 'Tester' },
+    reactions: {
+        cache: reactions,
+    },
 });
 
 const samples = [
@@ -20,16 +23,16 @@ const samples = [
     ['Besteht heute Abend (19.01.) ca 18:30 Uhr Interesse an dieser LT-Runde?', 'lt'],
     [':MG_LT~1: 25.01. - 17:00 Uhr - "Die lange Nacht in Yharnam"', 'lt'],
     [':MG_LT: 16.01.26 // 18.00 // D HARD', 'lt'],
-    [':MG_LT: 24.10.2025, ca. 19h Start - Runde', 'lt'],
+    [':MG_LT: 24.10.2025, ca. 19h Start - Runde', 'lt', new Date('2025-10-20T12:00:00Z')],
     [':MG_LT: 08.01.2026- so gegen 19/20 Uhr', 'lt'],
-    [':MG_LT: Dienstag 11.11.2025 - 19:30/20:00', 'lt'],
+    [':MG_LT: Dienstag 11.11.2025 - 19:30/20:00', 'lt', new Date('2025-11-01T12:00:00Z')],
     [':MG_LT: 24.01.2026 Start gegen 1/4 nach 9', 'lt'],
-    [':MG_LT: 17.06.2023 - gegen halb 9', 'lt'],
-    [':MG_LT: 07.01.2024 um 20', 'lt'],
+    [':MG_LT: 17.06.2023 - gegen halb 9', 'lt', new Date('2023-06-15T12:00:00Z')],
+    [':MG_LT: 07.01.2024 um 20', 'lt', new Date('2024-01-05T12:00:00Z')],
 ];
 
-for (const [content, tier] of samples) {
-    const parsed = parseAnnouncement(makeMessage(content));
+for (const [content, tier, createdAt] of samples) {
+    const parsed = parseAnnouncement(makeMessage(content, createdAt));
     assert.ok(parsed, `Expected parsed announcement for "${content}"`);
     assert.equal(parsed.tier, tier);
     assert.match(parsed.starts_at, /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
@@ -51,12 +54,12 @@ const forwardYearCheck = parseAnnouncement(
 assert.equal(forwardYearCheck.starts_at, '2026-01-05 19:00:00');
 
 const backwardYearCheck = parseAnnouncement(
-    makeMessage(':MG_BT~1: 15.12. - 19:00 Uhr - "Winterrunde"', new Date('2026-01-20T12:00:00Z')),
+    makeMessage(':MG_BT~1: 15.12. - 19:00 Uhr - "Winterrunde"', new Date('2026-01-10T12:00:00Z')),
 );
 assert.equal(backwardYearCheck.starts_at, '2025-12-15 19:00:00');
 
 const explicitYearCheck = parseAnnouncement(
-    makeMessage(':MG_BT~1: 15.12.2026 - 19:00 Uhr - "Winterrunde"', new Date('2026-01-20T12:00:00Z')),
+    makeMessage(':MG_BT~1: 15.12.2026 - 19:00 Uhr - "Winterrunde"', new Date('2026-01-10T12:00:00Z')),
 );
 assert.equal(explicitYearCheck.starts_at, '2025-12-15 19:00:00');
 
@@ -78,13 +81,30 @@ const typoMissingDigitCheck = parseAnnouncement(
 );
 assert.equal(typoMissingDigitCheck.starts_at, '2025-01-24 18:30:00');
 
+const noDateCheck = parseAnnouncement(
+    makeMessage('~~gibt es noch Interesse an einer Arena-Runde? vllt 2h bis 1-2 Uhr ab 22 Uhr?~~'),
+);
+assert.equal(noDateCheck, null);
+
 const timestampEpoch = 1766253600;
 const timestampCheck = parseAnnouncement(
-    makeMessage(`<t:${timestampEpoch}:F> - :MG_LT: 20.12.2025 - 20:00 Uhr - "Timestamp Test"`),
+    makeMessage(
+        `<t:${timestampEpoch}:F> - :MG_LT: 20.12.2025 - 20:00 Uhr - "Timestamp Test"`,
+        new Date('2026-01-10T12:00:00Z'),
+    ),
 );
 const timestampDate = new Date(timestampEpoch * 1000);
 const pad = (value) => String(value).padStart(2, '0');
 const expectedTimestamp = `${timestampDate.getFullYear()}-${pad(timestampDate.getMonth() + 1)}-${pad(timestampDate.getDate())} ${pad(timestampDate.getHours())}:${pad(timestampDate.getMinutes())}:00`;
 assert.equal(timestampCheck.starts_at, expectedTimestamp);
+
+const cancelledReactionCheck = parseAnnouncement(
+    makeMessage(
+        ':MG_LT: 24.01.2026 - 19:00 Uhr - "Cancelled Test"',
+        new Date('2026-01-10T12:00:00Z'),
+        [{ emoji: { name: '❌' } }],
+    ),
+);
+assert.equal(cancelledReactionCheck.cancelled, true);
 
 console.log('discord-game-scanner.test.js passed');
