@@ -48,6 +48,7 @@ function sanitizeDateInput(content) {
         .replace(/https?:\/\/\S+/gi, ' ')
         .replace(/<:MG_[A-Z0-9_]+:\d+>/gi, ' ')
         .replace(/:MG_[A-Z0-9_]+~?\d*:/gi, ' ')
+        .replace(/<t:\d{9,12}(?::[tTdDfFR])?>/g, ' ')
         .replace(/<@&\d+>/g, ' ')
         .replace(/<@\d+>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -70,11 +71,27 @@ function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
         resolvedYear += 2000;
     }
 
-    if (!hasYear && fallbackDate) {
+    if (fallbackDate) {
         const candidate = new Date(resolvedYear, month - 1, day);
         const deltaDays = Math.round((candidate - fallbackDate) / (1000 * 60 * 60 * 24));
-        if (deltaDays > 14) {
+        const futureLimitDays = 31;
+
+        if (deltaDays > futureLimitDays) {
             resolvedYear -= 1;
+        } else if (deltaDays < -futureLimitDays) {
+            resolvedYear += 1;
+        }
+
+        if (hasYear) {
+            const adjustedCandidate = new Date(resolvedYear, month - 1, day);
+            const adjustedDelta = Math.round((adjustedCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
+            const alternateYear = resolvedYear + (adjustedDelta > 0 ? -1 : 1);
+            const alternateCandidate = new Date(alternateYear, month - 1, day);
+            const alternateDelta = Math.round((alternateCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
+
+            if (Math.abs(adjustedDelta) > futureLimitDays && Math.abs(alternateDelta) < Math.abs(adjustedDelta)) {
+                resolvedYear = alternateYear;
+            }
         }
     }
 
@@ -88,9 +105,10 @@ function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
 
 function extractDate(content, fallbackDate) {
     const sanitized = sanitizeDateInput(content);
-    const isoMatch = sanitized.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (isoMatch) {
-        return resolveInferredYear(
+    const candidates = [];
+    const isoMatches = sanitized.matchAll(/(\d{4})-(\d{1,2})-(\d{1,2})/g);
+    for (const isoMatch of isoMatches) {
+        const resolved = resolveInferredYear(
             {
                 day: Number(isoMatch[3]),
                 month: Number(isoMatch[2]),
@@ -99,6 +117,9 @@ function extractDate(content, fallbackDate) {
             },
             fallbackDate
         );
+        if (resolved) {
+            candidates.push(resolved);
+        }
     }
 
     const monthNameMatch = sanitized.match(
@@ -132,7 +153,7 @@ function extractDate(content, fallbackDate) {
         const monthKey = monthNameMatch[2].toLowerCase();
         const month = monthMap[monthKey];
         const year = monthNameMatch[3] ? Number(monthNameMatch[3]) : undefined;
-        return resolveInferredYear(
+        const resolved = resolveInferredYear(
             {
                 day,
                 month,
@@ -141,6 +162,9 @@ function extractDate(content, fallbackDate) {
             },
             fallbackDate
         );
+        if (resolved) {
+            candidates.push(resolved);
+        }
     }
 
     const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.-]\s*(\d{1,2})(?:\s*[.-]\s*(\d{2,4}))?/g);
@@ -161,21 +185,21 @@ function extractDate(content, fallbackDate) {
             fallbackDate
         );
         if (resolved) {
-            return resolved;
+            candidates.push(resolved);
         }
     }
 
     const relative = parseRelativeDate(sanitized, fallbackDate);
     if (relative) {
-        return {
+        candidates.push({
             year: relative.getFullYear(),
             month: relative.getMonth() + 1,
             day: relative.getDate(),
             explicit: false,
-        };
+        });
     }
 
-    if (fallbackDate) {
+    if (!candidates.length && fallbackDate) {
         return {
             year: fallbackDate.getFullYear(),
             month: fallbackDate.getMonth() + 1,
@@ -184,7 +208,34 @@ function extractDate(content, fallbackDate) {
         };
     }
 
-    return null;
+    if (!candidates.length) {
+        return null;
+    }
+
+    if (!fallbackDate) {
+        return candidates[0];
+    }
+
+    const scored = candidates.map(candidate => {
+        const date = new Date(candidate.year, candidate.month - 1, candidate.day);
+        const deltaDays = Math.round((date - fallbackDate) / (1000 * 60 * 60 * 24));
+        return { ...candidate, deltaDays };
+    });
+    const windowed = scored.filter(candidate => Math.abs(candidate.deltaDays) <= 31);
+    const pool = windowed.length ? windowed : scored;
+    pool.sort((a, b) => {
+        const delta = Math.abs(a.deltaDays) - Math.abs(b.deltaDays);
+        if (delta !== 0) {
+            return delta;
+        }
+        if (a.explicit === b.explicit) {
+            return 0;
+        }
+        return a.explicit ? -1 : 1;
+    });
+
+    const { deltaDays, ...best } = pool[0];
+    return best;
 }
 
 function extractTime(content, fallbackDate) {
@@ -192,25 +243,74 @@ function extractTime(content, fallbackDate) {
     const sanitized = source
         .replace(/<:MG_[A-Z]+:\d+>/gi, ' ')
         .replace(/:MG_[A-Z]+~?\d*:/gi, ' ');
+    const timeSource = sanitized
+        .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
+        .replace(/\b\d{1,2}\s*[.-]\s*\d{1,2}(?:\s*[.-]\s*\d{2,4})?\b/g, ' ');
 
-    const colonMatch = sanitized.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
+    const colonMatch = timeSource.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
     if (colonMatch) {
         return { hour: Number(colonMatch[1]), minute: Number(colonMatch[2]), explicit: true };
     }
 
-    const dotMatch = sanitized.match(/\b(\d{1,2})\s*[.]\s*(\d{2})\s*(?:uhr|Uhr)\b/);
+    const slashRangeMatch = timeSource.match(/\b(\d{1,2})(?::(\d{2}))?\s*\/\s*(\d{1,2})(?::(\d{2}))?\s*(?:uhr|Uhr)?\b/);
+    if (slashRangeMatch) {
+        const hour = Number(slashRangeMatch[1]);
+        const minute = Number(slashRangeMatch[2] || 0);
+        const hasMinutes = slashRangeMatch[2] || slashRangeMatch[4];
+        const hasUhr = /uhr/i.test(slashRangeMatch[0]);
+        if (hasMinutes || hasUhr || hour >= 5) {
+            return { hour, minute, explicit: true };
+        }
+    }
+
+    const dotMatch = timeSource.match(/\b(\d{1,2})\s*[.]\s*(\d{2})\s*(?:uhr|Uhr)?\b/);
     if (dotMatch) {
         return { hour: Number(dotMatch[1]), minute: Number(dotMatch[2]), explicit: true };
     }
 
-    const rangeMatch = sanitized.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(?:uhr|Uhr)\b/);
+    const looseDotMatch = timeSource.match(/(?:\/\/|\s\/\s|\s-\s|\s\|\s)\s*(\d{1,2})\.(\d{2})\b/);
+    if (looseDotMatch) {
+        return { hour: Number(looseDotMatch[1]), minute: Number(looseDotMatch[2]), explicit: true };
+    }
+
+    const rangeMatch = timeSource.match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(?:uhr|Uhr)\b/);
     if (rangeMatch) {
         return { hour: Number(rangeMatch[1]), minute: 0, explicit: true };
     }
 
-    const hourMatch = sanitized.match(/\b(\d{1,2})\s*(?:uhr|Uhr)\b/);
+    const quarterMatch = timeSource.match(/\b(1\/4|3\/4)\s*(nach|vor)\s*(\d{1,2})\b/i);
+    if (quarterMatch) {
+        const fraction = quarterMatch[1];
+        const direction = quarterMatch[2].toLowerCase();
+        const baseHour = Number(quarterMatch[3]);
+        const minutes = fraction === '1/4' ? 15 : 45;
+        if (direction === 'nach') {
+            return { hour: baseHour, minute: minutes, explicit: true };
+        }
+        const hour = baseHour === 0 ? 23 : baseHour - 1;
+        return { hour, minute: minutes === 15 ? 45 : 15, explicit: true };
+    }
+
+    const halfMatch = timeSource.match(/\bhalb\s*(\d{1,2})\b/i);
+    if (halfMatch) {
+        const baseHour = Number(halfMatch[1]);
+        const hour = baseHour === 0 ? 23 : baseHour - 1;
+        return { hour, minute: 30, explicit: true };
+    }
+
+    const hMatch = timeSource.match(/\b(\d{1,2})\s*h\s*(\d{2})?\b/i);
+    if (hMatch) {
+        return { hour: Number(hMatch[1]), minute: Number(hMatch[2] || 0), explicit: true };
+    }
+
+    const hourMatch = timeSource.match(/\b(\d{1,2})\s*(?:uhr|Uhr)\b/);
     if (hourMatch) {
         return { hour: Number(hourMatch[1]), minute: 0, explicit: true };
+    }
+
+    const umMatch = timeSource.match(/\bum\s*(\d{1,2})(?![:.\d])\b/i);
+    if (umMatch) {
+        return { hour: Number(umMatch[1]), minute: 0, explicit: true };
     }
 
     if (fallbackDate) {
@@ -218,6 +318,36 @@ function extractTime(content, fallbackDate) {
     }
 
     return null;
+}
+
+function extractDiscordTimestamp(content) {
+    const match = String(content || '').match(/<t:(\d{9,12})(?::[tTdDfFR])?>/);
+    if (!match) {
+        return null;
+    }
+
+    const epoch = Number(match[1]);
+    if (!Number.isFinite(epoch)) {
+        return null;
+    }
+    const date = new Date(epoch * 1000);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return {
+        dateParts: {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            day: date.getDate(),
+            explicit: true,
+        },
+        timeParts: {
+            hour: date.getHours(),
+            minute: date.getMinutes(),
+            explicit: true,
+        },
+    };
 }
 
 function formatDateTime(dateParts, timeParts) {
@@ -252,8 +382,9 @@ function parseAnnouncement(message) {
     const content = message?.content ?? '';
     const tier = extractTier(content);
     const fallbackDate = message?.createdAt ?? null;
-    const dateParts = extractDate(content, fallbackDate);
-    const timeParts = extractTime(content, fallbackDate);
+    const timestampParts = extractDiscordTimestamp(content);
+    const dateParts = timestampParts?.dateParts || extractDate(content, fallbackDate);
+    const timeParts = timestampParts?.timeParts || extractTime(content, fallbackDate);
     const startsAt = formatDateTime(dateParts, timeParts);
     const memberAvatar =
         typeof message?.member?.displayAvatarURL === 'function'

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DiscordBotSetting;
 use App\Models\GameAnnouncement;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -21,55 +22,120 @@ class GameSettingsController extends Controller
 
         $settings = DiscordBotSetting::current();
         $tierLabels = ['bt', 'lt', 'ht', 'et'];
-        $connection = GameAnnouncement::query()->getConnection();
-        $driver = $connection->getDriverName();
-        $monthExpression = $driver === 'sqlite'
-            ? "strftime('%Y-%m', starts_at)"
-            : "DATE_FORMAT(starts_at, '%Y-%m')";
-        $rows = GameAnnouncement::query()
-            ->selectRaw("{$monthExpression} as month, LOWER(tier) as tier, COUNT(*) as total")
+        $announcements = GameAnnouncement::query()
             ->whereNotNull('starts_at')
-            ->groupBy('month', 'tier')
-            ->orderByDesc('month')
-            ->get();
+            ->get([
+                'discord_author_id',
+                'discord_author_name',
+                'tier',
+                'starts_at',
+                'posted_at',
+                'content',
+            ]);
 
-        $monthly = $rows
-            ->groupBy('month')
-            ->map(function ($group, string $month) use ($tierLabels) {
-                $counts = array_fill_keys([...$tierLabels, 'unknown'], 0);
+        $entries = $announcements->map(function (GameAnnouncement $announcement) {
+            $authorKey = $announcement->discord_author_id
+                ? 'id:'.$announcement->discord_author_id
+                : ($announcement->discord_author_name ? 'name:'.$announcement->discord_author_name : 'unknown');
+            $content = $announcement->content ?? '';
+            $cancelled = (bool) preg_match(
+                '/\b(abgesagt|abgesage|abgesagt|entfällt|faellt\s+aus|fällt\s+aus|cancel(?:led|ed))\b/ui',
+                $content
+            );
 
-                foreach ($group as $row) {
-                    $tier = in_array($row->tier, $tierLabels, true) ? $row->tier : 'unknown';
-                    $counts[$tier] = (int) $row->total;
+            return [
+                'author_key' => $authorKey,
+                'author_id' => $announcement->discord_author_id,
+                'author_name' => $announcement->discord_author_name,
+                'tier' => $announcement->tier ? strtolower((string) $announcement->tier) : 'unknown',
+                'starts_at' => Carbon::parse($announcement->starts_at),
+                'posted_at' => $announcement->posted_at ? Carbon::parse($announcement->posted_at) : null,
+                'cancelled' => $cancelled,
+            ];
+        });
+
+        $deduped = collect();
+        $duplicateCount = 0;
+
+        $entries->groupBy('author_key')->each(function ($group) use (&$deduped, &$duplicateCount) {
+            $sorted = $group->sortBy(fn ($entry) => $entry['starts_at']->timestamp);
+            $lastTime = null;
+            $lastDate = null;
+
+            foreach ($sorted as $entry) {
+                $currentTime = $entry['starts_at'];
+                $currentDate = $currentTime->toDateString();
+                if ($lastTime && $lastDate === $currentDate && $currentTime->diffInMinutes($lastTime) < 180) {
+                    $duplicateCount++;
+
+                    continue;
                 }
+                $deduped->push($entry);
+                $lastTime = $currentTime;
+                $lastDate = $currentDate;
+            }
+        });
 
-                $total = array_sum($counts);
+        $monthly = collect();
+        $totals = array_fill_keys([...$tierLabels, 'unknown'], 0);
+        $cancelledTotals = array_fill_keys([...$tierLabels, 'unknown'], 0);
 
-                return [
+        foreach ($deduped as $entry) {
+            $month = $entry['starts_at']->format('Y-m');
+            $tier = in_array($entry['tier'], $tierLabels, true) ? $entry['tier'] : 'unknown';
+
+            if (! $monthly->has($month)) {
+                $monthly->put($month, [
                     'month' => $month,
-                    'counts' => $counts,
-                    'total' => $total,
-                ];
+                    'counts' => array_fill_keys([...$tierLabels, 'unknown'], 0),
+                    'cancelled' => array_fill_keys([...$tierLabels, 'unknown'], 0),
+                ]);
+            }
+
+            $current = $monthly->get($month);
+
+            if ($entry['cancelled']) {
+                $current['cancelled'][$tier] += 1;
+                $cancelledTotals[$tier] += 1;
+                $monthly->put($month, $current);
+
+                continue;
+            }
+
+            $current['counts'][$tier] += 1;
+            $totals[$tier] += 1;
+            $monthly->put($month, $current);
+        }
+
+        $monthly = $monthly
+            ->values()
+            ->map(function (array $row) {
+                $row['total'] = array_sum($row['counts']);
+                $row['cancelled_total'] = array_sum($row['cancelled']);
+
+                return $row;
             })
+            ->sortByDesc('month')
             ->values();
 
-        $totals = array_fill_keys([...$tierLabels, 'unknown'], 0);
-        foreach ($rows as $row) {
-            $tier = in_array($row->tier, $tierLabels, true) ? $row->tier : 'unknown';
-            $totals[$tier] += (int) $row->total;
-        }
         $totals['total'] = array_sum($totals);
+        $cancelledTotals['total'] = array_sum($cancelledTotals);
 
-        $gmRows = GameAnnouncement::query()
-            ->selectRaw('discord_author_id, discord_author_name, COUNT(*) as total')
-            ->groupBy('discord_author_id', 'discord_author_name')
-            ->orderByDesc('total')
-            ->get();
-        $gmStats = $gmRows->map(fn ($row) => [
-            'discord_author_id' => $row->discord_author_id,
-            'discord_author_name' => $row->discord_author_name,
-            'total' => (int) $row->total,
-        ])->values();
+        $gmStats = $deduped
+            ->groupBy('author_key')
+            ->map(function ($group) {
+                $first = $group->first();
+                $cancelled = $group->filter(fn ($entry) => $entry['cancelled'])->count();
+
+                return [
+                    'discord_author_id' => $first['author_id'],
+                    'discord_author_name' => $first['author_name'],
+                    'total' => $group->count(),
+                    'cancelled' => $cancelled,
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
 
         return Inertia::render('admin/games', [
             'discordBotSettings' => [
@@ -82,6 +148,8 @@ class GameSettingsController extends Controller
             'stats' => [
                 'monthly' => $monthly,
                 'totals' => $totals,
+                'cancelled_totals' => $cancelledTotals,
+                'duplicate_count' => $duplicateCount,
                 'gms' => $gmStats,
             ],
         ]);
