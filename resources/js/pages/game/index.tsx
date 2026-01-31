@@ -95,6 +95,11 @@ export default function MasteredGames({ games, user, characters }: Props) {
       other_coins: Number(user.other_coins ?? 0),
     })
 
+  const totalSessions = useMemo(
+    () =>
+      games.reduce((sum, game) => sum + Math.max(0, Number(game.sessions ?? 0)), 0),
+    [games],
+  )
 
   const filteredGames = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -463,7 +468,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
             <h1 className="text-2xl font-bold">
               Game Master Log
               <span className="ml-3 inline-flex items-center rounded-full border border-base-200 px-2 py-0.5 text-xs text-base-content/60">
-                {games.length} Sessions
+                {totalSessions} Sessions
               </span>
             </h1>
             <p className="text-base-content/70 text-sm">Track your progress with a summary of all GM sessions.</p>
