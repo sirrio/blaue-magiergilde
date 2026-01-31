@@ -653,13 +653,6 @@ function startHttpServer(client) {
             }
         }
 
-        const channelId = String(payload?.channel_id || '').trim();
-        if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
-            logReject(req, 'invalid channel_id');
-            respondJson(res, 422, { error: 'Invalid channel_id.' });
-            return;
-        }
-
         if (isGamesSync) {
             try {
                 await runGameAnnouncementSync(client);
@@ -670,6 +663,13 @@ function startHttpServer(client) {
                 respondJson(res, 500, { error: 'Games sync failed.' });
                 return;
             }
+        }
+
+        const channelId = String(payload?.channel_id || '').trim();
+        if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
+            logReject(req, 'invalid channel_id');
+            respondJson(res, 422, { error: 'Invalid channel_id.' });
+            return;
         }
 
         const { snapshot, error } = await getSnapshot(channelId, client);
