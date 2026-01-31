@@ -60,6 +60,24 @@ const explicitYearCheck = parseAnnouncement(
 );
 assert.equal(explicitYearCheck.starts_at, '2025-12-15 19:00:00');
 
+const typoFutureYearCheck = parseAnnouncement(
+    makeMessage(
+        ':MG_LT: 04.05.3035 - 11/12:00 Uhr - "Do you mind?"',
+        new Date('2025-05-01T08:26:08Z'),
+    ),
+);
+assert.equal(typoFutureYearCheck.starts_at, '2025-05-04 11:00:00');
+
+const typoExtraDigitCheck = parseAnnouncement(
+    makeMessage(':MG_LT: - Fr - 17.05.22024 - 15 Uhr', new Date('2024-05-17T09:43:41Z')),
+);
+assert.equal(typoExtraDigitCheck.starts_at, '2024-05-17 15:00:00');
+
+const typoMissingDigitCheck = parseAnnouncement(
+    makeMessage(':MG_HT: 24.01.205 - 18:30/19:00 Uhr', new Date('2025-01-23T12:00:00Z')),
+);
+assert.equal(typoMissingDigitCheck.starts_at, '2025-01-24 18:30:00');
+
 const timestampEpoch = 1766253600;
 const timestampCheck = parseAnnouncement(
     makeMessage(`<t:${timestampEpoch}:F> - :MG_LT: 20.12.2025 - 20:00 Uhr - "Timestamp Test"`),

@@ -63,12 +63,23 @@ function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
         return null;
     }
 
+    if (hasYear && Number.isFinite(year) && year >= 100 && year <= 999 && fallbackDate) {
+        hasYear = false;
+        year = undefined;
+    }
+
     let resolvedYear = hasYear ? year : fallbackDate?.getFullYear();
     if (!Number.isFinite(resolvedYear)) {
         return null;
     }
     if (resolvedYear < 100) {
         resolvedYear += 2000;
+    }
+    if (resolvedYear > 9999) {
+        const trimmed = Number(String(resolvedYear).slice(-4));
+        if (Number.isFinite(trimmed)) {
+            resolvedYear = trimmed;
+        }
     }
 
     if (fallbackDate) {
@@ -83,14 +94,32 @@ function resolveInferredYear({ day, month, year, hasYear }, fallbackDate) {
         }
 
         if (hasYear) {
-            const adjustedCandidate = new Date(resolvedYear, month - 1, day);
-            const adjustedDelta = Math.round((adjustedCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
+            let adjustedCandidate = new Date(resolvedYear, month - 1, day);
+            let adjustedDelta = Math.round((adjustedCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
             const alternateYear = resolvedYear + (adjustedDelta > 0 ? -1 : 1);
             const alternateCandidate = new Date(alternateYear, month - 1, day);
             const alternateDelta = Math.round((alternateCandidate - fallbackDate) / (1000 * 60 * 60 * 24));
 
             if (Math.abs(adjustedDelta) > futureLimitDays && Math.abs(alternateDelta) < Math.abs(adjustedDelta)) {
                 resolvedYear = alternateYear;
+                adjustedCandidate = alternateCandidate;
+                adjustedDelta = alternateDelta;
+            }
+
+            const fallbackYear = fallbackDate.getFullYear();
+            if (resolvedYear > fallbackYear + 1 || resolvedYear < fallbackYear - 1 || Math.abs(adjustedDelta) > 366) {
+                const guardYears = [fallbackYear - 1, fallbackYear, fallbackYear + 1];
+                let bestYear = resolvedYear;
+                let bestDelta = Number.POSITIVE_INFINITY;
+                for (const guardYear of guardYears) {
+                    const guardCandidate = new Date(guardYear, month - 1, day);
+                    const guardDelta = Math.abs(Math.round((guardCandidate - fallbackDate) / (1000 * 60 * 60 * 24)));
+                    if (guardDelta < bestDelta) {
+                        bestDelta = guardDelta;
+                        bestYear = guardYear;
+                    }
+                }
+                resolvedYear = bestYear;
             }
         }
     }
@@ -247,11 +276,6 @@ function extractTime(content, fallbackDate) {
         .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
         .replace(/\b\d{1,2}\s*[.-]\s*\d{1,2}(?:\s*[.-]\s*\d{2,4})?\b/g, ' ');
 
-    const colonMatch = timeSource.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
-    if (colonMatch) {
-        return { hour: Number(colonMatch[1]), minute: Number(colonMatch[2]), explicit: true };
-    }
-
     const slashRangeMatch = timeSource.match(/\b(\d{1,2})(?::(\d{2}))?\s*\/\s*(\d{1,2})(?::(\d{2}))?\s*(?:uhr|Uhr)?\b/);
     if (slashRangeMatch) {
         const hour = Number(slashRangeMatch[1]);
@@ -261,6 +285,11 @@ function extractTime(content, fallbackDate) {
         if (hasMinutes || hasUhr || hour >= 5) {
             return { hour, minute, explicit: true };
         }
+    }
+
+    const colonMatch = timeSource.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
+    if (colonMatch) {
+        return { hour: Number(colonMatch[1]), minute: Number(colonMatch[2]), explicit: true };
     }
 
     const dotMatch = timeSource.match(/\b(\d{1,2})\s*[.]\s*(\d{2})\s*(?:uhr|Uhr)?\b/);

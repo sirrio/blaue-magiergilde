@@ -80,7 +80,8 @@ const adminSections = [
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, betaNoticeEnabled } = usePage<PageProps>().props
+  const { auth, discordConnected, handbookChannels, activeChannelId, betaNoticeEnabled, features } =
+    usePage<PageProps>().props
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   const handbookDesktopRef = useRef<HTMLDetailsElement>(null)
@@ -98,6 +99,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const handbookChannelList = handbookChannels ?? []
   const showHandbookDropdown = handbookChannelList.length > 0
   const handbookLabel = 'Guild Handbook'
+  const filteredMenuLinks = menuLinks.filter((menuLink) => {
+    if (menuLink.route === 'games.index') {
+      return features?.games_calendar ?? true
+    }
+    if (menuLink.route === 'rooms.index') {
+      return features?.rooms ?? true
+    }
+    return true
+  })
   const formatHandbookChannelLabel = (name: string) => {
     const normalized = name.replace(/-/g, ' ')
     if (!normalized) {
@@ -119,7 +129,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Menu size={20} />
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
-              {menuLinks.map((menuLink) => (
+              {filteredMenuLinks.map((menuLink) => (
                 menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                   <li key={menuLink.route} role="none">
                     <details ref={handbookMobileRef}>
@@ -201,7 +211,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             Blaue Magiergilde
           </Link>
           <ul className="menu menu-horizontal items-center space-x-1 px-1 hidden lg:flex ml-4" role="menubar">
-            {menuLinks.map((menuLink) => (
+            {filteredMenuLinks.map((menuLink) => (
               menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                 <li key={menuLink.route} role="none">
                   <details ref={handbookDesktopRef}>
