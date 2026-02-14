@@ -16,80 +16,56 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('characters', function (Blueprint $table) {
-            $table->dropIndex('characters_user_id_foreign');
-            $table->dropIndex('characters_guild_status_index');
-        });
+        $this->dropIndexIfExists('characters', 'characters_user_id_foreign');
+        $this->dropIndexIfExists('characters', 'characters_guild_status_index');
+        $this->dropIndexIfExists('games', 'games_user_id_foreign');
+        $this->dropIndexIfExists('adventures', 'adventures_character_id_foreign');
+        $this->dropIndexIfExists('adventures', 'adventures_character_id_deleted_at_index');
+        $this->dropIndexIfExists('downtimes', 'downtimes_character_id_foreign');
+        $this->dropIndexIfExists('downtimes', 'downtimes_character_id_deleted_at_index');
+        $this->dropIndexIfExists('allies', 'allies_character_id_foreign');
+        $this->dropIndexIfExists('allies', 'allies_character_id_name_index');
+        $this->dropIndexIfExists('character_character_class', 'character_character_class_character_id_foreign');
 
-        Schema::table('games', function (Blueprint $table) {
-            $table->dropIndex('games_user_id_foreign');
-        });
+        // Some environments created this as *_index, others as *_foreign.
+        $this->dropIndexIfExists('auction_bids', 'auction_bids_auction_item_id_foreign');
+        $this->dropIndexIfExists('auction_bids', 'auction_bids_auction_item_id_index');
 
-        Schema::table('adventures', function (Blueprint $table) {
-            $table->dropIndex('adventures_character_id_foreign');
-            $table->dropIndex('adventures_character_id_deleted_at_index');
-        });
+        $this->dropIndexIfExists('discord_channels', 'discord_channels_parent_id_index');
+        $this->dropIndexIfExists('discord_messages', 'discord_messages_discord_channel_id_index');
+        $this->dropIndexIfExists('room_assets', 'room_assets_room_id_foreign');
 
-        Schema::table('downtimes', function (Blueprint $table) {
-            $table->dropIndex('downtimes_character_id_foreign');
-            $table->dropIndex('downtimes_character_id_deleted_at_index');
-        });
+        $this->addCheckIfMissing(
+            'characters',
+            'chk_characters_guild_status',
+            "`guild_status` IN ('pending','approved','declined','retired','draft')"
+        );
+        $this->addCheckIfMissing(
+            'games',
+            'chk_games_tier',
+            "`tier` IN ('bt','lt','ht','et')"
+        );
+        $this->addCheckIfMissing(
+            'games',
+            'chk_games_tier_of_month_reward',
+            "`tier_of_month_reward` IS NULL OR `tier_of_month_reward` IN ('bubble','coin')"
+        );
+        $this->addCheckIfMissing(
+            'auctions',
+            'chk_auctions_status',
+            "`status` IN ('open','closed','draft')"
+        );
+        $this->addCheckIfMissing(
+            'auctions',
+            'chk_auctions_currency',
+            "`currency` = 'GP'"
+        );
 
-        Schema::table('allies', function (Blueprint $table) {
-            $table->dropIndex('allies_character_id_foreign');
-            $table->dropIndex('allies_character_id_name_index');
-        });
-
-        Schema::table('character_character_class', function (Blueprint $table) {
-            $table->dropIndex('character_character_class_character_id_foreign');
-        });
-
-        Schema::table('auction_bids', function (Blueprint $table) {
-            $table->dropIndex('auction_bids_auction_item_id_foreign');
-        });
-
-        Schema::table('discord_channels', function (Blueprint $table) {
-            $table->dropIndex('discord_channels_parent_id_index');
-        });
-
-        Schema::table('discord_messages', function (Blueprint $table) {
-            $table->dropIndex('discord_messages_discord_channel_id_index');
-        });
-
-        Schema::table('room_assets', function (Blueprint $table) {
-            $table->dropIndex('room_assets_room_id_foreign');
-        });
-
-        DB::statement("ALTER TABLE `characters` ADD CONSTRAINT `chk_characters_guild_status` CHECK (`guild_status` IN ('pending','approved','declined','retired','draft'))");
-        DB::statement("ALTER TABLE `games` ADD CONSTRAINT `chk_games_tier` CHECK (`tier` IN ('bt','lt','ht','et'))");
-        DB::statement("ALTER TABLE `games` ADD CONSTRAINT `chk_games_tier_of_month_reward` CHECK (`tier_of_month_reward` IS NULL OR `tier_of_month_reward` IN ('bubble','coin'))");
-        DB::statement("ALTER TABLE `auctions` ADD CONSTRAINT `chk_auctions_status` CHECK (`status` IN ('open','closed','draft'))");
-        DB::statement("ALTER TABLE `auctions` ADD CONSTRAINT `chk_auctions_currency` CHECK (`currency` = 'GP')");
-
-        Schema::table('shop_settings', function (Blueprint $table) {
-            $table->unsignedTinyInteger('singleton_guard')->default(1);
-            $table->unique('singleton_guard', 'shop_settings_singleton_guard_unique');
-        });
-
-        Schema::table('auction_settings', function (Blueprint $table) {
-            $table->unsignedTinyInteger('singleton_guard')->default(1);
-            $table->unique('singleton_guard', 'auction_settings_singleton_guard_unique');
-        });
-
-        Schema::table('backstock_settings', function (Blueprint $table) {
-            $table->unsignedTinyInteger('singleton_guard')->default(1);
-            $table->unique('singleton_guard', 'backstock_settings_singleton_guard_unique');
-        });
-
-        Schema::table('discord_bot_settings', function (Blueprint $table) {
-            $table->unsignedTinyInteger('singleton_guard')->default(1);
-            $table->unique('singleton_guard', 'discord_bot_settings_singleton_guard_unique');
-        });
-
-        Schema::table('discord_backup_settings', function (Blueprint $table) {
-            $table->unsignedTinyInteger('singleton_guard')->default(1);
-            $table->unique('singleton_guard', 'discord_backup_settings_singleton_guard_unique');
-        });
+        $this->ensureSingletonGuard('shop_settings', 'shop_settings_singleton_guard_unique');
+        $this->ensureSingletonGuard('auction_settings', 'auction_settings_singleton_guard_unique');
+        $this->ensureSingletonGuard('backstock_settings', 'backstock_settings_singleton_guard_unique');
+        $this->ensureSingletonGuard('discord_bot_settings', 'discord_bot_settings_singleton_guard_unique');
+        $this->ensureSingletonGuard('discord_backup_settings', 'discord_backup_settings_singleton_guard_unique');
     }
 
     /**
@@ -101,79 +77,124 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('shop_settings', function (Blueprint $table) {
-            $table->dropUnique('shop_settings_singleton_guard_unique');
-            $table->dropColumn('singleton_guard');
-        });
+        $this->dropSingletonGuardIfExists('shop_settings', 'shop_settings_singleton_guard_unique');
+        $this->dropSingletonGuardIfExists('auction_settings', 'auction_settings_singleton_guard_unique');
+        $this->dropSingletonGuardIfExists('backstock_settings', 'backstock_settings_singleton_guard_unique');
+        $this->dropSingletonGuardIfExists('discord_bot_settings', 'discord_bot_settings_singleton_guard_unique');
+        $this->dropSingletonGuardIfExists('discord_backup_settings', 'discord_backup_settings_singleton_guard_unique');
 
-        Schema::table('auction_settings', function (Blueprint $table) {
-            $table->dropUnique('auction_settings_singleton_guard_unique');
-            $table->dropColumn('singleton_guard');
-        });
+        $this->dropCheckIfExists('characters', 'chk_characters_guild_status');
+        $this->dropCheckIfExists('games', 'chk_games_tier');
+        $this->dropCheckIfExists('games', 'chk_games_tier_of_month_reward');
+        $this->dropCheckIfExists('auctions', 'chk_auctions_status');
+        $this->dropCheckIfExists('auctions', 'chk_auctions_currency');
 
-        Schema::table('backstock_settings', function (Blueprint $table) {
-            $table->dropUnique('backstock_settings_singleton_guard_unique');
-            $table->dropColumn('singleton_guard');
-        });
+        $this->createIndexIfMissing('characters', 'characters_user_id_foreign', ['user_id']);
+        $this->createIndexIfMissing('characters', 'characters_guild_status_index', ['guild_status']);
+        $this->createIndexIfMissing('games', 'games_user_id_foreign', ['user_id']);
+        $this->createIndexIfMissing('adventures', 'adventures_character_id_foreign', ['character_id']);
+        $this->createIndexIfMissing('adventures', 'adventures_character_id_deleted_at_index', ['character_id', 'deleted_at']);
+        $this->createIndexIfMissing('downtimes', 'downtimes_character_id_foreign', ['character_id']);
+        $this->createIndexIfMissing('downtimes', 'downtimes_character_id_deleted_at_index', ['character_id', 'deleted_at']);
+        $this->createIndexIfMissing('allies', 'allies_character_id_foreign', ['character_id']);
+        $this->createIndexIfMissing('allies', 'allies_character_id_name_index', ['character_id', 'name']);
+        $this->createIndexIfMissing('character_character_class', 'character_character_class_character_id_foreign', ['character_id']);
+        $this->createIndexIfMissing('auction_bids', 'auction_bids_auction_item_id_foreign', ['auction_item_id']);
+        $this->createIndexIfMissing('discord_channels', 'discord_channels_parent_id_index', ['parent_id']);
+        $this->createIndexIfMissing('discord_messages', 'discord_messages_discord_channel_id_index', ['discord_channel_id']);
+        $this->createIndexIfMissing('room_assets', 'room_assets_room_id_foreign', ['room_id']);
+    }
 
-        Schema::table('discord_bot_settings', function (Blueprint $table) {
-            $table->dropUnique('discord_bot_settings_singleton_guard_unique');
-            $table->dropColumn('singleton_guard');
-        });
+    private function hasIndex(string $table, string $indexName): bool
+    {
+        $row = DB::selectOne(
+            'SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1',
+            [$table, $indexName]
+        );
 
-        Schema::table('discord_backup_settings', function (Blueprint $table) {
-            $table->dropUnique('discord_backup_settings_singleton_guard_unique');
-            $table->dropColumn('singleton_guard');
-        });
+        return $row !== null;
+    }
 
-        DB::statement('ALTER TABLE `characters` DROP CHECK `chk_characters_guild_status`');
-        DB::statement('ALTER TABLE `games` DROP CHECK `chk_games_tier`');
-        DB::statement('ALTER TABLE `games` DROP CHECK `chk_games_tier_of_month_reward`');
-        DB::statement('ALTER TABLE `auctions` DROP CHECK `chk_auctions_status`');
-        DB::statement('ALTER TABLE `auctions` DROP CHECK `chk_auctions_currency`');
+    private function dropIndexIfExists(string $table, string $indexName): void
+    {
+        if (! $this->hasIndex($table, $indexName)) {
+            return;
+        }
 
-        Schema::table('characters', function (Blueprint $table) {
-            $table->index('user_id', 'characters_user_id_foreign');
-            $table->index('guild_status', 'characters_guild_status_index');
+        Schema::table($table, function (Blueprint $table) use ($indexName): void {
+            $table->dropIndex($indexName);
         });
+    }
 
-        Schema::table('games', function (Blueprint $table) {
-            $table->index('user_id', 'games_user_id_foreign');
-        });
+    /**
+     * @param  array<int, string>  $columns
+     */
+    private function createIndexIfMissing(string $tableName, string $indexName, array $columns): void
+    {
+        if ($this->hasIndex($tableName, $indexName)) {
+            return;
+        }
 
-        Schema::table('adventures', function (Blueprint $table) {
-            $table->index('character_id', 'adventures_character_id_foreign');
-            $table->index(['character_id', 'deleted_at'], 'adventures_character_id_deleted_at_index');
+        Schema::table($tableName, function (Blueprint $table) use ($columns, $indexName): void {
+            $table->index($columns, $indexName);
         });
+    }
 
-        Schema::table('downtimes', function (Blueprint $table) {
-            $table->index('character_id', 'downtimes_character_id_foreign');
-            $table->index(['character_id', 'deleted_at'], 'downtimes_character_id_deleted_at_index');
-        });
+    private function hasCheckConstraint(string $constraintName): bool
+    {
+        $row = DB::selectOne(
+            'SELECT 1 FROM information_schema.check_constraints WHERE constraint_schema = DATABASE() AND constraint_name = ? LIMIT 1',
+            [$constraintName]
+        );
 
-        Schema::table('allies', function (Blueprint $table) {
-            $table->index('character_id', 'allies_character_id_foreign');
-            $table->index(['character_id', 'name'], 'allies_character_id_name_index');
-        });
+        return $row !== null;
+    }
 
-        Schema::table('character_character_class', function (Blueprint $table) {
-            $table->index('character_id', 'character_character_class_character_id_foreign');
-        });
+    private function addCheckIfMissing(string $table, string $constraintName, string $clause): void
+    {
+        if ($this->hasCheckConstraint($constraintName)) {
+            return;
+        }
 
-        Schema::table('auction_bids', function (Blueprint $table) {
-            $table->index('auction_item_id', 'auction_bids_auction_item_id_foreign');
-        });
+        DB::statement("ALTER TABLE `{$table}` ADD CONSTRAINT `{$constraintName}` CHECK ({$clause})");
+    }
 
-        Schema::table('discord_channels', function (Blueprint $table) {
-            $table->index('parent_id', 'discord_channels_parent_id_index');
-        });
+    private function dropCheckIfExists(string $table, string $constraintName): void
+    {
+        if (! $this->hasCheckConstraint($constraintName)) {
+            return;
+        }
 
-        Schema::table('discord_messages', function (Blueprint $table) {
-            $table->index('discord_channel_id', 'discord_messages_discord_channel_id_index');
-        });
+        DB::statement("ALTER TABLE `{$table}` DROP CHECK `{$constraintName}`");
+    }
 
-        Schema::table('room_assets', function (Blueprint $table) {
-            $table->index('room_id', 'room_assets_room_id_foreign');
-        });
+    private function ensureSingletonGuard(string $table, string $uniqueIndex): void
+    {
+        if (! Schema::hasColumn($table, 'singleton_guard')) {
+            Schema::table($table, function (Blueprint $table): void {
+                $table->unsignedTinyInteger('singleton_guard')->default(1);
+            });
+        }
+
+        if (! $this->hasIndex($table, $uniqueIndex)) {
+            Schema::table($table, function (Blueprint $table) use ($uniqueIndex): void {
+                $table->unique('singleton_guard', $uniqueIndex);
+            });
+        }
+    }
+
+    private function dropSingletonGuardIfExists(string $table, string $uniqueIndex): void
+    {
+        if ($this->hasIndex($table, $uniqueIndex)) {
+            Schema::table($table, function (Blueprint $table) use ($uniqueIndex): void {
+                $table->dropUnique($uniqueIndex);
+            });
+        }
+
+        if (Schema::hasColumn($table, 'singleton_guard')) {
+            Schema::table($table, function (Blueprint $table): void {
+                $table->dropColumn('singleton_guard');
+            });
+        }
     }
 };
