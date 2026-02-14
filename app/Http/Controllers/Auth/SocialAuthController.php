@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
 use Laravel\Socialite\Facades\Socialite;
 
 class SocialAuthController extends Controller
@@ -63,6 +64,18 @@ class SocialAuthController extends Controller
         );
 
         Auth::login($user, true);
+
+        return $this->redirectAfterLogin($user);
+    }
+
+    private function redirectAfterLogin(User $user): RedirectResponse
+    {
+        $requiredVersion = (int) Config::get('legal.privacy_policy.version', 0);
+        $acceptedVersion = (int) ($user->privacy_policy_accepted_version ?? 0);
+
+        if ($user->privacy_policy_accepted_at === null || $acceptedVersion < $requiredVersion) {
+            return redirect()->route('privacy-consent.show');
+        }
 
         return redirect()->route('characters.index');
     }
