@@ -1,6 +1,6 @@
 const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
-const { postAuctionToChannel } = require('./auctionPoster');
+const { postAuctionToChannel, updateAuctionItemPost, fetchAuctionItemById } = require('./auctionPoster');
 const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
@@ -126,6 +126,7 @@ function startHttpServer(client) {
         const isBackstockPost = path === '/backstock-post';
         const isAuctionPost = path === '/auction-post';
         const isAuctionVoiceBid = path === '/auction-voice-bid';
+        const isAuctionItemSold = path === '/auction-item-sold';
         const isGamesSync = path === '/games-sync';
 
         const allowedPost =
@@ -144,6 +145,7 @@ function startHttpServer(client) {
             isBackstockPost ||
             isAuctionPost ||
             isAuctionVoiceBid ||
+            isAuctionItemSold ||
             isGamesSync;
 
         if (
@@ -651,6 +653,61 @@ function startHttpServer(client) {
                 respondJson(res, 500, { error: 'Auction voice bid failed.' });
                 return;
             }
+        }
+
+        if (isAuctionItemSold) {
+            const auctionItemId = Number(payload?.auction_item_id || 0);
+            const winnerDiscordId = payload?.winner_discord_id ? String(payload.winner_discord_id).trim() : '';
+
+            if (!Number.isFinite(auctionItemId) || auctionItemId <= 0) {
+                logReject(req, 'invalid auction_item_id');
+                respondJson(res, 422, { error: 'Invalid auction_item_id.' });
+                return;
+            }
+
+            const updateResult = await updateAuctionItemPost({
+                client,
+                auctionItemId,
+            });
+
+            if (!updateResult.ok) {
+                logReject(req, updateResult.error || 'auction item update failed');
+                respondJson(res, updateResult.status || 500, { error: updateResult.error || 'Auction item update failed.' });
+                return;
+            }
+
+            let dmSent = false;
+            let dmError = null;
+            try {
+                const auctionItem = await fetchAuctionItemById(auctionItemId);
+                const discordId = winnerDiscordId || auctionItem?.sold_bidder_discord_id;
+
+                if (discordId && /^[0-9]{5,}$/.test(String(discordId))) {
+                    const user = await client.users.fetch(String(discordId));
+                    const amount = auctionItem?.sold_amount ?? null;
+                    const currency = auctionItem?.auction_currency || 'GP';
+                    const itemName = auctionItem?.name || 'item';
+                    const auctionId = auctionItem?.auction_id || null;
+
+                    let message = `You won **${itemName}**`;
+                    if (amount) {
+                        message += ` for **${amount} ${currency}**`;
+                    }
+                    if (auctionId) {
+                        message += ` in Auction #${String(auctionId).padStart(3, '0')}.`;
+                    } else {
+                        message += '.';
+                    }
+                    await user.send(message);
+                    dmSent = true;
+                }
+            } catch (error) {
+                dmError = error instanceof Error ? error.message : 'DM failed';
+                console.warn('[bot] Auction winner DM failed.', error);
+            }
+
+            respondJson(res, 200, { status: 'updated', dm_sent: dmSent, dm_error: dmError });
+            return;
         }
 
         if (isGamesSync) {

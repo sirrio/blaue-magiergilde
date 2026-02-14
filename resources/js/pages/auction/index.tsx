@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2, XCircle } from 'lucide-react'
 import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -647,6 +647,7 @@ const AuctionItemRow = ({
   const item = getAuctionItemSnapshot(auctionItem)
   const textColor = getRarityTextColor(item.rarity)
   const highestBid = getHighestBid(auctionItem)
+  const isSold = Boolean(auctionItem.sold_at)
   const isCustomListing = Boolean(auctionItem.snapshot_custom)
   const bidCandidates = useMemo(() => {
     const merged = new Map<string, AuctionVoiceCandidate>()
@@ -670,6 +671,7 @@ const AuctionItemRow = ({
     ? bidCandidates.find((candidate) => candidate.id === highestBid.bidder_discord_id)
     : null
   const highestBidderName = highestBid?.bidder_name ?? ''
+  const canFinalize = Boolean(highestBid) && !isSold
 
   const handleSnapshotRefresh = () => {
     if (!window.confirm('Refresh this listing from the compendium?')) return
@@ -687,6 +689,26 @@ const AuctionItemRow = ({
     })
   }
 
+  const handleFinalizeSold = () => {
+    if (!highestBid) {
+      toast.show('No bids available.', 'error')
+      return
+    }
+    if (!window.confirm('Mark this item as sold?')) return
+
+    router.post(route('admin.auction-items.finalize', { auctionItem: auctionItem.id }), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Item marked as sold.', 'info')
+        router.reload()
+      },
+      onError: (errors) => {
+        const message = errors.auction_item || 'Item could not be finalized.'
+        toast.show(String(message), 'error')
+      },
+    })
+  }
+
   return (
     <ListRow className="grid-cols-1">
       <div className="col-span-full flex w-full flex-col gap-2">
@@ -699,6 +721,11 @@ const AuctionItemRow = ({
               <span className={cn(textColor, 'text-sm font-semibold leading-none')}>
                 {getAuctionItemLabel(item.name, auctionItem)}
               </span>
+              {isSold ? (
+                <span className="rounded-full border border-success/40 px-2 py-0.5 text-[9px] uppercase text-success">
+                  Sold
+                </span>
+              ) : null}
               {isCustomListing ? (
                 <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
                   Custom listing
@@ -710,6 +737,17 @@ const AuctionItemRow = ({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 border-l border-base-200 pl-2">
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleFinalizeSold}
+              aria-label="Finalize sold"
+              title={isSold ? 'Already sold' : highestBid ? 'Finalize sold' : 'No bids'}
+              disabled={!canFinalize}
+            >
+              <CheckCircle2 size={16} />
+            </Button>
             <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
             <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
               <RotateCcw size={16} />

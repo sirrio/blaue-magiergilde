@@ -75,7 +75,14 @@ function formatAuctionLine(row, currency) {
     const itemLabel = formatLink(displayName, row.url);
     const missing = getRepairMissing(row);
     const startingBid = getStartingBid(row);
-    return `**(${row.remaining_auctions})** - ${startingBid} ${currency} - ${itemLabel} (${missing})`;
+    const baseLine = `**(${row.remaining_auctions})** - ${startingBid} ${currency} - ${itemLabel} (${missing})`;
+    if (!row.sold_at) {
+        return baseLine;
+    }
+    const soldDetails = row.sold_amount
+        ? ` (${row.sold_amount} ${currency}${row.sold_bidder_name ? ` · ${row.sold_bidder_name}` : ''})`
+        : (row.sold_bidder_name ? ` (${row.sold_bidder_name})` : '');
+    return `~~${baseLine}~~ ✅ SOLD${soldDetails}`;
 }
 
 function parseMessageIds(value) {
@@ -91,33 +98,50 @@ function parseMessageIds(value) {
     return [];
 }
 
+function parseItemMessageMap(value) {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    if (typeof value !== 'string') return {};
+    try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === 'object') {
+            return parsed;
+        }
+    } catch {
+        return {};
+    }
+    return {};
+}
+
 async function fetchAuctionPostState() {
     const [rows] = await db.execute(
-        'SELECT id, last_post_channel_id, last_post_message_ids FROM auction_settings ORDER BY id ASC LIMIT 1',
+        'SELECT id, last_post_channel_id, last_post_message_ids, last_post_item_message_ids FROM auction_settings ORDER BY id ASC LIMIT 1',
     );
     if (!rows[0]) return null;
     return {
         id: rows[0].id,
         lastPostChannelId: rows[0].last_post_channel_id,
         lastPostMessageIds: parseMessageIds(rows[0].last_post_message_ids),
+        lastPostItemMessageIds: parseItemMessageMap(rows[0].last_post_item_message_ids),
     };
 }
 
-async function saveAuctionPostState({ settingsId, channelId, messageIds }) {
+async function saveAuctionPostState({ settingsId, channelId, messageIds, itemMessageIds }) {
     const payload = JSON.stringify(messageIds ?? []);
+    const itemPayload = JSON.stringify(itemMessageIds ?? {});
     const timestamp = nowSql();
 
     if (!settingsId) {
         await db.execute(
-            'INSERT INTO auction_settings (last_post_channel_id, last_post_message_ids, created_at, updated_at) VALUES (?, ?, ?, ?)',
-            [channelId, payload, timestamp, timestamp],
+            'INSERT INTO auction_settings (last_post_channel_id, last_post_message_ids, last_post_item_message_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            [channelId, payload, itemPayload, timestamp, timestamp],
         );
         return;
     }
 
     await db.execute(
-        'UPDATE auction_settings SET last_post_channel_id = ?, last_post_message_ids = ?, updated_at = ? WHERE id = ?',
-        [channelId, payload, timestamp, settingsId],
+        'UPDATE auction_settings SET last_post_channel_id = ?, last_post_message_ids = ?, last_post_item_message_ids = ?, updated_at = ? WHERE id = ?',
+        [channelId, payload, itemPayload, timestamp, settingsId],
     );
 }
 
@@ -157,17 +181,24 @@ async function fetchAuctionItems(auctionId) {
     const [rows] = await db.execute(
         `
             SELECT
+                ai.id AS auction_item_id,
                 ai.remaining_auctions,
                 ai.repair_current,
                 ai.repair_max,
                 ai.notes,
+                ai.sold_at,
+                ai.sold_bid_id,
                 COALESCE(ai.item_name, i.name) AS name,
                 COALESCE(ai.item_url, i.url) AS url,
                 COALESCE(ai.item_cost, i.cost) AS cost,
                 COALESCE(ai.item_rarity, i.rarity) AS rarity,
-                COALESCE(ai.item_type, i.type) AS type
+                COALESCE(ai.item_type, i.type) AS type,
+                b.bidder_name AS sold_bidder_name,
+                b.bidder_discord_id AS sold_bidder_discord_id,
+                b.amount AS sold_amount
             FROM auction_items ai
             LEFT JOIN items i ON i.id = ai.item_id
+            LEFT JOIN auction_bids b ON b.id = ai.sold_bid_id
             WHERE ai.auction_id = ?
             ORDER BY COALESCE(ai.item_name, i.name) ASC
         `,
@@ -176,6 +207,82 @@ async function fetchAuctionItems(auctionId) {
     return rows;
 }
 
+async function fetchAuctionItemById(auctionItemId) {
+    const [rows] = await db.execute(
+        `
+            SELECT
+                ai.id AS auction_item_id,
+                ai.auction_id,
+                ai.remaining_auctions,
+                ai.repair_current,
+                ai.repair_max,
+                ai.notes,
+                ai.sold_at,
+                ai.sold_bid_id,
+                COALESCE(ai.item_name, i.name) AS name,
+                COALESCE(ai.item_url, i.url) AS url,
+                COALESCE(ai.item_cost, i.cost) AS cost,
+                COALESCE(ai.item_rarity, i.rarity) AS rarity,
+                COALESCE(ai.item_type, i.type) AS type,
+                b.bidder_name AS sold_bidder_name,
+                b.bidder_discord_id AS sold_bidder_discord_id,
+                b.amount AS sold_amount,
+                a.currency AS auction_currency
+            FROM auction_items ai
+            LEFT JOIN items i ON i.id = ai.item_id
+            LEFT JOIN auction_bids b ON b.id = ai.sold_bid_id
+            INNER JOIN auctions a ON a.id = ai.auction_id
+            WHERE ai.id = ?
+            LIMIT 1
+        `,
+        [auctionItemId],
+    );
+
+    return rows[0] ?? null;
+}
+
+async function updateAuctionItemPost({ client, auctionItemId }) {
+    const postState = await fetchAuctionPostState();
+    if (!postState?.lastPostChannelId) {
+        return { ok: false, status: 404, error: 'No auction post channel configured.' };
+    }
+
+    const row = await fetchAuctionItemById(auctionItemId);
+    if (!row) {
+        return { ok: false, status: 404, error: 'Auction item not found.' };
+    }
+
+    const messageId = postState.lastPostItemMessageIds?.[String(auctionItemId)];
+    if (!messageId) {
+        return { ok: false, status: 404, error: 'Auction post message not found.' };
+    }
+
+    let channel;
+    try {
+        await waitForDiscordRateLimit(client);
+        channel = await client.channels.fetch(postState.lastPostChannelId);
+    } catch {
+        return { ok: false, status: 404, error: 'Channel not found.' };
+    }
+
+    if (!channel?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Channel is not text based.' };
+    }
+
+    try {
+        await waitForDiscordRateLimit(client);
+        const message = await channel.messages.fetch(messageId);
+        if (!message) {
+            return { ok: false, status: 404, error: 'Message not found.' };
+        }
+        await waitForDiscordRateLimit(client);
+        await message.edit(formatAuctionLine(row, row.auction_currency || 'GP'));
+    } catch {
+        return { ok: false, status: 500, error: 'Failed to update auction post.' };
+    }
+
+    return { ok: true, auctionItemId };
+}
 async function resolveDestination({ client, channelId, auction }) {
     let target;
     try {
@@ -261,12 +368,17 @@ async function sendOneLine(destination, line) {
 
 async function sendLines(destination, lines) {
     const messageIds = [];
+    const itemMessageIds = {};
     for (const line of lines) {
-         
-        const messageId = await sendOneLine(destination, line);
-        if (messageId) messageIds.push(messageId);
+        const messageId = await sendOneLine(destination, line.text);
+        if (messageId) {
+            messageIds.push(messageId);
+            if (line.auctionItemId) {
+                itemMessageIds[String(line.auctionItemId)] = messageId;
+            }
+        }
     }
-    return messageIds;
+    return { messageIds, itemMessageIds };
 }
 
 async function postAuctionToChannel({ client, channelId, auctionId }) {
@@ -289,6 +401,7 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
 
     const destination = destinationResult.destination;
     const messageIds = [];
+    const itemMessageIds = {};
 
     await deletePreviousPosts({ client, settings: postState });
 
@@ -326,10 +439,15 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
         typeOrder.forEach((type) => {
             const rows = byType.get(type) ?? [];
             rows.forEach((row) => {
-                lines.push(formatAuctionLine(row, auction.currency || 'GP'));
+                lines.push({
+                    auctionItemId: row.auction_item_id,
+                    text: formatAuctionLine(row, auction.currency || 'GP'),
+                });
             });
         });
-        messageIds.push(...await sendLines(destination, lines));
+        const { messageIds: lineMessageIds, itemMessageIds: lineItemMap } = await sendLines(destination, lines);
+        messageIds.push(...lineMessageIds);
+        Object.assign(itemMessageIds, lineItemMap);
     }
 
     const updateUnix = Math.floor(Date.now() / 1000);
@@ -340,6 +458,7 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
         settingsId: postState?.id ?? null,
         channelId: destination.id,
         messageIds,
+        itemMessageIds,
     });
 
     return {
@@ -352,4 +471,6 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
 
 module.exports = {
     postAuctionToChannel,
+    updateAuctionItemPost,
+    fetchAuctionItemById,
 };

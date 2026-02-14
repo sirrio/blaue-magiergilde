@@ -7,6 +7,7 @@ use App\Models\AuctionItem;
 use App\Models\Item;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
@@ -111,4 +112,43 @@ it('rolls over eligible items when closing an auction', function () {
 
     expect($newAuction->auctionItems()->where('item_id', $expiredItem->id)->exists())->toBeFalse();
     expect($newAuction->auctionItems()->where('item_id', $soldItem->id)->exists())->toBeFalse();
+});
+
+it('marks an auction item as sold and notifies the bot', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create(['rarity' => 'common', 'type' => 'item']);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+    $bid = AuctionBid::query()->create([
+        'auction_item_id' => $auctionItem->id,
+        'bidder_name' => 'Winner',
+        'bidder_discord_id' => '12345',
+        'amount' => 250,
+        'created_by' => $admin->id,
+    ]);
+
+    config()->set('services.bot.http_url', 'http://bot.test');
+    config()->set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/auction-item-sold' => Http::response(['status' => 'updated'], 200),
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.auction-items.finalize', ['auctionItem' => $auctionItem->id]))
+        ->assertRedirect();
+
+    $auctionItem->refresh();
+    expect($auctionItem->sold_at)->not->toBeNull()
+        ->and($auctionItem->sold_bid_id)->toBe($bid->id);
 });

@@ -103,6 +103,8 @@ export interface AuctionItem {
   repair_current?: number | null
   repair_max?: number | null
   remaining_auctions: number
+  sold_at?: string | null
+  sold_bid_id?: number | null
   bids: AuctionBid[]
   hidden_bids: AuctionHiddenBid[]
 }
