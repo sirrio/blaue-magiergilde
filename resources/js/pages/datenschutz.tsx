@@ -58,9 +58,10 @@ export default function Datenschutz() {
                 Datenverarbeitung in unserem Auftrag (Auftragsverarbeitung). Wir haben mit dem Hoster einen Vertrag zur
                 Auftragsverarbeitung gemäß Art. 28 DSGVO geschlossen. Dieser Vertrag stellt sicher, dass DigitalOcean die
                 Daten unserer Websitebesucher nur nach unseren Weisungen und in Einklang mit den geltenden
-                Datenschutzgesetzen verarbeitet. DigitalOcean ist ein US-amerikanisches Unternehmen; wir haben durch
-                geeignete Garantien (insbesondere EU-Standardvertragsklauseln) dafür gesorgt, dass ein dem europäischen
-                Datenschutzniveau entsprechendes Schutzniveau gewährleistet ist.
+                Datenschutzgesetzen verarbeitet. DigitalOcean ist ein US-amerikanisches Unternehmen. Sofern eine
+                Verarbeitung in Drittlaendern (insbesondere USA) stattfindet, erfolgt diese nur auf Grundlage geeigneter
+                Garantien gemaess Art. 46 DSGVO (insbesondere EU-Standardvertragsklauseln) oder auf Basis eines
+                Angemessenheitsbeschlusses gemaess Art. 45 DSGVO, soweit anwendbar.
               </p>
               <p>
                 Beim Aufruf unserer Website übermittelt Ihr Browser automatisch Informationen an den Server unseres
@@ -110,7 +111,7 @@ export default function Datenschutz() {
                 Cookies zulassen.
               </p>
               <p>
-                Für den Einsatz technisch notwendiger Cookies ist nach § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.
+                Fuer den Einsatz technisch notwendiger Cookies ist nach § 25 Abs. 2 TDDDG keine Einwilligung erforderlich.
                 Die Verarbeitung erfolgt insoweit auf Basis unseres berechtigten Interesses gemäß Art. 6 Abs. 1 lit. f
                 DSGVO, da die Cookies für die Bereitstellung der von Ihnen angeforderten Dienste unbedingt erforderlich
                 sind.
@@ -155,12 +156,11 @@ export default function Datenschutz() {
                 Sie in der <a className="link" href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Datenschutzerklärung von Discord</a>.
               </p>
               <p>
-                Die Verarbeitung Ihrer Daten im Rahmen des Discord-Logins erfolgt auf Grundlage Ihrer Einwilligung (Art.
-                6 Abs. 1 lit. a DSGVO), die Sie durch das freiwillige Nutzen der "Login mit Discord"-Funktion erteilen.
-                Sie können diese Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie uns z.B. eine
-                Nachricht senden und die Löschung Ihres Benutzerkontos verlangen. In diesem Fall werden wir Ihre im
-                Zusammenhang mit dem Discord-Login gespeicherten personenbezogenen Daten umgehend löschen, sofern keine
-                gesetzlichen Aufbewahrungspflichten dem entgegenstehen.
+                Die Verarbeitung Ihrer Daten im Rahmen des Discord-Logins erfolgt zur Bereitstellung Ihres Benutzerkontos
+                und zur Durchfuehrung der Anmeldung (Art. 6 Abs. 1 lit. b DSGVO). Soweit technische Protokolle und
+                Sicherheitsinformationen verarbeitet werden, erfolgt dies auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO
+                (berechtigtes Interesse an einem sicheren und missbrauchsfreien Betrieb). Ohne diese Verarbeitung kann die
+                Anmeldung ueber Discord nicht bereitgestellt werden.
               </p>
               <p>
                 Alle über das Benutzerkonto ausgetauschten oder von Ihnen eingegebenen Inhalte unterliegen ebenfalls den
@@ -177,18 +177,18 @@ export default function Datenschutz() {
               </p>
               <p>
                 Rechtsgrundlage für die Verarbeitung ist Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der von Ihnen
-                gewünschten Funktionen innerhalb der Gilde) sowie Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
-                einem funktionsfähigen und sicheren Betrieb). Inhalte und Daten aus Bot-Interaktionen sind grundsätzlich
-                nur für Sie sichtbar; administrative Bereiche (z.B. Charakterfreigaben) sind nur für berechtigte
-                Admins einsehbar.
+                gewuenschten Funktionen innerhalb der Gilde) sowie Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
+                einem funktionsfaehigen und sicheren Betrieb). Die Sichtbarkeit von Bot-Inhalten richtet sich nach den
+                jeweiligen Discord-Kanalberechtigungen sowie den Rollen- und Berechtigungseinstellungen in der Website.
               </p>
-              <h2 className="font-bold">Discord-Backup eigener Texte</h2>
+              <h2 className="font-bold">Discord-Backup ausgewaehlter Kanaele</h2>
               <p>
-                Optional kann ein internes Backup für ausgewählte Discord-Kanäle aktiviert werden. Dabei sichern wir
-                ausschließlich eigene Regel- und Informationsbeiträge, die von der Gildenleitung erstellt wurden. Es
-                werden keine Nutzerunterhaltungen oder personenbezogenen Inhalte Dritter gesichert. Technisch fallen
-                dabei Kanal- und Thread-IDs sowie Zeitstempel an, um Inhalte korrekt zuzuordnen. Die Sicherungen können
-                jederzeit manuell gelöscht werden.
+                Optional kann ein internes Backup fuer ausgewaehlte Discord-Kanaele aktiviert werden. Dabei werden
+                Nachrichten aus den durch die Administration ausgewaehlten Kanaelen bzw. Threads verarbeitet und fuer die
+                interne Darstellung im Guild-Handbook gespeichert. Je nach Kanalinhalt koennen dabei auch
+                personenbezogene Daten enthalten sein (z.B. Discord-ID, Benutzername/Anzeigename, Nachrichteninhalte,
+                Zeitstempel, Attachments). Die Sicherungen koennen jederzeit manuell geloescht werden; beim Entfernen von
+                Kanaelen aus der Auswahl werden zugehoerige Inhalte ebenfalls entfernt.
               </p>
               <h2 className="font-bold">Datei-Uploads (Avatare und Raum-Assets)</h2>
               <p>
@@ -209,6 +209,52 @@ export default function Datenschutz() {
                 wir administrative Änderungsprotokolle. Diese enthalten u.a. Zeitpunkt, Art der Änderung sowie die
                 beteiligten Benutzerkonten. Die Protokolle dienen der internen Nachvollziehbarkeit und Systemsicherheit
                 und sind nur für Admins einsehbar.
+              </p>
+              <h2 className="font-bold">Empfaenger und Kategorien von Empfaengern</h2>
+              <ul>
+                <li>Interne Stellen (Administration und berechtigte Rollen innerhalb der Gilde)</li>
+                <li>Auftragsverarbeiter fuer Hosting und technische Bereitstellung (insbesondere DigitalOcean)</li>
+                <li>Discord als eigenstaendig Verantwortlicher, soweit Sie Discord-Login oder Bot-Funktionen nutzen</li>
+              </ul>
+              <p>
+                Eine darueber hinausgehende Weitergabe Ihrer Daten erfolgt nicht, sofern keine gesetzliche Verpflichtung
+                besteht oder Sie eingewilligt haben.
+              </p>
+              <h2 className="font-bold">Datenuebermittlungen in Drittlaender</h2>
+              <p>
+                Bei Nutzung von Discord und einzelnen technischen Diensten kann eine Uebermittlung personenbezogener Daten
+                in Drittlaender (insbesondere USA) nicht ausgeschlossen werden. Solche Uebermittlungen erfolgen nur unter
+                Beachtung der Art. 44 ff. DSGVO, insbesondere auf Grundlage von EU-Standardvertragsklauseln (Art. 46
+                DSGVO) oder eines Angemessenheitsbeschlusses (Art. 45 DSGVO), soweit anwendbar.
+              </p>
+              <p>
+                Informationen zu den konkret eingesetzten Garantien koennen Sie unter der oben genannten Kontaktadresse
+                anfordern.
+              </p>
+              <h2 className="font-bold">Speicherdauer und Loeschung</h2>
+              <p>
+                Wir speichern personenbezogene Daten nur so lange, wie es fuer die genannten Zwecke erforderlich ist oder
+                wir gesetzlich dazu verpflichtet sind. Im Einzelnen gelten insbesondere folgende Grundsaetze:
+              </p>
+              <ul>
+                <li>Server-Logs: in der Regel 7 bis 14 Tage</li>
+                <li>Account-Daten: bis zur Loeschung des Kontos bzw. Wegfall des Nutzungszwecks</li>
+                <li>Nachweise zur Zustimmung zur Datenschutzerklaerung: bis zum Ablauf anwendbarer Verjaehrungsfristen</li>
+                <li>Discord-Backup-Daten: bis zur manuellen Loeschung oder bis Kanaele aus der Auswahl entfernt werden</li>
+                <li>Datei-Uploads: bis Sie die Datei loeschen oder das zugehoerige Konto/Objekt entfernt wird</li>
+                <li>Administrative Protokolle: bis der Nachweiszweck entfaellt, danach Loeschung oder Anonymisierung</li>
+              </ul>
+              <h2 className="font-bold">Pflicht zur Bereitstellung von Daten</h2>
+              <p>
+                Die Bereitstellung bestimmter personenbezogener Daten ist fuer die Nutzung unserer Dienste erforderlich.
+                Ohne erforderliche Angaben (z.B. Login-Daten, Discord-ID bei Discord-Login, technisch notwendige
+                Verbindungsdaten) koennen wir Konto, Anmeldung oder einzelne Funktionen nicht bereitstellen. Freiwillige
+                Angaben erkennen Sie daran, dass sie fuer die Nutzung nicht zwingend noetig sind.
+              </p>
+              <h2 className="font-bold">Keine automatisierte Entscheidungsfindung</h2>
+              <p>
+                Eine ausschliesslich automatisierte Entscheidungsfindung einschliesslich Profiling gemaess Art. 22 DSGVO
+                findet nicht statt.
               </p>
               <h2 className="font-bold">Keine weiteren Drittanbieterdienste</h2>
               <p>
@@ -262,8 +308,9 @@ export default function Datenschutz() {
               </p>
               <h2 className="font-bold">Aktualität und Änderungen dieser Erklärung</h2>
               <p>
-                Diese Datenschutzerklärung ist aktuell gültig (Stand: Januar 2026). Wir behalten uns vor, den Inhalt
-                dieser Erklärung bei Bedarf anzupassen, um sie an geänderte Rechtslagen oder technische Änderungen
+                Diese Datenschutzerklaerung ist aktuell gueltig (Stand: 14. Februar 2026, Version 20260214). Wir behalten
+                uns vor, den Inhalt dieser Erklaerung bei Bedarf anzupassen, um sie an geaenderte Rechtslagen oder
+                technische Aenderungen
                 unseres Angebots anzupassen. Die jeweils aktuelle Fassung der Datenschutzerklärung finden Sie auf dieser
                 Website. Auf wesentliche Änderungen weisen wir gegebenenfalls zusätzlich auf der Website hin.
               </p>

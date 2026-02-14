@@ -9,11 +9,10 @@ export interface PageProps {
   tiers: object
   versions: string[]
   factions: object
-  features: { games_calendar: boolean; rooms: boolean }
+  features: { games_calendar: boolean; rooms: boolean; character_status_switch: boolean }
   discordConnected: boolean
   handbookChannels?: { id: string; name: string }[]
   activeChannelId?: string | null
-  betaNoticeEnabled?: boolean
   ziggy: Config & { location: string }
 
   [key: string]: unknown

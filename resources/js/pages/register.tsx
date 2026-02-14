@@ -2,24 +2,56 @@ import DiscordIcon from '@/components/discord-icon'
 import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { Head, Link, useForm } from '@inertiajs/react'
+import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import type { ElementType } from 'react'
 
 export default function Register() {
-  const { data, setData, post, processing, errors } = useForm({
+  const { privacyPolicyVersion, privacyPolicyUpdatedNotice } = usePage<{
+    privacyPolicyVersion: number
+    privacyPolicyUpdatedNotice: string
+  }>().props
+
+  const { data, setData, post, processing, errors, setError, clearErrors } = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
+    privacy_policy_accepted: false,
   })
 
   const buttonOutlineWhite = 'border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white'
   const buttonOutlineDiscord = 'border-sky-400/35 bg-white/0 text-sky-200 hover:bg-sky-400/10 hover:text-sky-100'
 
+  const ensurePrivacyAccepted = () => {
+    if (data.privacy_policy_accepted) {
+      return true
+    }
+
+    setError('privacy_policy_accepted', 'Bitte bestaetige die Datenschutzerklaerung.')
+    return false
+  }
+
+  const handlePrivacyAcceptedChange = (checked: boolean) => {
+    setData('privacy_policy_accepted', checked)
+    if (checked) {
+      clearErrors('privacy_policy_accepted')
+    }
+  }
+
+  const handleDiscordRegisterClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!ensurePrivacyAccepted()) {
+      e.preventDefault()
+    }
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ensurePrivacyAccepted()) {
+      return
+    }
     post(route('register'))
   }
 
@@ -47,7 +79,32 @@ export default function Register() {
                 </div>
               </div>
 
-              <Button as="a" href={route('discord.login')} variant="outline" modifier="block" className={cn('gap-2', buttonOutlineDiscord)}>
+              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-content">
+                <p className="font-semibold">Datenschutz-Update</p>
+                <p className="mt-1 text-white/85">
+                  {privacyPolicyUpdatedNotice} (Version {privacyPolicyVersion})
+                </p>
+              </div>
+              <Checkbox
+                checked={data.privacy_policy_accepted}
+                onChange={(e) => handlePrivacyAcceptedChange(e.target.checked)}
+                errors={errors.privacy_policy_accepted}
+              >
+                Ich habe die{' '}
+                <Link href={route('datenschutz')} className="link text-white" target="_blank">
+                  Datenschutzerklaerung
+                </Link>{' '}
+                gelesen und akzeptiere sie.
+              </Checkbox>
+
+              <Button
+                as="a"
+                href={route('discord.login')}
+                onClick={handleDiscordRegisterClick}
+                variant="outline"
+                modifier="block"
+                className={cn('gap-2', buttonOutlineDiscord)}
+              >
                 <DiscordIcon width={20} />
                 Mit Discord registrieren
               </Button>
@@ -55,22 +112,10 @@ export default function Register() {
               <div className="divider my-0 opacity-60">oder</div>
 
               <form onSubmit={submit} className="space-y-4">
-                <Input
-                  type="text"
-                  value={data.name}
-                  onChange={(e) => setData('name', e.target.value)}
-                  errors={errors.name}
-                  placeholder="Dein Name"
-                >
+                <Input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name} placeholder="Dein Name">
                   Name
                 </Input>
-                <Input
-                  type="email"
-                  value={data.email}
-                  onChange={(e) => setData('email', e.target.value)}
-                  errors={errors.email}
-                  placeholder="you@example.com"
-                >
+                <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} placeholder="you@example.com">
                   Email
                 </Input>
                 <Input

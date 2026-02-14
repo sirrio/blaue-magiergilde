@@ -9,6 +9,7 @@ type SelectProps = {
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
   errors?: ReactNode
   className?: string
+  disabled?: boolean
 }
 
 type SelectLabelProps = {
@@ -27,7 +28,8 @@ export const Select: React.FC<SelectProps> = ({
                                                 value,
                                                 onChange,
                                                 errors = '',
-                                                className = ''
+                                                className = '',
+                                                disabled = false,
                                               }) => {
   const generatedId = useId()
   const selectId = id ?? generatedId
@@ -37,7 +39,7 @@ export const Select: React.FC<SelectProps> = ({
   return (
     <div className={'w-full'}>
       {labelElement}
-      <select className={cn('select w-full', className)} id={selectId} value={value} onChange={onChange}>
+      <select className={cn('select w-full', className)} id={selectId} value={value} onChange={onChange} disabled={disabled}>
         {optionsElement}
       </select>
       {errors ? (

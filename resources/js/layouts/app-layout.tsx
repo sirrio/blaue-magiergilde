@@ -80,7 +80,7 @@ const adminSections = [
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, betaNoticeEnabled, features } =
+  const { auth, discordConnected, handbookChannels, activeChannelId, features } =
     usePage<PageProps>().props
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
@@ -377,14 +377,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
         {children}
       </main>
-      {betaNoticeEnabled ? (
-        <div className="toast toast-start toast-bottom z-40">
-          <div role="alert" className="alert alert-warning text-xs">
-            Beta: data is not live and can be used for testing.
-          </div>
-        </div>
-      ) : null}
-      
     </div>
   )
 }

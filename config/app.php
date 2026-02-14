@@ -54,8 +54,6 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
-    'beta_notice_enabled' => env('BETA_NOTICE_ENABLED', true),
-
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

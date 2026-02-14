@@ -12,8 +12,11 @@ import { Settings } from 'lucide-react'
 import React, { useState } from 'react'
 
 const UpdateCharacterModal = ({ character }: { character: Character }) => {
+  const { classes, factions, versions, errors, features } = usePage<PageProps>().props
+  const isCharacterStatusSwitchEnabled = features?.character_status_switch ?? true
   const currentStatus = character.guild_status ?? 'pending'
   const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
+  const showDraftToggleOptions = !isCharacterStatusSwitchEnabled || canEditStatus
   const statusLabelMap: Record<string, string> = {
     pending: 'Active',
     draft: 'Draft',
@@ -32,12 +35,13 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
     bubble_shop_spend: character.bubble_shop_spend,
     external_link: character.external_link,
     is_filler: character.is_filler,
-    ...(canEditStatus ? { guild_status: currentStatus } : {}),
+    ...((!isCharacterStatusSwitchEnabled || canEditStatus)
+      ? { guild_status: !isCharacterStatusSwitchEnabled ? 'draft' : currentStatus }
+      : {}),
     avatar: undefined,
   }
 
   const { data, setData, post } = useForm(formData)
-  const { classes, factions, versions, errors } = usePage<PageProps>().props
   const [activeTab, setActiveTab] = useState<'basics' | 'details'>('basics')
 
   const handleFormSubmit = () => {
@@ -109,12 +113,13 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
               </Select>
               <Select
                 errors={errors.guild_status}
-                value={canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
+                value={!isCharacterStatusSwitchEnabled ? 'draft' : canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
                 onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
+                disabled={!isCharacterStatusSwitchEnabled || !canEditStatus}
               >
                 <SelectLabel>Visibility</SelectLabel>
                 <SelectOptions>
-                  {!canEditStatus ? (
+                  {!showDraftToggleOptions ? (
                     <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
                   ) : (
                     <>

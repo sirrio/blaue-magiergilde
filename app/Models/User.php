@@ -43,6 +43,8 @@ class User extends Authenticatable
         'avatar',
         'simplified_tracking',
         'avatar_masked',
+        'privacy_policy_accepted_at',
+        'privacy_policy_accepted_version',
     ];
 
     /**
@@ -66,6 +68,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'simplified_tracking' => 'boolean',
             'avatar_masked' => 'boolean',
+            'privacy_policy_accepted_at' => 'datetime',
         ];
     }
 

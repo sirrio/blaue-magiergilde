@@ -10,6 +10,7 @@ use App\Models\Game;
 use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -75,7 +76,9 @@ class CharacterController extends Controller
         $character->user_id = Auth::user()->getAuthIdentifier();
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
-        $character->guild_status = $request->guild_status ?? 'pending';
+        $character->guild_status = $this->isCharacterStatusSwitchEnabled()
+            ? ($request->guild_status ?? 'pending')
+            : 'draft';
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }
@@ -145,7 +148,9 @@ class CharacterController extends Controller
         $character->dm_coins = $request->dm_coins;
         $character->bubble_shop_spend = $request->bubble_shop_spend;
         $character->external_link = $request->external_link;
-        if ($request->filled('guild_status')) {
+        if (! $this->isCharacterStatusSwitchEnabled()) {
+            $character->guild_status = 'draft';
+        } elseif ($request->filled('guild_status')) {
             $character->guild_status = $request->guild_status;
         }
         if ($request->file('avatar')) {
@@ -228,5 +233,10 @@ class CharacterController extends Controller
         if (! $userId || $character->user_id !== $userId) {
             abort(403);
         }
+    }
+
+    private function isCharacterStatusSwitchEnabled(): bool
+    {
+        return (bool) Config::get('features.character_status_switch', true);
     }
 }
