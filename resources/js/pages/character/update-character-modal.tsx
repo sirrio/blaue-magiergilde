@@ -11,7 +11,7 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Settings } from 'lucide-react'
 import React, { useState } from 'react'
 
-const UpdateCharacterModal = ({ character }: { character: Character }) => {
+const UpdateCharacterModal = ({ character, children }: { character: Character; children?: React.ReactNode }) => {
   const { classes, factions, versions, errors, features } = usePage<PageProps>().props
   const isCharacterStatusSwitchEnabled = features?.character_status_switch ?? true
   const currentStatus = character.guild_status ?? 'pending'
@@ -54,15 +54,17 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button
-          className="flex md:hidden md:group-hover:flex"
-          size="xs"
-          modifier="square"
-          aria-label="Edit character"
-          title="Edit character"
-        >
-          <Settings size={14} />
-        </Button>
+        {children ?? (
+          <Button
+            className="flex md:hidden md:group-hover:flex"
+            size="xs"
+            modifier="square"
+            aria-label="Edit character"
+            title="Edit character"
+          >
+            <Settings size={14} />
+          </Button>
+        )}
       </ModalTrigger>
       <ModalTitle>Edit character</ModalTitle>
       <ModalContent>

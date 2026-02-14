@@ -642,8 +642,9 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   return (
     <Modal wide>
       <ModalTrigger>
-        <Button size="sm" className="w-full" aria-label="Manage allies" title="Manage allies">
+        <Button size="sm" className="w-full justify-center gap-1" aria-label="Manage allies" title="Manage allies">
           <BookHeart size={14} />
+          <span className="sm:hidden">Allies</span>
         </Button>
       </ModalTrigger>
       <ModalTitle>Manage Allies</ModalTitle>

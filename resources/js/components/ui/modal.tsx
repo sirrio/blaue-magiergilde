@@ -86,25 +86,31 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false,
           >
             <div
               className={cn(
-                'modal-box relative',
+                'modal-box relative flex max-h-[92dvh] w-full flex-col p-0',
                 wide ? '!max-w-4xl' : 'max-w-md',
                 overflowVisible && 'overflow-visible'
               )}
             >
-              <button
-                type="button"
-                className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                onClick={closeModal}
-                aria-label="Close modal"
-                title="Close"
-              >
-                <XIcon size={18} />
-              </button>
-              <h3 id="modal-title" className="font-semibold mb-2">
-                {titleElement}
-              </h3>
-              <div className="text-sm">{contentElement}</div>
-              {actionElement ? <div className="modal-action">{actionElement}</div> : null}
+              <div className="flex items-center justify-between gap-3 border-b border-base-200 px-4 py-3">
+                <h3 id="modal-title" className="text-sm font-semibold">
+                  {titleElement}
+                </h3>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-circle btn-ghost"
+                  onClick={closeModal}
+                  aria-label="Close modal"
+                  title="Close"
+                >
+                  <XIcon size={18} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">{contentElement}</div>
+              {actionElement ? (
+                <div className="sticky bottom-0 border-t border-base-200 bg-base-100 px-4 py-3">
+                  <div className="flex justify-end">{actionElement}</div>
+                </div>
+              ) : null}
             </div>
           </dialog>,
           document.body
@@ -125,7 +131,7 @@ export const ModalAction = ({ children, variant, onClick, disabled = false }: Mo
   <button
     type="button"
     className={cn(
-      'btn btn-outline',
+      'btn btn-outline w-full sm:w-auto',
       variant === 'success' ? 'btn-success' : '',
       variant === 'error' ? 'btn-error' : ''
     )}

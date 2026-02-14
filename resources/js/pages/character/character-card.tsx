@@ -129,9 +129,9 @@ export function CharacterCard({
     <div ref={setNodeRef} style={dragStyle}>
       <Card className={cn('group')}>
         <CardBody>
-          <CardAction className={cn('absolute top-2 right-2 gap-1')}>
+          <CardAction className={cn('absolute top-2 right-2 hidden gap-1 md:group-hover:flex')}>
             <Button
-              className="flex md:hidden md:group-hover:flex"
+              className="flex"
               size="xs"
               modifier="square"
               aria-label="Reorder character"
@@ -141,9 +141,19 @@ export function CharacterCard({
             >
               <Grip size={14} />
             </Button>
-            <UpdateCharacterModal character={character} />
+            <UpdateCharacterModal character={character}>
+              <Button
+                className="flex"
+                size="xs"
+                modifier="square"
+                aria-label="Edit character"
+                title="Edit character"
+              >
+                <Pencil size={14} />
+              </Button>
+            </UpdateCharacterModal>
             <Button
-              className="flex md:hidden md:group-hover:flex"
+              className="flex"
               as="a"
               href={route('characters.download', character.id)}
               modifier="square"
@@ -153,9 +163,20 @@ export function CharacterCard({
             >
               <Download size={14} />
             </Button>
-            <DestroyCharacterModal character={character} />
+            <DestroyCharacterModal character={character}>
+              <Button
+                className="flex"
+                size="xs"
+                modifier="square"
+                color="error"
+                aria-label="Delete character"
+                title="Delete character"
+              >
+                <XCircle size={14} />
+              </Button>
+            </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-20')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:pr-20')}>
             <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
               {statusIcon}
             </span>
@@ -172,6 +193,44 @@ export function CharacterCard({
               <span>
                 Level {level} {calculateClassString(character)}
               </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
+              <Button
+                size="sm"
+                variant="outline"
+                className="justify-center"
+                aria-label="Reorder character"
+                title="Reorder character"
+                {...attributes}
+                {...listeners}
+              >
+                <Grip size={14} />
+                Reorder
+              </Button>
+              <UpdateCharacterModal character={character}>
+                <Button size="sm" variant="outline" className="justify-center" aria-label="Edit character" title="Edit character">
+                  <Pencil size={14} />
+                  Edit
+                </Button>
+              </UpdateCharacterModal>
+              <Button
+                as="a"
+                href={route('characters.download', character.id)}
+                size="sm"
+                variant="outline"
+                className="justify-center"
+                aria-label="Download character"
+                title="Download character"
+              >
+                <Download size={14} />
+                Download
+              </Button>
+              <DestroyCharacterModal character={character}>
+                <Button size="sm" color="error" className="justify-center" aria-label="Delete character" title="Delete character">
+                  <XCircle size={14} />
+                  Delete
+                </Button>
+              </DestroyCharacterModal>
             </div>
             <CharacterImage className="mx-auto mt-3 mb-2 w-full max-w-56" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
@@ -268,8 +327,8 @@ export function CharacterCard({
                 </Button>
               </div>
             ) : (
-              <div className={cn('mt-4 grid grid-cols-4 gap-1')}>
-                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-4')}>
+              <div className={cn('mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-1')}>
+                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
                   <BookOpen size={14} />
                   Details
                 </Button>
@@ -287,6 +346,7 @@ export function CharacterCard({
                   title="Open external link"
                 >
                   <ExternalLink size={14} />
+                  <span className="sm:hidden">Link</span>
                 </Button>
               </div>
             )}

@@ -18,7 +18,7 @@ import UpdateGameModal from '@/pages/game/update-game-modal'
 import type { Character, Game, User } from '@/types'
 import { Head, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { AlertCircle, ChevronDown, ChevronUp, Coins, Droplets, LoaderCircle, PartyPopper, Pencil, Plus, Swords } from 'lucide-react'
+import { AlertCircle, ChevronDown, ChevronUp, Coins, Droplets, LoaderCircle, PartyPopper, Pencil, Plus, Swords, Trash } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 interface Props {
@@ -713,88 +713,151 @@ export default function MasteredGames({ games, user, characters }: Props) {
                   )}
                 </div>
               </div>
+              <div className="flex justify-end">
+                <Button type="button" size="xs" variant="ghost" onClick={toggleSortOrder}>
+                  Date
+                  {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
+                  {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </Button>
+              </div>
             </div>
           </div>
           {filteredGames.length > 0 ? (
             <>
-              <div className="mt-4 overflow-x-auto">
+              <List className="mt-4 md:hidden">
+                {filteredGames.map((game, index) => {
+                  const notes = game.notes ?? ''
+                  const isExpanded = expandedNotes.has(game.id)
+                  const showToggle = notes.length > 140
+                  const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
+                  const tierReward = game.tier_of_month_reward
+                  const gameBubbles =
+                    calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
+                  const gameCoins =
+                    calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
+                  return (
+                    <ListRow key={game.id} className="block">
+                      <div className="space-y-2 rounded-box border border-base-200 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="flex min-w-0 items-center gap-1 truncate text-sm font-medium">
+                            <span>#{gameNumber}</span>
+                            {game.tier === 'bt' && <LogoBt width={16} />}
+                            {game.tier === 'lt' && <LogoLt width={16} />}
+                            {game.tier === 'ht' && <LogoHt width={16} />}
+                            {game.tier === 'et' && <LogoEt width={16} />}
+                            <span className="truncate">{game.title ?? 'Game'}</span>
+                          </h3>
+                          <span className="shrink-0 text-xs text-base-content/70">
+                            {format(new Date(game.start_date), 'dd.MM.yyyy')}
+                          </span>
+                        </div>
+                        <p className={`text-base-content/50 text-xs whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                          {notes || 'No notes'}
+                        </p>
+                        {showToggle ? (
+                          <button
+                            type="button"
+                            className="text-xs text-primary/70 hover:text-primary"
+                            onClick={() => toggleNotes(game.id)}
+                          >
+                            {isExpanded ? 'Show less' : 'Show notes'}
+                          </button>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2 text-xs">
+                          <span>
+                            {gameBubbles} <Droplets size={13} className="inline" />
+                          </span>
+                          <span>
+                            {gameCoins} <Coins size={13} className="inline" />
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <UpdateGameModal game={game}>
+                              <Button size="sm" variant="ghost" aria-label="Edit game">
+                                <Pencil size={14} />
+                                Edit
+                              </Button>
+                            </UpdateGameModal>
+                            <DestroyGameModal game={game}>
+                              <Button size="sm" variant="ghost" color="error" aria-label="Delete game">
+                                <Trash size={14} />
+                                Delete
+                              </Button>
+                            </DestroyGameModal>
+                          </div>
+                        </div>
+                      </div>
+                    </ListRow>
+                  )
+                })}
+              </List>
+              <div className="mt-4 hidden md:block overflow-x-auto">
                 <div className="min-w-[760px]">
                   <div className={`${headerColumns} px-4 pb-2 text-xs font-semibold uppercase text-base-content/50`}>
                     <span>Game</span>
                     <span>Notes</span>
                     <span className="text-right">Bubbles</span>
                     <span className="text-right">Coins</span>
-                    <span className="text-right">
-                      <button
-                        type="button"
-                        onClick={toggleSortOrder}
-                        className="inline-flex items-center justify-end gap-1 text-xs uppercase text-base-content/50 hover:text-base-content"
-                      >
-                        Date
-                        {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
-                        {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-                      </button>
-                    </span>
+                    <span className="text-right">Date</span>
                     <span className="text-right">Actions</span>
                   </div>
                   <List>
                     {filteredGames.map((game, index) => {
-                const notes = game.notes ?? ''
-                const isExpanded = expandedNotes.has(game.id)
-                const showToggle = notes.length > 140
-                const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
-                const tierReward = game.tier_of_month_reward
-                const gameBubbles =
-                  calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
-                const gameCoins =
-                  calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
-                return (
-                      <ListRow key={game.id} className={`${headerColumns} items-center`}>
-                    <div className="min-w-0">
-                      <h3 className="flex items-center gap-1 truncate text-sm font-medium">
-                        <span>#{gameNumber}</span>
-                        {game.tier === 'bt' && <LogoBt width={16} />}
-                        {game.tier === 'lt' && <LogoLt width={16} />}
-                        {game.tier === 'ht' && <LogoHt width={16} />}
-                        {game.tier === 'et' && <LogoEt width={16} />}
-                        <span className="truncate">{game.title ?? 'Game'}</span>
-                      </h3>
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <p className={`text-base-content/50 text-xs whitespace-pre-wrap ${!isExpanded ? 'line-clamp-2' : ''}`}>
-                        {notes || 'No notes'}
-                      </p>
-                      {showToggle ? (
-                        <button
-                          type="button"
-                          className="text-xs text-primary/70 hover:text-primary"
-                          onClick={() => toggleNotes(game.id)}
-                        >
-                          {isExpanded ? 'Show less' : 'Show notes'}
-                        </button>
-                      ) : null}
-                    </div>
-                    <p className="text-right text-xs">
-                      {gameBubbles} <Droplets size={13} className="inline" />
-                    </p>
-                    <p className="text-right text-xs">
-                      {gameCoins} <Coins size={13} className="inline" />
-                    </p>
-                    <div className="text-right text-xs text-base-content/70">
-                      {format(new Date(game.start_date), 'dd.MM.yyyy')}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <UpdateGameModal game={game}>
-                        <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game">
-                          <Pencil size={14} />
-                        </Button>
-                      </UpdateGameModal>
-                      <DestroyGameModal game={game}>
-                        <DestroyGameButton />
-                      </DestroyGameModal>
-                    </div>
-                      </ListRow>
-                    )
+                      const notes = game.notes ?? ''
+                      const isExpanded = expandedNotes.has(game.id)
+                      const showToggle = notes.length > 140
+                      const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
+                      const tierReward = game.tier_of_month_reward
+                      const gameBubbles =
+                        calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
+                      const gameCoins =
+                        calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
+                      return (
+                        <ListRow key={game.id} className={`${headerColumns} items-center`}>
+                          <div className="min-w-0">
+                            <h3 className="flex items-center gap-1 truncate text-sm font-medium">
+                              <span>#{gameNumber}</span>
+                              {game.tier === 'bt' && <LogoBt width={16} />}
+                              {game.tier === 'lt' && <LogoLt width={16} />}
+                              {game.tier === 'ht' && <LogoHt width={16} />}
+                              {game.tier === 'et' && <LogoEt width={16} />}
+                              <span className="truncate">{game.title ?? 'Game'}</span>
+                            </h3>
+                          </div>
+                          <div className="min-w-0 space-y-1">
+                            <p className={`text-base-content/50 text-xs whitespace-pre-wrap ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                              {notes || 'No notes'}
+                            </p>
+                            {showToggle ? (
+                              <button
+                                type="button"
+                                className="text-xs text-primary/70 hover:text-primary"
+                                onClick={() => toggleNotes(game.id)}
+                              >
+                                {isExpanded ? 'Show less' : 'Show notes'}
+                              </button>
+                            ) : null}
+                          </div>
+                          <p className="text-right text-xs">
+                            {gameBubbles} <Droplets size={13} className="inline" />
+                          </p>
+                          <p className="text-right text-xs">
+                            {gameCoins} <Coins size={13} className="inline" />
+                          </p>
+                          <div className="text-right text-xs text-base-content/70">
+                            {format(new Date(game.start_date), 'dd.MM.yyyy')}
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <UpdateGameModal game={game}>
+                              <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game">
+                                <Pencil size={14} />
+                              </Button>
+                            </UpdateGameModal>
+                            <DestroyGameModal game={game}>
+                              <DestroyGameButton />
+                            </DestroyGameModal>
+                          </div>
+                        </ListRow>
+                      )
                     })}
                   </List>
                 </div>
