@@ -4,6 +4,7 @@ use App\Models\Character;
 use App\Models\CharacterClass;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 
 uses(RefreshDatabase::class);
 
@@ -36,6 +37,8 @@ it('allows owners to create draft characters', function () {
 });
 
 it('lets owners switch between pending and draft', function () {
+    Config::set('features.character_status_switch', true);
+
     $user = User::factory()->create();
     $class = CharacterClass::factory()->create();
     $character = Character::factory()->for($user)->create([
@@ -56,6 +59,66 @@ it('lets owners switch between pending and draft', function () {
             'faction' => $character->faction,
             'notes' => $character->notes,
             'guild_status' => 'draft',
+        ])
+        ->assertRedirect(route('characters.index'));
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
+it('forces draft on create when character status switching is disabled', function () {
+    Config::set('features.character_status_switch', false);
+
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('characters.store'), [
+            'name' => 'Forced Draft Mage',
+            'class' => [$class->id],
+            'external_link' => 'https://example.com',
+            'start_tier' => 'bt',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+            'guild_status' => 'pending',
+        ])
+        ->assertRedirect(route('characters.index'));
+
+    $this->assertDatabaseHas('characters', [
+        'user_id' => $user->id,
+        'name' => 'Forced Draft Mage',
+        'guild_status' => 'draft',
+    ]);
+});
+
+it('forces draft on update when character status switching is disabled', function () {
+    Config::set('features.character_status_switch', false);
+
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'guild_status' => 'pending',
+        'is_filler' => false,
+    ]);
+
+    $this->actingAs($user)
+        ->put(route('characters.update', $character), [
+            'name' => $character->name,
+            'class' => [$class->id],
+            'external_link' => $character->external_link,
+            'version' => $character->version,
+            'dm_bubbles' => $character->dm_bubbles,
+            'dm_coins' => $character->dm_coins,
+            'bubble_shop_spend' => $character->bubble_shop_spend,
+            'is_filler' => $character->is_filler,
+            'faction' => $character->faction,
+            'notes' => $character->notes,
+            'guild_status' => 'pending',
         ])
         ->assertRedirect(route('characters.index'));
 

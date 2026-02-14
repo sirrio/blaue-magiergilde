@@ -12,6 +12,8 @@ import { useForm, usePage } from '@inertiajs/react'
 import React, { useState } from 'react'
 
 const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
+  const { classes, factions, versions, tiers, errors, features } = usePage<PageProps>().props
+  const isCharacterStatusSwitchEnabled = features?.character_status_switch ?? true
   const initialFormData = {
     name: '',
     class: [] as number[],
@@ -24,12 +26,11 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
     external_link: '',
     is_filler: false,
     start_tier: 'bt',
-    guild_status: 'pending',
+    guild_status: isCharacterStatusSwitchEnabled ? 'pending' : 'draft',
     avatar: undefined,
   }
 
   const { data, setData, post } = useForm(initialFormData)
-  const { classes, factions, versions, tiers, errors } = usePage<PageProps>().props
   const [activeTab, setActiveTab] = useState<'basics' | 'details'>('basics')
 
   const handleFormSubmit = () => {
@@ -102,7 +103,8 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               <Select
                 errors={errors.guild_status}
                 value={data.guild_status}
-                onChange={(e) => setData('guild_status', e.target.value)}
+                onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
+                disabled={!isCharacterStatusSwitchEnabled}
               >
                 <SelectLabel>Visibility</SelectLabel>
                 <SelectOptions>
