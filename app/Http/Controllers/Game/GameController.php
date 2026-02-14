@@ -18,15 +18,30 @@ class GameController extends Controller
     public function index()
     {
         $characters = Character::query()
+            ->without(['allies', 'downtimes', 'characterClasses'])
             ->where('user_id', Auth::user()->getAuthIdentifier())
-            ->with(['adventures' => fn ($q) => $q->withTrashed()])
+            ->with(['adventures' => fn ($q) => $q
+                ->withTrashed()
+                ->select(['id', 'character_id', 'duration', 'has_additional_bubble'])])
             ->withTrashed()
             ->orderBy('position')
-            ->get();
+            ->get(['id', 'is_filler', 'dm_bubbles', 'dm_coins'])
+            ->withoutAppends();
         $games = Game::query()
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->orderby('start_date', 'desc')
-            ->get();
+            ->get([
+                'id',
+                'title',
+                'tier',
+                'duration',
+                'start_date',
+                'has_additional_bubble',
+                'tier_of_month_reward',
+                'sessions',
+                'notes',
+                'user_id',
+            ]);
 
         return Inertia::render('game/index', [
             'user' => Auth::user(),

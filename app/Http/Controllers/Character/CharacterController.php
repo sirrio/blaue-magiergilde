@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Character\StoreCharacterRequest;
 use App\Http\Requests\Character\UpdateCharacterRequest;
 use App\Models\Character;
-use App\Models\Game;
 use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -31,24 +30,23 @@ class CharacterController extends Controller
             ->withCount('room')
             ->with('adventures')
             ->orderBy('position')
-            ->get();
+            ->get()
+            ->withoutAppends();
         $characters->each(function (Character $character) use ($simplifiedTracking): void {
             $character->setAttribute('simplified_tracking', $simplifiedTracking);
         });
         $guildCharacters = Character::query()
+            ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
-            ->get(['id', 'name', 'avatar', 'guild_status']);
-        $games = Game::query()
-            ->where('user_id', $user?->getAuthIdentifier())
-            ->get();
+            ->get(['id', 'name', 'avatar', 'guild_status'])
+            ->withoutAppends();
 
         return Inertia::render('character/index', [
             'user' => $user,
             'characters' => $characters,
             'guildCharacters' => $guildCharacters,
-            'games' => $games,
         ]);
     }
 
@@ -110,10 +108,12 @@ class CharacterController extends Controller
         $character->setAttribute('simplified_tracking', $simplifiedTracking);
 
         $guildCharacters = Character::query()
+            ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
-            ->get(['id', 'name', 'avatar', 'guild_status']);
+            ->get(['id', 'name', 'avatar', 'guild_status'])
+            ->withoutAppends();
 
         return Inertia::render('character/show', [
             'character' => $character->load('adventures.allies.linkedCharacter'),

@@ -29,6 +29,8 @@ class Ally extends Model
     public function linkedCharacter(): BelongsTo
     {
         return $this->belongsTo(Character::class, 'linked_character_id')
+            ->without(['allies', 'downtimes', 'characterClasses'])
+            ->select(['id', 'name', 'avatar', 'user_id'])
             ->with('user:id,name');
     }
 }
