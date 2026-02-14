@@ -12,12 +12,31 @@ export default function PrivacyConsent() {
     privacyPolicyUpdatedNotice: string
   }>().props
 
-  const { data, setData, post, processing, errors } = useForm({
+  const { data, setData, post, processing, errors, setError, clearErrors } = useForm({
     privacy_policy_accepted: false,
   })
 
+  const ensurePrivacyAccepted = () => {
+    if (data.privacy_policy_accepted) {
+      return true
+    }
+
+    setError('privacy_policy_accepted', 'Bitte bestaetige die Datenschutzerklaerung.')
+    return false
+  }
+
+  const handlePrivacyAcceptedChange = (checked: boolean) => {
+    setData('privacy_policy_accepted', checked)
+    if (checked) {
+      clearErrors('privacy_policy_accepted')
+    }
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ensurePrivacyAccepted()) {
+      return
+    }
     post(route('privacy-consent.store'))
   }
 
@@ -54,7 +73,7 @@ export default function PrivacyConsent() {
               <form onSubmit={submit} className="space-y-4">
                 <Checkbox
                   checked={data.privacy_policy_accepted}
-                  onChange={(e) => setData('privacy_policy_accepted', e.target.checked)}
+                  onChange={(e) => handlePrivacyAcceptedChange(e.target.checked)}
                   errors={errors.privacy_policy_accepted}
                 >
                   Ich habe die{' '}
@@ -64,7 +83,7 @@ export default function PrivacyConsent() {
                   gelesen und akzeptiere sie.
                 </Checkbox>
 
-                <Button type="submit" disabled={processing} variant="outline" modifier="block" className={buttonOutlineWhite}>
+                <Button type="submit" disabled={processing || !data.privacy_policy_accepted} variant="outline" modifier="block" className={buttonOutlineWhite}>
                   Datenschutzerklaerung akzeptieren
                 </Button>
               </form>

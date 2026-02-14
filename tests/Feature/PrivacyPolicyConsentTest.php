@@ -52,6 +52,48 @@ test('users can accept updated privacy policy and continue', function () {
         ->and((int) $user->privacy_policy_accepted_version)->toBe((int) Config::get('legal.privacy_policy.version'));
 });
 
+test('privacy consent acceptance ignores stale consent intended url', function () {
+    $user = User::factory()->create([
+        'privacy_policy_accepted_at' => null,
+        'privacy_policy_accepted_version' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->withSession(['url.intended' => route('privacy-consent.show')])
+        ->post(route('privacy-consent.store'), [
+            'privacy_policy_accepted' => true,
+        ])
+        ->assertRedirect(route('characters.index'));
+});
+
+test('privacy consent acceptance ignores stale oauth callback intended url', function () {
+    $user = User::factory()->create([
+        'privacy_policy_accepted_at' => null,
+        'privacy_policy_accepted_version' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->withSession(['url.intended' => route('discord.callback', ['code' => 'stale', 'state' => 'stale'])])
+        ->post(route('privacy-consent.store'), [
+            'privacy_policy_accepted' => true,
+        ])
+        ->assertRedirect(route('characters.index'));
+});
+
+test('privacy consent acceptance ignores external intended url', function () {
+    $user = User::factory()->create([
+        'privacy_policy_accepted_at' => null,
+        'privacy_policy_accepted_version' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->withSession(['url.intended' => 'https://example.com/phishing'])
+        ->post(route('privacy-consent.store'), [
+            'privacy_policy_accepted' => true,
+        ])
+        ->assertRedirect(route('characters.index'));
+});
+
 test('users must explicitly accept the privacy policy when submitting consent', function () {
     $user = User::factory()->create([
         'privacy_policy_accepted_at' => null,
