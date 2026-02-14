@@ -27,6 +27,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
 
   const { data, setData, post } = useForm(initialFormData)
   const { classes, factions, versions, tiers, errors } = usePage<PageProps>().props
+  const startTierOptions = Object.entries(tiers).filter(([key]) => key !== 'et')
 
   const handleFormSubmit = () => {
     post(route('characters.store'), {
@@ -51,7 +52,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
           <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
             <SelectLabel>Start tier</SelectLabel>
             <SelectOptions>
-              {Object.entries(tiers).map(([key, value]: [string, string]) => (
+              {startTierOptions.map(([key, value]: [string, string]) => (
                 <option key={key} value={key}>
                   {value}
                 </option>

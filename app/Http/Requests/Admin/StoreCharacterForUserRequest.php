@@ -26,7 +26,7 @@ class StoreCharacterForUserRequest extends FormRequest
             'class' => 'required|array|min:1',
             'class.*' => 'integer|exists:character_classes,id',
             'external_link' => 'required|url',
-            'start_tier' => 'required|string',
+            'start_tier' => 'required|in:bt,lt,ht',
             'version' => 'required|string',
             'dm_bubbles' => 'required|integer|min:0|max:1024',
             'dm_coins' => 'required|integer|min:0|max:1024',

@@ -8,6 +8,7 @@ use App\Http\Requests\Adventure\UpdateAdventureRequest;
 use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
+use Illuminate\Support\Facades\Config;
 
 class AdventureController extends Controller
 {
@@ -115,7 +116,7 @@ class AdventureController extends Controller
 
         $characters = Character::query()
             ->whereIn('id', $guildCharacterIds)
-            ->where('guild_status', 'approved')
+            ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->get(['id', 'name']);
 
         $createdIds = [];
@@ -134,5 +135,19 @@ class AdventureController extends Controller
         }
 
         return $createdIds;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function guildCharacterStatusesForAllies(): array
+    {
+        $statuses = ['pending', 'approved'];
+
+        if (! (bool) Config::get('features.character_status_switch', true)) {
+            $statuses[] = 'draft';
+        }
+
+        return $statuses;
     }
 }

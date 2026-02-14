@@ -174,6 +174,7 @@ const AdminCharacterModal = ({
   character?: AdminCharacter
 }>) => {
   const { classes, factions, versions, tiers, errors } = usePage<PageProps>().props
+  const startTierOptions = Object.entries(tiers).filter(([key]) => key !== 'et')
   const isEdit = Boolean(character)
   const currentStatus = character?.guild_status ?? 'pending'
   const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
@@ -274,7 +275,7 @@ const AdminCharacterModal = ({
               >
                 <SelectLabel>Start tier</SelectLabel>
                 <SelectOptions>
-                  {Object.entries(tiers).map(([key, value]: [string, string]) => (
+                  {startTierOptions.map(([key, value]: [string, string]) => (
                     <option key={key} value={key}>
                       {value}
                     </option>

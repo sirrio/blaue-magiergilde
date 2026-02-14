@@ -14,6 +14,7 @@ import React, { useState } from 'react'
 const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
   const { classes, factions, versions, tiers, errors, features } = usePage<PageProps>().props
   const isCharacterStatusSwitchEnabled = features?.character_status_switch ?? true
+  const startTierOptions = Object.entries(tiers).filter(([key]) => key !== 'et')
   const initialFormData = {
     name: '',
     class: [] as number[],
@@ -73,7 +74,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
                 <SelectLabel>Start tier</SelectLabel>
                 <SelectOptions>
-                  {Object.entries(tiers).map(([key, value]: [string, string]) => (
+                  {startTierOptions.map(([key, value]: [string, string]) => (
                     <option key={key} value={key}>
                       {value}
                     </option>

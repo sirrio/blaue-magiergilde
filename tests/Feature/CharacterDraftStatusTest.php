@@ -36,6 +36,28 @@ it('allows owners to create draft characters', function () {
     ]);
 });
 
+it('rejects epic tier as start tier', function () {
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('characters.store'), [
+            'name' => 'Invalid Start Tier',
+            'class' => [$class->id],
+            'external_link' => 'https://example.com',
+            'start_tier' => 'et',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+            'guild_status' => 'draft',
+        ])
+        ->assertSessionHasErrors('start_tier');
+});
+
 it('lets owners switch between pending and draft', function () {
     Config::set('features.character_status_switch', true);
 
