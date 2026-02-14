@@ -102,7 +102,6 @@ class HandleInertiaRequests extends Middleware
                 'et' => 'Epic Tier',
             ],
             'handbookChannels' => $handbookChannels,
-            'betaNoticeEnabled' => (bool) (config('app.beta_notice_enabled') ?? env('BETA_NOTICE_ENABLED', true)),
         ];
     }
 }

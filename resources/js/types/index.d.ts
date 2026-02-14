@@ -13,7 +13,6 @@ export interface PageProps {
   discordConnected: boolean
   handbookChannels?: { id: string; name: string }[]
   activeChannelId?: string | null
-  betaNoticeEnabled?: boolean
   ziggy: Config & { location: string }
 
   [key: string]: unknown
