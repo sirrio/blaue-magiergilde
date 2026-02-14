@@ -39,7 +39,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
           value={checked ? '1' : '0'}
           onChange={onChange}
         />
-        <span className="label-text text-sm leading-5">{children}</span>
+        <span className="label-text text-sm leading-5 whitespace-normal break-words">{children}</span>
       </label>
       {errors ? (
         <label className="label pt-1">

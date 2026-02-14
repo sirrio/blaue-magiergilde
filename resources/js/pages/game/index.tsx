@@ -465,7 +465,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-xl font-bold sm:text-2xl">
               Game Master Log
               <span className="ml-3 inline-flex items-center rounded-full border border-base-200 px-2 py-0.5 text-xs text-base-content/60">
                 {totalSessions} Sessions
@@ -474,7 +474,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
             <p className="text-base-content/70 text-sm">Track your progress with a summary of all GM sessions.</p>
           </div>
           <StoreGameModal>
-            <Button variant="outline" size="sm" className="flex items-center">
+            <Button variant="outline" size="sm" className="flex w-full items-center sm:w-auto">
               <Plus size={18} />
               <span>Create New Game</span>
             </Button>
@@ -698,7 +698,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                   <span className="text-base-content/60">Tier:</span>
                   {renderFilterOptions('tierFilter', tierFilterOptions, tierFilter, setTierFilter, true)}
                 </div>
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-xs text-base-content/60">
+                <div className="flex w-full flex-wrap items-center gap-2 text-xs text-base-content/60 sm:ml-auto sm:w-auto sm:justify-end">
                   <span className="rounded-full border border-base-200 px-2 py-1">
                     Showing {filteredGames.length} of {games.length}
                   </span>
@@ -717,26 +717,28 @@ export default function MasteredGames({ games, user, characters }: Props) {
           </div>
           {filteredGames.length > 0 ? (
             <>
-              <div className={`${headerColumns} mt-4 px-4 pb-2 text-xs font-semibold uppercase text-base-content/50`}>
-                <span>Game</span>
-                <span>Notes</span>
-                <span className="text-right">Bubbles</span>
-                <span className="text-right">Coins</span>
-                <span className="text-right">
-                  <button
-                    type="button"
-                    onClick={toggleSortOrder}
-                    className="inline-flex items-center justify-end gap-1 text-xs uppercase text-base-content/50 hover:text-base-content"
-                  >
-                    Date
-                    {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
-                    {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-                  </button>
-                </span>
-                <span className="text-right">Actions</span>
-              </div>
-              <List>
-              {filteredGames.map((game, index) => {
+              <div className="mt-4 overflow-x-auto">
+                <div className="min-w-[760px]">
+                  <div className={`${headerColumns} px-4 pb-2 text-xs font-semibold uppercase text-base-content/50`}>
+                    <span>Game</span>
+                    <span>Notes</span>
+                    <span className="text-right">Bubbles</span>
+                    <span className="text-right">Coins</span>
+                    <span className="text-right">
+                      <button
+                        type="button"
+                        onClick={toggleSortOrder}
+                        className="inline-flex items-center justify-end gap-1 text-xs uppercase text-base-content/50 hover:text-base-content"
+                      >
+                        Date
+                        {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
+                        {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                      </button>
+                    </span>
+                    <span className="text-right">Actions</span>
+                  </div>
+                  <List>
+                    {filteredGames.map((game, index) => {
                 const notes = game.notes ?? ''
                 const isExpanded = expandedNotes.has(game.id)
                 const showToggle = notes.length > 140
@@ -747,7 +749,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                 const gameCoins =
                   calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
                 return (
-                  <ListRow key={game.id} className={`${headerColumns} items-center`}>
+                      <ListRow key={game.id} className={`${headerColumns} items-center`}>
                     <div className="min-w-0">
                       <h3 className="flex items-center gap-1 truncate text-sm font-medium">
                         <span>#{gameNumber}</span>
@@ -791,10 +793,12 @@ export default function MasteredGames({ games, user, characters }: Props) {
                         <DestroyGameButton />
                       </DestroyGameModal>
                     </div>
-                  </ListRow>
-                )
-              })}
-              </List>
+                      </ListRow>
+                    )
+                    })}
+                  </List>
+                </div>
+              </div>
             </>
           ) : (
             <p className="mt-4 text-center text-sm text-base-content/50">

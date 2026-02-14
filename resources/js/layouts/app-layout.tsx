@@ -206,9 +206,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
               )}
             </ul>
           </div>
-          <Link href={route('characters.index')} className="btn btn-ghost text-xl">
-            <img className={cn('h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
-            Blaue Magiergilde
+          <Link href={route('characters.index')} className="btn btn-ghost px-2 text-base sm:text-xl" aria-label="Blaue Magiergilde">
+            <img className={cn('h-8 sm:h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
+            <span className="hidden sm:inline">Blaue Magiergilde</span>
           </Link>
           <ul className="menu menu-horizontal items-center space-x-1 px-1 hidden lg:flex ml-4" role="menubar">
             {filteredMenuLinks.map((menuLink) => (

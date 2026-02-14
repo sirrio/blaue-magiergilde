@@ -182,14 +182,14 @@ export default function Show({ character, guildCharacters }: { character: Charac
     <AppLayout>
       <Head title={character.name + ' Details'} />
       <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
-        <div className="flex items-center justify-between border-b pb-4">
-          <h1 className="text-2xl font-bold">{character.name} Details</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-4">
+          <h1 className="text-xl font-bold sm:text-2xl">{character.name} Details</h1>
           <Link href={route('characters.index')} className="btn btn-sm">
             Back
           </Link>
         </div>
         <div className="flex justify-center">
-          <CharacterPortrait character={character} className="h-32 w-32" masked={avatarMasked} />
+          <CharacterPortrait character={character} className="h-24 w-24 sm:h-32 sm:w-32" masked={avatarMasked} />
         </div>
 
         <div>
@@ -222,24 +222,26 @@ export default function Show({ character, guildCharacters }: { character: Charac
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.adventures.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                      <span>Adventure</span>
-                      <span>Notes</span>
-                      <span className="text-right">Time</span>
-                      <button
-                        type="button"
-                        className="flex items-center justify-end gap-1 text-right"
-                        onClick={() =>
-                          setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                        }
-                      >
-                        Date
-                        {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-                      </button>
-                      <span className="text-right">Actions</span>
-                    </div>
-                    <List className="shadow-none">
-                      {sortedAdventures.map((adv) => {
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[760px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                          <span>Adventure</span>
+                          <span>Notes</span>
+                          <span className="text-right">Time</span>
+                          <button
+                            type="button"
+                            className="flex items-center justify-end gap-1 text-right"
+                            onClick={() =>
+                              setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                            }
+                          >
+                            Date
+                            {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                          </button>
+                          <span className="text-right">Actions</span>
+                        </div>
+                        <List className="shadow-none">
+                          {sortedAdventures.map((adv) => {
                         const notes = adventureNotesMap.get(adv.id) ?? ''
                         const showToggle = notes.length > 140
                         const isExpanded = expandedAdventures.includes(adv.id)
@@ -328,8 +330,10 @@ export default function Show({ character, guildCharacters }: { character: Charac
                             </div>
                           </ListRow>
                         )
-                      })}
-                    </List>
+                          })}
+                        </List>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <p className="text-center text-sm text-base-content/70">No adventures</p>
@@ -369,24 +373,26 @@ export default function Show({ character, guildCharacters }: { character: Charac
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.downtimes.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                      <span>Type</span>
-                      <span>Notes</span>
-                      <span className="text-right">Time</span>
-                      <button
-                        type="button"
-                        className="flex items-center justify-end gap-1 text-right"
-                        onClick={() =>
-                          setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                        }
-                      >
-                        Date
-                        {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-                      </button>
-                      <span className="text-right">Actions</span>
-                    </div>
-                    <List className="shadow-none">
-                      {sortedDowntimes.map((dt) => {
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[760px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                          <span>Type</span>
+                          <span>Notes</span>
+                          <span className="text-right">Time</span>
+                          <button
+                            type="button"
+                            className="flex items-center justify-end gap-1 text-right"
+                            onClick={() =>
+                              setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                            }
+                          >
+                            Date
+                            {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                          </button>
+                          <span className="text-right">Actions</span>
+                        </div>
+                        <List className="shadow-none">
+                          {sortedDowntimes.map((dt) => {
                         const notes = downtimeNotesMap.get(dt.id) ?? ''
                         const showToggle = notes.length > 140
                         const isExpanded = expandedDowntimes.includes(dt.id)
@@ -454,8 +460,10 @@ export default function Show({ character, guildCharacters }: { character: Charac
                             </div>
                           </ListRow>
                         )
-                      })}
-                    </List>
+                          })}
+                        </List>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <p className="text-center text-sm text-base-content/70">No downtimes</p>
@@ -493,40 +501,44 @@ export default function Show({ character, guildCharacters }: { character: Charac
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.allies.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-[minmax(0,1fr)_140px_200px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                      <span>Ally</span>
-                      <span>Standing</span>
-                      <span>Classes</span>
-                    </div>
-                    <List className="shadow-none">
-                      {character.allies.map((ally) => (
-                        <ListRow
-                          key={ally.id}
-                          className="grid w-full grid-cols-[minmax(0,1fr)_140px_200px] items-center gap-4"
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <AllyPortrait ally={ally} className="h-9 w-9" />
-                          <div className="flex min-w-0 flex-col gap-0.5">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="truncate text-sm font-medium">
-                                {getAllyDisplayName(ally)}
-                              </span>
-                              <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                {ally.linked_character_id ? 'Linked' : 'Custom'}
-                              </span>
-                            </div>
-                            {getAllyOwnerName(ally) ? (
-                              <span className="truncate text-xs text-base-content/50">
-                                Owner: {getAllyOwnerName(ally)}
-                              </span>
-                            ) : null}
-                          </div>
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[560px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_140px_200px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                          <span>Ally</span>
+                          <span>Standing</span>
+                          <span>Classes</span>
                         </div>
-                          <RatingHearts rating={ally.rating} />
-                          <span className="truncate text-sm text-base-content/70">{ally.classes || '-'}</span>
-                        </ListRow>
-                      ))}
-                    </List>
+                        <List className="shadow-none">
+                          {character.allies.map((ally) => (
+                            <ListRow
+                              key={ally.id}
+                              className="grid w-full grid-cols-[minmax(0,1fr)_140px_200px] items-center gap-4"
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <AllyPortrait ally={ally} className="h-9 w-9" />
+                                <div className="flex min-w-0 flex-col gap-0.5">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span className="truncate text-sm font-medium">
+                                      {getAllyDisplayName(ally)}
+                                    </span>
+                                    <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
+                                      {ally.linked_character_id ? 'Linked' : 'Custom'}
+                                    </span>
+                                  </div>
+                                  {getAllyOwnerName(ally) ? (
+                                    <span className="truncate text-xs text-base-content/50">
+                                      Owner: {getAllyOwnerName(ally)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <RatingHearts rating={ally.rating} />
+                              <span className="truncate text-sm text-base-content/70">{ally.classes || '-'}</span>
+                            </ListRow>
+                          ))}
+                        </List>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <p className="text-center text-sm text-base-content/70">No allies</p>

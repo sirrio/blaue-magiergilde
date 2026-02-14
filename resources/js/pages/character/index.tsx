@@ -143,18 +143,19 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
       <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
         <section className="flex flex-col justify-between gap-2 border-b pb-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-bold">
-              Your Characters <span className="text-base-content/50 ml-1 text-sm font-normal">{activeCharacterCount}/8 Active</span>
+            <h1 className="text-xl font-bold sm:text-2xl">
+              Your Characters{' '}
+              <span className="text-base-content/50 ml-1 inline-block text-xs font-normal sm:text-sm">{activeCharacterCount}/8 Active</span>
               {simplifiedTracking ? (
-                <span className="ml-2 rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
+                <span className="ml-2 inline-flex rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
                   Simplified tracking
                 </span>
               ) : null}
             </h1>
             <p className="text-base-content/70 text-sm">Manage all your characters easily below.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <Button size="sm" variant="ghost" className="flex items-center space-x-1" onClick={() => copyCharactersToClipboard(characters)}>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-4">
+            <Button size="sm" variant="ghost" className="flex items-center space-x-1 text-xs sm:text-sm" onClick={() => copyCharactersToClipboard(characters)}>
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>
             <ActionMenu
@@ -180,7 +181,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             {chars.length > 0 && (
               <>
                 <StoreCharacterModal>
-                  <Button size="sm" variant="outline" className="flex items-center space-x-2">
+                  <Button size="sm" variant="outline" className="flex items-center space-x-2 text-xs sm:text-sm">
                     <Plus size={16} />
                     <span>Add Character</span>
                   </Button>
@@ -197,7 +198,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <BookUser size={64} className="text-base-content mx-auto mb-4" />
             <h2 className="text-base-content text-lg font-semibold">No characters yet</h2>
             <p className="text-base-content/70 text-sm">Start by creating or syncing your characters.</p>
-            <div className="mt-6 flex justify-center gap-4">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <StoreCharacterModal>
                 <Button variant="outline" className="flex items-center space-x-2">
                   <Plus size={16} />

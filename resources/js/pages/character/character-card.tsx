@@ -155,11 +155,11 @@ export function CharacterCard({
             </Button>
             <DestroyCharacterModal character={character} />
           </CardAction>
-          <CardTitle className={cn('pb-0 flex items-center gap-2')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-20')}>
             <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
               {statusIcon}
             </span>
-            <span>{character.name}</span>
+            <span className="truncate">{character.name}</span>
             {hasRoom ? (
               <span className="text-primary/70" title="Room assigned">
                 <MapPin size={14} />
@@ -173,7 +173,7 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
             </div>
-            <CharacterImage className="mt-4 mb-2" character={character} masked={avatarMasked} />
+            <CharacterImage className="mx-auto mt-3 mb-2 w-full max-w-56" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
               <>
                 {!simplifiedTracking ? (
@@ -192,7 +192,7 @@ export function CharacterCard({
                     </div>
                   </>
                 ) : null}
-                <div className={cn('mt-4 grid gap-0.5', simplifiedTracking ? 'grid-cols-2' : 'grid-cols-2')}>
+                <div className={cn('mt-4 grid grid-cols-1 gap-1 sm:grid-cols-2')}>
                   {!simplifiedTracking ? (
                     <InfoBox>
                       <InfoBoxTitle>
@@ -242,7 +242,7 @@ export function CharacterCard({
                 </div>
               </>
             ) : (
-              <div className="flex justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center whitespace-pre-wrap">
                   <LogoFiller /> Filler character
                 </div>

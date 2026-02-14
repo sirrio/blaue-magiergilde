@@ -11,7 +11,7 @@ const DISCORD_INVITE_URL = 'https://discord.gg/dd5c'
 const FAQ_URL = 'https://docs.google.com/document/d/13J4LiV4o2RygG2j35LLQC4Dyh_-B94om7EiSAl_I15c'
 
 function InfoChip({ children }: { children: ReactNode }) {
-  return <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-white/80">{children}</span>
+  return <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/80 sm:px-3">{children}</span>
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -65,7 +65,7 @@ export default function Welcome() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_80%_30%,rgba(14,165,233,0.16),transparent_45%)]" />
 
           <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-6 md:pb-20 md:pt-10">
-            <header className="flex items-center justify-between gap-4">
+            <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div className="flex items-center gap-3">
                 <img src="/images/icon_magiergilde_white.svg" className="h-9 w-9" alt="Blaue Magiergilde" />
                 <div className="leading-tight">
@@ -74,12 +74,12 @@ export default function Welcome() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center">
                 <Button
                   as={Link as ElementType}
                   href={route('login')}
                   variant="outline"
-                  className={cn('gap-2', buttonOutlineWhite)}
+                  className={cn('w-full gap-2 text-sm sm:w-auto sm:text-base', buttonOutlineWhite)}
                 >
                   <ScrollText size={18} />
                   {appLabel}
@@ -88,7 +88,7 @@ export default function Welcome() {
                   as="a"
                   href={DISCORD_INVITE_URL}
                   variant="outline"
-                  className={cn('gap-2', buttonOutlineDiscord)}
+                  className={cn('w-full gap-2 text-sm sm:w-auto sm:text-base', buttonOutlineDiscord)}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -98,7 +98,7 @@ export default function Welcome() {
               </div>
             </header>
 
-            <div className="mt-14 grid items-start gap-10 lg:mt-20 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="mt-10 grid items-start gap-8 sm:mt-14 lg:mt-20 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="space-y-6">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
                   <Sparkles size={14} />
@@ -106,24 +106,24 @@ export default function Welcome() {
                 </div>
 
                 <div className="space-y-3">
-                  <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">
+                  <h1 className="text-3xl font-extrabold leading-tight sm:text-4xl md:text-6xl">
                     Spiele D&amp;D, wann du Zeit hast.
                     <span className="block bg-gradient-to-r from-sky-300 via-indigo-300 to-purple-300 bg-clip-text text-transparent">
                       In einer freundlichen Gilde.
                     </span>
                   </h1>
-                  <p className="max-w-2xl text-base text-white/85 md:text-lg">
+                  <p className="max-w-2xl text-sm text-white/85 sm:text-base md:text-lg">
                     Die Blaue Magiergilde ist ein offenes Spielsystem, in dem Spieler:innen und Spielleiter:innen gemeinsam magische
                     Geschichten erleben - ohne Kampagnenzwang, aber mit langfristiger Charakterentwicklung.
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="grid gap-2 sm:flex sm:flex-wrap">
                   <Button
                     as="a"
                     href={DISCORD_INVITE_URL}
                     variant="outline"
-                    className={cn('gap-2', buttonOutlineDiscord)}
+                    className={cn('w-full gap-2 text-sm sm:w-auto sm:text-base', buttonOutlineDiscord)}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -134,7 +134,7 @@ export default function Welcome() {
                     as={Link as ElementType}
                     href={route('login')}
                     variant="outline"
-                    className={cn('gap-2', buttonOutlineWhite)}
+                    className={cn('w-full gap-2 text-sm sm:w-auto sm:text-base', buttonOutlineWhite)}
                   >
                     <ScrollText size={18} />
                     {appLabel}
@@ -185,7 +185,7 @@ export default function Welcome() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-14">
+        <section className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
           <div className="grid gap-4 md:grid-cols-3">
             <FeatureCard
               icon={CalendarCheck2}
@@ -206,7 +206,7 @@ export default function Welcome() {
         </section>
 
         <section className="border-y border-white/10 bg-white/[0.03]">
-          <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
             <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
               <Card className="border border-white/10 bg-white/5 shadow-xl">
                 <CardBody className="space-y-3">
@@ -215,12 +215,12 @@ export default function Welcome() {
                     Der schnellste Einstieg: Discord beitreten und direkt Teil der Community werden. Wenn du die App nutzen willst,
                     logge dich mit deinem Account ein.
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid gap-2 sm:flex sm:flex-wrap">
                     <Button
                       as="a"
                       href={DISCORD_INVITE_URL}
                       variant="outline"
-                      className={cn('gap-2', buttonOutlineDiscord)}
+                      className={cn('w-full gap-2 text-sm sm:w-auto sm:text-base', buttonOutlineDiscord)}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -231,7 +231,7 @@ export default function Welcome() {
                       as={Link as ElementType}
                       href={route('login')}
                       variant="outline"
-                      className={cn('gap-2', buttonOutlineWhite)}
+                      className={cn('w-full gap-2 text-sm sm:w-auto sm:text-base', buttonOutlineWhite)}
                     >
                       <ScrollText size={18} />
                       {appLabel}
