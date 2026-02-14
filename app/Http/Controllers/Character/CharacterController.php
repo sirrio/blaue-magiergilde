@@ -37,7 +37,7 @@ class CharacterController extends Controller
         });
         $guildCharacters = Character::query()
             ->whereNull('deleted_at')
-            ->where('guild_status', 'approved')
+            ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
             ->get(['id', 'name', 'avatar', 'guild_status']);
         $games = Game::query()
@@ -111,7 +111,7 @@ class CharacterController extends Controller
 
         $guildCharacters = Character::query()
             ->whereNull('deleted_at')
-            ->where('guild_status', 'approved')
+            ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
             ->get(['id', 'name', 'avatar', 'guild_status']);
 
@@ -238,5 +238,19 @@ class CharacterController extends Controller
     private function isCharacterStatusSwitchEnabled(): bool
     {
         return (bool) Config::get('features.character_status_switch', true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function guildCharacterStatusesForAllies(): array
+    {
+        $statuses = ['pending', 'approved'];
+
+        if (! $this->isCharacterStatusSwitchEnabled()) {
+            $statuses[] = 'draft';
+        }
+
+        return $statuses;
     }
 }
