@@ -2,17 +2,24 @@ import DiscordIcon from '@/components/discord-icon'
 import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { Head, Link, useForm } from '@inertiajs/react'
+import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import type { ElementType } from 'react'
 
 export default function Register() {
+  const { privacyPolicyVersion, privacyPolicyUpdatedNotice } = usePage<{
+    privacyPolicyVersion: number
+    privacyPolicyUpdatedNotice: string
+  }>().props
+
   const { data, setData, post, processing, errors } = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
+    privacy_policy_accepted: false,
   })
 
   const buttonOutlineWhite = 'border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white'
@@ -91,6 +98,23 @@ export default function Register() {
                 >
                   Confirm Password
                 </Input>
+                <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-content">
+                  <p className="font-semibold">Datenschutz-Update</p>
+                  <p className="mt-1 text-white/85">
+                    {privacyPolicyUpdatedNotice} (Version {privacyPolicyVersion})
+                  </p>
+                </div>
+                <Checkbox
+                  checked={data.privacy_policy_accepted}
+                  onChange={(e) => setData('privacy_policy_accepted', e.target.checked)}
+                  errors={errors.privacy_policy_accepted}
+                >
+                  Ich habe die{' '}
+                  <Link href={route('datenschutz')} className="link text-white" target="_blank">
+                    Datenschutzerklaerung
+                  </Link>{' '}
+                  gelesen und akzeptiere sie.
+                </Checkbox>
                 <Button type="submit" disabled={processing} variant="outline" modifier="block" className={buttonOutlineWhite}>
                   Register
                 </Button>

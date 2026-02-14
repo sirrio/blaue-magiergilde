@@ -27,6 +27,8 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
+            'privacy_policy_accepted_at' => now(),
+            'privacy_policy_accepted_version' => (int) config('legal.privacy_policy.version', 20260214),
             'remember_token' => Str::random(10),
         ];
     }

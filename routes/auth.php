@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\PrivacyPolicyConsentController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Character\SyncAccountController;
@@ -23,6 +24,13 @@ Route::get('/auth/callback', [SocialAuthController::class, 'handleProviderCallba
 Route::post('/auth/sync', SyncAccountController::class)
     ->middleware(['auth'])
     ->name('auth.sync');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/privacy-consent', [PrivacyPolicyConsentController::class, 'show'])
+        ->name('privacy-consent.show');
+    Route::post('/privacy-consent', [PrivacyPolicyConsentController::class, 'store'])
+        ->name('privacy-consent.store');
+});
 
 Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware(['auth'])
