@@ -301,7 +301,7 @@ export interface Character {
   id: number
   name: string
   class: Array<CharacterClass>
-  start_tier: 'bt' | 'lt' | 'ht' | 'et'
+  start_tier: 'bt' | 'lt' | 'ht'
   version: '2014' | '2024'
   dm_bubbles: number
   dm_coins: number
