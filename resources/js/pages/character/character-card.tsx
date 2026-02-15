@@ -67,6 +67,8 @@ function CharacterSettingsModal({
   onTrackingModeChange,
   onAvatarMaskedChange,
   triggerVariant = 'ghost',
+  triggerSize = 'xs',
+  triggerClassName,
 }: {
   simplifiedTracking: boolean
   avatarMasked: boolean
@@ -76,11 +78,20 @@ function CharacterSettingsModal({
   onTrackingModeChange?: (value: boolean) => void
   onAvatarMaskedChange?: (value: boolean) => void
   triggerVariant?: 'ghost' | 'outline'
+  triggerSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+  triggerClassName?: string
 }) {
   return (
     <Modal>
       <ModalTrigger>
-        <Button size="xs" variant={triggerVariant} modifier="square" aria-label="Character settings" title="Character settings">
+        <Button
+          size={triggerSize}
+          variant={triggerVariant}
+          modifier="square"
+          className={triggerClassName}
+          aria-label="Character settings"
+          title="Character settings"
+        >
           <Settings size={14} />
         </Button>
       </ModalTrigger>
@@ -276,7 +287,7 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
             </div>
-            <div className="mt-2 grid grid-cols-4 gap-1 md:hidden">
+            <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}
                 avatarMasked={avatarMasked}
@@ -286,26 +297,16 @@ export function CharacterCard({
                 onTrackingModeChange={onTrackingModeChange}
                 onAvatarMaskedChange={onAvatarMaskedChange}
                 triggerVariant="outline"
+                triggerSize="sm"
+                triggerClassName="w-full justify-center"
               />
-              <Button
-                size="xs"
-                variant="outline"
-                className="justify-center"
-                modifier="square"
-                aria-label="Reorder character"
-                title="Reorder character"
-                {...attributes}
-                {...listeners}
-              >
-                <Grip size={14} />
-              </Button>
               <UpdateCharacterModal character={character}>
-                <Button size="xs" variant="outline" className="justify-center" modifier="square" aria-label="Edit character" title="Edit character">
+                <Button size="sm" variant="outline" className="w-full justify-center" aria-label="Edit character" title="Edit character">
                   <Pencil size={14} />
                 </Button>
               </UpdateCharacterModal>
               <DestroyCharacterModal character={character}>
-                <Button size="xs" color="error" className="justify-center" modifier="square" aria-label="Delete character" title="Delete character">
+                <Button size="sm" variant="outline" color="error" className="w-full justify-center" aria-label="Delete character" title="Delete character">
                   <XCircle size={14} />
                 </Button>
               </DestroyCharacterModal>

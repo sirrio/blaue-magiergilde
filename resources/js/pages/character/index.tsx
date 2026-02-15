@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
 import { Character } from '@/types'
-import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router } from '@inertiajs/react'
 import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
@@ -23,7 +23,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   useEffect(() => {
     setChars([...visibleCharacters])
   }, [visibleCharacters])
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
+  const sensors = useSensors(useSensor(PointerSensor))
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
