@@ -108,10 +108,22 @@ function CharacterSettingsModal({
             />
           </label>
           <div className="border-t border-base-200 pt-3">
-            <Button as="a" href={route('characters.download', characterId)} size="sm" variant="outline" className="w-full">
-              <Download size={14} />
-              Download character
-            </Button>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button as="a" href={route('characters.download', characterId)} size="sm" variant="outline" className="w-full">
+                <Download size={14} />
+                Download JSON
+              </Button>
+              <Button
+                as="a"
+                href={route('characters.download', { character: characterId, format: 'pretty' })}
+                size="sm"
+                variant="outline"
+                className="w-full"
+              >
+                <Download size={14} />
+                Download Pretty
+              </Button>
+            </div>
           </div>
         </div>
       </ModalContent>
