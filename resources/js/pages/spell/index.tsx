@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/app-layout'
 import SpellRow from '@/pages/spell/spell-row'
 import { Source, Spell } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
-import { LoaderCircle, Plus } from 'lucide-react'
+import { LoaderCircle, Plus, Scale, Shield } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
 interface FilterOption {
@@ -68,86 +68,103 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
       </ModalTrigger>
       <ModalTitle>Add spell</ModalTitle>
       <ModalContent>
-        <Input errors={errors.name} placeholder="Fireball" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-          Name
-        </Input>
-        <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
-          URL
-        </Input>
-        <Input
-          errors={errors.legacy_url}
-          placeholder="https://..."
-          type="url"
-          value={data.legacy_url}
-          onChange={(e) => setData('legacy_url', e.target.value)}
-        >
-          Legacy URL
-        </Input>
-        <Input
-          errors={errors.spell_level}
-          placeholder="3"
-          type="number"
-          value={data.spell_level}
-          onChange={(e) => setData('spell_level', Number(e.target.value))}
-        >
-          Spell Level
-        </Input>
-        <Select
-          errors={errors.source_id}
-          value={data.source_id}
-          onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
-        >
-          <SelectLabel>Source</SelectLabel>
-          <SelectOptions>
-            <option value="">No source</option>
-            {sources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.shortcode} - {source.name}
-              </option>
-            ))}
-          </SelectOptions>
-        </Select>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-xs"
-            checked={Boolean(data.guild_enabled)}
-            onChange={(e) => setData('guild_enabled', e.target.checked)}
-          />
-          <span>Allowed in guild</span>
-        </label>
-        <Select
-          errors={errors.spell_school}
-          value={data.spell_school}
-          onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
-        >
-          <SelectLabel>School</SelectLabel>
-          <SelectOptions>
-            <option value="abjuration">Abjuration</option>
-            <option value="conjuration">Conjuration</option>
-            <option value="divination">Divination</option>
-            <option value="enchantment">Enchantment</option>
-            <option value="evocation">Evocation</option>
-            <option value="illusion">Illusion</option>
-            <option value="necromancy">Necromancy</option>
-            <option value="transmutation">Transmutation</option>
-          </SelectOptions>
-        </Select>
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-xs"
-              checked={Boolean(data.ruling_changed)}
-              onChange={(e) => handleRulingToggle(e.target.checked)}
-            />
-            <span>Ruling changed</span>
-          </label>
-          {data.ruling_changed ? (
-            <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
-              Ruling note
-            </TextArea>
-          ) : null}
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
+            <Input errors={errors.name} placeholder="Fireball" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+              Name
+            </Input>
+            <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
+              URL
+            </Input>
+            <Input
+              errors={errors.legacy_url}
+              placeholder="https://..."
+              type="url"
+              value={data.legacy_url}
+              onChange={(e) => setData('legacy_url', e.target.value)}
+            >
+              Legacy URL
+            </Input>
+            <Select
+              errors={errors.source_id}
+              value={data.source_id}
+              onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+            >
+              <SelectLabel>Source</SelectLabel>
+              <SelectOptions>
+                <option value="">No source</option>
+                {sources.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.shortcode} - {source.name}
+                  </option>
+                ))}
+              </SelectOptions>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
+            <Input
+              errors={errors.spell_level}
+              placeholder="3"
+              type="number"
+              value={data.spell_level}
+              onChange={(e) => setData('spell_level', Number(e.target.value))}
+            >
+              Spell Level
+            </Input>
+            <Select
+              errors={errors.spell_school}
+              value={data.spell_school}
+              onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
+            >
+              <SelectLabel>School</SelectLabel>
+              <SelectOptions>
+                <option value="abjuration">Abjuration</option>
+                <option value="conjuration">Conjuration</option>
+                <option value="divination">Divination</option>
+                <option value="enchantment">Enchantment</option>
+                <option value="evocation">Evocation</option>
+                <option value="illusion">Illusion</option>
+                <option value="necromancy">Necromancy</option>
+                <option value="transmutation">Transmutation</option>
+              </SelectOptions>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.guild_enabled)}
+                onChange={(e) => setData('guild_enabled', e.target.checked)}
+              />
+              <span className="inline-flex items-center gap-2">
+                <Shield className="h-4 w-4 text-base-content/70" />
+                Allowed in guild
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.ruling_changed)}
+                onChange={(e) => handleRulingToggle(e.target.checked)}
+              />
+              <span className="inline-flex items-center gap-2">
+                <Scale className={data.ruling_changed ? 'h-4 w-4 text-warning' : 'h-4 w-4 text-base-content/70'} />
+                Ruling changed
+              </span>
+            </label>
+            {data.ruling_changed ? (
+              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+                Ruling note
+              </TextArea>
+            ) : null}
+          </div>
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
