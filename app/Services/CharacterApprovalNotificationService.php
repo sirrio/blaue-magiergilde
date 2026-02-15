@@ -129,7 +129,7 @@ class CharacterApprovalNotificationService
                         $path = substr($path, strlen('storage/'));
                     }
 
-                    if ($character->user?->avatar_masked) {
+                    if ($character->avatar_masked ?? true) {
                         $avatarUrl = $baseUrl.'/avatars/masked?path='.urlencode($path);
                     } else {
                         $avatarUrl = $baseUrl.'/storage/'.$path;

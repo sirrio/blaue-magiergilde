@@ -44,11 +44,11 @@ it('logs an audit entry when admin updates guild status', function () {
 
 it('includes simplified tracking flag for character approvals', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $user = User::factory()->create(['simplified_tracking' => true]);
-    Character::factory()->for($user)->create();
+    $user = User::factory()->create();
+    Character::factory()->for($user)->create(['simplified_tracking' => true]);
 
     $this->actingAs($admin)
         ->get('/admin/character-approvals')
         ->assertInertia(fn (Assert $page) => $page
-            ->where('characters.0.user.simplified_tracking', true));
+            ->where('characters.0.simplified_tracking', true));
 });

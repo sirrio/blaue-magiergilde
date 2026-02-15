@@ -31,7 +31,7 @@ class CharacterApprovalController extends Controller
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->withCount('room')
             ->with([
-                'user:id,name,discord_id,simplified_tracking',
+                'user:id,name,discord_id',
                 'adventures:id,character_id,duration,has_additional_bubble',
                 'characterClasses:id,name',
             ]);
@@ -84,6 +84,7 @@ class CharacterApprovalController extends Controller
                 'is_filler',
                 'admin_managed',
                 'avatar',
+                'simplified_tracking',
             ]);
 
         return Inertia::render('character-approvals/list', [

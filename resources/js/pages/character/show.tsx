@@ -5,8 +5,8 @@ import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
-import { Character, Ally, PageProps } from '@/types'
-import { Head, Link, router, usePage } from '@inertiajs/react'
+import { Character, Ally } from '@/types'
+import { Head, Link, router } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Pencil, Trash } from 'lucide-react'
 import { useImage } from 'react-image'
@@ -71,8 +71,7 @@ const formatParticipantSummary = (names: string[]) => {
 }
 
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
-  const { auth } = usePage<PageProps>().props
-  const avatarMasked = auth.user?.avatar_masked ?? true
+  const avatarMasked = character.avatar_masked ?? true
   const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
   const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)

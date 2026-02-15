@@ -135,7 +135,7 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId }) {
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked }) {
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -177,6 +177,17 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
 
     rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
+            .setCustomId(`characterManage_tracking_toggle_${characterId}_${ownerDiscordId}`)
+            .setLabel(`Tracking: ${simplifiedTracking ? 'Simplified' : 'Adventure'}`)
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_avatar_mask_toggle_${characterId}_${ownerDiscordId}`)
+            .setLabel(`Token mask: ${avatarMasked ? 'On' : 'Off'}`)
+            .setStyle(ButtonStyle.Secondary),
+    ));
+
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
             .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
             .setLabel('Back')
             .setStyle(ButtonStyle.Secondary),
@@ -209,6 +220,9 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const dmCoins = String(safeInt(character.dm_coins));
     const bubbleSpend = String(safeInt(character.bubble_shop_spend));
     const statusLabel = formatGuildStatusLabel(character.guild_status);
+    const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+        ? true
+        : Boolean(character.avatar_masked);
 
     const descriptionParts = [name];
     if (currentTier !== '-') {
@@ -229,6 +243,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Status', value: statusLabel, inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
+            { name: 'Token mask', value: avatarMasked ? 'On' : 'Off', inline: true },
             { name: 'External Link', value: linkValue, inline: false },
             { name: 'Notes', value: notes, inline: false },
             { name: 'DM Bubbles', value: dmBubbles, inline: true },
@@ -238,12 +253,19 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 
     return {
         embeds: [embed],
-        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId }),
+        components: buildCharacterManageRows({
+            characterId: character.id,
+            ownerDiscordId,
+            simplifiedTracking,
+            avatarMasked,
+        }),
     };
 }
 
 function buildCharacterCardPayload({ character, ownerDiscordId }) {
-    const avatarMasked = Boolean(character.avatar_masked);
+    const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+        ? true
+        : Boolean(character.avatar_masked);
     const attachment = avatarMasked ? null : tryBuildLocalAvatarAttachment(character);
     const url = resolvePublicAvatarUrl(character.avatar, { masked: avatarMasked });
     const simplifiedTracking = Boolean(character.simplified_tracking);
@@ -266,51 +288,6 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
         }),
         files,
     };
-}
-
-function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }) {
-    const embed = new EmbedBuilder()
-        .setTitle('Settings')
-        .setColor(0x4f46e5)
-        .setDescription('Choose how you want to track character progress.')
-        .addFields(
-            {
-                name: 'Tracking mode',
-                value: simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking',
-                inline: false,
-            },
-            {
-                name: 'Token mask',
-                value: avatarMasked ? 'On' : 'Off',
-                inline: true,
-            },
-        );
-
-    const buttons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_standard_${ownerDiscordId}`)
-            .setLabel('Adventure-based tracking')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(!simplifiedTracking),
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_simplified_${ownerDiscordId}`)
-            .setLabel('Simplified tracking')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(simplifiedTracking),
-    );
-
-    const settingsRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_avatar_${ownerDiscordId}`)
-            .setLabel(`Token mask: ${avatarMasked ? 'On' : 'Off'}`)
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_back_${ownerDiscordId}`)
-            .setLabel('Back')
-            .setStyle(ButtonStyle.Secondary),
-    );
-
-    return { embeds: [embed], components: [buttons, settingsRow] };
 }
 
 function getAdventureStepNumber(stepKey) {
@@ -2064,7 +2041,6 @@ module.exports = {
     buildCharacterManageRows,
     buildCharacterManageView,
     buildCharacterCardPayload,
-    buildTrackingSettingsView,
     buildAdventureStepEmbed,
     buildAdventureDurationRows,
     buildAdventureDateRows,

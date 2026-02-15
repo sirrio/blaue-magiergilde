@@ -43,6 +43,7 @@ type AdminCharacter = Pick<
   | 'version'
   | 'character_classes'
   | 'avatar'
+  | 'simplified_tracking'
 >
 
 type CharacterGroup = {
@@ -533,7 +534,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
       const userId = character.user_id
       const userName = character.user?.name ?? 'Unknown User'
       const discordId = character.user?.discord_id ?? null
-      const simplifiedTracking = Boolean(character.user?.simplified_tracking)
+      const simplifiedTracking = Boolean(character.simplified_tracking)
       const groupKey = String(userId)
       if (!grouped.has(groupKey)) {
         grouped.set(groupKey, {
@@ -544,7 +545,11 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
           characters: [],
         })
       }
-      grouped.get(groupKey)?.characters.push(character)
+      const group = grouped.get(groupKey)
+      if (!group) return
+
+      group.simplifiedTracking = Boolean(group.simplifiedTracking || simplifiedTracking)
+      group.characters.push(character)
     })
 
     return Array.from(grouped.values())

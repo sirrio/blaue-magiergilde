@@ -4,25 +4,46 @@ use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\User;
 
-it('updates tracking mode for the user', function () {
-    $user = User::factory()->create(['simplified_tracking' => false]);
+it('updates tracking mode for an owned character', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->create([
+        'user_id' => $user->id,
+        'simplified_tracking' => false,
+    ]);
 
-    $response = $this->actingAs($user)->patch(route('characters.tracking'), [
+    $response = $this->actingAs($user)->patch(route('characters.tracking', $character), [
         'simplified_tracking' => true,
     ]);
 
     $response->assertRedirect();
-    expect($user->fresh()->simplified_tracking)->toBeTrue();
+    expect($character->fresh()->simplified_tracking)->toBeTrue();
+});
+
+it('forbids changing tracking mode on foreign characters', function () {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $character = Character::factory()->create([
+        'user_id' => $owner->id,
+        'simplified_tracking' => false,
+    ]);
+
+    $response = $this->actingAs($otherUser)->patch(route('characters.tracking', $character), [
+        'simplified_tracking' => true,
+    ]);
+
+    $response->assertForbidden();
+    expect($character->fresh()->simplified_tracking)->toBeFalse();
 });
 
 it('blocks quick level updates when simplified tracking is disabled', function () {
-    $user = User::factory()->create(['simplified_tracking' => false]);
+    $user = User::factory()->create();
     $character = Character::factory()->create([
         'user_id' => $user->id,
         'start_tier' => 'bt',
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
         'is_filler' => false,
+        'simplified_tracking' => false,
     ]);
 
     $response = $this->actingAs($user)->post(route('characters.quick-level', $character), [
@@ -33,13 +54,14 @@ it('blocks quick level updates when simplified tracking is disabled', function (
 });
 
 it('creates and removes pseudo adventures for quick mode levels', function () {
-    $user = User::factory()->create(['simplified_tracking' => true]);
+    $user = User::factory()->create();
     $character = Character::factory()->create([
         'user_id' => $user->id,
         'start_tier' => 'bt',
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
         'is_filler' => false,
+        'simplified_tracking' => true,
     ]);
 
     Adventure::factory()->create([

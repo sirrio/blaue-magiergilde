@@ -22,7 +22,6 @@ class CharacterController extends Controller
     public function index(): Response
     {
         $user = Auth::user();
-        $simplifiedTracking = $user?->simplified_tracking ?? false;
 
         $characters = Character::query()
             ->where('user_id', $user?->getAuthIdentifier())
@@ -32,9 +31,6 @@ class CharacterController extends Controller
             ->orderBy('position')
             ->get()
             ->withoutAppends();
-        $characters->each(function (Character $character) use ($simplifiedTracking): void {
-            $character->setAttribute('simplified_tracking', $simplifiedTracking);
-        });
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
@@ -104,8 +100,6 @@ class CharacterController extends Controller
     public function show(Character $character): Response
     {
         $this->ensureCharacterOwner($character);
-        $simplifiedTracking = Auth::user()?->simplified_tracking ?? false;
-        $character->setAttribute('simplified_tracking', $simplifiedTracking);
 
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])

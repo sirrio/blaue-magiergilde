@@ -3,6 +3,7 @@ import LogoTier from '@/components/logo-tier'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
+import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
@@ -28,7 +29,7 @@ import { PageProps } from '@/types'
 import { usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Pencil, Swords, XCircle } from 'lucide-react'
+import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -57,16 +58,81 @@ function CharacterImage({
   )
 }
 
+function CharacterSettingsModal({
+  simplifiedTracking,
+  avatarMasked,
+  characterId,
+  isTrackingModeUpdating = false,
+  isAvatarMaskedUpdating = false,
+  onTrackingModeChange,
+  onAvatarMaskedChange,
+  triggerVariant = 'ghost',
+}: {
+  simplifiedTracking: boolean
+  avatarMasked: boolean
+  characterId: number
+  isTrackingModeUpdating?: boolean
+  isAvatarMaskedUpdating?: boolean
+  onTrackingModeChange?: (value: boolean) => void
+  onAvatarMaskedChange?: (value: boolean) => void
+  triggerVariant?: 'ghost' | 'outline'
+}) {
+  return (
+    <Modal>
+      <ModalTrigger>
+        <Button size="xs" variant={triggerVariant} modifier="square" aria-label="Character settings" title="Character settings">
+          <Settings size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Character Settings</ModalTitle>
+      <ModalContent>
+        <div className="space-y-3">
+          <label className={cn('flex items-center justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
+            <span>Simplified tracking</span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm toggle-primary"
+              checked={simplifiedTracking}
+              disabled={isTrackingModeUpdating || !onTrackingModeChange}
+              onChange={(event) => onTrackingModeChange?.(event.target.checked)}
+            />
+          </label>
+          <label className={cn('flex items-center justify-between gap-3 text-sm', isAvatarMaskedUpdating && 'opacity-60')}>
+            <span>Token mask</span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm toggle-primary"
+              checked={avatarMasked}
+              disabled={isAvatarMaskedUpdating || !onAvatarMaskedChange}
+              onChange={(event) => onAvatarMaskedChange?.(event.target.checked)}
+            />
+          </label>
+          <div className="border-t border-base-200 pt-3">
+            <Button as="a" href={route('characters.download', characterId)} size="sm" variant="outline" className="w-full">
+              <Download size={14} />
+              Download character
+            </Button>
+          </div>
+        </div>
+      </ModalContent>
+    </Modal>
+  )
+}
+
 export function CharacterCard({
   character,
   guildCharacters = [],
-  simplifiedTrackingOverride,
-  avatarMaskedOverride,
+  onTrackingModeChange,
+  isTrackingModeUpdating = false,
+  onAvatarMaskedChange,
+  isAvatarMaskedUpdating = false,
 }: {
   character: Character
   guildCharacters?: Character[]
-  simplifiedTrackingOverride?: boolean
-  avatarMaskedOverride?: boolean
+  onTrackingModeChange?: (value: boolean) => void
+  isTrackingModeUpdating?: boolean
+  onAvatarMaskedChange?: (value: boolean) => void
+  isAvatarMaskedUpdating?: boolean
 }) {
   const { features } = usePage<PageProps>().props
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
@@ -74,8 +140,8 @@ export function CharacterCard({
 
   const level = calculateLevel(character)
   const tier = calculateTier(character)
-  const simplifiedTracking = simplifiedTrackingOverride ?? Boolean(character.simplified_tracking ?? character.user?.simplified_tracking)
-  const avatarMasked = avatarMaskedOverride ?? (character.user?.avatar_masked ?? true)
+  const simplifiedTracking = character.simplified_tracking ?? false
+  const avatarMasked = character.avatar_masked ?? true
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
@@ -136,6 +202,15 @@ export function CharacterCard({
       <Card className={cn('group')}>
         <CardBody>
           <CardAction className={cn('absolute top-2 right-2 hidden gap-1 md:group-hover:flex')}>
+            <CharacterSettingsModal
+              simplifiedTracking={simplifiedTracking}
+              avatarMasked={avatarMasked}
+              characterId={character.id}
+              isTrackingModeUpdating={isTrackingModeUpdating}
+              isAvatarMaskedUpdating={isAvatarMaskedUpdating}
+              onTrackingModeChange={onTrackingModeChange}
+              onAvatarMaskedChange={onAvatarMaskedChange}
+            />
             <Button
               className="flex"
               size="xs"
@@ -158,17 +233,6 @@ export function CharacterCard({
                 <Pencil size={14} />
               </Button>
             </UpdateCharacterModal>
-            <Button
-              className="flex"
-              as="a"
-              href={route('characters.download', character.id)}
-              modifier="square"
-              size="xs"
-              aria-label="Download character"
-              title="Download character"
-            >
-              <Download size={14} />
-            </Button>
             <DestroyCharacterModal character={character}>
               <Button
                 className="flex"
@@ -182,7 +246,7 @@ export function CharacterCard({
               </Button>
             </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:pr-20')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:pr-28')}>
             <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
               {statusIcon}
             </span>
@@ -201,6 +265,16 @@ export function CharacterCard({
               </span>
             </div>
             <div className="mt-2 grid grid-cols-4 gap-1 md:hidden">
+              <CharacterSettingsModal
+                simplifiedTracking={simplifiedTracking}
+                avatarMasked={avatarMasked}
+                characterId={character.id}
+                isTrackingModeUpdating={isTrackingModeUpdating}
+                isAvatarMaskedUpdating={isAvatarMaskedUpdating}
+                onTrackingModeChange={onTrackingModeChange}
+                onAvatarMaskedChange={onAvatarMaskedChange}
+                triggerVariant="outline"
+              />
               <Button
                 size="xs"
                 variant="outline"
@@ -218,18 +292,6 @@ export function CharacterCard({
                   <Pencil size={14} />
                 </Button>
               </UpdateCharacterModal>
-              <Button
-                as="a"
-                href={route('characters.download', character.id)}
-                size="xs"
-                variant="outline"
-                className="justify-center"
-                modifier="square"
-                aria-label="Download character"
-                title="Download character"
-              >
-                <Download size={14} />
-              </Button>
               <DestroyCharacterModal character={character}>
                 <Button size="xs" color="error" className="justify-center" modifier="square" aria-label="Delete character" title="Delete character">
                   <XCircle size={14} />

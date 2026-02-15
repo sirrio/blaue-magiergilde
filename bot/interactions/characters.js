@@ -18,10 +18,6 @@ const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
     listCharactersForDiscord,
-    getUserTrackingModeForDiscord,
-    updateUserTrackingModeForDiscord,
-    getUserAvatarMaskedForDiscord,
-    updateUserAvatarMaskedForDiscord,
     updateCharacterManualLevelForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
@@ -108,7 +104,6 @@ const {
     buildDowntimeStepEmbed,
     buildDowntimeTypeManageView,
     buildDowntimeTypeRows,
-    buildTrackingSettingsView,
     buildFactionRow,
     buildStartTierRow,
     buildVersionRow,
@@ -146,9 +141,7 @@ function clearAvatarUpdateState(userId) {
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
-    const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-    const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
+    const listView = buildCharacterListView({ ownerDiscordId, characters });
     await interaction.update({
         ...listView,
         content: '',
@@ -1133,8 +1126,8 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_tracking_')) {
-        const ownerDiscordId = interaction.customId.replace('charactersAction_tracking_', '');
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_refresh_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_refresh_', '');
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
@@ -1147,58 +1140,10 @@ async function handle(interaction) {
         }
 
         await interaction.deferUpdate().catch(() => undefined);
-
-        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-        await updateManageMessage(interaction, {
-            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }),
-            content: '',
-        });
+        const characters = await listCharactersForDiscord(interaction.user);
+        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        await updateManageMessage(interaction, { ...listView, content: '' });
         return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('charactersTracking_')) {
-        const raw = interaction.customId.replace('charactersTracking_', '');
-        const parts = raw.split('_');
-        const ownerDiscordId = parts.pop();
-        const action = parts.join('_');
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
-            return true;
-        }
-
-        await interaction.deferUpdate().catch(() => undefined);
-
-        if (action === 'back') {
-            const characters = await listCharactersForDiscord(interaction.user);
-            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-            await updateManageMessage(interaction, { ...listView, content: '' });
-            return true;
-        }
-
-        if (action === 'standard' || action === 'simplified') {
-            const simplifiedTracking = action === 'simplified';
-            await updateUserTrackingModeForDiscord(interaction.user, simplifiedTracking);
-            const characters = await listCharactersForDiscord(interaction.user);
-            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-            await updateManageMessage(interaction, { ...listView, content: '' });
-            return true;
-        }
-
-        if (action === 'avatar') {
-            const current = await getUserAvatarMaskedForDiscord(interaction.user);
-            await updateUserAvatarMaskedForDiscord(interaction.user, !current);
-            const characters = await listCharactersForDiscord(interaction.user);
-            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-            await updateManageMessage(interaction, { ...listView, content: '' });
-            return true;
-        }
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
@@ -1304,11 +1249,9 @@ async function handle(interaction) {
 
         clearCreationState(ownerDiscordId);
         try {
-        const characters = await listCharactersForDiscord(interaction.user);
-        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-        const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-        await interaction.update({ ...listView, content: '' });
+            const characters = await listCharactersForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({
@@ -2258,14 +2201,7 @@ async function handle(interaction) {
             await interaction.deferUpdate();
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
-                const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-                const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-                const listView = buildCharacterListView({
-                    ownerDiscordId,
-                    characters,
-                    simplifiedTracking,
-                    avatarMasked,
-                });
+                const listView = buildCharacterListView({ ownerDiscordId, characters });
                 await interaction.editReply({
                     ...listView,
                     content: '',
@@ -2403,6 +2339,50 @@ async function handle(interaction) {
             await interaction.update({
                 embeds: [statusView.embed],
                 components: statusView.components,
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'tracking_toggle') {
+            const nextValue = !Boolean(character.simplified_tracking);
+            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { simplifiedTracking: nextValue });
+            if (!result.ok) {
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+            if (!refreshed) {
+                await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            await interaction.update({
+                ...buildCharacterManageView(refreshed, { ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'avatar_mask_toggle') {
+            const currentAvatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+                ? true
+                : Boolean(character.avatar_masked);
+            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { avatarMasked: !currentAvatarMasked });
+            if (!result.ok) {
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+            if (!refreshed) {
+                await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            await interaction.update({
+                ...buildCharacterManageView(refreshed, { ownerDiscordId }),
                 content: '',
             });
             return true;

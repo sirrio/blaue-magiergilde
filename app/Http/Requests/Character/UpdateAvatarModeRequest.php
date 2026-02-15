@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Character;
 
+use App\Models\Character;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateAvatarModeRequest extends FormRequest
@@ -11,7 +12,12 @@ class UpdateAvatarModeRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        $user = $this->user();
+        $character = $this->route('character');
+
+        return $user !== null
+            && $character instanceof Character
+            && (int) $character->user_id === (int) $user->getAuthIdentifier();
     }
 
     /**

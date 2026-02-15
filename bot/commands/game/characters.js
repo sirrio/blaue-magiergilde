@@ -14,8 +14,6 @@ const { commandName } = require('../../commandConfig');
 const {
     DiscordNotLinkedError,
     listCharactersForDiscord,
-    getUserTrackingModeForDiscord,
-    getUserAvatarMaskedForDiscord,
 } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
 const {
@@ -253,7 +251,15 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked }) {
+function buildCharacterListView({ ownerDiscordId, characters }) {
+    const simplifiedCount = characters.filter(character => Boolean(character.simplified_tracking)).length;
+    const unmaskedCount = characters.filter(character => {
+        const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+            ? true
+            : Boolean(character.avatar_masked);
+        return !avatarMasked;
+    }).length;
+
     const summary = new EmbedBuilder()
         .setTitle('Your Characters')
         .setColor(0x4f46e5)
@@ -263,10 +269,11 @@ function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking
                 : 'No characters yet. Create your first with **New**.',
         );
     summary.addFields({
-        name: 'Settings',
+        name: 'Per-character settings',
         value: [
-            `Tracking: ${simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking'}`,
-            `Token mask: ${avatarMasked ? 'On' : 'Off'}`,
+            `Simplified tracking: **${simplifiedCount}**/${characters.length || 0}`,
+            `Unmasked token: **${unmaskedCount}**/${characters.length || 0}`,
+            'Change these in **Manage** per character.',
         ].join('\n'),
         inline: false,
     });
@@ -302,8 +309,8 @@ function buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking
             .setLabel('New')
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-            .setCustomId(`charactersAction_tracking_${ownerDiscordId}`)
-            .setLabel('Settings')
+            .setCustomId(`charactersAction_refresh_${ownerDiscordId}`)
+            .setLabel('Refresh')
             .setStyle(ButtonStyle.Secondary),
     ));
 
@@ -330,12 +337,8 @@ module.exports = {
         }
 
         let characters;
-        let simplifiedTracking = false;
-        let avatarMasked = true;
         try {
             characters = await listCharactersForDiscord(interaction.user);
-            simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -347,8 +350,6 @@ module.exports = {
         const listView = buildCharacterListView({
             ownerDiscordId: interaction.user.id,
             characters,
-            simplifiedTracking,
-            avatarMasked,
         });
 
         if (interaction.deferred || interaction.replied) {

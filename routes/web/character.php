@@ -16,10 +16,10 @@ Route::get('characters/deleted', DeletedCharacterController::class)
     ->middleware(['auth'])
     ->name('characters.deleted');
 
-Route::patch('characters/tracking', TrackingModeController::class)
+Route::patch('characters/{character}/tracking', TrackingModeController::class)
     ->middleware(['auth'])
     ->name('characters.tracking');
-Route::patch('characters/avatar-mode', AvatarModeController::class)
+Route::patch('characters/{character}/avatar-mode', AvatarModeController::class)
     ->middleware(['auth'])
     ->name('characters.avatar-mode');
 Route::get('avatars/masked', AvatarMaskController::class)

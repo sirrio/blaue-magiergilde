@@ -32,6 +32,8 @@ class CharacterFactory extends Factory
             ]),
             'notes' => $this->faker->sentence(),
             'position' => $this->faker->numberBetween(0, 10),
+            'simplified_tracking' => false,
+            'avatar_masked' => true,
         ];
     }
 }
