@@ -219,6 +219,11 @@ export function CharacterCard({
     remaining: secondsToHourMinuteString(remainingDowntimeSeconds),
   }
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
+  const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
+  const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
+  const downtimeDisabledReason = 'Downtime cannot be calculated correctly after simple mode auto-level adventures.'
+  const adventuresCountWarningReason = 'Simple mode auto-level entries exist. Played adventures count is not reliable.'
+  const factionLevelWarningReason = 'Simple mode auto-level entries exist. Faction level is not reliable.'
 
   return (
     <div ref={setNodeRef} style={dragStyle}>
@@ -331,41 +336,61 @@ export function CharacterCard({
                   </>
                 ) : null}
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
-                  {!simplifiedTracking ? (
-                    <InfoBox>
-                      <InfoBoxTitle>
-                        <Swords size={15} /> Adventures
-                      </InfoBoxTitle>
-                      <InfoBoxLine>Played: {character.adventures.length}</InfoBoxLine>
-                      <InfoBoxLine>
-                        Started in: <LogoTier width={13} tier={character.start_tier} />
-                      </InfoBoxLine>
-                      <InfoBoxLine>
-                        Bubble Shop: {character.bubble_shop_spend}
-                        <Droplets size={13} />
-                      </InfoBoxLine>
-                    </InfoBox>
-                  ) : null}
+                  <InfoBox>
+                    <InfoBoxTitle>
+                      <Swords size={15} /> Adventures
+                    </InfoBoxTitle>
+                    <InfoBoxLine>
+                      Played:{' '}
+                      {downtimeDisabledInSimpleMode ? (
+                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={adventuresCountWarningReason} title={adventuresCountWarningReason}>
+                          <span className="cursor-help font-semibold text-warning">?</span>
+                        </span>
+                      ) : (
+                        character.adventures.length
+                      )}
+                    </InfoBoxLine>
+                    <InfoBoxLine>
+                      Started in: <LogoTier width={13} tier={character.start_tier} />
+                    </InfoBoxLine>
+                    <InfoBoxLine>
+                      Bubble Shop: {character.bubble_shop_spend}
+                      <Droplets size={13} />
+                    </InfoBoxLine>
+                  </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Anvil size={15} /> Factions
                     </InfoBoxTitle>
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
-                    <InfoBoxLine>Level: {factionLevel}</InfoBoxLine>
+                    <InfoBoxLine>
+                      Level:{' '}
+                      {downtimeDisabledInSimpleMode ? (
+                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={factionLevelWarningReason} title={factionLevelWarningReason}>
+                          <span className="cursor-help font-semibold text-warning">?</span>
+                        </span>
+                      ) : (
+                        factionLevel
+                      )}
+                    </InfoBoxLine>
                   </InfoBox>
-                  {!simplifiedTracking ? (
-                    <InfoBox>
-                      <InfoBoxTitle>
-                        <FlameKindling size={15} /> Downtime
-                      </InfoBoxTitle>
-                      <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
-                      <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
-                      <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
-                      <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} title={remainingDowntimeTooltip}>
-                        <InfoBoxLine className="font-semibold cursor-help">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
-                      </div>
-                    </InfoBox>
-                  ) : null}
+                  <InfoBox>
+                    <InfoBoxTitle>
+                      <FlameKindling size={15} /> Downtime
+                    </InfoBoxTitle>
+                    {downtimeDisabledInSimpleMode ? (
+                      <InfoBoxLine className="text-warning">Cannot calculate downtime while simple mode entries exist.</InfoBoxLine>
+                    ) : (
+                      <>
+                        <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
+                        <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
+                        <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
+                        <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} title={remainingDowntimeTooltip}>
+                          <InfoBoxLine className="font-semibold cursor-help">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
+                        </div>
+                      </>
+                    )}
+                  </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Crown size={15} /> Game Master
@@ -391,46 +416,49 @@ export function CharacterCard({
                 </div>
               </div>
             )}
-            {simplifiedTracking ? (
-              <div className={cn('mt-3 grid gap-2')}>
-                <SetCharacterLevelModal character={character} />
-                <Button
-                  as="a"
-                  size="sm"
-                  href={character.external_link}
-                  target="_blank"
-                  className="w-full"
-                  aria-label="Open external link"
-                  title="Open external link"
-                >
-                  <ExternalLink size={14} />
-                  Open link
-                </Button>
-              </div>
-            ) : (
-              <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
-                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
-                  <BookOpen size={14} />
-                  Details
-                </Button>
-                {canLogActivity ? (
+            <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
+              <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
+                <BookOpen size={14} />
+                Details
+              </Button>
+              {canLogActivity ? (
+                simplifiedTracking ? (
+                  <SetCharacterLevelModal character={character} />
+                ) : (
                   <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
-                ) : null}
-                {canLogActivity ? <StoreDowntimeModal character={character}></StoreDowntimeModal> : null}
-                <AlliesModal character={character} guildCharacters={guildCharacters} />
-                <Button
-                  as="a"
-                  size="sm"
-                  href={character.external_link}
-                  target="_blank"
-                  aria-label="Open external link"
-                  title="Open external link"
-                >
-                  <ExternalLink size={14} />
-                  <span className="sm:hidden">Link</span>
-                </Button>
-              </div>
-            )}
+                )
+              ) : null}
+              {canLogActivity ? (
+                downtimeDisabledInSimpleMode ? (
+                  <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} title={downtimeDisabledReason}>
+                    <Button
+                      size="sm"
+                      className="w-full justify-center gap-1"
+                      disabled
+                      aria-label="Add downtime disabled"
+                      title={downtimeDisabledReason}
+                    >
+                      <FlameKindling size={14} />
+                      <span className="sm:hidden">Downtime</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <StoreDowntimeModal character={character}></StoreDowntimeModal>
+                )
+              ) : null}
+              <AlliesModal character={character} guildCharacters={guildCharacters} />
+              <Button
+                as="a"
+                size="sm"
+                href={character.external_link}
+                target="_blank"
+                aria-label="Open external link"
+                title="Open external link"
+              >
+                <ExternalLink size={14} />
+                <span className="sm:hidden">Link</span>
+              </Button>
+            </div>
           </CardContent>
         </CardBody>
       </Card>
