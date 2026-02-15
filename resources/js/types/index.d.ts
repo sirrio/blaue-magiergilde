@@ -26,6 +26,8 @@ export interface User {
   id: number
   name: string
   email: string
+  discord_username?: string | null
+  discord_display_name?: string | null
   avatar?: string
   created_at: string
   updated_at: string
@@ -317,6 +319,8 @@ export interface Character {
     id: number
     name: string
     discord_id?: number | null
+    discord_username?: string | null
+    discord_display_name?: string | null
     simplified_tracking?: boolean
     avatar_masked?: boolean
   }

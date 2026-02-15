@@ -27,6 +27,7 @@ class SocialAuthController extends Controller
     {
         $discordUser = Socialite::driver('discord')->user();
         $discordId = $discordUser->getId();
+        $discordProfile = $this->resolveDiscordProfile($discordUser);
 
         if (Auth::check()) {
             /** @var User $user */
@@ -45,6 +46,8 @@ class SocialAuthController extends Controller
 
             $user->discord_id = $discordId;
             $user->avatar = $discordUser->getAvatar();
+            $user->discord_username = $discordProfile['username'];
+            $user->discord_display_name = $discordProfile['display_name'];
             $user->save();
 
             return redirect()
@@ -52,20 +55,61 @@ class SocialAuthController extends Controller
                 ->with('status', 'discord-connected');
         }
 
-        $user = User::query()->updateOrCreate(
-            [
+        $user = User::query()
+            ->where('discord_id', $discordId)
+            ->first();
+
+        if ($user) {
+            $user->avatar = $discordUser->getAvatar();
+            $user->discord_username = $discordProfile['username'];
+            $user->discord_display_name = $discordProfile['display_name'];
+            $user->save();
+        } else {
+            $fallbackName = trim((string) (
+                $discordProfile['display_name']
+                ?? $discordProfile['username']
+                ?? $discordUser->getName()
+                ?? 'Discord User'
+            ));
+
+            $user = User::query()->create([
                 'discord_id' => $discordId,
-            ],
-            [
-                'name' => $discordUser->getName(),
+                'discord_username' => $discordProfile['username'],
+                'discord_display_name' => $discordProfile['display_name'],
+                'name' => $fallbackName !== '' ? $fallbackName : 'Discord User',
                 'avatar' => $discordUser->getAvatar(),
                 'password' => null,
-            ]
-        );
+            ]);
+        }
 
         Auth::login($user, true);
 
         return $this->redirectAfterLogin($user);
+    }
+
+    /**
+     * @return array{username: string|null, display_name: string|null}
+     */
+    private function resolveDiscordProfile(object $discordUser): array
+    {
+        $raw = is_array($discordUser->user ?? null) ? $discordUser->user : [];
+
+        $username = is_string($raw['username'] ?? null)
+            ? trim((string) $raw['username'])
+            : null;
+        $displayName = is_string($raw['global_name'] ?? null)
+            ? trim((string) $raw['global_name'])
+            : null;
+
+        if ($displayName === '' && method_exists($discordUser, 'getNickname')) {
+            $nickname = $discordUser->getNickname();
+            $displayName = is_string($nickname) ? trim($nickname) : null;
+        }
+
+        return [
+            'username' => $username !== '' ? $username : null,
+            'display_name' => $displayName !== '' ? $displayName : null,
+        ];
     }
 
     private function redirectAfterLogin(User $user): RedirectResponse

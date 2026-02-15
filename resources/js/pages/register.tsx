@@ -112,9 +112,16 @@ export default function Register() {
               <div className="divider my-0 opacity-60">oder</div>
 
               <form onSubmit={submit} className="space-y-3 sm:space-y-4">
-                <Input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name} placeholder="Dein Name">
-                  Name
+                <Input
+                  type="text"
+                  value={data.name}
+                  onChange={(e) => setData('name', e.target.value)}
+                  errors={errors.name}
+                  placeholder="Dein Nickname (kein Klarname)"
+                >
+                  Nickname
                 </Input>
+                <p className="text-xs text-white/70">Bitte verwende einen Nickname, nicht deinen echten Namen.</p>
                 <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} placeholder="you@example.com">
                   Email
                 </Input>

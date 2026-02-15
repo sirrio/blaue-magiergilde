@@ -92,8 +92,9 @@ export default function Profile() {
             <CardContent>
               <form onSubmit={submitProfile} className="space-y-4">
                 <Input type="text" value={profileForm.data.name} onChange={(e) => profileForm.setData('name', e.target.value)} errors={profileForm.errors.name}>
-                  Name
+                  Nickname
                 </Input>
+                <p className="text-xs text-base-content/70">Use a nickname here, not your real name.</p>
                 <Input type="email" value={profileForm.data.email} onChange={(e) => profileForm.setData('email', e.target.value)} errors={profileForm.errors.email}>
                   Email
                 </Input>

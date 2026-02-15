@@ -49,6 +49,7 @@ type AdminCharacter = Pick<
 type CharacterGroup = {
   key: string
   label: string
+  discordHandle?: string | null
   discordId?: number | null
   simplifiedTracking?: boolean
   characters: AdminCharacter[]
@@ -533,6 +534,9 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     characters.forEach((character) => {
       const userId = character.user_id
       const userName = character.user?.name ?? 'Unknown User'
+      const discordUsername = character.user?.discord_username?.trim()
+      const discordDisplayName = character.user?.discord_display_name?.trim()
+      const discordHandle = discordUsername || discordDisplayName || null
       const discordId = character.user?.discord_id ?? null
       const simplifiedTracking = Boolean(character.simplified_tracking)
       const groupKey = String(userId)
@@ -540,6 +544,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
         grouped.set(groupKey, {
           key: groupKey,
           label: userName,
+          discordHandle,
           discordId,
           simplifiedTracking,
           characters: [],
@@ -548,6 +553,9 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
       const group = grouped.get(groupKey)
       if (!group) return
 
+      if (!group.discordHandle && discordHandle) {
+        group.discordHandle = discordHandle
+      }
       group.simplifiedTracking = Boolean(group.simplifiedTracking || simplifiedTracking)
       group.characters.push(character)
     })
@@ -655,8 +663,11 @@ const tierTextClassMap: Record<string, string> = {
             {groups.map((group) => (
               <div key={group.key} className="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/70 bg-base-200/70 px-4 py-2 text-xs font-semibold uppercase text-base-content/60">
-                  <span>
+                  <span className="normal-case">
                     {group.label}
+                    {group.discordHandle ? (
+                      <span className="ml-1 text-[11px] font-normal normal-case text-base-content/60">| {group.discordHandle}</span>
+                    ) : null}
                     <span className="ml-2 text-[10px] font-normal normal-case text-base-content/50">
                       ({group.characters.length})
                     </span>
