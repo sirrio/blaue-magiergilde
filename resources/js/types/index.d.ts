@@ -216,6 +216,20 @@ export interface Source {
   shortcode: string
 }
 
+export interface CompendiumImportRun {
+  id: number
+  entity_type: 'items' | 'spells'
+  filename: string
+  total_rows: number
+  new_rows: number
+  updated_rows: number
+  unchanged_rows: number
+  invalid_rows: number
+  error_samples?: Array<{ line?: number; message?: string }> | null
+  applied_at?: string | null
+  user?: { id: number; name: string } | null
+}
+
 export interface DiscordBackupAttachment {
   id: number
   filename: string

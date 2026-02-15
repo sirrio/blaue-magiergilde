@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CompendiumImportRun;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordBotSetting;
 use App\Models\DiscordChannel;
@@ -68,6 +69,24 @@ class BackupController extends Controller
                 ->orderBy('shortcode')
                 ->orderBy('name')
                 ->get(['id', 'name', 'shortcode']),
+            'compendiumImportRuns' => CompendiumImportRun::query()
+                ->with('user:id,name')
+                ->orderByDesc('applied_at')
+                ->orderByDesc('id')
+                ->limit(10)
+                ->get([
+                    'id',
+                    'user_id',
+                    'entity_type',
+                    'filename',
+                    'total_rows',
+                    'new_rows',
+                    'updated_rows',
+                    'unchanged_rows',
+                    'invalid_rows',
+                    'error_samples',
+                    'applied_at',
+                ]),
         ]);
     }
 }
