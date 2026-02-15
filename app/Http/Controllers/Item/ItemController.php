@@ -185,9 +185,11 @@ class ItemController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Item $item)
+    public function destroy(Item $item): RedirectResponse
     {
-        //
+        $item->delete();
+
+        return redirect()->back();
     }
 
     private function applyDefaultSpellRoll(Item $item, Request $request): void

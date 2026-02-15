@@ -157,8 +157,10 @@ class SpellController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Spell $spell)
+    public function destroy(Spell $spell): RedirectResponse
     {
-        //
+        $spell->delete();
+
+        return redirect()->back();
     }
 }

@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, FlaskRound, RotateCcw, ScrollText, Scale, Shield, Store, Sword, XCircle } from 'lucide-react'
+import { Copy, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -51,9 +51,9 @@ const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
   return null
 }
 
-const copyToClipboard = (text: string) => {
+const copyToClipboard = (text: string, message = 'Copied to clipboard.') => {
   navigator.clipboard.writeText(text).then(() => {
-    toast.show('Characters copied to clipboard', 'info')
+    toast.show(message, 'info')
   })
 }
 
@@ -173,8 +173,15 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
-          +
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          onClick={() => setIsOpen(true)}
+          title="Add spell to listing"
+          aria-label="Add spell to listing"
+        >
+          <Plus size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Select spell options</ModalTitle>
@@ -274,8 +281,8 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
-          <Edit size={14} />
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} title="Edit listing" aria-label="Edit listing">
+          <Pencil size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
@@ -406,6 +413,9 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
   const spellLegacyUrl = spell?.legacy_url || shopItem?.spell_legacy_url || ''
   const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
   const isCustomListing = Boolean(shopItem?.snapshot_custom)
+  const discordLineText = spell
+    ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${item.cost}`
+    : `[${baseName}](<${item.url}>): ${item.cost}`
 
   const handleSnapshotRefresh = () => {
     if (!shopItem) return
@@ -439,12 +449,30 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
     })
   }
 
+  const handleDeleteItem = () => {
+    if (shopItem) return
+    if (!window.confirm(`Delete item "${item.name}"?`)) return
+
+    router.delete(route('admin.items.destroy', { item }), {
+      preserveScroll: true,
+      onError: () => {
+        toast.show('Item could not be deleted.', 'error')
+      },
+    })
+  }
+
   return (
     <ListRow>
       <div className={cn(textColor)}>{renderIcon(item.type)}</div>
       <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
         <span>
-          {displayName}{' '}
+          {item.url ? (
+            <a href={item.url} target="_blank" rel="noreferrer" className="link link-hover font-medium" title="Open item URL">
+              {displayName}
+            </a>
+          ) : (
+            <span>{displayName}</span>
+          )}{' '}
           <span className={'text-xs font-light italic'}>({item.pick_count})</span>
           {item.source?.shortcode ? (
             <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
@@ -499,15 +527,48 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
         {shopItem ? (
           <>
             <ShopItemSnapshotModal shopItem={shopItem} item={item} />
-            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleSnapshotRefresh}
+              title="Refresh listing from base item"
+              aria-label="Refresh listing from base item"
+            >
               <RotateCcw size={14} />
             </Button>
           </>
         ) : (
+          null
+        )}
+        {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
+        {shopItem && spell ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            modifier="square"
+            onClick={handleRemoveSpell}
+            title="Remove spell from listing"
+            aria-label="Remove spell from listing"
+          >
+            <Minus size={14} />
+          </Button>
+        ) : null}
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          title="Copy Discord line"
+          aria-label="Copy Discord line"
+          onClick={() => copyToClipboard(discordLineText, 'Item line copied in Discord format.')}
+        >
+          <Copy size={14} />
+        </Button>
+        {!shopItem ? (
           <Modal>
             <ModalTrigger>
-              <Button size="xs" variant="ghost" modifier="square">
-                <Edit size={14} />
+              <Button size="xs" variant="ghost" modifier="square" title="Edit item" aria-label="Edit item">
+                <Pencil size={14} />
               </Button>
             </ModalTrigger>
             <ModalTitle>
@@ -686,36 +747,12 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
             </ModalContent>
             <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
           </Modal>
-        )}
-        {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
-        {shopItem && spell ? (
-          <Button size="xs" variant="ghost" modifier="square" onClick={handleRemoveSpell} aria-label="Remove spell">
-            -
+        ) : null}
+        {!shopItem ? (
+          <Button size="xs" variant="ghost" modifier="square" color="error" onClick={handleDeleteItem} title="Delete item" aria-label="Delete item">
+            <Trash size={14} />
           </Button>
         ) : null}
-        <Button
-          size="xs"
-          variant="ghost"
-          modifier="square"
-          onClick={() =>
-            copyToClipboard(
-              spell
-                ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${item.cost}`
-                : `[${baseName}](<${item.url}>): ${item.cost}`,
-            )
-          }
-        >
-          <Copy size={14} />
-        </Button>
-        {item.url ? (
-          <Button as="a" href={item.url} target="_blank" size="xs" variant="ghost" modifier="square">
-            <ExternalLink size={14} />
-          </Button>
-        ) : (
-          <Button disabled size="xs" variant="ghost" modifier="square" className="text-error">
-            <XCircle size={14} />
-          </Button>
-        )}
       </div>
     </ListRow>
   )
