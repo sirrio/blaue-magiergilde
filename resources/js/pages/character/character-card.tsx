@@ -117,11 +117,17 @@ export function CharacterCard({
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
   const totalDowntimeSeconds = factionDowntimeSeconds + otherDowntimeSeconds
+  const remainingDowntimeSeconds = calculateRemainingDowntime(character)
+  const remainingDowntimeGold = Math.max(0, (remainingDowntimeSeconds / 3600) * 15)
+  const remainingDowntimeGoldLabel = Number.isInteger(remainingDowntimeGold)
+    ? remainingDowntimeGold.toString()
+    : remainingDowntimeGold.toFixed(1).replace(/\.0$/, '')
+  const remainingDowntimeTooltip = `Potential earnings: ${remainingDowntimeGoldLabel} Gold (15 Gold / hour)`
   const formattedDowntimes = {
     total: secondsToHourMinuteString(totalDowntimeSeconds),
     faction: secondsToHourMinuteString(factionDowntimeSeconds),
     other: secondsToHourMinuteString(otherDowntimeSeconds),
-    remaining: secondsToHourMinuteString(calculateRemainingDowntime(character)),
+    remaining: secondsToHourMinuteString(remainingDowntimeSeconds),
   }
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
 
@@ -280,7 +286,9 @@ export function CharacterCard({
                       <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
                       <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
                       <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
-                      <InfoBoxLine className="font-semibold">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
+                      <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} title={remainingDowntimeTooltip}>
+                        <InfoBoxLine className="font-semibold cursor-help">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
+                      </div>
                     </InfoBox>
                   ) : null}
                   <InfoBox>
