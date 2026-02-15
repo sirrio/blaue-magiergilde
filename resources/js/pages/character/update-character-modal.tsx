@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Settings } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import React, { useState } from 'react'
 
 const UpdateCharacterModal = ({ character, children }: { character: Character; children?: React.ReactNode }) => {
@@ -62,7 +62,7 @@ const UpdateCharacterModal = ({ character, children }: { character: Character; c
             aria-label="Edit character"
             title="Edit character"
           >
-            <Settings size={14} />
+            <Pencil size={14} />
           </Button>
         )}
       </ModalTrigger>

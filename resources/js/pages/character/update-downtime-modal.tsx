@@ -6,7 +6,7 @@ import { TextArea } from '@/components/ui/text-area'
 import DurationInputStack from '@/components/duration-input-stack'
 import { Downtime, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Settings } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import React from 'react'
 
 const UpdateDowntimeModal = ({
@@ -46,7 +46,7 @@ const UpdateDowntimeModal = ({
         <ModalTrigger>
           {children ?? (
             <Button size="xs" modifier="square" variant="ghost" aria-label="Edit downtime" title="Edit downtime">
-              <Settings size={14} />
+              <Pencil size={14} />
             </Button>
           )}
         </ModalTrigger>

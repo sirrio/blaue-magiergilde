@@ -12,6 +12,7 @@ import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
 import { calculateCoinsSpend } from '@/helper/calculateCoinsSpend'
 import AppLayout from '@/layouts/app-layout'
+import { cn } from '@/lib/utils'
 import DestroyGameModal, { DestroyGameButton } from '@/pages/game/destroy-game-modal'
 import StoreGameModal from '@/pages/game/store-game-modal'
 import UpdateGameModal from '@/pages/game/update-game-modal'
@@ -125,43 +126,12 @@ export default function MasteredGames({ games, user, characters }: Props) {
     tierFilter !== 'all' ? `Tier: ${tierFilter.toUpperCase()}` : null,
   ].filter(Boolean) as string[]
   const tierFilterOptions = [
+    { label: 'All', value: 'all' as const },
     { label: 'BT', value: 'bt' as const },
     { label: 'LT', value: 'lt' as const },
     { label: 'HT', value: 'ht' as const },
     { label: 'ET', value: 'et' as const },
   ]
-
-  const renderFilterOptions = <T extends string>(
-    filterKey: string,
-    options: { label: string; value: T }[],
-    currentValue: T,
-    onChange: (value: T) => void,
-    includeAll = false,
-  ) => (
-    <div className="filter">
-      {includeAll ? (
-        <input
-          className="btn btn-xs filter-reset"
-          type="radio"
-          name={filterKey}
-          aria-label="All"
-          checked={currentValue === 'all'}
-          onChange={() => onChange('all' as T)}
-        />
-      ) : null}
-      {options.map(({ label, value }) => (
-        <input
-          key={value}
-          className="btn btn-xs"
-          type="radio"
-          name={filterKey}
-          aria-label={label}
-          checked={currentValue === value}
-          onChange={() => onChange(value)}
-        />
-      ))}
-    </div>
-  )
 
   const toggleSortOrder = () => {
     startSortTransition(() => {
@@ -463,15 +433,15 @@ export default function MasteredGames({ games, user, characters }: Props) {
     <AppLayout>
       <Head title="Game Master Log" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <section className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 border-b border-base-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold sm:text-2xl">
+            <h1 className="text-lg font-bold sm:text-xl">
               Game Master Log
               <span className="ml-3 inline-flex items-center rounded-full border border-base-200 px-2 py-0.5 text-xs text-base-content/60">
                 {totalSessions} Sessions
               </span>
             </h1>
-            <p className="text-base-content/70 text-sm">Track your progress with a summary of all GM sessions.</p>
+            <p className="text-xs text-base-content/70 sm:text-sm">Track your progress with a summary of all GM sessions.</p>
           </div>
           <StoreGameModal>
             <Button variant="outline" size="sm" className="flex w-full items-center sm:w-auto">
@@ -696,7 +666,18 @@ export default function MasteredGames({ games, user, characters }: Props) {
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <div className="flex items-center gap-2 whitespace-nowrap">
                   <span className="text-base-content/60">Tier:</span>
-                  {renderFilterOptions('tierFilter', tierFilterOptions, tierFilter, setTierFilter, true)}
+                  <div className="join join-horizontal">
+                    {tierFilterOptions.map(({ label, value }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={cn('btn btn-xs join-item', tierFilter === value ? 'btn-primary' : 'btn-outline')}
+                        onClick={() => setTierFilter(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 text-xs text-base-content/60 sm:ml-auto sm:w-auto sm:justify-end">
                   <span className="rounded-full border border-base-200 px-2 py-1">
@@ -711,6 +692,19 @@ export default function MasteredGames({ games, user, characters }: Props) {
                       </span>
                     ))
                   )}
+                  {hasFilters ? (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => {
+                        setSearch('')
+                        setTierFilter('all')
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : null}
                 </div>
               </div>
               <div className="flex justify-end">
@@ -737,7 +731,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                     calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
                   return (
                     <ListRow key={game.id} className="block">
-                      <div className="space-y-2 rounded-box border border-base-200 p-3">
+                      <div className="space-y-2 rounded-box border border-base-200 p-2.5">
                         <div className="flex items-start justify-between gap-3">
                           <h3 className="flex min-w-0 items-center gap-1 truncate text-sm font-medium">
                             <span>#{gameNumber}</span>
@@ -770,17 +764,22 @@ export default function MasteredGames({ games, user, characters }: Props) {
                           <span>
                             {gameCoins} <Coins size={13} className="inline" />
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <UpdateGameModal game={game}>
-                              <Button size="sm" variant="ghost" aria-label="Edit game">
-                                <Pencil size={14} />
-                                Edit
+                              <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game" title="Edit game">
+                                <Pencil size={13} />
                               </Button>
                             </UpdateGameModal>
                             <DestroyGameModal game={game}>
-                              <Button size="sm" variant="ghost" color="error" aria-label="Delete game">
-                                <Trash size={14} />
-                                Delete
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                modifier="square"
+                                color="error"
+                                aria-label="Delete game"
+                                title="Delete game"
+                              >
+                                <Trash size={13} />
                               </Button>
                             </DestroyGameModal>
                           </div>

@@ -7,7 +7,7 @@ import DurationInputStack from '@/components/duration-input-stack'
 import AdventureParticipantPicker from '@/pages/character/adventure-ally-picker'
 import { Adventure, Ally, Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Settings } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import React, { useState } from 'react'
 
 const UpdateAdventureModal = ({
@@ -58,7 +58,7 @@ const UpdateAdventureModal = ({
         <ModalTrigger>
           {children ?? (
             <Button size="xs" modifier="square" variant="ghost" aria-label="Edit adventure" title="Edit adventure">
-              <Settings size={14} />
+              <Pencil size={14} />
             </Button>
           )}
         </ModalTrigger>

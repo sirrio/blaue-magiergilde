@@ -182,11 +182,18 @@ export default function Show({ character, guildCharacters }: { character: Charac
     <AppLayout>
       <Head title={character.name + ' Details'} />
       <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-4">
-          <h1 className="text-xl font-bold sm:text-2xl">{character.name} Details</h1>
-          <Link href={route('characters.index')} className="btn btn-sm">
-            Back
-          </Link>
+        <div className="space-y-2 border-b border-base-200 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h1 className="text-xl font-bold sm:text-2xl">{character.name} Details</h1>
+            <Link href={route('characters.index')} className="btn btn-sm">
+              Back
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="badge badge-ghost badge-sm">{character.adventures.length} Adventures</span>
+            <span className="badge badge-ghost badge-sm">{character.downtimes.length} Downtimes</span>
+            <span className="badge badge-ghost badge-sm">{character.allies.length} Allies</span>
+          </div>
         </div>
         <div className="flex justify-center">
           <CharacterPortrait character={character} className="h-24 w-24 sm:h-32 sm:w-32" masked={avatarMasked} />
@@ -295,25 +302,25 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         showTrigger={false}
                                       />
                                       <Button
-                                        size="sm"
+                                        size="xs"
                                         variant="ghost"
+                                        modifier="square"
                                         aria-label="Edit adventure"
                                         title="Edit adventure"
                                         onClick={() => setActiveAdventureModalId(adv.id)}
                                       >
-                                        <Pencil size={14} />
-                                        Edit
+                                        <Pencil size={13} />
                                       </Button>
                                       <Button
-                                        size="sm"
+                                        size="xs"
                                         variant="ghost"
+                                        modifier="square"
                                         color="error"
                                         aria-label="Delete adventure"
                                         title="Delete adventure"
                                         onClick={() => handleAdventureDelete(adv.id)}
                                       >
-                                        <Trash size={14} />
-                                        Delete
+                                        <Trash size={13} />
                                       </Button>
                                     </>
                                   )}
@@ -522,25 +529,25 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     showTrigger={false}
                                   />
                                   <Button
-                                    size="sm"
+                                    size="xs"
                                     variant="ghost"
+                                    modifier="square"
                                     aria-label="Edit downtime"
                                     title="Edit downtime"
                                     onClick={() => setActiveDowntimeModalId(dt.id)}
                                   >
-                                    <Pencil size={14} />
-                                    Edit
+                                    <Pencil size={13} />
                                   </Button>
                                   <Button
-                                    size="sm"
+                                    size="xs"
                                     variant="ghost"
+                                    modifier="square"
                                     color="error"
                                     aria-label="Delete downtime"
                                     title="Delete downtime"
                                     onClick={() => handleDowntimeDelete(dt.id)}
                                   >
-                                    <Trash size={14} />
-                                    Delete
+                                    <Trash size={13} />
                                   </Button>
                                 </div>
                               </div>

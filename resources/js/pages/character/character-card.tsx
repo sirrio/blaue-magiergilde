@@ -28,7 +28,7 @@ import { PageProps } from '@/types'
 import { usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Pencil, Swords, Download, XCircle } from 'lucide-react'
+import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Pencil, Swords, XCircle } from 'lucide-react'
 import React from 'react'
 import { useImage } from 'react-image'
 
@@ -194,45 +194,43 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
+            <div className="mt-2 grid grid-cols-4 gap-1 md:hidden">
               <Button
-                size="sm"
+                size="xs"
                 variant="outline"
                 className="justify-center"
+                modifier="square"
                 aria-label="Reorder character"
                 title="Reorder character"
                 {...attributes}
                 {...listeners}
               >
                 <Grip size={14} />
-                Reorder
               </Button>
               <UpdateCharacterModal character={character}>
-                <Button size="sm" variant="outline" className="justify-center" aria-label="Edit character" title="Edit character">
+                <Button size="xs" variant="outline" className="justify-center" modifier="square" aria-label="Edit character" title="Edit character">
                   <Pencil size={14} />
-                  Edit
                 </Button>
               </UpdateCharacterModal>
               <Button
                 as="a"
                 href={route('characters.download', character.id)}
-                size="sm"
+                size="xs"
                 variant="outline"
                 className="justify-center"
+                modifier="square"
                 aria-label="Download character"
                 title="Download character"
               >
                 <Download size={14} />
-                Download
               </Button>
               <DestroyCharacterModal character={character}>
-                <Button size="sm" color="error" className="justify-center" aria-label="Delete character" title="Delete character">
+                <Button size="xs" color="error" className="justify-center" modifier="square" aria-label="Delete character" title="Delete character">
                   <XCircle size={14} />
-                  Delete
                 </Button>
               </DestroyCharacterModal>
             </div>
-            <CharacterImage className="mx-auto mt-3 mb-2 w-full max-w-56" character={character} masked={avatarMasked} />
+            <CharacterImage className="mx-auto mb-2 mt-3 w-full max-w-44 sm:max-w-56" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
               <>
                 {!simplifiedTracking ? (
@@ -251,7 +249,7 @@ export function CharacterCard({
                     </div>
                   </>
                 ) : null}
-                <div className={cn('mt-4 grid grid-cols-1 gap-1 sm:grid-cols-2')}>
+                <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   {!simplifiedTracking ? (
                     <InfoBox>
                       <InfoBoxTitle>
@@ -311,7 +309,7 @@ export function CharacterCard({
               </div>
             )}
             {simplifiedTracking ? (
-              <div className={cn('mt-4 grid gap-2')}>
+              <div className={cn('mt-3 grid gap-2')}>
                 <SetCharacterLevelModal character={character} />
                 <Button
                   as="a"
@@ -327,7 +325,7 @@ export function CharacterCard({
                 </Button>
               </div>
             ) : (
-              <div className={cn('mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-1')}>
+              <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
                 <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
                   <BookOpen size={14} />
                   Details

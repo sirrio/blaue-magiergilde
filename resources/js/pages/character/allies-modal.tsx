@@ -263,7 +263,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
                   : current.name,
             }))
           }}
-          className="input input-bordered input-xs mb-2 w-full"
+          className="input input-bordered input-sm mb-2 w-full md:input-xs"
         >
           <option value="">Custom ally (no link)</option>
           {linkedOptions.map((character) => (
@@ -275,7 +275,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
       </div>
       <div className="mb-1">
         <label className="label">Classes</label>
-        <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
+        <div className="grid grid-cols-2 gap-1 rounded border p-1 text-xs sm:grid-cols-4">
           {classes.map((cc: CharacterClass) => {
             const id = createRandomString(24)
             const selected = editData.classes
@@ -486,7 +486,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
                   : current.name,
             }))
           }}
-          className="input input-bordered input-xs mb-2 w-full"
+          className="input input-bordered input-sm mb-2 w-full md:input-xs"
         >
           <option value="">Custom ally (no link)</option>
           {linkedOptions.map((character) => (
@@ -498,7 +498,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       </div>
       <div className="mb-1">
         <label className="label">Classes</label>
-        <div className="grid grid-cols-4 gap-1 rounded border p-1 text-xs">
+        <div className="grid grid-cols-2 gap-1 rounded border p-1 text-xs sm:grid-cols-4">
           {classes.map((cc: CharacterClass) => {
             const id = createRandomString(24)
             const selected = editData.classes
@@ -649,7 +649,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       </ModalTrigger>
       <ModalTitle>Manage Allies</ModalTitle>
       <ModalContent>
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:gap-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -691,19 +691,19 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
             </div>
           </div>
 
-          <div className="flex min-h-[520px] flex-col space-y-4">
-            <div className="flex min-h-[52px] items-center justify-between">
+          <div className="flex min-h-0 flex-col space-y-4 md:min-h-[520px]">
+            <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold uppercase text-base-content/50">Ally details</p>
                 <h3 className="text-base font-semibold">{selectedAlly ? getAllyDisplayName(selectedAlly) : 'Select an ally'}</h3>
               </div>
-              <Button size="xs" onClick={() => setEditingId('new')}>
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setEditingId('new')}>
                 <PlusCircle size={16} className="mr-1" /> Add Ally
               </Button>
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <div className="min-h-[420px]">
+              <div className="min-h-0 md:min-h-[420px]">
                 {editingId ? (
                   editingId === 'new' ? (
                     <NewAllyCard
