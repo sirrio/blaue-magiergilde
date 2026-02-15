@@ -6,7 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { Item, PageProps, ShopItem, Spell } from '@/types'
+import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, FlaskRound, RotateCcw, ScrollText, Scale, Shield, Store, Sword, XCircle } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
@@ -317,7 +317,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   )
 }
 
-export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: ShopItem }) {
+export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; shopItem?: ShopItem; sources?: Source[] }) {
   const formData = {
     id: item.id,
     name: item.name,
@@ -325,6 +325,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     cost: item.cost,
     type: item.type,
     rarity: item.rarity,
+    source_id: item.source_id ?? '',
     shop_enabled: item.shop_enabled ?? true,
     guild_enabled: item.guild_enabled ?? true,
     default_spell_roll_enabled: item.default_spell_roll_enabled ?? false,
@@ -445,6 +446,11 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
         <span>
           {displayName}{' '}
           <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+          {item.source?.shortcode ? (
+            <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
+              {item.source.shortcode}
+            </span>
+          ) : null}
           {shopItem && isCustomListing ? (
             <span className="ml-2 rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
               Custom listing
@@ -539,6 +545,21 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
                   <option value="item">Item</option>
                   <option value="spellscroll">Spell Scroll</option>
                   <option value="consumable">Consumable</option>
+                </SelectOptions>
+              </Select>
+              <Select
+                errors={errors.source_id}
+                value={data.source_id}
+                onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+              >
+                <SelectLabel>Source</SelectLabel>
+                <SelectOptions>
+                  <option value="">No source</option>
+                  {sources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.shortcode} - {source.name}
+                    </option>
+                  ))}
                 </SelectOptions>
               </Select>
               <label className="flex items-center gap-2 text-sm">

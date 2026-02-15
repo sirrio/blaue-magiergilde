@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DiscordBackupController;
 use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use App\Http\Controllers\Admin\GameSettingsController;
+use App\Http\Controllers\Admin\SourceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'admin'])->group(function () {
@@ -37,6 +38,15 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     Route::get('/admin/settings/discord/bot/owners/status', [DiscordBotSettingsController::class, 'status'])
         ->name('admin.settings.bot.owners.status');
+
+    Route::post('/admin/settings/sources', [SourceController::class, 'store'])
+        ->name('admin.settings.sources.store');
+
+    Route::patch('/admin/settings/sources/{source}', [SourceController::class, 'update'])
+        ->name('admin.settings.sources.update');
+
+    Route::delete('/admin/settings/sources/{source}', [SourceController::class, 'destroy'])
+        ->name('admin.settings.sources.destroy');
 
     Route::get('/admin/games', [GameSettingsController::class, 'index'])->name('admin.games');
     Route::patch('/admin/games', [DiscordBotSettingsController::class, 'update'])->name('admin.games.update');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Item\StoreItemRequest;
 use App\Http\Requests\Item\UpdateItemRequest;
 use App\Models\Item;
+use App\Models\Source;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,6 +29,7 @@ class ItemController extends Controller
         $searchTerm = request('search');
 
         $itemQuery = Item::query();
+        $itemQuery->with('source:id,name,shortcode');
 
         if (! empty($searchTerm)) {
             $itemQuery->where('name', 'LIKE', "%$searchTerm%");
@@ -101,11 +103,16 @@ class ItemController extends Controller
                 'default_spell_schools',
                 'ruling_changed',
                 'ruling_note',
+                'source_id',
             ])
             ->get();
 
         return Inertia::render('item/index', [
             'items' => Inertia::defer(fn () => $items),
+            'sources' => Source::query()
+                ->orderBy('shortcode')
+                ->orderBy('name')
+                ->get(['id', 'name', 'shortcode']),
         ]);
     }
 
@@ -129,6 +136,7 @@ class ItemController extends Controller
         $item->url = $request->url;
         $item->rarity = $request->rarity;
         $item->type = $request->type;
+        $item->source_id = $request->input('source_id');
         $item->shop_enabled = $request->boolean('shop_enabled', true);
         $item->guild_enabled = $request->boolean('guild_enabled', true);
         $this->applyRulingNote($item, $request);
@@ -164,6 +172,7 @@ class ItemController extends Controller
         $item->url = $request->url;
         $item->rarity = $request->rarity;
         $item->type = $request->type;
+        $item->source_id = $request->input('source_id');
         $item->shop_enabled = $request->boolean('shop_enabled', true);
         $item->guild_enabled = $request->boolean('guild_enabled', true);
         $this->applyRulingNote($item, $request);

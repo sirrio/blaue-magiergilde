@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Source;
 use App\Models\Spell;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,6 +12,10 @@ test('admin can update spells', function () {
     $admin->forceFill(['is_admin' => true])->save();
 
     $spell = Spell::factory()->create();
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
 
     $payload = [
         'id' => $spell->id,
@@ -19,6 +24,7 @@ test('admin can update spells', function () {
         'legacy_url' => 'https://example.com/legacy-mage-shield',
         'spell_school' => 'abjuration',
         'spell_level' => 1,
+        'source_id' => $source->id,
         'guild_enabled' => true,
         'ruling_changed' => true,
         'ruling_note' => 'Updated ruling.',
@@ -36,6 +42,7 @@ test('admin can update spells', function () {
         ->and($spell->legacy_url)->toBe('https://example.com/legacy-mage-shield')
         ->and($spell->spell_school)->toBe('abjuration')
         ->and($spell->spell_level)->toBe(1)
+        ->and($spell->source_id)->toBe($source->id)
         ->and((bool) $spell->guild_enabled)->toBeTrue()
         ->and($spell->ruling_changed)->toBeTrue()
         ->and($spell->ruling_note)->toBe('Updated ruling.');

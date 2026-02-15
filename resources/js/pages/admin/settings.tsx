@@ -1,5 +1,6 @@
 import { ActionMenu } from '@/components/ui/action-menu'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
@@ -13,6 +14,7 @@ import {
   DiscordBotOwnersStatus,
   DiscordBotSettings,
   PageProps,
+  Source,
 } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { Settings as SettingsIcon } from 'lucide-react'
@@ -27,9 +29,11 @@ const getCsrfToken = () => {
 export default function Settings({
   discordBackup,
   discordBotSettings,
+  sources,
 }: {
   discordBackup: DiscordBackupStats
   discordBotSettings: DiscordBotSettings
+  sources: Source[]
 }) {
   const { errors: pageErrors } = usePage<PageProps>().props
   const backupForm = useForm({})
@@ -43,6 +47,15 @@ export default function Settings({
     character_approval_channel_name: discordBotSettings.character_approval_channel_name ?? '',
     character_approval_channel_guild_id: discordBotSettings.character_approval_channel_guild_id ?? '',
   })
+  const createSourceForm = useForm({
+    name: '',
+    shortcode: '',
+  })
+  const sourceEditForm = useForm({
+    id: 0,
+    name: '',
+    shortcode: '',
+  })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
@@ -52,6 +65,7 @@ export default function Settings({
   const [ownerStatus, setOwnerStatus] = useState<DiscordBotOwnersStatus | null>(null)
   const [ownerStatusLoading, setOwnerStatusLoading] = useState(false)
   const [ownerStatusError, setOwnerStatusError] = useState<string | null>(null)
+  const [editingSource, setEditingSource] = useState<Source | null>(null)
 
   const fetchBackupStatus = useCallback(
     async (showToast: boolean) => {
@@ -418,6 +432,62 @@ export default function Settings({
     void fetchOwnerStatus()
   }, [fetchOwnerStatus])
 
+  useEffect(() => {
+    if (!editingSource) return
+    sourceEditForm.setData({
+      id: editingSource.id,
+      name: editingSource.name,
+      shortcode: editingSource.shortcode,
+    })
+  }, [editingSource, sourceEditForm])
+
+  const handleSourceCreate = () => {
+    createSourceForm.post(route('admin.settings.sources.store'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        createSourceForm.reset()
+        toast.show('Source created.', 'info')
+      },
+      onError: () => {
+        toast.show('Source could not be created.', 'error')
+      },
+    })
+  }
+
+  const handleSourceUpdate = () => {
+    sourceEditForm.patch(route('admin.settings.sources.update', sourceEditForm.data.id), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setEditingSource(null)
+        sourceEditForm.reset()
+        toast.show('Source updated.', 'info')
+      },
+      onError: () => {
+        toast.show('Source could not be updated.', 'error')
+      },
+    })
+  }
+
+  const handleSourceDelete = (source: Source) => {
+    if (!window.confirm(`Delete source ${source.shortcode}?`)) {
+      return
+    }
+
+    router.delete(route('admin.settings.sources.destroy', source.id), {
+      preserveScroll: true,
+      onSuccess: () => {
+        if (editingSource?.id === source.id) {
+          setEditingSource(null)
+          sourceEditForm.reset()
+        }
+        toast.show('Source deleted.', 'info')
+      },
+      onError: () => {
+        toast.show('Source could not be deleted.', 'error')
+      },
+    })
+  }
+
   const ownerCacheLabel = ownerStatusLoading
     ? 'Loading...'
     : ownerStatus?.updated_at
@@ -604,6 +674,85 @@ export default function Settings({
               Select at least one channel before starting a backup.
             </div>
           ) : null}
+        </div>
+        <div className="rounded-box bg-base-100 shadow-md p-3">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold">Compendium sources</h2>
+            <p className="text-xs text-base-content/60">
+              Manage source books used by items and spells.
+            </p>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+            <Input
+              value={createSourceForm.data.name}
+              onChange={(event) => createSourceForm.setData('name', event.target.value)}
+              errors={createSourceForm.errors.name}
+              placeholder="Player's Handbook"
+            >
+              Source name
+            </Input>
+            <Input
+              value={createSourceForm.data.shortcode}
+              onChange={(event) => createSourceForm.setData('shortcode', event.target.value)}
+              errors={createSourceForm.errors.shortcode}
+              placeholder="PHB"
+            >
+              Shortcode
+            </Input>
+            <Button size="sm" variant="outline" onClick={handleSourceCreate} disabled={createSourceForm.processing}>
+              Add source
+            </Button>
+          </div>
+          <div className="mt-4 space-y-2">
+            {sources.length === 0 ? (
+              <p className="text-xs text-base-content/60">No sources configured yet.</p>
+            ) : (
+              sources.map((source) => (
+                <div key={source.id} className="flex items-center justify-between gap-3 rounded-lg border border-base-200 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="rounded-full border border-base-300 px-2 py-0.5 text-[10px] uppercase text-base-content/70">
+                      {source.shortcode}
+                    </span>
+                    <span className="truncate text-sm">{source.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="xs" variant="ghost" onClick={() => setEditingSource(source)}>
+                      Edit
+                    </Button>
+                    <Button size="xs" variant="ghost" className="text-error" onClick={() => handleSourceDelete(source)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <Modal isOpen={editingSource !== null} onClose={() => setEditingSource(null)}>
+            <ModalTitle>Edit source</ModalTitle>
+            <ModalContent>
+              <Input
+                value={sourceEditForm.data.name}
+                onChange={(event) => sourceEditForm.setData('name', event.target.value)}
+                errors={sourceEditForm.errors.name}
+                placeholder="Player's Handbook"
+              >
+                Source name
+              </Input>
+              <Input
+                value={sourceEditForm.data.shortcode}
+                onChange={(event) => sourceEditForm.setData('shortcode', event.target.value)}
+                errors={sourceEditForm.errors.shortcode}
+                placeholder="PHB"
+              >
+                Shortcode
+              </Input>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={handleSourceUpdate} disabled={sourceEditForm.processing}>
+                  Save source
+                </Button>
+              </div>
+            </ModalContent>
+          </Modal>
         </div>
         <div className="rounded-box bg-base-100 shadow-md p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">

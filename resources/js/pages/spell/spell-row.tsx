@@ -6,7 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { PageProps, Spell } from '@/types'
+import { PageProps, Source, Spell } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Copy, Edit, ExternalLink, Scale, Shield, XCircle } from 'lucide-react'
 
@@ -31,7 +31,7 @@ const copyToClipboard = (text: string) => {
   })
 }
 
-export default function SpellRow({ spell }: { spell: Spell }) {
+export default function SpellRow({ spell, sources = [] }: { spell: Spell; sources?: Source[] }) {
   const formData = {
     id: spell.id,
     name: spell.name,
@@ -39,6 +39,7 @@ export default function SpellRow({ spell }: { spell: Spell }) {
     legacy_url: spell.legacy_url || '',
     spell_school: spell.spell_school || '',
     spell_level: spell.spell_level,
+    source_id: spell.source_id ?? '',
     guild_enabled: spell.guild_enabled ?? true,
     ruling_changed: spell.ruling_changed ?? false,
     ruling_note: spell.ruling_note ?? '',
@@ -78,6 +79,11 @@ export default function SpellRow({ spell }: { spell: Spell }) {
       </div>
       <div className={cn(textColor, 'text-xs sm:text-sm')}>
         {spell.name} <span className={'text-xs font-light italic'}>(Level {spell.spell_level})</span>
+        {spell.source?.shortcode ? (
+          <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
+            {spell.source.shortcode}
+          </span>
+        ) : null}
       </div>
       <div className="flex items-center justify-center text-xs">
         {isGuildEnabled ? (
@@ -137,6 +143,21 @@ export default function SpellRow({ spell }: { spell: Spell }) {
           >
             Spell Level
           </Input>
+          <Select
+            errors={errors.source_id}
+            value={data.source_id}
+            onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+          >
+            <SelectLabel>Source</SelectLabel>
+            <SelectOptions>
+              <option value="">No source</option>
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.shortcode} - {source.name}
+                </option>
+              ))}
+            </SelectOptions>
+          </Select>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

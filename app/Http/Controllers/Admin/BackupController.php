@@ -8,6 +8,7 @@ use App\Models\DiscordBotSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
+use App\Models\Source;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -63,6 +64,10 @@ class BackupController extends Controller
                 'character_approval_channel_name' => DiscordBotSetting::current()->character_approval_channel_name,
                 'character_approval_channel_guild_id' => DiscordBotSetting::current()->character_approval_channel_guild_id,
             ],
+            'sources' => Source::query()
+                ->orderBy('shortcode')
+                ->orderBy('name')
+                ->get(['id', 'name', 'shortcode']),
         ]);
     }
 }

@@ -7,7 +7,7 @@ import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
-import { Item } from '@/types'
+import { Item, Source } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
 import { LoaderCircle, Plus } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
@@ -31,7 +31,7 @@ const spellSchoolLabels: Record<string, string> = {
 const spellLevels = Array.from({ length: 10 }, (_, i) => i)
 const spellSchools = Object.keys(spellSchoolLabels)
 
-const StoreItemModal = () => {
+const StoreItemModal = ({ sources }: { sources: Source[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
@@ -39,6 +39,7 @@ const StoreItemModal = () => {
     cost: '',
     rarity: 'common',
     type: 'item',
+    source_id: '' as number | '',
     shop_enabled: true,
     guild_enabled: true,
     default_spell_roll_enabled: false,
@@ -53,6 +54,7 @@ const StoreItemModal = () => {
     reset()
     setData('shop_enabled', true)
     setData('guild_enabled', true)
+    setData('source_id', '')
     setData('default_spell_roll_enabled', false)
     setData('default_spell_levels', [])
     setData('default_spell_schools', [])
@@ -148,6 +150,21 @@ const StoreItemModal = () => {
             <option value="item">Item</option>
             <option value="spellscroll">Spell Scroll</option>
             <option value="consumable">Consumable</option>
+          </SelectOptions>
+        </Select>
+        <Select
+          errors={errors.source_id}
+          value={data.source_id}
+          onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+        >
+          <SelectLabel>Source</SelectLabel>
+          <SelectOptions>
+            <option value="">No source</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.shortcode} - {source.name}
+              </option>
+            ))}
           </SelectOptions>
         </Select>
         <label className="flex items-center gap-2 text-sm">
@@ -254,7 +271,7 @@ const StoreItemModal = () => {
   )
 }
 
-export default function Index({ items }: { items: Item[] }) {
+export default function Index({ items, sources }: { items: Item[]; sources: Source[] }) {
   const rarityFilters: FilterOption[] = [
     { label: 'Common', value: 'common' },
     { label: 'Uncommon', value: 'uncommon' },
@@ -380,7 +397,7 @@ export default function Index({ items }: { items: Item[] }) {
             <h1 className="text-2xl font-bold">Items</h1>
             <p className="text-sm text-base-content/70">Browse and filter the guild inventory.</p>
           </div>
-          <StoreItemModal />
+          <StoreItemModal sources={sources} />
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -448,7 +465,7 @@ export default function Index({ items }: { items: Item[] }) {
           }
           data={['items']}
         >
-          <List>{items?.map((item) => <ItemRow key={item.id} item={item} />)}</List>
+          <List>{items?.map((item) => <ItemRow key={item.id} item={item} sources={sources} />)}</List>
         </Deferred>
       </div>
     </AppLayout>

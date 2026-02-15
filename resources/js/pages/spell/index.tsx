@@ -6,7 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
 import SpellRow from '@/pages/spell/spell-row'
-import { Spell } from '@/types'
+import { Source, Spell } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
 import { LoaderCircle, Plus } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
@@ -16,7 +16,7 @@ interface FilterOption {
   value: string
 }
 
-const StoreSpellModal = () => {
+const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
@@ -24,6 +24,7 @@ const StoreSpellModal = () => {
     legacy_url: '',
     spell_school: 'abjuration',
     spell_level: 0,
+    source_id: '' as number | '',
     guild_enabled: true,
     ruling_changed: false,
     ruling_note: '',
@@ -35,6 +36,7 @@ const StoreSpellModal = () => {
     setData('guild_enabled', true)
     setData('spell_school', 'abjuration')
     setData('spell_level', 0)
+    setData('source_id', '')
     setData('ruling_changed', false)
     setData('ruling_note', '')
   }, [isOpen, reset, setData])
@@ -90,6 +92,21 @@ const StoreSpellModal = () => {
         >
           Spell Level
         </Input>
+        <Select
+          errors={errors.source_id}
+          value={data.source_id}
+          onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+        >
+          <SelectLabel>Source</SelectLabel>
+          <SelectOptions>
+            <option value="">No source</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.shortcode} - {source.name}
+              </option>
+            ))}
+          </SelectOptions>
+        </Select>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -140,7 +157,7 @@ const StoreSpellModal = () => {
   )
 }
 
-export default function Index({ spells }: { spells: Spell[] }) {
+export default function Index({ spells, sources }: { spells: Spell[]; sources: Source[] }) {
   const spellSchoolFilters: FilterOption[] = [
     { label: 'Abjuration', value: 'abjuration' },
     { label: 'Conjuration', value: 'conjuration' },
@@ -254,7 +271,7 @@ export default function Index({ spells }: { spells: Spell[] }) {
             <h1 className="text-2xl font-bold">Spells</h1>
             <p className="text-sm text-base-content/70">Search the spell list by school or level.</p>
           </div>
-          <StoreSpellModal />
+          <StoreSpellModal sources={sources} />
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -314,7 +331,7 @@ export default function Index({ spells }: { spells: Spell[] }) {
           }
           data={['spells']}
         >
-          <List>{spells?.map((spell) => <SpellRow key={spell.id} spell={spell} />)}</List>
+          <List>{spells?.map((spell) => <SpellRow key={spell.id} spell={spell} sources={sources} />)}</List>
         </Deferred>
       </div>
     </AppLayout>

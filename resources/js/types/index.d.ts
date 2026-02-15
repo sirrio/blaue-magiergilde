@@ -210,6 +210,12 @@ export interface DiscordBotOwnersStatus {
   owners?: DiscordBotOwner[]
 }
 
+export interface Source {
+  id: number
+  name: string
+  shortcode: string
+}
+
 export interface DiscordBackupAttachment {
   id: number
   filename: string
@@ -254,6 +260,8 @@ export interface Item {
   default_spell_schools?: Spell['spell_school'][] | null
   ruling_changed?: boolean
   ruling_note?: string | null
+  source_id?: number | null
+  source?: Source | null
 }
 
 export interface Spell {
@@ -266,6 +274,8 @@ export interface Spell {
   guild_enabled?: boolean
   ruling_changed?: boolean
   ruling_note?: string | null
+  source_id?: number | null
+  source?: Source | null
 }
 
 export interface CharacterClass {
