@@ -6,12 +6,20 @@ import { Input } from '@/components/ui/input'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
 import type { GameAnnouncement, PageProps } from '@/types'
-import { Head, usePage } from '@inertiajs/react'
+import { Head, router, usePage } from '@inertiajs/react'
 import { CalendarRange, LayoutGrid, List as ListIcon, SquareArrowOutUpRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 interface Props {
   games: GameAnnouncement[]
+  pagination: {
+    currentPage: number
+    lastPage: number
+    perPage: number
+    total: number
+    hasMorePages: boolean
+  }
+  perPageOptions: number[]
   lastSyncedAt?: string | null
 }
 
@@ -97,7 +105,7 @@ const getConfidenceColor = (confidence: number) => {
   return 'bg-error'
 }
 
-export default function GamesIndex({ games, lastSyncedAt }: Props) {
+export default function GamesIndex({ games, pagination, perPageOptions, lastSyncedAt }: Props) {
   const getInitials = useInitials()
   const { features } = usePage<PageProps>().props
   const [search, setSearch] = useState('')
@@ -286,6 +294,21 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
           : null,
   ].filter(Boolean) as string[]
 
+  const navigateToPage = (page: number, perPage: number) => {
+    router.get(
+      route('games.index'),
+      {
+        page,
+        per_page: perPage,
+      },
+      {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+      },
+    )
+  }
+
   return (
     <AppLayout>
       <Head title="Games" />
@@ -295,7 +318,8 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
             <h1 className="text-2xl font-semibold tracking-tight">Games</h1>
             <p className="text-sm text-base-content/70">Recent announcements from Discord.</p>
             <p className="text-[11px] text-base-content/60">
-              {games.length} entries
+              {pagination.total} entries
+              {pagination.lastPage > 1 ? ` · Page ${pagination.currentPage}/${pagination.lastPage}` : ''}
               {lastSyncedAt
                 ? (() => {
                     const formatted = formatGameDate(lastSyncedAt, true)
@@ -335,7 +359,9 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
           <CardBody className="gap-1.5">
             <div className="rounded-box border border-base-200 bg-base-100 p-1.5">
               <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-base-content/60">
-                <span className="badge badge-ghost badge-xs">{filteredGames.length} of {games.length}</span>
+                <span className="badge badge-ghost badge-xs">
+                  {filteredGames.length} of {games.length} on this page
+                </span>
                 {activeFilters.length === 0 ? (
                   <span className="text-base-content/50">No filters</span>
                 ) : (
@@ -359,6 +385,21 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                 </Input>
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-base-content/60">Page size:</span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {perPageOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={cn('btn btn-xs', pagination.perPage === option ? 'btn-primary' : 'btn-ghost')}
+                        onClick={() => navigateToPage(1, option)}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-1">
                   <span className="text-base-content/60">Tier:</span>
                   <div className="flex flex-wrap items-center gap-1">
@@ -590,6 +631,29 @@ export default function GamesIndex({ games, lastSyncedAt }: Props) {
                 )}
               </>
             )}
+            {pagination.lastPage > 1 ? (
+              <div className="mt-1 flex flex-wrap items-center justify-end gap-1 border-t border-base-200/80 pt-1">
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  disabled={pagination.currentPage <= 1}
+                  onClick={() => navigateToPage(pagination.currentPage - 1, pagination.perPage)}
+                >
+                  Previous
+                </button>
+                <span className="px-1 text-[11px] text-base-content/60">
+                  Page {pagination.currentPage} / {pagination.lastPage}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  disabled={!pagination.hasMorePages}
+                  onClick={() => navigateToPage(pagination.currentPage + 1, pagination.perPage)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
           </CardBody>
         </Card>
       </div>
