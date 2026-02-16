@@ -8,22 +8,11 @@ import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Settings } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import React, { useState } from 'react'
 
-const UpdateCharacterModal = ({ character }: { character: Character }) => {
-  const { classes, factions, versions, errors, features } = usePage<PageProps>().props
-  const isCharacterStatusSwitchEnabled = features?.character_status_switch ?? true
-  const currentStatus = character.guild_status ?? 'pending'
-  const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
-  const showDraftToggleOptions = !isCharacterStatusSwitchEnabled || canEditStatus
-  const statusLabelMap: Record<string, string> = {
-    pending: 'Active',
-    draft: 'Draft',
-    approved: 'Approved',
-    declined: 'Declined',
-    retired: 'Retired',
-  }
+const UpdateCharacterModal = ({ character, children }: { character: Character; children?: React.ReactNode }) => {
+  const { classes, factions, versions, errors } = usePage<PageProps>().props
   const formData = {
     name: character.name,
     class: character.character_classes.map((cc) => cc.id),
@@ -35,9 +24,6 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
     bubble_shop_spend: character.bubble_shop_spend,
     external_link: character.external_link,
     is_filler: character.is_filler,
-    ...((!isCharacterStatusSwitchEnabled || canEditStatus)
-      ? { guild_status: !isCharacterStatusSwitchEnabled ? 'draft' : currentStatus }
-      : {}),
     avatar: undefined,
   }
 
@@ -54,15 +40,17 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button
-          className="flex md:hidden md:group-hover:flex"
-          size="xs"
-          modifier="square"
-          aria-label="Edit character"
-          title="Edit character"
-        >
-          <Settings size={14} />
-        </Button>
+        {children ?? (
+          <Button
+            className="flex md:hidden md:group-hover:flex"
+            size="xs"
+            modifier="square"
+            aria-label="Edit character"
+            title="Edit character"
+          >
+            <Pencil size={14} />
+          </Button>
+        )}
       </ModalTrigger>
       <ModalTitle>Edit character</ModalTitle>
       <ModalContent>
@@ -109,24 +97,6 @@ const UpdateCharacterModal = ({ character }: { character: Character }) => {
                       {version}
                     </option>
                   ))}
-                </SelectOptions>
-              </Select>
-              <Select
-                errors={errors.guild_status}
-                value={!isCharacterStatusSwitchEnabled ? 'draft' : canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
-                onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
-                disabled={!isCharacterStatusSwitchEnabled || !canEditStatus}
-              >
-                <SelectLabel>Visibility</SelectLabel>
-                <SelectOptions>
-                  {!showDraftToggleOptions ? (
-                    <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
-                  ) : (
-                    <>
-                      <option value="pending">Active</option>
-                      <option value="draft">Draft</option>
-                    </>
-                  )}
                 </SelectOptions>
               </Select>
               <Input

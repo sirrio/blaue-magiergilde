@@ -11,5 +11,6 @@ Route::middleware(['auth', 'admin'])
             'index',
             'store',
             'update',
+            'destroy',
         ]);
     });

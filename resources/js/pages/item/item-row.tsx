@@ -6,9 +6,9 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { Item, PageProps, ShopItem, Spell } from '@/types'
+import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Edit, ExternalLink, FlaskRound, RotateCcw, ScrollText, Scale, Shield, Store, Sword, XCircle } from 'lucide-react'
+import { Copy, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -51,9 +51,9 @@ const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
   return null
 }
 
-const copyToClipboard = (text: string) => {
+const copyToClipboard = (text: string, message = 'Copied to clipboard.') => {
   navigator.clipboard.writeText(text).then(() => {
-    toast.show('Characters copied to clipboard', 'info')
+    toast.show(message, 'info')
   })
 }
 
@@ -173,8 +173,15 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
-          +
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          onClick={() => setIsOpen(true)}
+          title="Add spell to listing"
+          aria-label="Add spell to listing"
+        >
+          <Plus size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Select spell options</ModalTitle>
@@ -274,8 +281,8 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
-          <Edit size={14} />
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} title="Edit listing" aria-label="Edit listing">
+          <Pencil size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
@@ -317,7 +324,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   )
 }
 
-export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: ShopItem }) {
+export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; shopItem?: ShopItem; sources?: Source[] }) {
   const formData = {
     id: item.id,
     name: item.name,
@@ -325,6 +332,7 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     cost: item.cost,
     type: item.type,
     rarity: item.rarity,
+    source_id: item.source_id ?? '',
     shop_enabled: item.shop_enabled ?? true,
     guild_enabled: item.guild_enabled ?? true,
     default_spell_roll_enabled: item.default_spell_roll_enabled ?? false,
@@ -405,6 +413,9 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
   const spellLegacyUrl = spell?.legacy_url || shopItem?.spell_legacy_url || ''
   const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
   const isCustomListing = Boolean(shopItem?.snapshot_custom)
+  const discordLineText = spell
+    ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${item.cost}`
+    : `[${baseName}](<${item.url}>): ${item.cost}`
 
   const handleSnapshotRefresh = () => {
     if (!shopItem) return
@@ -438,13 +449,36 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
     })
   }
 
+  const handleDeleteItem = () => {
+    if (shopItem) return
+    if (!window.confirm(`Delete item "${item.name}"?`)) return
+
+    router.delete(route('admin.items.destroy', { item }), {
+      preserveScroll: true,
+      onError: () => {
+        toast.show('Item could not be deleted.', 'error')
+      },
+    })
+  }
+
   return (
     <ListRow>
       <div className={cn(textColor)}>{renderIcon(item.type)}</div>
       <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
         <span>
-          {displayName}{' '}
+          {item.url ? (
+            <a href={item.url} target="_blank" rel="noreferrer" className="link link-hover font-medium" title="Open item URL">
+              {displayName}
+            </a>
+          ) : (
+            <span>{displayName}</span>
+          )}{' '}
           <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+          {item.source?.shortcode ? (
+            <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
+              {item.source.shortcode}
+            </span>
+          ) : null}
           {shopItem && isCustomListing ? (
             <span className="ml-2 rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
               Custom listing
@@ -493,15 +527,48 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
         {shopItem ? (
           <>
             <ShopItemSnapshotModal shopItem={shopItem} item={item} />
-            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleSnapshotRefresh}
+              title="Refresh listing from base item"
+              aria-label="Refresh listing from base item"
+            >
               <RotateCcw size={14} />
             </Button>
           </>
         ) : (
+          null
+        )}
+        {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
+        {shopItem && spell ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            modifier="square"
+            onClick={handleRemoveSpell}
+            title="Remove spell from listing"
+            aria-label="Remove spell from listing"
+          >
+            <Minus size={14} />
+          </Button>
+        ) : null}
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          title="Copy Discord line"
+          aria-label="Copy Discord line"
+          onClick={() => copyToClipboard(discordLineText, 'Item line copied in Discord format.')}
+        >
+          <Copy size={14} />
+        </Button>
+        {!shopItem ? (
           <Modal>
             <ModalTrigger>
-              <Button size="xs" variant="ghost" modifier="square">
-                <Edit size={14} />
+              <Button size="xs" variant="ghost" modifier="square" title="Edit item" aria-label="Edit item">
+                <Pencil size={14} />
               </Button>
             </ModalTrigger>
             <ModalTitle>
@@ -515,161 +582,177 @@ export default function ItemRow({ item, shopItem }: { item: Item; shopItem?: Sho
               </div>
             </ModalTitle>
             <ModalContent>
-              <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-                Name
-              </Input>
-              <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
-                URL
-              </Input>
-              <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-                Cost
-              </Input>
-              <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-                <SelectLabel>Rarity</SelectLabel>
-                <SelectOptions>
-                  <option value="common">Common</option>
-                  <option value="uncommon">Uncommon</option>
-                  <option value="rare">Rare</option>
-                  <option value="very_rare">Very Rare</option>
-                </SelectOptions>
-              </Select>
-              <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-                <SelectLabel>Type</SelectLabel>
-                <SelectOptions>
-                  <option value="item">Item</option>
-                  <option value="spellscroll">Spell Scroll</option>
-                  <option value="consumable">Consumable</option>
-                </SelectOptions>
-              </Select>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-xs"
-                  checked={Boolean(data.shop_enabled)}
-                  onChange={(e) => setData('shop_enabled', e.target.checked)}
-                />
-                <span>Include in shop rolls</span>
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-xs"
-                  checked={Boolean(data.guild_enabled)}
-                  onChange={(e) => setData('guild_enabled', e.target.checked)}
-                />
-                <span>Allowed in guild</span>
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-xs"
-                    checked={Boolean(data.ruling_changed)}
-                    onChange={(e) => handleRulingToggle(e.target.checked)}
-                  />
-                  <span>Ruling changed</span>
-                </label>
-                {data.ruling_changed ? (
-                  <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
-                    Ruling note
-                  </TextArea>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-xs"
-                    checked={Boolean(data.default_spell_roll_enabled)}
-                    onChange={(e) => handleAutoRollToggle(e.target.checked)}
-                  />
-                  <span>Auto-roll spell on shop</span>
-                </label>
-                {data.default_spell_roll_enabled ? (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="label">Default spell levels</p>
-                      <div className="grid grid-cols-5 gap-1">
-                        {spellLevels.map((level) => {
-                          const id = `default-level-${item.id}-${level}`
-                          return (
-                            <div key={level} className="flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                id={id}
-                                className="checkbox checkbox-xs"
-                                checked={data.default_spell_levels.includes(level)}
-                                onChange={() => toggleDefaultSpellLevel(level)}
-                              />
-                              <label htmlFor={id} className="label cursor-pointer">
-                                {level === 0 ? 'Cantrip' : level}
-                              </label>
-                            </div>
-                          )
-                        })}
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
+                  <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+                    Name
+                  </Input>
+                  <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
+                    URL
+                  </Input>
+                  <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
+                    Cost
+                  </Input>
+                  <Select
+                    errors={errors.source_id}
+                    value={data.source_id}
+                    onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+                  >
+                    <SelectLabel>Source</SelectLabel>
+                    <SelectOptions>
+                      <option value="">No source</option>
+                      {sources.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.shortcode} - {source.name}
+                        </option>
+                      ))}
+                    </SelectOptions>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
+                  <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+                    <SelectLabel>Rarity</SelectLabel>
+                    <SelectOptions>
+                      <option value="common">Common</option>
+                      <option value="uncommon">Uncommon</option>
+                      <option value="rare">Rare</option>
+                      <option value="very_rare">Very Rare</option>
+                    </SelectOptions>
+                  </Select>
+                  <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+                    <SelectLabel>Type</SelectLabel>
+                    <SelectOptions>
+                      <option value="item">Item</option>
+                      <option value="spellscroll">Spell Scroll</option>
+                      <option value="consumable">Consumable</option>
+                    </SelectOptions>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-xs"
+                      checked={Boolean(data.shop_enabled)}
+                      onChange={(e) => setData('shop_enabled', e.target.checked)}
+                    />
+                    <span className="inline-flex items-center gap-2">
+                      <Store className="h-4 w-4 text-base-content/70" />
+                      Include in shop rolls
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-xs"
+                      checked={Boolean(data.guild_enabled)}
+                      onChange={(e) => setData('guild_enabled', e.target.checked)}
+                    />
+                    <span className="inline-flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-base-content/70" />
+                      Allowed in guild
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-xs"
+                      checked={Boolean(data.ruling_changed)}
+                      onChange={(e) => handleRulingToggle(e.target.checked)}
+                    />
+                    <span className="inline-flex items-center gap-2">
+                      <Scale className={cn('h-4 w-4', data.ruling_changed ? 'text-warning' : 'text-base-content/70')} />
+                      Ruling changed
+                    </span>
+                  </label>
+                  {data.ruling_changed ? (
+                    <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+                      Ruling note
+                    </TextArea>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Auto-roll</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-xs"
+                      checked={Boolean(data.default_spell_roll_enabled)}
+                      onChange={(e) => handleAutoRollToggle(e.target.checked)}
+                    />
+                    <span className="inline-flex items-center gap-2">
+                      <ScrollText className="h-4 w-4 text-base-content/70" />
+                      Auto-roll spell on shop
+                    </span>
+                  </label>
+                  {data.default_spell_roll_enabled ? (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="label">Default spell levels</p>
+                        <div className="grid grid-cols-5 gap-1">
+                          {spellLevels.map((level) => {
+                            const id = `default-level-${item.id}-${level}`
+                            return (
+                              <div key={level} className="flex items-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  id={id}
+                                  className="checkbox checkbox-xs"
+                                  checked={data.default_spell_levels.includes(level)}
+                                  onChange={() => toggleDefaultSpellLevel(level)}
+                                />
+                                <label htmlFor={id} className="label cursor-pointer">
+                                  {level === 0 ? 'Cantrip' : level}
+                                </label>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="label">Default spell schools</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          {spellSchools.map((school) => {
+                            const id = `default-school-${item.id}-${school}`
+                            return (
+                              <div key={school} className="flex items-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  id={id}
+                                  className="checkbox checkbox-xs"
+                                  checked={data.default_spell_schools.includes(school)}
+                                  onChange={() => toggleDefaultSpellSchool(school)}
+                                />
+                                <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
+                                  <svg className="icon h-4 w-4 fill-current">
+                                    <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
+                                  </svg>
+                                  {spellSchoolLabels[school] ?? school}
+                                </label>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <p className="label">Default spell schools</p>
-                      <div className="grid grid-cols-2 gap-1">
-                        {spellSchools.map((school) => {
-                          const id = `default-school-${item.id}-${school}`
-                          return (
-                            <div key={school} className="flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                id={id}
-                                className="checkbox checkbox-xs"
-                                checked={data.default_spell_schools.includes(school)}
-                                onChange={() => toggleDefaultSpellSchool(school)}
-                              />
-                              <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
-                                <svg className="icon h-4 w-4 fill-current">
-                                  <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
-                                </svg>
-                                {school.toUpperCase()}
-                              </label>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
             </ModalContent>
             <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
           </Modal>
-        )}
-        {shopItem && !spell && <AddSpellModal shopItemId={shopItem.id} />}
-        {shopItem && spell ? (
-          <Button size="xs" variant="ghost" modifier="square" onClick={handleRemoveSpell} aria-label="Remove spell">
-            -
+        ) : null}
+        {!shopItem ? (
+          <Button size="xs" variant="ghost" modifier="square" color="error" onClick={handleDeleteItem} title="Delete item" aria-label="Delete item">
+            <Trash size={14} />
           </Button>
         ) : null}
-        <Button
-          size="xs"
-          variant="ghost"
-          modifier="square"
-          onClick={() =>
-            copyToClipboard(
-              spell
-                ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${item.cost}`
-                : `[${baseName}](<${item.url}>): ${item.cost}`,
-            )
-          }
-        >
-          <Copy size={14} />
-        </Button>
-        {item.url ? (
-          <Button as="a" href={item.url} target="_blank" size="xs" variant="ghost" modifier="square">
-            <ExternalLink size={14} />
-          </Button>
-        ) : (
-          <Button disabled size="xs" variant="ghost" modifier="square" className="text-error">
-            <XCircle size={14} />
-          </Button>
-        )}
       </div>
     </ListRow>
   )

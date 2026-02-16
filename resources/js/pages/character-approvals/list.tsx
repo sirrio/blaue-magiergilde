@@ -9,6 +9,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
 import { calculateTier } from '@/helper/calculateTier'
+import { calculateLevel } from '@/helper/calculateLevel'
 import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
@@ -43,11 +44,13 @@ type AdminCharacter = Pick<
   | 'version'
   | 'character_classes'
   | 'avatar'
+  | 'simplified_tracking'
 >
 
 type CharacterGroup = {
   key: string
   label: string
+  discordHandle?: string | null
   discordId?: number | null
   simplifiedTracking?: boolean
   characters: AdminCharacter[]
@@ -532,19 +535,30 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     characters.forEach((character) => {
       const userId = character.user_id
       const userName = character.user?.name ?? 'Unknown User'
+      const discordUsername = character.user?.discord_username?.trim()
+      const discordDisplayName = character.user?.discord_display_name?.trim()
+      const discordHandle = discordUsername || discordDisplayName || null
       const discordId = character.user?.discord_id ?? null
-      const simplifiedTracking = Boolean(character.user?.simplified_tracking)
+      const simplifiedTracking = Boolean(character.simplified_tracking)
       const groupKey = String(userId)
       if (!grouped.has(groupKey)) {
         grouped.set(groupKey, {
           key: groupKey,
           label: userName,
+          discordHandle,
           discordId,
           simplifiedTracking,
           characters: [],
         })
       }
-      grouped.get(groupKey)?.characters.push(character)
+      const group = grouped.get(groupKey)
+      if (!group) return
+
+      if (!group.discordHandle && discordHandle) {
+        group.discordHandle = discordHandle
+      }
+      group.simplifiedTracking = Boolean(group.simplifiedTracking || simplifiedTracking)
+      group.characters.push(character)
     })
 
     return Array.from(grouped.values())
@@ -650,8 +664,11 @@ const tierTextClassMap: Record<string, string> = {
             {groups.map((group) => (
               <div key={group.key} className="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/70 bg-base-200/70 px-4 py-2 text-xs font-semibold uppercase text-base-content/60">
-                  <span>
+                  <span className="normal-case">
                     {group.label}
+                    {group.discordHandle ? (
+                      <span className="ml-1 text-[11px] font-normal normal-case text-base-content/60">| {group.discordHandle}</span>
+                    ) : null}
                     <span className="ml-2 text-[10px] font-normal normal-case text-base-content/50">
                       ({group.characters.length})
                     </span>
@@ -692,6 +709,7 @@ const tierTextClassMap: Record<string, string> = {
                     const statusLabel = getStatusLabel(status)
                     const isDraft = status === 'draft'
                     const currentTier = calculateTier(character)
+                    const currentLevel = calculateLevel(character)
                     const isAdminManaged = Boolean(character.admin_managed)
                     const characterNotes = character.notes?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
@@ -733,6 +751,10 @@ const tierTextClassMap: Record<string, string> = {
                             <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
                               <LogoTier tier={character.start_tier} width={12} />
                               <span>Start</span>
+                            </span>
+                            <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
+                              <Gauge size={12} className="text-primary/70" />
+                              <span>Lvl {currentLevel}</span>
                             </span>
                             <span
                               className={cn(

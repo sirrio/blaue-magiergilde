@@ -48,6 +48,7 @@ const allowedFactions = new Set([
 ]);
 const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'retired', 'draft']);
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
+const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
 function normalizeTier(value, fallback = 'bt') {
     const tier = String(value || '').trim().toLowerCase();
@@ -69,7 +70,7 @@ function normalizeGuildStatus(value, fallback = 'pending') {
     return allowedGuildStatuses.has(status) ? status : fallback;
 }
 
-function normalizeUserGuildStatus(value, fallback = 'pending') {
+function normalizeUserGuildStatus(value, fallback = 'draft') {
     const status = normalizeGuildStatus(value, fallback);
     return allowedUserGuildStatuses.has(status) ? status : fallback;
 }
@@ -180,8 +181,8 @@ async function listCharactersForDiscord(discordUser) {
                 c.bubble_shop_spend,
                 c.is_filler,
                 c.guild_status,
-                u.simplified_tracking,
-                u.avatar_masked,
+                c.simplified_tracking,
+                c.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -190,7 +191,6 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
-            INNER JOIN users u ON u.id = c.user_id
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -247,8 +247,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.bubble_shop_spend,
                 c.is_filler,
                 c.guild_status,
-                u.simplified_tracking,
-                u.avatar_masked,
+                c.simplified_tracking,
+                c.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -257,7 +257,6 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
-            INNER JOIN users u ON u.id = c.user_id
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -293,47 +292,6 @@ async function findCharacterForDiscord(discordUser, characterId) {
         [characterId, userId],
     );
     return rows[0] ?? null;
-}
-
-async function getUserTrackingModeForDiscord(discordUser) {
-    const userId = await getLinkedUserIdForDiscord(discordUser);
-    if (!userId) throw new DiscordNotLinkedError();
-
-    const [rows] = await db.execute('SELECT simplified_tracking FROM users WHERE id = ? LIMIT 1', [userId]);
-    return Boolean(rows[0]?.simplified_tracking);
-}
-
-async function updateUserTrackingModeForDiscord(discordUser, simplifiedTracking) {
-    const userId = await getLinkedUserIdForDiscord(discordUser);
-    if (!userId) throw new DiscordNotLinkedError();
-
-    const value = normalizeBoolean(simplifiedTracking, false);
-    await db.execute(
-        'UPDATE users SET simplified_tracking = ?, updated_at = ? WHERE id = ?',
-        [value ? 1 : 0, nowSql(), userId],
-    );
-    return { ok: true, simplifiedTracking: value };
-}
-
-async function getUserAvatarMaskedForDiscord(discordUser) {
-    const userId = await getLinkedUserIdForDiscord(discordUser);
-    if (!userId) throw new DiscordNotLinkedError();
-
-    const [rows] = await db.execute('SELECT avatar_masked FROM users WHERE id = ? LIMIT 1', [userId]);
-    const value = rows[0]?.avatar_masked;
-    return value === null || value === undefined ? true : Boolean(value);
-}
-
-async function updateUserAvatarMaskedForDiscord(discordUser, avatarMasked) {
-    const userId = await getLinkedUserIdForDiscord(discordUser);
-    if (!userId) throw new DiscordNotLinkedError();
-
-    const value = normalizeBoolean(avatarMasked, true);
-    await db.execute(
-        'UPDATE users SET avatar_masked = ?, updated_at = ? WHERE id = ?',
-        [value ? 1 : 0, nowSql(), userId],
-    );
-    return { ok: true, avatarMasked: value };
 }
 
 async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel) {
@@ -515,7 +473,9 @@ async function createCharacterForDiscord(
     const safeDmCoins = normalizeNumber(dmCoins, 0);
     const safeBubbleShop = normalizeNumber(bubbleShopSpend, 0);
     const safeIsFiller = normalizeBoolean(isFiller, false);
-    const safeGuildStatus = normalizeUserGuildStatus(guildStatus, 'pending');
+    const safeGuildStatus = isCharacterStatusSwitchEnabled
+        ? normalizeUserGuildStatus(guildStatus, 'draft')
+        : 'draft';
 
     const connection = await db.getConnection();
     try {
@@ -593,7 +553,7 @@ async function createCharacterForDiscord(
 async function updateCharacterForDiscord(
     discordUser,
     characterId,
-    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus },
+    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus, simplifiedTracking, avatarMasked },
 ) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
@@ -614,14 +574,25 @@ async function updateCharacterForDiscord(
         ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
         : existing.bubble_shop_spend;
     const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
-    const newGuildStatus = typeof guildStatus !== 'undefined'
-        ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
-        : existing.guild_status;
+    const newGuildStatus = !isCharacterStatusSwitchEnabled
+        ? 'draft'
+        : typeof guildStatus !== 'undefined'
+            ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
+            : existing.guild_status;
+    const newSimplifiedTracking = typeof simplifiedTracking !== 'undefined'
+        ? normalizeBoolean(simplifiedTracking, Boolean(existing.simplified_tracking))
+        : Boolean(existing.simplified_tracking);
+    const existingAvatarMasked = existing.avatar_masked === null || existing.avatar_masked === undefined
+        ? true
+        : Boolean(existing.avatar_masked);
+    const newAvatarMasked = typeof avatarMasked !== 'undefined'
+        ? normalizeBoolean(avatarMasked, existingAvatarMasked)
+        : existingAvatarMasked;
 
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, simplified_tracking = ?, avatar_masked = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
         [
@@ -637,6 +608,8 @@ async function updateCharacterForDiscord(
             newBubbleShopSpend,
             newIsFiller ? 1 : 0,
             newGuildStatus,
+            newSimplifiedTracking ? 1 : 0,
+            newAvatarMasked ? 1 : 0,
             updatedAt,
             characterId,
             userId,
@@ -1216,10 +1189,6 @@ module.exports = {
     createUserForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
-    getUserTrackingModeForDiscord,
-    updateUserTrackingModeForDiscord,
-    getUserAvatarMaskedForDiscord,
-    updateUserAvatarMaskedForDiscord,
     updateCharacterManualLevelForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,

@@ -45,7 +45,7 @@ const allowedFactions = new Set([
     'arkanisten',
 ]);
 const allowedGuildStatuses = new Set(['pending', 'draft', 'approved', 'declined', 'retired']);
-const editableGuildStatuses = new Set(['pending', 'draft']);
+const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
 const downtimeCreationSteps = ['duration', 'date', 'type', 'notes', 'confirm'];
 
@@ -125,17 +125,12 @@ function formatGuildStatusLabel(value) {
     return 'Pending';
 }
 
-function canEditGuildStatus(value) {
-    const status = normalizeGuildStatus(value);
-    return editableGuildStatuses.has(status);
-}
-
 function safeInt(value, fallback = 0) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId }) {
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked }) {
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -168,12 +163,19 @@ function buildCharacterManageRows({ characterId, ownerDiscordId }) {
                 .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
                 .setLabel('Bubble Shop')
                 .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`characterManage_status_${characterId}_${ownerDiscordId}`)
-                .setLabel('Status')
-                .setStyle(ButtonStyle.Secondary),
         ),
     ];
+
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterManage_tracking_toggle_${characterId}_${ownerDiscordId}`)
+            .setLabel(`Tracking: ${simplifiedTracking ? 'Simplified' : 'Adventure'}`)
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_avatar_mask_toggle_${characterId}_${ownerDiscordId}`)
+            .setLabel(`Token mask: ${avatarMasked ? 'On' : 'Off'}`)
+            .setStyle(ButtonStyle.Secondary),
+    ));
 
     rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -209,6 +211,9 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const dmCoins = String(safeInt(character.dm_coins));
     const bubbleSpend = String(safeInt(character.bubble_shop_spend));
     const statusLabel = formatGuildStatusLabel(character.guild_status);
+    const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+        ? true
+        : Boolean(character.avatar_masked);
 
     const descriptionParts = [name];
     if (currentTier !== '-') {
@@ -229,6 +234,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Status', value: statusLabel, inline: true },
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
+            { name: 'Token mask', value: avatarMasked ? 'On' : 'Off', inline: true },
             { name: 'External Link', value: linkValue, inline: false },
             { name: 'Notes', value: notes, inline: false },
             { name: 'DM Bubbles', value: dmBubbles, inline: true },
@@ -238,12 +244,19 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
 
     return {
         embeds: [embed],
-        components: buildCharacterManageRows({ characterId: character.id, ownerDiscordId }),
+        components: buildCharacterManageRows({
+            characterId: character.id,
+            ownerDiscordId,
+            simplifiedTracking,
+            avatarMasked,
+        }),
     };
 }
 
 function buildCharacterCardPayload({ character, ownerDiscordId }) {
-    const avatarMasked = Boolean(character.avatar_masked);
+    const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+        ? true
+        : Boolean(character.avatar_masked);
     const attachment = avatarMasked ? null : tryBuildLocalAvatarAttachment(character);
     const url = resolvePublicAvatarUrl(character.avatar, { masked: avatarMasked });
     const simplifiedTracking = Boolean(character.simplified_tracking);
@@ -266,51 +279,6 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
         }),
         files,
     };
-}
-
-function buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }) {
-    const embed = new EmbedBuilder()
-        .setTitle('Settings')
-        .setColor(0x4f46e5)
-        .setDescription('Choose how you want to track character progress.')
-        .addFields(
-            {
-                name: 'Tracking mode',
-                value: simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking',
-                inline: false,
-            },
-            {
-                name: 'Token mask',
-                value: avatarMasked ? 'On' : 'Off',
-                inline: true,
-            },
-        );
-
-    const buttons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_standard_${ownerDiscordId}`)
-            .setLabel('Adventure-based tracking')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(!simplifiedTracking),
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_simplified_${ownerDiscordId}`)
-            .setLabel('Simplified tracking')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(simplifiedTracking),
-    );
-
-    const settingsRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_avatar_${ownerDiscordId}`)
-            .setLabel(`Token mask: ${avatarMasked ? 'On' : 'Off'}`)
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`charactersTracking_back_${ownerDiscordId}`)
-            .setLabel('Back')
-            .setStyle(ButtonStyle.Secondary),
-    );
-
-    return { embeds: [embed], components: [buttons, settingsRow] };
 }
 
 function getAdventureStepNumber(stepKey) {
@@ -788,7 +756,7 @@ function buildCreationEmbed(step, title, description) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
-        .setFooter({ text: `Step ${step}/8` });
+        .setFooter({ text: `Step ${step}/7` });
 }
 
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
@@ -884,25 +852,6 @@ function buildVersionRow(ownerDiscordId, selectedValue) {
         .addOptions([
             { label: '2014', value: '2014' },
             { label: '2024', value: '2024' },
-        ].map(option =>
-            new StringSelectMenuOptionBuilder()
-                .setLabel(option.label)
-                .setValue(option.value)
-                .setDefault(option.value === selectedValue),
-        ));
-
-    return new ActionRowBuilder().addComponents(select);
-}
-
-function buildStatusRow(ownerDiscordId, selectedValue) {
-    const select = new StringSelectMenuBuilder()
-        .setCustomId(`charactersCreate_status_${ownerDiscordId}`)
-        .setPlaceholder('Select status...')
-        .setMinValues(1)
-        .setMaxValues(1)
-        .addOptions([
-            { label: 'Active', value: 'pending' },
-            { label: 'Draft', value: 'draft' },
         ].map(option =>
             new StringSelectMenuOptionBuilder()
                 .setLabel(option.label)
@@ -1138,53 +1087,6 @@ function buildCharacterFactionView({ character, ownerDiscordId }) {
     return { embed, components };
 }
 
-function buildCharacterStatusView({ character, ownerDiscordId }) {
-    const status = normalizeGuildStatus(character.guild_status);
-    const statusLabel = formatGuildStatusLabel(status);
-    const editable = canEditGuildStatus(status);
-
-    const embed = new EmbedBuilder()
-        .setTitle('Status')
-        .setColor(0x4f46e5)
-        .setDescription(
-            editable
-                ? `Choose the approval status for ${character.name}.`
-                : `${character.name} is **${statusLabel}**. This status cannot be changed here.`,
-        );
-
-    const components = [];
-
-    if (editable) {
-        const select = new StringSelectMenuBuilder()
-            .setCustomId(`characterStatusSelect_${character.id}_${ownerDiscordId}`)
-            .setPlaceholder('Select status...')
-            .setMinValues(1)
-            .setMaxValues(1)
-            .addOptions([
-                { label: 'Active', value: 'pending' },
-                { label: 'Draft', value: 'draft' },
-            ].map(option =>
-                new StringSelectMenuOptionBuilder()
-                    .setLabel(option.label)
-                    .setValue(option.value)
-                    .setDefault(option.value === status),
-            ));
-
-        components.push(new ActionRowBuilder().addComponents(select));
-    }
-
-    components.push(
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-    );
-
-    return { embed, components };
-}
-
 function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -1226,7 +1128,17 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
 
 function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
     const primaryRow = new ActionRowBuilder();
-    const canLogActivity = guildStatus !== 'draft';
+    const isDraft = String(guildStatus || '').trim().toLowerCase() === 'draft';
+    const canLogActivity = !isDraft;
+    if (isDraft) {
+        primaryRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
+                .setLabel('Register with Magiergilde')
+                .setStyle(ButtonStyle.Success)
+                .setDisabled(!isCharacterStatusSwitchEnabled),
+        );
+    }
     if (!simplifiedTracking && canLogActivity) {
         primaryRow.addComponents(
             new ButtonBuilder()
@@ -2064,7 +1976,6 @@ module.exports = {
     buildCharacterManageRows,
     buildCharacterManageView,
     buildCharacterCardPayload,
-    buildTrackingSettingsView,
     buildAdventureStepEmbed,
     buildAdventureDurationRows,
     buildAdventureDateRows,
@@ -2087,7 +1998,6 @@ module.exports = {
     getStartTierSelection,
     buildFactionRow,
     buildVersionRow,
-    buildStatusRow,
     buildCreationConfirmRows,
     buildCreationBasicsRows,
     buildCreationStepActionRows,
@@ -2098,7 +2008,6 @@ module.exports = {
     buildCreationBasicModal,
     buildCharacterClassesView,
     buildCharacterFactionView,
-    buildCharacterStatusView,
     buildDeleteConfirmRow,
     buildAdventureDeleteConfirmRow,
     buildDowntimeDeleteConfirmRow,
@@ -2138,7 +2047,6 @@ module.exports = {
     allowedFactions,
     formatFactionLabel,
     formatGuildStatusLabel,
-    canEditGuildStatus,
     safeInt,
     participantSearchKey,
     setParticipantSearch,

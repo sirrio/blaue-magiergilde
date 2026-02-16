@@ -38,6 +38,7 @@ class StoreItemRequest extends FormRequest
             'cost' => 'string',
             'rarity' => 'required|string',
             'type' => 'required|string',
+            'source_id' => 'nullable|integer|exists:sources,id',
             'shop_enabled' => 'boolean',
             'guild_enabled' => 'boolean',
             'default_spell_roll_enabled' => 'boolean',

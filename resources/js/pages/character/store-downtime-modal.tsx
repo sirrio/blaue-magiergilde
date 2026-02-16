@@ -32,12 +32,13 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
       <ModalTrigger>
         <Button
           size="sm"
-          className={'w-full'}
+          className="w-full justify-center gap-1"
           disabled={character.is_filler}
           aria-label="Add downtime"
           title="Add downtime"
         >
           <FlameKindling size={14} />
+          <span className="md:hidden">Downtime</span>
         </Button>
       </ModalTrigger>
       <ModalTitle>Add Downtime</ModalTitle>

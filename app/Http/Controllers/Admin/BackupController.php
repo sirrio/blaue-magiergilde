@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CompendiumImportRun;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordBotSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
+use App\Models\Source;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -63,6 +65,28 @@ class BackupController extends Controller
                 'character_approval_channel_name' => DiscordBotSetting::current()->character_approval_channel_name,
                 'character_approval_channel_guild_id' => DiscordBotSetting::current()->character_approval_channel_guild_id,
             ],
+            'sources' => Source::query()
+                ->orderBy('shortcode')
+                ->orderBy('name')
+                ->get(['id', 'name', 'shortcode']),
+            'compendiumImportRuns' => CompendiumImportRun::query()
+                ->with('user:id,name')
+                ->orderByDesc('applied_at')
+                ->orderByDesc('id')
+                ->limit(10)
+                ->get([
+                    'id',
+                    'user_id',
+                    'entity_type',
+                    'filename',
+                    'total_rows',
+                    'new_rows',
+                    'updated_rows',
+                    'unchanged_rows',
+                    'invalid_rows',
+                    'error_samples',
+                    'applied_at',
+                ]),
         ]);
     }
 }

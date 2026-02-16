@@ -41,6 +41,8 @@ class Character extends Model
     protected $casts = [
         'is_filler' => 'boolean',
         'admin_managed' => 'boolean',
+        'simplified_tracking' => 'boolean',
+        'avatar_masked' => 'boolean',
     ];
 
     protected $appends = ['faction_rank'];

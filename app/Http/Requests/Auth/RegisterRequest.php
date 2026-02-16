@@ -28,4 +28,11 @@ class RegisterRequest extends FormRequest
             'privacy_policy_accepted.accepted' => 'Bitte bestaetige die Datenschutzerklaerung.',
         ];
     }
+
+    public function attributes(): array
+    {
+        return [
+            'name' => 'nickname',
+        ];
+    }
 }

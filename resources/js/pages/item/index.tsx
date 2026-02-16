@@ -6,10 +6,11 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
+import { cn } from '@/lib/utils'
 import ItemRow from '@/pages/item/item-row'
-import { Item } from '@/types'
+import { Item, Source } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
-import { LoaderCircle, Plus } from 'lucide-react'
+import { LoaderCircle, Plus, Scale, ScrollText, Shield, Store } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
 interface FilterOption {
@@ -31,7 +32,7 @@ const spellSchoolLabels: Record<string, string> = {
 const spellLevels = Array.from({ length: 10 }, (_, i) => i)
 const spellSchools = Object.keys(spellSchoolLabels)
 
-const StoreItemModal = () => {
+const StoreItemModal = ({ sources }: { sources: Source[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
@@ -39,6 +40,7 @@ const StoreItemModal = () => {
     cost: '',
     rarity: 'common',
     type: 'item',
+    source_id: '' as number | '',
     shop_enabled: true,
     guild_enabled: true,
     default_spell_roll_enabled: false,
@@ -53,6 +55,7 @@ const StoreItemModal = () => {
     reset()
     setData('shop_enabled', true)
     setData('guild_enabled', true)
+    setData('source_id', '')
     setData('default_spell_roll_enabled', false)
     setData('default_spell_levels', [])
     setData('default_spell_schools', [])
@@ -124,127 +127,167 @@ const StoreItemModal = () => {
       </ModalTrigger>
       <ModalTitle>Add item</ModalTitle>
       <ModalContent>
-        <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-          Name
-        </Input>
-        <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
-          URL
-        </Input>
-        <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-          Cost
-        </Input>
-        <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-          <SelectLabel>Rarity</SelectLabel>
-          <SelectOptions>
-            <option value="common">Common</option>
-            <option value="uncommon">Uncommon</option>
-            <option value="rare">Rare</option>
-            <option value="very_rare">Very Rare</option>
-          </SelectOptions>
-        </Select>
-        <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-          <SelectLabel>Type</SelectLabel>
-          <SelectOptions>
-            <option value="item">Item</option>
-            <option value="spellscroll">Spell Scroll</option>
-            <option value="consumable">Consumable</option>
-          </SelectOptions>
-        </Select>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-xs"
-            checked={Boolean(data.shop_enabled)}
-            onChange={(e) => setData('shop_enabled', e.target.checked)}
-          />
-          <span>Include in shop rolls</span>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-xs"
-            checked={Boolean(data.guild_enabled)}
-            onChange={(e) => setData('guild_enabled', e.target.checked)}
-          />
-          <span>Allowed in guild</span>
-        </label>
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-xs"
-              checked={Boolean(data.ruling_changed)}
-              onChange={(e) => handleRulingToggle(e.target.checked)}
-            />
-            <span>Ruling changed</span>
-          </label>
-          {data.ruling_changed ? (
-            <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
-              Ruling note
-            </TextArea>
-          ) : null}
-        </div>
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-xs"
-              checked={Boolean(data.default_spell_roll_enabled)}
-              onChange={(e) => handleAutoRollToggle(e.target.checked)}
-            />
-            <span>Auto-roll spell on shop</span>
-          </label>
-          {data.default_spell_roll_enabled ? (
-            <div className="space-y-3">
-              <div>
-                <p className="label">Default spell levels</p>
-                <div className="grid grid-cols-5 gap-1">
-                  {spellLevels.map((level) => {
-                    const id = `create-default-level-${level}`
-                    return (
-                      <div key={level} className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          id={id}
-                          className="checkbox checkbox-xs"
-                          checked={data.default_spell_levels.includes(level)}
-                          onChange={() => toggleDefaultSpellLevel(level)}
-                        />
-                        <label htmlFor={id} className="label cursor-pointer">
-                          {level === 0 ? 'Cantrip' : level}
-                        </label>
-                      </div>
-                    )
-                  })}
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
+            <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+              Name
+            </Input>
+            <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
+              URL
+            </Input>
+            <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
+              Cost
+            </Input>
+            <Select
+              errors={errors.source_id}
+              value={data.source_id}
+              onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+            >
+              <SelectLabel>Source</SelectLabel>
+              <SelectOptions>
+                <option value="">No source</option>
+                {sources.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.shortcode} - {source.name}
+                  </option>
+                ))}
+              </SelectOptions>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
+            <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+              <SelectLabel>Rarity</SelectLabel>
+              <SelectOptions>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="very_rare">Very Rare</option>
+              </SelectOptions>
+            </Select>
+            <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+              <SelectLabel>Type</SelectLabel>
+              <SelectOptions>
+                <option value="item">Item</option>
+                <option value="spellscroll">Spell Scroll</option>
+                <option value="consumable">Consumable</option>
+              </SelectOptions>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.shop_enabled)}
+                onChange={(e) => setData('shop_enabled', e.target.checked)}
+              />
+              <span className="inline-flex items-center gap-2">
+                <Store className="h-4 w-4 text-base-content/70" />
+                Include in shop rolls
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.guild_enabled)}
+                onChange={(e) => setData('guild_enabled', e.target.checked)}
+              />
+              <span className="inline-flex items-center gap-2">
+                <Shield className="h-4 w-4 text-base-content/70" />
+                Allowed in guild
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.ruling_changed)}
+                onChange={(e) => handleRulingToggle(e.target.checked)}
+              />
+              <span className="inline-flex items-center gap-2">
+                <Scale className={cn('h-4 w-4', data.ruling_changed ? 'text-warning' : 'text-base-content/70')} />
+                Ruling changed
+              </span>
+            </label>
+            {data.ruling_changed ? (
+              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
+                Ruling note
+              </TextArea>
+            ) : null}
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Auto-roll</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={Boolean(data.default_spell_roll_enabled)}
+                onChange={(e) => handleAutoRollToggle(e.target.checked)}
+              />
+              <span className="inline-flex items-center gap-2">
+                <ScrollText className="h-4 w-4 text-base-content/70" />
+                Auto-roll spell on shop
+              </span>
+            </label>
+            {data.default_spell_roll_enabled ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="label">Default spell levels</p>
+                  <div className="grid grid-cols-5 gap-1">
+                    {spellLevels.map((level) => {
+                      const id = `create-default-level-${level}`
+                      return (
+                        <div key={level} className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            id={id}
+                            className="checkbox checkbox-xs"
+                            checked={data.default_spell_levels.includes(level)}
+                            onChange={() => toggleDefaultSpellLevel(level)}
+                          />
+                          <label htmlFor={id} className="label cursor-pointer">
+                            {level === 0 ? 'Cantrip' : level}
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="label">Default spell schools</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {spellSchools.map((school) => {
+                      const id = `create-default-school-${school}`
+                      return (
+                        <div key={school} className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            id={id}
+                            className="checkbox checkbox-xs"
+                            checked={data.default_spell_schools.includes(school)}
+                            onChange={() => toggleDefaultSpellSchool(school)}
+                          />
+                          <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
+                            <svg className="icon h-4 w-4 fill-current">
+                              <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
+                            </svg>
+                            {spellSchoolLabels[school] ?? school}
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className="label">Default spell schools</p>
-                <div className="grid grid-cols-2 gap-1">
-                  {spellSchools.map((school) => {
-                    const id = `create-default-school-${school}`
-                    return (
-                      <div key={school} className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          id={id}
-                          className="checkbox checkbox-xs"
-                          checked={data.default_spell_schools.includes(school)}
-                          onChange={() => toggleDefaultSpellSchool(school)}
-                        />
-                        <label htmlFor={id} className="label cursor-pointer flex items-center gap-1">
-                          <svg className="icon h-4 w-4 fill-current">
-                            <use xlinkHref={`/images/spell-schools.svg#${school}`}></use>
-                          </svg>
-                          {spellSchoolLabels[school] ?? school}
-                        </label>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
@@ -254,7 +297,7 @@ const StoreItemModal = () => {
   )
 }
 
-export default function Index({ items }: { items: Item[] }) {
+export default function Index({ items, sources }: { items: Item[]; sources: Source[] }) {
   const rarityFilters: FilterOption[] = [
     { label: 'Common', value: 'common' },
     { label: 'Uncommon', value: 'uncommon' },
@@ -380,7 +423,7 @@ export default function Index({ items }: { items: Item[] }) {
             <h1 className="text-2xl font-bold">Items</h1>
             <p className="text-sm text-base-content/70">Browse and filter the guild inventory.</p>
           </div>
-          <StoreItemModal />
+          <StoreItemModal sources={sources} />
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -448,7 +491,7 @@ export default function Index({ items }: { items: Item[] }) {
           }
           data={['items']}
         >
-          <List>{items?.map((item) => <ItemRow key={item.id} item={item} />)}</List>
+          <List>{items?.map((item) => <ItemRow key={item.id} item={item} sources={sources} />)}</List>
         </Deferred>
       </div>
     </AppLayout>

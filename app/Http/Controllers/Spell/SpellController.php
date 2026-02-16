@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Spell;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Spell\StoreSpellRequest;
 use App\Http\Requests\Spell\UpdateSpellRequest;
+use App\Models\Source;
 use App\Models\Spell;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -24,6 +25,7 @@ class SpellController extends Controller
         $searchTerm = request('search', '');
 
         $spellQuery = Spell::query();
+        $spellQuery->with('source:id,name,shortcode');
 
         if (! empty($searchTerm)) {
             $spellQuery->where('name', 'LIKE', "%{$searchTerm}%");
@@ -67,11 +69,15 @@ class SpellController extends Controller
         $spells = $spellQuery
             ->orderBy('spell_level')
             ->orderBy('name')
-            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'guild_enabled', 'ruling_changed', 'ruling_note'])
+            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'guild_enabled', 'ruling_changed', 'ruling_note', 'source_id'])
             ->get();
 
         return Inertia::render('spell/index', [
             'spells' => Inertia::defer(fn () => $spells),
+            'sources' => Source::query()
+                ->orderBy('shortcode')
+                ->orderBy('name')
+                ->get(['id', 'name', 'shortcode']),
         ]);
 
     }
@@ -96,6 +102,7 @@ class SpellController extends Controller
         $spell->legacy_url = $request->input('legacy_url');
         $spell->spell_school = $request->input('spell_school');
         $spell->spell_level = (int) $request->input('spell_level', 0);
+        $spell->source_id = $request->input('source_id');
         $spell->guild_enabled = $request->boolean('guild_enabled', true);
 
         $hasRulingChange = $request->boolean('ruling_changed');
@@ -134,6 +141,7 @@ class SpellController extends Controller
         $spell->legacy_url = $request->input('legacy_url');
         $spell->spell_school = $request->input('spell_school');
         $spell->spell_level = (int) $request->input('spell_level', 0);
+        $spell->source_id = $request->input('source_id');
         $spell->guild_enabled = $request->boolean('guild_enabled', true);
 
         $hasRulingChange = $request->boolean('ruling_changed');
@@ -149,8 +157,10 @@ class SpellController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Spell $spell)
+    public function destroy(Spell $spell): RedirectResponse
     {
-        //
+        $spell->delete();
+
+        return redirect()->back();
     }
 }

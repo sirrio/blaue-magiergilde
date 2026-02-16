@@ -17,7 +17,7 @@ class QuickLevelController extends Controller
         $user = $request->user();
         abort_unless($user && $character->user_id === $user->id, 403);
 
-        if (! $user->simplified_tracking) {
+        if (! ($character->simplified_tracking ?? false)) {
             return redirect()->back()->withErrors([
                 'level' => 'Simplified tracking must be enabled to set a level.',
             ]);

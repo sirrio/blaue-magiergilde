@@ -1,5 +1,6 @@
 import { ActionMenu } from '@/components/ui/action-menu'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
@@ -7,12 +8,14 @@ import { TextArea } from '@/components/ui/text-area'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import {
+  CompendiumImportRun,
   DiscordBackupChannel,
   DiscordBackupStats,
   DiscordBackupStatus,
   DiscordBotOwnersStatus,
   DiscordBotSettings,
   PageProps,
+  Source,
 } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { Settings as SettingsIcon } from 'lucide-react'
@@ -27,9 +30,13 @@ const getCsrfToken = () => {
 export default function Settings({
   discordBackup,
   discordBotSettings,
+  sources,
+  compendiumImportRuns,
 }: {
   discordBackup: DiscordBackupStats
   discordBotSettings: DiscordBotSettings
+  sources: Source[]
+  compendiumImportRuns: CompendiumImportRun[]
 }) {
   const { errors: pageErrors } = usePage<PageProps>().props
   const backupForm = useForm({})
@@ -43,6 +50,15 @@ export default function Settings({
     character_approval_channel_name: discordBotSettings.character_approval_channel_name ?? '',
     character_approval_channel_guild_id: discordBotSettings.character_approval_channel_guild_id ?? '',
   })
+  const createSourceForm = useForm({
+    name: '',
+    shortcode: '',
+  })
+  const sourceEditForm = useForm({
+    id: 0,
+    name: '',
+    shortcode: '',
+  })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
   )
@@ -52,6 +68,31 @@ export default function Settings({
   const [ownerStatus, setOwnerStatus] = useState<DiscordBotOwnersStatus | null>(null)
   const [ownerStatusLoading, setOwnerStatusLoading] = useState(false)
   const [ownerStatusError, setOwnerStatusError] = useState<string | null>(null)
+  const [editingSource, setEditingSource] = useState<Source | null>(null)
+  const [importEntityType, setImportEntityType] = useState<'items' | 'spells'>('items')
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
+  const [applyBusy, setApplyBusy] = useState(false)
+  const [importPreview, setImportPreview] = useState<{
+    preview_token: string
+    entity_type: 'items' | 'spells'
+    filename: string
+    summary: {
+      total_rows: number
+      new_rows: number
+      updated_rows: number
+      unchanged_rows: number
+      invalid_rows: number
+    }
+    row_samples: Array<{
+      line: number
+      action: 'new' | 'updated' | 'unchanged'
+      payload: Record<string, string | number | boolean | null>
+      source_shortcode?: string
+      changes?: Record<string, { from: string | number | boolean | null; to: string | number | boolean | null }>
+    }>
+    error_samples: Array<{ line?: number; message?: string }>
+  } | null>(null)
 
   const fetchBackupStatus = useCallback(
     async (showToast: boolean) => {
@@ -418,6 +459,147 @@ export default function Settings({
     void fetchOwnerStatus()
   }, [fetchOwnerStatus])
 
+  useEffect(() => {
+    if (!editingSource) return
+    sourceEditForm.setData({
+      id: editingSource.id,
+      name: editingSource.name,
+      shortcode: editingSource.shortcode,
+    })
+  }, [editingSource, sourceEditForm])
+
+  const handleSourceCreate = () => {
+    createSourceForm.post(route('admin.settings.sources.store'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        createSourceForm.reset()
+        toast.show('Source created.', 'info')
+      },
+      onError: () => {
+        toast.show('Source could not be created.', 'error')
+      },
+    })
+  }
+
+  const handleSourceUpdate = () => {
+    sourceEditForm.patch(route('admin.settings.sources.update', sourceEditForm.data.id), {
+      preserveScroll: true,
+      onSuccess: () => {
+        setEditingSource(null)
+        sourceEditForm.reset()
+        toast.show('Source updated.', 'info')
+      },
+      onError: () => {
+        toast.show('Source could not be updated.', 'error')
+      },
+    })
+  }
+
+  const handleSourceDelete = (source: Source) => {
+    if (!window.confirm(`Delete source ${source.shortcode}?`)) {
+      return
+    }
+
+    router.delete(route('admin.settings.sources.destroy', source.id), {
+      preserveScroll: true,
+      onSuccess: () => {
+        if (editingSource?.id === source.id) {
+          setEditingSource(null)
+          sourceEditForm.reset()
+        }
+        toast.show('Source deleted.', 'info')
+      },
+      onError: () => {
+        toast.show('Source could not be deleted.', 'error')
+      },
+    })
+  }
+
+  const handlePreviewImport = useCallback(async () => {
+    if (!importFile) {
+      toast.show('Select a CSV file first.', 'error')
+      return
+    }
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('entity_type', importEntityType)
+    formData.append('file', importFile)
+
+    setImportBusy(true)
+    try {
+      const response = await fetch(route('admin.settings.compendium.preview'), {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: formData,
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.message ?? 'Preview failed.'), 'error')
+        return
+      }
+
+      setImportPreview(payload)
+      toast.show('Preview ready.', 'info')
+    } catch {
+      toast.show('Preview failed.', 'error')
+    } finally {
+      setImportBusy(false)
+    }
+  }, [importEntityType, importFile])
+
+  const handleApplyImport = useCallback(async () => {
+    if (!importPreview?.preview_token) {
+      toast.show('Run preview first.', 'error')
+      return
+    }
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setApplyBusy(true)
+    try {
+      const response = await fetch(route('admin.settings.compendium.apply'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ preview_token: importPreview.preview_token }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.message ?? 'Import apply failed.'), 'error')
+        return
+      }
+
+      setImportPreview(null)
+      setImportFile(null)
+      toast.show('Import applied.', 'info')
+      router.reload({ only: ['compendiumImportRuns'] })
+    } catch {
+      toast.show('Import apply failed.', 'error')
+    } finally {
+      setApplyBusy(false)
+    }
+  }, [importPreview])
+
   const ownerCacheLabel = ownerStatusLoading
     ? 'Loading...'
     : ownerStatus?.updated_at
@@ -425,6 +607,9 @@ export default function Settings({
       : 'Not yet cached'
   const ownerEntries = ownerStatus?.owners ?? []
   const ownerIdsFallback = ownerStatus?.owner_ids ?? discordBotSettings.owner_ids ?? []
+  const sourceById = useMemo(() => {
+    return Object.fromEntries(sources.map((source) => [source.id, `${source.shortcode} - ${source.name}`]))
+  }, [sources])
 
   const approvalChannelLabel = useMemo(() => {
     if (ownerIdsForm.data.character_approval_channel_name) {
@@ -604,6 +789,236 @@ export default function Settings({
               Select at least one channel before starting a backup.
             </div>
           ) : null}
+        </div>
+        <div className="rounded-box bg-base-100 shadow-md p-3">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold">Compendium sources</h2>
+            <p className="text-xs text-base-content/60">
+              Manage source books used by items and spells.
+            </p>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+            <Input
+              value={createSourceForm.data.name}
+              onChange={(event) => createSourceForm.setData('name', event.target.value)}
+              errors={createSourceForm.errors.name}
+              placeholder="Player's Handbook"
+            >
+              Source name
+            </Input>
+            <Input
+              value={createSourceForm.data.shortcode}
+              onChange={(event) => createSourceForm.setData('shortcode', event.target.value)}
+              errors={createSourceForm.errors.shortcode}
+              placeholder="PHB"
+            >
+              Shortcode
+            </Input>
+            <Button size="sm" variant="outline" onClick={handleSourceCreate} disabled={createSourceForm.processing}>
+              Add source
+            </Button>
+          </div>
+          <div className="mt-4 space-y-2">
+            {sources.length === 0 ? (
+              <p className="text-xs text-base-content/60">No sources configured yet.</p>
+            ) : (
+              sources.map((source) => (
+                <div key={source.id} className="flex items-center justify-between gap-3 rounded-lg border border-base-200 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="rounded-full border border-base-300 px-2 py-0.5 text-[10px] uppercase text-base-content/70">
+                      {source.shortcode}
+                    </span>
+                    <span className="truncate text-sm">{source.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="xs" variant="ghost" onClick={() => setEditingSource(source)}>
+                      Edit
+                    </Button>
+                    <Button size="xs" variant="ghost" className="text-error" onClick={() => handleSourceDelete(source)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <Modal isOpen={editingSource !== null} onClose={() => setEditingSource(null)}>
+            <ModalTitle>Edit source</ModalTitle>
+            <ModalContent>
+              <Input
+                value={sourceEditForm.data.name}
+                onChange={(event) => sourceEditForm.setData('name', event.target.value)}
+                errors={sourceEditForm.errors.name}
+                placeholder="Player's Handbook"
+              >
+                Source name
+              </Input>
+              <Input
+                value={sourceEditForm.data.shortcode}
+                onChange={(event) => sourceEditForm.setData('shortcode', event.target.value)}
+                errors={sourceEditForm.errors.shortcode}
+                placeholder="PHB"
+              >
+                Shortcode
+              </Input>
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={handleSourceUpdate} disabled={sourceEditForm.processing}>
+                  Save source
+                </Button>
+              </div>
+            </ModalContent>
+          </Modal>
+        </div>
+        <div className="rounded-box bg-base-100 shadow-md p-3">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold">Compendium import</h2>
+            <p className="text-xs text-base-content/60">
+              Upload CSV metadata for items or spells, preview changes, then apply.
+            </p>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
+            <label className="form-control">
+              <span className="label text-xs">Entity</span>
+              <select
+                className="select select-sm w-full"
+                value={importEntityType}
+                onChange={(event) => setImportEntityType(event.target.value as 'items' | 'spells')}
+              >
+                <option value="items">Items</option>
+                <option value="spells">Spells</option>
+              </select>
+            </label>
+            <label className="form-control">
+              <span className="label text-xs">CSV file</span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="file-input file-input-bordered file-input-sm w-full"
+                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                as="a"
+                size="sm"
+                variant="outline"
+                href={route('admin.settings.compendium.template', { entity_type: importEntityType })}
+              >
+                Template
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => void handlePreviewImport()} disabled={importBusy}>
+                {importBusy ? 'Previewing...' : 'Preview'}
+              </Button>
+            </div>
+          </div>
+          {importPreview ? (
+            <div className="mt-4 space-y-3 rounded-lg border border-base-200 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full border border-base-200 px-2 py-1">Rows: {importPreview.summary.total_rows}</span>
+                <span className="rounded-full border border-success/40 px-2 py-1 text-success">New: {importPreview.summary.new_rows}</span>
+                <span className="rounded-full border border-warning/40 px-2 py-1 text-warning">Updated: {importPreview.summary.updated_rows}</span>
+                <span className="rounded-full border border-base-200 px-2 py-1">Unchanged: {importPreview.summary.unchanged_rows}</span>
+                <span className="rounded-full border border-error/40 px-2 py-1 text-error">Invalid: {importPreview.summary.invalid_rows}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table table-xs">
+                  <thead>
+                    <tr>
+                      <th>Line</th>
+                      <th>Action</th>
+                      {(importPreview.entity_type === 'items'
+                        ? ['name', 'type', 'rarity', 'cost', 'url', 'source', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
+                        : ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
+                      ).map((column) => (
+                        <th key={column}>{column}</th>
+                      ))}
+                      <th>Changes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.row_samples.map((sample) => (
+                      <tr key={`${sample.line}-${sample.action}`}>
+                        <td>{sample.line}</td>
+                        <td>{sample.action}</td>
+                        {(importPreview.entity_type === 'items'
+                          ? ['name', 'type', 'rarity', 'cost', 'url', 'source', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
+                          : ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
+                        ).map((column) => {
+                          const rawValue = column === 'source' ? sample.payload?.source_id : sample.payload?.[column]
+                          let displayValue: string | number | boolean | null = rawValue ?? null
+
+                          if (column === 'source') {
+                            const sourceId = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+                            const resolved = Number.isFinite(sourceId) && sourceById[sourceId]
+                              ? sourceById[sourceId]
+                              : null
+                            displayValue = resolved ?? sample.source_shortcode ?? null
+                          }
+
+                          return <td key={`${sample.line}-${column}`}>{displayValue === null ? '-' : String(displayValue)}</td>
+                        })}
+                        <td>{sample.changes ? Object.keys(sample.changes).join(', ') || '-' : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {importPreview.error_samples.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-error">Errors</p>
+                  {importPreview.error_samples.map((error, index) => (
+                    <p key={`${error.line ?? index}-${index}`} className="text-xs text-error">
+                      Line {error.line ?? '-'}: {error.message ?? 'Invalid row'}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={() => void handleApplyImport()} disabled={applyBusy}>
+                  {applyBusy ? 'Applying...' : 'Apply import'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-semibold text-base-content/70">Recent imports</p>
+            {compendiumImportRuns.length === 0 ? (
+              <p className="text-xs text-base-content/60">No imports yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table table-xs">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Type</th>
+                      <th>File</th>
+                      <th>Total</th>
+                      <th>New</th>
+                      <th>Updated</th>
+                      <th>Unchanged</th>
+                      <th>Invalid</th>
+                      <th>By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compendiumImportRuns.map((run) => (
+                      <tr key={run.id}>
+                        <td>{run.applied_at ? new Date(run.applied_at).toLocaleString() : '-'}</td>
+                        <td>{run.entity_type}</td>
+                        <td>{run.filename}</td>
+                        <td>{run.total_rows}</td>
+                        <td>{run.new_rows}</td>
+                        <td>{run.updated_rows}</td>
+                        <td>{run.unchanged_rows}</td>
+                        <td>{run.invalid_rows}</td>
+                        <td>{run.user?.name ?? '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
         <div className="rounded-box bg-base-100 shadow-md p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">

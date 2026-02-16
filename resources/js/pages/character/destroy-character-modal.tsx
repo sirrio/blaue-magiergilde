@@ -3,8 +3,9 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Character } from '@/types'
 import { router } from '@inertiajs/react'
 import { Trash } from 'lucide-react'
+import React from 'react'
 
-const DestroyCharacterModal = ({ character }: { character: Character }) => {
+const DestroyCharacterModal = ({ character, children }: { character: Character; children?: React.ReactNode }) => {
   const handleFormSubmit = () => {
     router.delete(route('characters.destroy', character.id), { preserveState: 'errors' })
   }
@@ -12,16 +13,18 @@ const DestroyCharacterModal = ({ character }: { character: Character }) => {
   return (
     <Modal>
       <ModalTrigger>
-        <Button
-          className="flex md:hidden md:group-hover:flex"
-          size="xs"
-          modifier="square"
-          color="error"
-          aria-label="Delete character"
-          title="Delete character"
-        >
-          <Trash size={14} />
-        </Button>
+        {children ?? (
+          <Button
+            className="flex md:hidden md:group-hover:flex"
+            size="xs"
+            modifier="square"
+            color="error"
+            aria-label="Delete character"
+            title="Delete character"
+          >
+            <Trash size={14} />
+          </Button>
+        )}
       </ModalTrigger>
       <ModalTitle>Delete</ModalTitle>
       <ModalContent>

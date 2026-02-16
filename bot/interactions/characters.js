@@ -18,10 +18,6 @@ const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
     listCharactersForDiscord,
-    getUserTrackingModeForDiscord,
-    updateUserTrackingModeForDiscord,
-    getUserAvatarMaskedForDiscord,
-    updateUserAvatarMaskedForDiscord,
     updateCharacterManualLevelForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
@@ -80,7 +76,6 @@ const {
     buildCharacterClassesView,
     buildCharacterFactionView,
     buildCharacterManageView,
-    buildCharacterStatusView,
     buildClassesRow,
     buildCreationBasicModal,
     buildCreationBasicsEmbed,
@@ -108,11 +103,9 @@ const {
     buildDowntimeStepEmbed,
     buildDowntimeTypeManageView,
     buildDowntimeTypeRows,
-    buildTrackingSettingsView,
     buildFactionRow,
     buildStartTierRow,
     buildVersionRow,
-    buildStatusRow,
     allowedFactions,
     formatParticipantList,
     getParticipantSearch,
@@ -127,6 +120,8 @@ const {
     pendingAdventureCreations,
     pendingDowntimeCreations,
 } = require('../state');
+
+const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -146,9 +141,7 @@ function clearAvatarUpdateState(userId) {
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
-    const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-    const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
+    const listView = buildCharacterListView({ ownerDiscordId, characters });
     await interaction.update({
         ...listView,
         content: '',
@@ -1118,7 +1111,7 @@ async function handle(interaction) {
                 startTier: 'bt',
                 version: '2024',
                 faction: 'none',
-                guildStatus: 'pending',
+                guildStatus: 'draft',
             },
             promptInteraction: interaction,
             promptMessage: interaction.message ?? null,
@@ -1133,8 +1126,8 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_tracking_')) {
-        const ownerDiscordId = interaction.customId.replace('charactersAction_tracking_', '');
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_refresh_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_refresh_', '');
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
@@ -1147,58 +1140,10 @@ async function handle(interaction) {
         }
 
         await interaction.deferUpdate().catch(() => undefined);
-
-        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-        await updateManageMessage(interaction, {
-            ...buildTrackingSettingsView({ ownerDiscordId, simplifiedTracking, avatarMasked }),
-            content: '',
-        });
+        const characters = await listCharactersForDiscord(interaction.user);
+        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        await updateManageMessage(interaction, { ...listView, content: '' });
         return true;
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('charactersTracking_')) {
-        const raw = interaction.customId.replace('charactersTracking_', '');
-        const parts = raw.split('_');
-        const ownerDiscordId = parts.pop();
-        const action = parts.join('_');
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
-            return true;
-        }
-
-        await interaction.deferUpdate().catch(() => undefined);
-
-        if (action === 'back') {
-            const characters = await listCharactersForDiscord(interaction.user);
-            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-            await updateManageMessage(interaction, { ...listView, content: '' });
-            return true;
-        }
-
-        if (action === 'standard' || action === 'simplified') {
-            const simplifiedTracking = action === 'simplified';
-            await updateUserTrackingModeForDiscord(interaction.user, simplifiedTracking);
-            const characters = await listCharactersForDiscord(interaction.user);
-            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-            await updateManageMessage(interaction, { ...listView, content: '' });
-            return true;
-        }
-
-        if (action === 'avatar') {
-            const current = await getUserAvatarMaskedForDiscord(interaction.user);
-            await updateUserAvatarMaskedForDiscord(interaction.user, !current);
-            const characters = await listCharactersForDiscord(interaction.user);
-            const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-            const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-            await updateManageMessage(interaction, { ...listView, content: '' });
-            return true;
-        }
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
@@ -1304,11 +1249,9 @@ async function handle(interaction) {
 
         clearCreationState(ownerDiscordId);
         try {
-        const characters = await listCharactersForDiscord(interaction.user);
-        const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-        const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-        const listView = buildCharacterListView({ ownerDiscordId, characters, simplifiedTracking, avatarMasked });
-        await interaction.update({ ...listView, content: '' });
+            const characters = await listCharactersForDiscord(interaction.user);
+            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await interaction.update({
@@ -1451,36 +1394,6 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_status_')) {
-        const ownerDiscordId = interaction.customId.replace('charactersCreate_status_', '');
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
-            return true;
-        }
-
-        const state = getCreationState(ownerDiscordId);
-        if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        ensurePromptMessage(state, interaction);
-        state.data.guildStatus = interaction.values[0];
-        state.step = 'status';
-
-        await interaction.update({
-            embeds: [
-                buildCreationEmbed(7, 'Choose status', 'Pick whether this character is ready for review.'),
-            ],
-            components: [
-                buildStatusRow(ownerDiscordId, state.data.guildStatus),
-                ...buildCreationStepActionRows(ownerDiscordId, 'status'),
-            ],
-            content: '',
-        });
-        return true;
-    }
-
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_confirm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_confirm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
@@ -1518,21 +1431,6 @@ async function handle(interaction) {
         state.promptInteraction = interaction;
 
         if (state.step === 'finalize') {
-            state.step = 'status';
-            await interaction.update({
-                embeds: [
-                    buildCreationEmbed(7, 'Choose status', 'Pick whether this character is ready for review.'),
-                ],
-                components: [
-                    buildStatusRow(ownerDiscordId, state.data.guildStatus),
-                    ...buildCreationStepActionRows(ownerDiscordId, 'status'),
-                ],
-                content: '',
-            });
-            return true;
-        }
-
-        if (state.step === 'status') {
             state.step = 'version';
             await interaction.update({
                 embeds: [
@@ -1782,40 +1680,12 @@ async function handle(interaction) {
                 return true;
             }
 
-            state.step = 'status';
-            await interaction.update({
-                embeds: [
-                    buildCreationEmbed(7, 'Choose status', 'Pick whether this character is ready for review.'),
-                ],
-                components: [
-                    buildStatusRow(ownerDiscordId, state.data.guildStatus),
-                    ...buildCreationStepActionRows(ownerDiscordId, 'status'),
-                ],
-                content: '',
-            });
-            return true;
-        }
-
-        if (stepKey === 'status') {
-            if (!state.data.guildStatus) {
-                await interaction.update({
-                    embeds: [
-                        buildCreationEmbed(7, 'Choose status', 'Please choose a status.'),
-                    ],
-                    components: [
-                        buildStatusRow(ownerDiscordId, state.data.guildStatus),
-                        ...buildCreationStepActionRows(ownerDiscordId, 'status'),
-                    ],
-                    content: '',
-                });
-                return true;
-            }
-
             state.step = 'finalize';
+            state.data.guildStatus = 'draft';
             const summary = await buildCreationSummaryEmbed(state);
             await interaction.update({
                 embeds: [
-                    buildCreationEmbed(8, 'Finalize', 'Please confirm the details.'),
+                    buildCreationEmbed(7, 'Finalize', 'Please confirm the details.'),
                     summary,
                 ],
                 components: buildCreationConfirmRows(ownerDiscordId),
@@ -1937,43 +1807,6 @@ async function handle(interaction) {
         }
 
         const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { faction });
-        if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const character = await findCharacterForDiscord(interaction.user, characterId);
-        if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        await updateManageMessage(interaction, {
-            ...buildCharacterManageView(character, { ownerDiscordId }),
-            content: '',
-        });
-        return true;
-    }
-
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterStatusSelect_')) {
-        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
-        const characterId = Number(characterIdRaw);
-        if (!Number.isFinite(characterId) || characterId < 1) return false;
-
-        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        await interaction.deferUpdate();
-
-        const guildStatus = String(interaction.values[0] || '').trim().toLowerCase();
-        if (!['pending', 'draft'].includes(guildStatus)) {
-            await updateManageMessage(interaction, { content: 'Invalid status.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus });
         if (!result.ok) {
             await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
             return true;
@@ -2228,6 +2061,40 @@ async function handle(interaction) {
             return true;
         }
 
+        if (action === 'register') {
+            if (!isCharacterStatusSwitchEnabled) {
+                await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const status = String(character.guild_status || '').trim().toLowerCase();
+            if (status !== 'draft') {
+                await interaction.update({
+                    ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                    content: '',
+                });
+                return true;
+            }
+
+            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus: 'pending' });
+            if (!result.ok) {
+                await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+            if (!refreshed) {
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            await interaction.update({
+                ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
         if (action === 'adv') {
             const row = buildAdventureMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
@@ -2258,14 +2125,7 @@ async function handle(interaction) {
             await interaction.deferUpdate();
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
-                const simplifiedTracking = await getUserTrackingModeForDiscord(interaction.user);
-                const avatarMasked = await getUserAvatarMaskedForDiscord(interaction.user);
-                const listView = buildCharacterListView({
-                    ownerDiscordId,
-                    characters,
-                    simplifiedTracking,
-                    avatarMasked,
-                });
+                const listView = buildCharacterListView({ ownerDiscordId, characters });
                 await interaction.editReply({
                     ...listView,
                     content: '',
@@ -2398,11 +2258,45 @@ async function handle(interaction) {
             return true;
         }
 
-        if (action === 'status') {
-            const statusView = buildCharacterStatusView({ character, ownerDiscordId });
+        if (action === 'tracking_toggle') {
+            const nextValue = !character.simplified_tracking;
+            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { simplifiedTracking: nextValue });
+            if (!result.ok) {
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+            if (!refreshed) {
+                await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
             await interaction.update({
-                embeds: [statusView.embed],
-                components: statusView.components,
+                ...buildCharacterManageView(refreshed, { ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'avatar_mask_toggle') {
+            const currentAvatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
+                ? true
+                : Boolean(character.avatar_masked);
+            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { avatarMasked: !currentAvatarMasked });
+            if (!result.ok) {
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+            if (!refreshed) {
+                await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            await interaction.update({
+                ...buildCharacterManageView(refreshed, { ownerDiscordId }),
                 content: '',
             });
             return true;

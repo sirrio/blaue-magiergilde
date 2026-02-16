@@ -6,36 +6,26 @@ import { calculateTier } from '@/helper/calculateTier'
 import { calculateClassString } from '@/helper/calculateClassString'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
-import { ActionMenu } from '@/components/ui/action-menu'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
-import { Character } from '@/types'
-import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
+import { Character, PageProps } from '@/types'
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
-import type { PageProps } from '@/types'
-import { Archive, BookUser, CircleUser, Copy, Plus, RefreshCw, Zap } from 'lucide-react'
+import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
-  const { auth } = usePage<PageProps>().props
-  const [simplifiedTracking, setSimplifiedTracking] = useState(Boolean(auth.user?.simplified_tracking))
-  const [isUpdatingTracking, setIsUpdatingTracking] = useState(false)
-  const [avatarMasked, setAvatarMasked] = useState(auth.user?.avatar_masked ?? true)
-  const [isUpdatingAvatarMasked, setIsUpdatingAvatarMasked] = useState(false)
-  useEffect(() => {
-    const nextValue = Boolean(auth.user?.simplified_tracking)
-    setSimplifiedTracking(nextValue)
-  }, [auth.user?.simplified_tracking])
-  useEffect(() => {
-    setAvatarMasked(auth.user?.avatar_masked ?? true)
-  }, [auth.user?.avatar_masked])
+  const { features } = usePage<PageProps>().props
+  const isStatusSwitchEnabled = features?.character_status_switch ?? true
+  const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
+  const [updatingAvatarMaskIds, setUpdatingAvatarMaskIds] = useState<number[]>([])
   const visibleCharacters = useMemo(() => characters.filter((char) => !char.deleted_at), [characters])
   const [chars, setChars] = useState([...visibleCharacters])
   useEffect(() => {
     setChars([...visibleCharacters])
   }, [visibleCharacters])
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(TouchSensor))
+  const sensors = useSensors(useSensor(PointerSensor))
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -98,6 +88,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     if (char.is_filler) return false
     return ['bt', 'lt', 'ht'].includes(calculateTier(char))
   }).length
+  const draftCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'draft').length
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -106,33 +97,43 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
   }
 
-  const updateTrackingMode = (value: boolean) => {
-    if (isUpdatingTracking) return
-    setSimplifiedTracking(value)
-    setIsUpdatingTracking(true)
+  const updateTrackingMode = (characterId: number, value: boolean) => {
+    if (updatingTrackingIds.includes(characterId)) return
+
+    setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, simplified_tracking: value } : char)))
+    setUpdatingTrackingIds((currentIds) => [...currentIds, characterId])
+
     router.patch(
-      route('characters.tracking'),
-      { simplified_tracking: value },
+      route('characters.tracking', characterId),
+      { simplified_tracking: value } as never,
       {
         preserveScroll: true,
         preserveState: true,
-        onError: () => setSimplifiedTracking(Boolean(auth.user?.simplified_tracking)),
-        onFinish: () => setIsUpdatingTracking(false),
+        onError: () => {
+          const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.simplified_tracking ?? false
+          setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, simplified_tracking: fallbackValue } : char)))
+        },
+        onFinish: () => setUpdatingTrackingIds((currentIds) => currentIds.filter((id) => id !== characterId)),
       },
     )
   }
-  const updateAvatarMode = (value: boolean) => {
-    if (isUpdatingAvatarMasked) return
-    setAvatarMasked(value)
-    setIsUpdatingAvatarMasked(true)
+  const updateAvatarMode = (characterId: number, value: boolean) => {
+    if (updatingAvatarMaskIds.includes(characterId)) return
+
+    setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, avatar_masked: value } : char)))
+    setUpdatingAvatarMaskIds((currentIds) => [...currentIds, characterId])
+
     router.patch(
-      route('characters.avatar-mode'),
-      { avatar_masked: value },
+      route('characters.avatar-mode', characterId),
+      { avatar_masked: value } as never,
       {
         preserveScroll: true,
         preserveState: true,
-        onError: () => setAvatarMasked(auth.user?.avatar_masked ?? true),
-        onFinish: () => setIsUpdatingAvatarMasked(false),
+        onError: () => {
+          const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.avatar_masked ?? true
+          setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, avatar_masked: fallbackValue } : char)))
+        },
+        onFinish: () => setUpdatingAvatarMaskIds((currentIds) => currentIds.filter((id) => id !== characterId)),
       },
     )
   }
@@ -141,46 +142,28 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     <AppLayout>
       <Head title="Characters" />
       <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
-        <section className="flex flex-col justify-between gap-2 border-b pb-4 sm:flex-row sm:items-center">
+        <section className="flex flex-col justify-between gap-3 border-b border-base-200 pb-3 sm:flex-row sm:items-start">
           <div>
-            <h1 className="text-2xl font-bold">
-              Your Characters <span className="text-base-content/50 ml-1 text-sm font-normal">{activeCharacterCount}/8 Active</span>
-              {simplifiedTracking ? (
-                <span className="ml-2 rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
-                  Simplified tracking
-                </span>
-              ) : null}
+            <h1 className="text-lg font-bold sm:text-xl">
+              Your Characters{' '}
+              <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{activeCharacterCount}/8 Active</span>
             </h1>
-            <p className="text-base-content/70 text-sm">Manage all your characters easily below.</p>
+            <p className="text-xs text-base-content/70 sm:text-sm">Manage all your characters easily below.</p>
+            {isStatusSwitchEnabled && draftCharacterCount > 0 ? (
+              <p className="mt-1 text-xs text-warning">
+                {draftCharacterCount} draft {draftCharacterCount === 1 ? 'character is' : 'characters are'} still private. Use
+                "Register with Magiergilde" on a card to start review.
+              </p>
+            ) : null}
           </div>
-          <div className="flex items-center gap-4">
-            <Button size="sm" variant="ghost" className="flex items-center space-x-1" onClick={() => copyCharactersToClipboard(characters)}>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <Button size="sm" variant="ghost" className="flex items-center gap-1.5" onClick={() => copyCharactersToClipboard(characters)}>
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>
-            <ActionMenu
-              items={[
-                {
-                  type: 'toggle',
-                  label: 'Simplified tracking',
-                  checked: simplifiedTracking,
-                  onToggle: updateTrackingMode,
-                  disabled: isUpdatingTracking,
-                  icon: <Zap size={14} />,
-                },
-                {
-                  type: 'toggle',
-                  label: 'Token mask',
-                  checked: avatarMasked,
-                  onToggle: updateAvatarMode,
-                  disabled: isUpdatingAvatarMasked,
-                  icon: <CircleUser size={14} />,
-                },
-              ]}
-            />
             {chars.length > 0 && (
               <>
                 <StoreCharacterModal>
-                  <Button size="sm" variant="outline" className="flex items-center space-x-2">
+                  <Button size="sm" variant="outline" className="flex items-center gap-2">
                     <Plus size={16} />
                     <span>Add Character</span>
                   </Button>
@@ -197,7 +180,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <BookUser size={64} className="text-base-content mx-auto mb-4" />
             <h2 className="text-base-content text-lg font-semibold">No characters yet</h2>
             <p className="text-base-content/70 text-sm">Start by creating or syncing your characters.</p>
-            <div className="mt-6 flex justify-center gap-4">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <StoreCharacterModal>
                 <Button variant="outline" className="flex items-center space-x-2">
                   <Plus size={16} />
@@ -234,7 +217,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             </div>
           </div>
         ) : (
-          <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
+          <div className={cn('grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
@@ -242,8 +225,10 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                     key={char.id}
                     character={char}
                     guildCharacters={guildCharacters}
-                    simplifiedTrackingOverride={simplifiedTracking}
-                    avatarMaskedOverride={avatarMasked}
+                    isTrackingModeUpdating={updatingTrackingIds.includes(char.id)}
+                    onTrackingModeChange={(value) => updateTrackingMode(char.id, value)}
+                    isAvatarMaskedUpdating={updatingAvatarMaskIds.includes(char.id)}
+                    onAvatarMaskedChange={(value) => updateAvatarMode(char.id, value)}
                   />
                 ))}
               </SortableContext>

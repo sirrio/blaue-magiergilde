@@ -30,6 +30,7 @@ class StoreSpellRequest extends FormRequest
             'legacy_url' => 'nullable|url',
             'spell_school' => 'nullable|in:abjuration,conjuration,divination,enchantment,evocation,illusion,necromancy,transmutation',
             'spell_level' => 'required|integer|min:0|max:9',
+            'source_id' => 'nullable|integer|exists:sources,id',
             'guild_enabled' => 'boolean',
             'ruling_changed' => 'boolean',
             'ruling_note' => 'nullable|string|max:500',

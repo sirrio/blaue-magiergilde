@@ -12,13 +12,14 @@ import { calculateBubbleSpend } from '@/helper/calculateBubbleSpend'
 import { calculateCoins } from '@/helper/calculateCoins'
 import { calculateCoinsSpend } from '@/helper/calculateCoinsSpend'
 import AppLayout from '@/layouts/app-layout'
+import { cn } from '@/lib/utils'
 import DestroyGameModal, { DestroyGameButton } from '@/pages/game/destroy-game-modal'
 import StoreGameModal from '@/pages/game/store-game-modal'
 import UpdateGameModal from '@/pages/game/update-game-modal'
 import type { Character, Game, User } from '@/types'
 import { Head, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { AlertCircle, ChevronDown, ChevronUp, Coins, Droplets, LoaderCircle, PartyPopper, Pencil, Plus, Swords } from 'lucide-react'
+import { AlertCircle, ChevronDown, ChevronUp, Coins, Droplets, LoaderCircle, PartyPopper, Pencil, Plus, Swords, Trash } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 interface Props {
@@ -125,43 +126,12 @@ export default function MasteredGames({ games, user, characters }: Props) {
     tierFilter !== 'all' ? `Tier: ${tierFilter.toUpperCase()}` : null,
   ].filter(Boolean) as string[]
   const tierFilterOptions = [
+    { label: 'All', value: 'all' as const },
     { label: 'BT', value: 'bt' as const },
     { label: 'LT', value: 'lt' as const },
     { label: 'HT', value: 'ht' as const },
     { label: 'ET', value: 'et' as const },
   ]
-
-  const renderFilterOptions = <T extends string>(
-    filterKey: string,
-    options: { label: string; value: T }[],
-    currentValue: T,
-    onChange: (value: T) => void,
-    includeAll = false,
-  ) => (
-    <div className="filter">
-      {includeAll ? (
-        <input
-          className="btn btn-xs filter-reset"
-          type="radio"
-          name={filterKey}
-          aria-label="All"
-          checked={currentValue === 'all'}
-          onChange={() => onChange('all' as T)}
-        />
-      ) : null}
-      {options.map(({ label, value }) => (
-        <input
-          key={value}
-          className="btn btn-xs"
-          type="radio"
-          name={filterKey}
-          aria-label={label}
-          checked={currentValue === value}
-          onChange={() => onChange(value)}
-        />
-      ))}
-    </div>
-  )
 
   const toggleSortOrder = () => {
     startSortTransition(() => {
@@ -463,18 +433,18 @@ export default function MasteredGames({ games, user, characters }: Props) {
     <AppLayout>
       <Head title="Game Master Log" />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <section className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 border-b border-base-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-lg font-bold sm:text-xl">
               Game Master Log
               <span className="ml-3 inline-flex items-center rounded-full border border-base-200 px-2 py-0.5 text-xs text-base-content/60">
                 {totalSessions} Sessions
               </span>
             </h1>
-            <p className="text-base-content/70 text-sm">Track your progress with a summary of all GM sessions.</p>
+            <p className="text-xs text-base-content/70 sm:text-sm">Track your progress with a summary of all GM sessions.</p>
           </div>
           <StoreGameModal>
-            <Button variant="outline" size="sm" className="flex items-center">
+            <Button variant="outline" size="sm" className="flex w-full items-center sm:w-auto">
               <Plus size={18} />
               <span>Create New Game</span>
             </Button>
@@ -696,9 +666,20 @@ export default function MasteredGames({ games, user, characters }: Props) {
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <div className="flex items-center gap-2 whitespace-nowrap">
                   <span className="text-base-content/60">Tier:</span>
-                  {renderFilterOptions('tierFilter', tierFilterOptions, tierFilter, setTierFilter, true)}
+                  <div className="join join-horizontal">
+                    {tierFilterOptions.map(({ label, value }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={cn('btn btn-xs join-item', tierFilter === value ? 'btn-primary' : 'btn-outline')}
+                        onClick={() => setTierFilter(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-xs text-base-content/60">
+                <div className="flex w-full flex-wrap items-center gap-2 text-xs text-base-content/60 sm:ml-auto sm:w-auto sm:justify-end">
                   <span className="rounded-full border border-base-200 px-2 py-1">
                     Showing {filteredGames.length} of {games.length}
                   </span>
@@ -711,90 +692,175 @@ export default function MasteredGames({ games, user, characters }: Props) {
                       </span>
                     ))
                   )}
+                  {hasFilters ? (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => {
+                        setSearch('')
+                        setTierFilter('all')
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : null}
                 </div>
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" size="xs" variant="ghost" onClick={toggleSortOrder}>
+                  Date
+                  {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
+                  {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </Button>
               </div>
             </div>
           </div>
           {filteredGames.length > 0 ? (
             <>
-              <div className={`${headerColumns} mt-4 px-4 pb-2 text-xs font-semibold uppercase text-base-content/50`}>
-                <span>Game</span>
-                <span>Notes</span>
-                <span className="text-right">Bubbles</span>
-                <span className="text-right">Coins</span>
-                <span className="text-right">
-                  <button
-                    type="button"
-                    onClick={toggleSortOrder}
-                    className="inline-flex items-center justify-end gap-1 text-xs uppercase text-base-content/50 hover:text-base-content"
-                  >
-                    Date
-                    {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
-                    {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-                  </button>
-                </span>
-                <span className="text-right">Actions</span>
-              </div>
-              <List>
-              {filteredGames.map((game, index) => {
-                const notes = game.notes ?? ''
-                const isExpanded = expandedNotes.has(game.id)
-                const showToggle = notes.length > 140
-                const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
-                const tierReward = game.tier_of_month_reward
-                const gameBubbles =
-                  calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
-                const gameCoins =
-                  calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
-                return (
-                  <ListRow key={game.id} className={`${headerColumns} items-center`}>
-                    <div className="min-w-0">
-                      <h3 className="flex items-center gap-1 truncate text-sm font-medium">
-                        <span>#{gameNumber}</span>
-                        {game.tier === 'bt' && <LogoBt width={16} />}
-                        {game.tier === 'lt' && <LogoLt width={16} />}
-                        {game.tier === 'ht' && <LogoHt width={16} />}
-                        {game.tier === 'et' && <LogoEt width={16} />}
-                        <span className="truncate">{game.title ?? 'Game'}</span>
-                      </h3>
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <p className={`text-base-content/50 text-xs whitespace-pre-wrap ${!isExpanded ? 'line-clamp-2' : ''}`}>
-                        {notes || 'No notes'}
-                      </p>
-                      {showToggle ? (
-                        <button
-                          type="button"
-                          className="text-xs text-primary/70 hover:text-primary"
-                          onClick={() => toggleNotes(game.id)}
-                        >
-                          {isExpanded ? 'Show less' : 'Show notes'}
-                        </button>
-                      ) : null}
-                    </div>
-                    <p className="text-right text-xs">
-                      {gameBubbles} <Droplets size={13} className="inline" />
-                    </p>
-                    <p className="text-right text-xs">
-                      {gameCoins} <Coins size={13} className="inline" />
-                    </p>
-                    <div className="text-right text-xs text-base-content/70">
-                      {format(new Date(game.start_date), 'dd.MM.yyyy')}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <UpdateGameModal game={game}>
-                        <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game">
-                          <Pencil size={14} />
-                        </Button>
-                      </UpdateGameModal>
-                      <DestroyGameModal game={game}>
-                        <DestroyGameButton />
-                      </DestroyGameModal>
-                    </div>
-                  </ListRow>
-                )
-              })}
+              <List className="mt-4 md:hidden">
+                {filteredGames.map((game, index) => {
+                  const notes = game.notes ?? ''
+                  const isExpanded = expandedNotes.has(game.id)
+                  const showToggle = notes.length > 140
+                  const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
+                  const tierReward = game.tier_of_month_reward
+                  const gameBubbles =
+                    calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
+                  const gameCoins =
+                    calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
+                  return (
+                    <ListRow key={game.id} className="block">
+                      <div className="space-y-2 rounded-box border border-base-200 p-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="flex min-w-0 items-center gap-1 truncate text-sm font-medium">
+                            <span>#{gameNumber}</span>
+                            {game.tier === 'bt' && <LogoBt width={16} />}
+                            {game.tier === 'lt' && <LogoLt width={16} />}
+                            {game.tier === 'ht' && <LogoHt width={16} />}
+                            {game.tier === 'et' && <LogoEt width={16} />}
+                            <span className="truncate">{game.title ?? 'Game'}</span>
+                          </h3>
+                          <span className="shrink-0 text-xs text-base-content/70">
+                            {format(new Date(game.start_date), 'dd.MM.yyyy')}
+                          </span>
+                        </div>
+                        <p className={`text-base-content/50 text-xs whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                          {notes || 'No notes'}
+                        </p>
+                        {showToggle ? (
+                          <button
+                            type="button"
+                            className="text-xs text-primary/70 hover:text-primary"
+                            onClick={() => toggleNotes(game.id)}
+                          >
+                            {isExpanded ? 'Show less' : 'Show notes'}
+                          </button>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2 text-xs">
+                          <span>
+                            {gameBubbles} <Droplets size={13} className="inline" />
+                          </span>
+                          <span>
+                            {gameCoins} <Coins size={13} className="inline" />
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <UpdateGameModal game={game}>
+                              <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game" title="Edit game">
+                                <Pencil size={13} />
+                              </Button>
+                            </UpdateGameModal>
+                            <DestroyGameModal game={game}>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                modifier="square"
+                                color="error"
+                                aria-label="Delete game"
+                                title="Delete game"
+                              >
+                                <Trash size={13} />
+                              </Button>
+                            </DestroyGameModal>
+                          </div>
+                        </div>
+                      </div>
+                    </ListRow>
+                  )
+                })}
               </List>
+              <div className="mt-4 hidden md:block overflow-x-auto">
+                <div className="min-w-[760px]">
+                  <div className={`${headerColumns} px-4 pb-2 text-xs font-semibold uppercase text-base-content/50`}>
+                    <span>Game</span>
+                    <span>Notes</span>
+                    <span className="text-right">Bubbles</span>
+                    <span className="text-right">Coins</span>
+                    <span className="text-right">Date</span>
+                    <span className="text-right">Actions</span>
+                  </div>
+                  <List>
+                    {filteredGames.map((game, index) => {
+                      const notes = game.notes ?? ''
+                      const isExpanded = expandedNotes.has(game.id)
+                      const showToggle = notes.length > 140
+                      const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
+                      const tierReward = game.tier_of_month_reward
+                      const gameBubbles =
+                        calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
+                      const gameCoins =
+                        calculateCoins([game]) + (tierReward === 'coin' ? 1 : 0)
+                      return (
+                        <ListRow key={game.id} className={`${headerColumns} items-center`}>
+                          <div className="min-w-0">
+                            <h3 className="flex items-center gap-1 truncate text-sm font-medium">
+                              <span>#{gameNumber}</span>
+                              {game.tier === 'bt' && <LogoBt width={16} />}
+                              {game.tier === 'lt' && <LogoLt width={16} />}
+                              {game.tier === 'ht' && <LogoHt width={16} />}
+                              {game.tier === 'et' && <LogoEt width={16} />}
+                              <span className="truncate">{game.title ?? 'Game'}</span>
+                            </h3>
+                          </div>
+                          <div className="min-w-0 space-y-1">
+                            <p className={`text-base-content/50 text-xs whitespace-pre-wrap ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                              {notes || 'No notes'}
+                            </p>
+                            {showToggle ? (
+                              <button
+                                type="button"
+                                className="text-xs text-primary/70 hover:text-primary"
+                                onClick={() => toggleNotes(game.id)}
+                              >
+                                {isExpanded ? 'Show less' : 'Show notes'}
+                              </button>
+                            ) : null}
+                          </div>
+                          <p className="text-right text-xs">
+                            {gameBubbles} <Droplets size={13} className="inline" />
+                          </p>
+                          <p className="text-right text-xs">
+                            {gameCoins} <Coins size={13} className="inline" />
+                          </p>
+                          <div className="text-right text-xs text-base-content/70">
+                            {format(new Date(game.start_date), 'dd.MM.yyyy')}
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <UpdateGameModal game={game}>
+                              <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game">
+                                <Pencil size={14} />
+                              </Button>
+                            </UpdateGameModal>
+                            <DestroyGameModal game={game}>
+                              <DestroyGameButton />
+                            </DestroyGameModal>
+                          </div>
+                        </ListRow>
+                      )
+                    })}
+                  </List>
+                </div>
+              </div>
             </>
           ) : (
             <p className="mt-4 text-center text-sm text-base-content/50">

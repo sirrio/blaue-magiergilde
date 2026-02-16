@@ -26,6 +26,8 @@ export interface User {
   id: number
   name: string
   email: string
+  discord_username?: string | null
+  discord_display_name?: string | null
   avatar?: string
   created_at: string
   updated_at: string
@@ -208,6 +210,26 @@ export interface DiscordBotOwnersStatus {
   owners?: DiscordBotOwner[]
 }
 
+export interface Source {
+  id: number
+  name: string
+  shortcode: string
+}
+
+export interface CompendiumImportRun {
+  id: number
+  entity_type: 'items' | 'spells'
+  filename: string
+  total_rows: number
+  new_rows: number
+  updated_rows: number
+  unchanged_rows: number
+  invalid_rows: number
+  error_samples?: Array<{ line?: number; message?: string }> | null
+  applied_at?: string | null
+  user?: { id: number; name: string } | null
+}
+
 export interface DiscordBackupAttachment {
   id: number
   filename: string
@@ -252,6 +274,8 @@ export interface Item {
   default_spell_schools?: Spell['spell_school'][] | null
   ruling_changed?: boolean
   ruling_note?: string | null
+  source_id?: number | null
+  source?: Source | null
 }
 
 export interface Spell {
@@ -264,6 +288,8 @@ export interface Spell {
   guild_enabled?: boolean
   ruling_changed?: boolean
   ruling_note?: string | null
+  source_id?: number | null
+  source?: Source | null
 }
 
 export interface CharacterClass {
@@ -317,6 +343,8 @@ export interface Character {
     id: number
     name: string
     discord_id?: number | null
+    discord_username?: string | null
+    discord_display_name?: string | null
     simplified_tracking?: boolean
     avatar_masked?: boolean
   }

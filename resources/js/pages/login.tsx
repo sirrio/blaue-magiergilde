@@ -32,27 +32,33 @@ export default function Login() {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-[#070A12]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_80%_75%,rgba(14,165,233,0.14),transparent_55%)]" />
 
-        <div className="relative mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10">
+        <div className="relative mx-auto flex min-h-screen max-w-lg flex-col justify-center px-3 py-6 sm:px-4 sm:py-10">
           <Card className="border border-white/10 bg-white/5 shadow-xl backdrop-blur">
-            <CardBody className="space-y-5">
-              <div className="flex flex-col items-center gap-2 text-center">
+            <CardBody className="space-y-4 p-4 sm:space-y-5 sm:p-8">
+              <div className="flex flex-col items-center gap-1.5 text-center sm:gap-2">
                 <Link href={route('home')} className="inline-flex items-center justify-center">
-                  <img className={cn('h-20 w-20')} src="/images/icon_magiergilde_white.svg" alt="Blaue Magiergilde" />
+                  <img className={cn('h-14 w-14 sm:h-20 sm:w-20')} src="/images/icon_magiergilde_white.svg" alt="Blaue Magiergilde" />
                 </Link>
                 <div>
-                  <h1 className="text-2xl font-bold">Willkommen zur Blauen Magiergilde</h1>
-                  <p className="text-sm text-white/70">Melde dich an, um deine Charaktere zu verwalten.</p>
+                  <h1 className="text-xl leading-tight font-bold sm:text-2xl">Willkommen zur Blauen Magiergilde</h1>
+                  <p className="text-xs text-white/70 sm:text-sm">Melde dich an, um deine Charaktere zu verwalten.</p>
                 </div>
               </div>
 
-              <Button as="a" href={route('discord.login')} variant="outline" modifier="block" className={cn('gap-2', buttonOutlineDiscord)}>
+              <Button
+                as="a"
+                href={route('discord.login')}
+                variant="outline"
+                modifier="block"
+                className={cn('gap-2 text-sm sm:text-base', buttonOutlineDiscord)}
+              >
                 <DiscordIcon width={20} />
                 Mit Discord fortfahren
               </Button>
 
               <div className="divider my-0 opacity-60">oder</div>
 
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={submit} className="space-y-3 sm:space-y-4">
                 <Input
                   type="email"
                   value={data.email}
@@ -71,7 +77,13 @@ export default function Login() {
                 >
                   Password
                 </Input>
-                <Button type="submit" disabled={processing} variant="outline" modifier="block" className={buttonOutlineWhite}>
+                <Button
+                  type="submit"
+                  disabled={processing}
+                  variant="outline"
+                  modifier="block"
+                  className={cn('text-sm sm:text-base', buttonOutlineWhite)}
+                >
                   Login
                 </Button>
               </form>

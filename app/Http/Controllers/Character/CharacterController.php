@@ -22,7 +22,6 @@ class CharacterController extends Controller
     public function index(): Response
     {
         $user = Auth::user();
-        $simplifiedTracking = $user?->simplified_tracking ?? false;
 
         $characters = Character::query()
             ->where('user_id', $user?->getAuthIdentifier())
@@ -32,9 +31,6 @@ class CharacterController extends Controller
             ->orderBy('position')
             ->get()
             ->withoutAppends();
-        $characters->each(function (Character $character) use ($simplifiedTracking): void {
-            $character->setAttribute('simplified_tracking', $simplifiedTracking);
-        });
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
@@ -75,7 +71,7 @@ class CharacterController extends Controller
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
         $character->guild_status = $this->isCharacterStatusSwitchEnabled()
-            ? ($request->guild_status ?? 'pending')
+            ? ($request->guild_status ?? 'draft')
             : 'draft';
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
@@ -104,8 +100,6 @@ class CharacterController extends Controller
     public function show(Character $character): Response
     {
         $this->ensureCharacterOwner($character);
-        $simplifiedTracking = Auth::user()?->simplified_tracking ?? false;
-        $character->setAttribute('simplified_tracking', $simplifiedTracking);
 
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
@@ -151,7 +145,13 @@ class CharacterController extends Controller
         if (! $this->isCharacterStatusSwitchEnabled()) {
             $character->guild_status = 'draft';
         } elseif ($request->filled('guild_status')) {
-            $character->guild_status = $request->guild_status;
+            $requestedStatus = $request->string('guild_status')->toString();
+            if (in_array((string) $previousStatus, ['approved', 'declined', 'retired'], true) && $requestedStatus !== $previousStatus) {
+                return redirect()->back()->withErrors([
+                    'guild_status' => 'Reviewed characters cannot be moved back to draft or pending.',
+                ]);
+            }
+            $character->guild_status = $requestedStatus;
         }
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
