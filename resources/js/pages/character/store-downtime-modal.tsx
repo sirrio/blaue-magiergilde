@@ -38,7 +38,7 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
           title="Add downtime"
         >
           <FlameKindling size={14} />
-          <span className="sm:hidden">Downtime</span>
+          <span className="md:hidden">Downtime</span>
         </Button>
       </ModalTrigger>
       <ModalTitle>Add Downtime</ModalTitle>

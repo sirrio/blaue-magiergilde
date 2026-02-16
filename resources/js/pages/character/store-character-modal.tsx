@@ -27,7 +27,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
     external_link: '',
     is_filler: false,
     start_tier: 'bt',
-    guild_status: isCharacterStatusSwitchEnabled ? 'pending' : 'draft',
     avatar: undefined,
   }
 
@@ -101,18 +100,11 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                   ))}
                 </SelectOptions>
               </Select>
-              <Select
-                errors={errors.guild_status}
-                value={data.guild_status}
-                onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
-                disabled={!isCharacterStatusSwitchEnabled}
-              >
-                <SelectLabel>Visibility</SelectLabel>
-                <SelectOptions>
-                  <option value="pending">Active</option>
-                  <option value="draft">Draft</option>
-                </SelectOptions>
-              </Select>
+              <p className="text-xs text-base-content/60">
+                {!isCharacterStatusSwitchEnabled
+                  ? 'Character submission is currently disabled. New characters stay draft.'
+                  : 'New characters start as draft. Use "Register with Magiergilde" on the character card to start review.'}
+              </p>
               <Input
                 placeholder="https://..."
                 errors={errors.external_link}

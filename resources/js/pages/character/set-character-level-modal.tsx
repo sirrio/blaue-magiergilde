@@ -99,7 +99,7 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
       <ModalTrigger>
         <Button size="sm" className="w-full justify-center gap-1" aria-label="Set level" title="Set level" onClick={() => setIsOpen(true)}>
           <Gauge size={14} />
-          <span className="sm:hidden">Set level</span>
+          <span className="md:hidden">Set level</span>
         </Button>
       </ModalTrigger>
       <ModalTitle>

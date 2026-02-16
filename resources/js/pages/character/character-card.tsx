@@ -3,7 +3,7 @@ import LogoTier from '@/components/logo-tier'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
-import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
@@ -26,11 +26,11 @@ import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import { Character } from '@/types'
 import { PageProps } from '@/types'
-import { usePage } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, Archive, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
-import React from 'react'
+import { Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
+import React, { useState } from 'react'
 import { useImage } from 'react-image'
 
 function CharacterImage({
@@ -142,6 +142,50 @@ function CharacterSettingsModal({
   )
 }
 
+function SubmitForApprovalModal({
+  character,
+  processing,
+  onSubmit,
+}: {
+  character: Character
+  processing: boolean
+  onSubmit: (onSuccess: () => void) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => !processing && setIsOpen(false)}>
+      <ModalTrigger>
+        <Button
+          size="sm"
+          color="warning"
+          className="w-full justify-center"
+          onClick={() => setIsOpen(true)}
+          disabled={processing}
+          aria-label="Register with Magiergilde"
+          title="Register with Magiergilde"
+        >
+          <Clock size={14} />
+          <span>Register with Magiergilde</span>
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Register Character With Magiergilde</ModalTitle>
+      <ModalContent>
+        <p className="text-sm text-base-content/80">
+          This changes <span className="font-semibold">{character.name}</span> from draft to active (pending) and registers it with
+          the Magiergilde for review.
+        </p>
+        <p className="mt-2 text-xs text-base-content/60">
+          After Magiergilde review, you cannot switch approved or declined characters back by yourself.
+        </p>
+      </ModalContent>
+      <ModalAction onClick={() => onSubmit(() => setIsOpen(false))} disabled={processing}>
+        Register now
+      </ModalAction>
+    </Modal>
+  )
+}
+
 export function CharacterCard({
   character,
   guildCharacters = [],
@@ -174,6 +218,7 @@ export function CharacterCard({
   const guildStatus = character.guild_status ?? 'pending'
   const draftOnlyMode = !(features?.character_status_switch ?? true)
   const canLogActivity = draftOnlyMode || guildStatus !== 'draft'
+  const requiresSubmissionBeforeDowntime = !draftOnlyMode && guildStatus === 'draft'
   const hasRoom = (character.room_count ?? 0) > 0
   const statusLabel = guildStatus === 'approved'
     ? 'Approved'
@@ -202,6 +247,14 @@ export function CharacterCard({
         : guildStatus === 'draft'
           ? 'text-base-content/60'
           : 'text-warning'
+  const statusTooltip = guildStatus === 'draft'
+    ? 'Draft only. This character is not registered with the Magiergilde yet.'
+    : guildStatus === 'pending'
+      ? 'Registered with the Magiergilde. Waiting for review.'
+      : `Status: ${statusLabel}`
+  const isStatusSwitchEnabled = features?.character_status_switch ?? true
+  const canSubmitForApproval = isStatusSwitchEnabled && guildStatus === 'draft'
+  const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
@@ -222,8 +275,31 @@ export function CharacterCard({
   const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
   const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
   const downtimeDisabledReason = 'Downtime cannot be calculated correctly after simple mode auto-level adventures.'
+  const submissionRequiredReason = 'Register with the Magiergilde first.'
   const adventuresCountWarningReason = 'Simple mode auto-level entries exist. Played adventures count is not reliable.'
   const factionLevelWarningReason = 'Simple mode auto-level entries exist. Faction level is not reliable.'
+
+  const submitForApproval = (onSuccess: () => void) => {
+    if (isSubmittingForApproval || !canSubmitForApproval) {
+      return
+    }
+
+    setIsSubmittingForApproval(true)
+    router.post(
+      route('characters.submit-approval', character.id),
+      {},
+      {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+          onSuccess()
+        },
+        onFinish: () => {
+          setIsSubmittingForApproval(false)
+        },
+      },
+    )
+  }
 
   return (
     <div ref={setNodeRef} style={dragStyle}>
@@ -275,7 +351,11 @@ export function CharacterCard({
             </DestroyCharacterModal>
           </CardAction>
           <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:pr-28')}>
-            <span className={cn('inline-flex items-center', statusClass)} title={`Status: ${statusLabel}`}>
+            <span
+              className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
+              data-tip={statusTooltip}
+              title={statusTooltip}
+            >
               {statusIcon}
             </span>
             <span className="truncate">{character.name}</span>
@@ -417,18 +497,60 @@ export function CharacterCard({
               </div>
             )}
             <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
-              <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
-                <BookOpen size={14} />
-                Details
-              </Button>
-              {canLogActivity ? (
-                simplifiedTracking ? (
-                  <SetCharacterLevelModal character={character} />
-                ) : (
-                  <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
-                )
-              ) : null}
-              {canLogActivity ? (
+              {canSubmitForApproval ? (
+                <div className="col-span-2 sm:col-span-4">
+                  <SubmitForApprovalModal
+                    character={character}
+                    processing={isSubmittingForApproval}
+                    onSubmit={submitForApproval}
+                  />
+                </div>
+              ) : (
+                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
+                  <BookOpen size={14} />
+                  Details
+                </Button>
+              )}
+              {requiresSubmissionBeforeDowntime ? (
+                <div
+                  className="tooltip tooltip-bottom w-full"
+                  data-tip={submissionRequiredReason}
+                  title={submissionRequiredReason}
+                >
+                  <Button
+                    size="sm"
+                    className="w-full justify-center gap-1"
+                    disabled
+                    aria-label={simplifiedTracking ? 'Set level disabled' : 'Add adventure disabled'}
+                    title={submissionRequiredReason}
+                  >
+                    {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
+                    <span className="md:hidden">{simplifiedTracking ? 'Set level' : 'Adventure'}</span>
+                  </Button>
+                </div>
+              ) : simplifiedTracking ? (
+                <SetCharacterLevelModal character={character} />
+              ) : (
+                <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
+              )}
+              {requiresSubmissionBeforeDowntime ? (
+                <div
+                  className="tooltip tooltip-bottom w-full"
+                  data-tip={submissionRequiredReason}
+                  title={submissionRequiredReason}
+                >
+                  <Button
+                    size="sm"
+                    className="w-full justify-center gap-1"
+                    disabled
+                    aria-label="Add downtime disabled"
+                    title={submissionRequiredReason}
+                  >
+                    <FlameKindling size={14} />
+                    <span className="md:hidden">Downtime</span>
+                  </Button>
+                </div>
+              ) : canLogActivity ? (
                 downtimeDisabledInSimpleMode ? (
                   <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} title={downtimeDisabledReason}>
                     <Button
@@ -439,14 +561,33 @@ export function CharacterCard({
                       title={downtimeDisabledReason}
                     >
                       <FlameKindling size={14} />
-                      <span className="sm:hidden">Downtime</span>
+                      <span className="md:hidden">Downtime</span>
                     </Button>
                   </div>
                 ) : (
                   <StoreDowntimeModal character={character}></StoreDowntimeModal>
                 )
               ) : null}
-              <AlliesModal character={character} guildCharacters={guildCharacters} />
+              {requiresSubmissionBeforeDowntime ? (
+                <div
+                  className="tooltip tooltip-bottom w-full"
+                  data-tip={submissionRequiredReason}
+                  title={submissionRequiredReason}
+                >
+                  <Button
+                    size="sm"
+                    className="w-full justify-center gap-1"
+                    disabled
+                    aria-label="Manage allies disabled"
+                    title={submissionRequiredReason}
+                  >
+                    <BookHeart size={14} />
+                    <span className="md:hidden">Allies</span>
+                  </Button>
+                </div>
+              ) : (
+                <AlliesModal character={character} guildCharacters={guildCharacters} />
+              )}
               <Button
                 as="a"
                 size="sm"

@@ -161,3 +161,65 @@ it('prevents admins from approving draft characters', function () {
     $character->refresh();
     expect($character->guild_status)->toBe('draft');
 });
+
+it('allows owners to register draft characters with Magiergilde for review', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character))
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending');
+});
+
+it('does not allow draft submission when character status switching is disabled', function () {
+    Config::set('features.character_status_switch', false);
+
+    $owner = User::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character))
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
+it('prevents owners from moving reviewed characters back to draft', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+    ]);
+
+    $this->actingAs($owner)
+        ->put(route('characters.update', $character), [
+            'name' => $character->name,
+            'class' => [$class->id],
+            'external_link' => $character->external_link,
+            'version' => $character->version,
+            'dm_bubbles' => $character->dm_bubbles,
+            'dm_coins' => $character->dm_coins,
+            'bubble_shop_spend' => $character->bubble_shop_spend,
+            'is_filler' => $character->is_filler,
+            'faction' => $character->faction,
+            'notes' => $character->notes,
+            'guild_status' => 'draft',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('approved');
+});

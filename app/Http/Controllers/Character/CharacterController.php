@@ -71,7 +71,7 @@ class CharacterController extends Controller
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
         $character->guild_status = $this->isCharacterStatusSwitchEnabled()
-            ? ($request->guild_status ?? 'pending')
+            ? ($request->guild_status ?? 'draft')
             : 'draft';
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
@@ -145,7 +145,13 @@ class CharacterController extends Controller
         if (! $this->isCharacterStatusSwitchEnabled()) {
             $character->guild_status = 'draft';
         } elseif ($request->filled('guild_status')) {
-            $character->guild_status = $request->guild_status;
+            $requestedStatus = $request->string('guild_status')->toString();
+            if (in_array((string) $previousStatus, ['approved', 'declined', 'retired'], true) && $requestedStatus !== $previousStatus) {
+                return redirect()->back()->withErrors([
+                    'guild_status' => 'Reviewed characters cannot be moved back to draft or pending.',
+                ]);
+            }
+            $character->guild_status = $requestedStatus;
         }
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');

@@ -41,7 +41,7 @@ const StoreAdventureModal = ({ character, guildCharacters = [] }: { character: C
       <ModalTrigger>
         <Button size="sm" className="w-full justify-center gap-1" aria-label="Add adventure" title="Add adventure">
           <Swords size={14} />
-          <span className="sm:hidden">Adventure</span>
+          <span className="md:hidden">Adventure</span>
         </Button>
       </ModalTrigger>
       <ModalTitle>Add Adventure</ModalTitle>

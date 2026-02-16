@@ -9,6 +9,7 @@ use App\Http\Controllers\Character\PermanentDeleteCharacterController;
 use App\Http\Controllers\Character\QuickLevelController;
 use App\Http\Controllers\Character\RestoreDeletedCharacterController;
 use App\Http\Controllers\Character\SortCharacterController;
+use App\Http\Controllers\Character\SubmitCharacterForApprovalController;
 use App\Http\Controllers\Character\TrackingModeController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,9 @@ Route::get('avatars/masked', AvatarMaskController::class)
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
     ->middleware(['auth'])
     ->name('characters.quick-level');
+Route::post('characters/{character}/submit-approval', SubmitCharacterForApprovalController::class)
+    ->middleware(['auth'])
+    ->name('characters.submit-approval');
 
 Route::resource('characters', CharacterController::class)->only([
     'index',

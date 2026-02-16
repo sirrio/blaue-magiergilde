@@ -8,14 +8,16 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
-import { Character } from '@/types'
+import { Character, PageProps } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { Head, router } from '@inertiajs/react'
+import { Head, router, usePage } from '@inertiajs/react'
 import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
+  const { features } = usePage<PageProps>().props
+  const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
   const [updatingAvatarMaskIds, setUpdatingAvatarMaskIds] = useState<number[]>([])
   const visibleCharacters = useMemo(() => characters.filter((char) => !char.deleted_at), [characters])
@@ -86,6 +88,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     if (char.is_filler) return false
     return ['bt', 'lt', 'ht'].includes(calculateTier(char))
   }).length
+  const draftCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'draft').length
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -146,15 +149,21 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
               <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{activeCharacterCount}/8 Active</span>
             </h1>
             <p className="text-xs text-base-content/70 sm:text-sm">Manage all your characters easily below.</p>
+            {isStatusSwitchEnabled && draftCharacterCount > 0 ? (
+              <p className="mt-1 text-xs text-warning">
+                {draftCharacterCount} draft {draftCharacterCount === 1 ? 'character is' : 'characters are'} still private. Use
+                "Register with Magiergilde" on a card to start review.
+              </p>
+            ) : null}
           </div>
-          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end sm:gap-2">
-            <Button size="xs" variant="ghost" className="flex items-center space-x-1 text-xs" onClick={() => copyCharactersToClipboard(characters)}>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <Button size="sm" variant="ghost" className="flex items-center gap-1.5" onClick={() => copyCharactersToClipboard(characters)}>
               <Copy size={16} /> <span>Copy Characters</span>
             </Button>
             {chars.length > 0 && (
               <>
                 <StoreCharacterModal>
-                  <Button size="sm" variant="outline" className="flex items-center space-x-2 text-xs">
+                  <Button size="sm" variant="outline" className="flex items-center gap-2">
                     <Plus size={16} />
                     <span>Add Character</span>
                   </Button>
@@ -208,7 +217,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             </div>
           </div>
         ) : (
-          <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
+          <div className={cn('grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
