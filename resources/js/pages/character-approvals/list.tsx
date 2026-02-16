@@ -9,6 +9,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
 import { calculateTier } from '@/helper/calculateTier'
+import { calculateLevel } from '@/helper/calculateLevel'
 import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
@@ -708,6 +709,7 @@ const tierTextClassMap: Record<string, string> = {
                     const statusLabel = getStatusLabel(status)
                     const isDraft = status === 'draft'
                     const currentTier = calculateTier(character)
+                    const currentLevel = calculateLevel(character)
                     const isAdminManaged = Boolean(character.admin_managed)
                     const characterNotes = character.notes?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
@@ -749,6 +751,10 @@ const tierTextClassMap: Record<string, string> = {
                             <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
                               <LogoTier tier={character.start_tier} width={12} />
                               <span>Start</span>
+                            </span>
+                            <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
+                              <Gauge size={12} className="text-primary/70" />
+                              <span>Lvl {currentLevel}</span>
                             </span>
                             <span
                               className={cn(
