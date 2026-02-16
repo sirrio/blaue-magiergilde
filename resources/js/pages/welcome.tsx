@@ -48,7 +48,7 @@ function FeatureCard({
 }
 
 export default function Welcome() {
-  const appLabel = 'App Login'
+  const appLabel = 'Zur App'
   const buttonOutlineWhite = 'border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white'
   const buttonOutlineDiscord = 'border-sky-400/35 bg-white/0 text-sky-200 hover:bg-sky-400/10 hover:text-sky-100'
 
@@ -176,7 +176,8 @@ export default function Welcome() {
                       und darauf, dass jede:r sich in der Runde wohl fühlt.
                     </p>
                     <p className="mt-3 text-xs text-white/65">
-                      Bildvorschlag: Gruppenfoto/Session-Szene oder Artwork der Gilde (z.B. Wappen/Blau-Magie-Motiv).
+                      Unsere Gilde verbindet viele Spielstile unter einem gemeinsamen Rahmen, damit neue und erfahrene Gruppen
+                      gleichermaßen schnell ins Spiel finden.
                     </p>
                   </div>
                 </div>
