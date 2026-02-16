@@ -48,6 +48,7 @@ const allowedFactions = new Set([
 ]);
 const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'retired', 'draft']);
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
+const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
 function normalizeTier(value, fallback = 'bt') {
     const tier = String(value || '').trim().toLowerCase();
@@ -69,7 +70,7 @@ function normalizeGuildStatus(value, fallback = 'pending') {
     return allowedGuildStatuses.has(status) ? status : fallback;
 }
 
-function normalizeUserGuildStatus(value, fallback = 'pending') {
+function normalizeUserGuildStatus(value, fallback = 'draft') {
     const status = normalizeGuildStatus(value, fallback);
     return allowedUserGuildStatuses.has(status) ? status : fallback;
 }
@@ -472,7 +473,9 @@ async function createCharacterForDiscord(
     const safeDmCoins = normalizeNumber(dmCoins, 0);
     const safeBubbleShop = normalizeNumber(bubbleShopSpend, 0);
     const safeIsFiller = normalizeBoolean(isFiller, false);
-    const safeGuildStatus = normalizeUserGuildStatus(guildStatus, 'pending');
+    const safeGuildStatus = isCharacterStatusSwitchEnabled
+        ? normalizeUserGuildStatus(guildStatus, 'draft')
+        : 'draft';
 
     const connection = await db.getConnection();
     try {
@@ -571,9 +574,11 @@ async function updateCharacterForDiscord(
         ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
         : existing.bubble_shop_spend;
     const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
-    const newGuildStatus = typeof guildStatus !== 'undefined'
-        ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
-        : existing.guild_status;
+    const newGuildStatus = !isCharacterStatusSwitchEnabled
+        ? 'draft'
+        : typeof guildStatus !== 'undefined'
+            ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
+            : existing.guild_status;
     const newSimplifiedTracking = typeof simplifiedTracking !== 'undefined'
         ? normalizeBoolean(simplifiedTracking, Boolean(existing.simplified_tracking))
         : Boolean(existing.simplified_tracking);

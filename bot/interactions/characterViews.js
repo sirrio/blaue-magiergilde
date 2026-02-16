@@ -45,7 +45,7 @@ const allowedFactions = new Set([
     'arkanisten',
 ]);
 const allowedGuildStatuses = new Set(['pending', 'draft', 'approved', 'declined', 'retired']);
-const editableGuildStatuses = new Set(['pending', 'draft']);
+const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
 const downtimeCreationSteps = ['duration', 'date', 'type', 'notes', 'confirm'];
 
@@ -125,11 +125,6 @@ function formatGuildStatusLabel(value) {
     return 'Pending';
 }
 
-function canEditGuildStatus(value) {
-    const status = normalizeGuildStatus(value);
-    return editableGuildStatuses.has(status);
-}
-
 function safeInt(value, fallback = 0) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
@@ -167,10 +162,6 @@ function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTrack
             new ButtonBuilder()
                 .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
                 .setLabel('Bubble Shop')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`characterManage_status_${characterId}_${ownerDiscordId}`)
-                .setLabel('Status')
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -765,7 +756,7 @@ function buildCreationEmbed(step, title, description) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .setDescription(description)
-        .setFooter({ text: `Step ${step}/8` });
+        .setFooter({ text: `Step ${step}/7` });
 }
 
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
@@ -861,25 +852,6 @@ function buildVersionRow(ownerDiscordId, selectedValue) {
         .addOptions([
             { label: '2014', value: '2014' },
             { label: '2024', value: '2024' },
-        ].map(option =>
-            new StringSelectMenuOptionBuilder()
-                .setLabel(option.label)
-                .setValue(option.value)
-                .setDefault(option.value === selectedValue),
-        ));
-
-    return new ActionRowBuilder().addComponents(select);
-}
-
-function buildStatusRow(ownerDiscordId, selectedValue) {
-    const select = new StringSelectMenuBuilder()
-        .setCustomId(`charactersCreate_status_${ownerDiscordId}`)
-        .setPlaceholder('Select status...')
-        .setMinValues(1)
-        .setMaxValues(1)
-        .addOptions([
-            { label: 'Active', value: 'pending' },
-            { label: 'Draft', value: 'draft' },
         ].map(option =>
             new StringSelectMenuOptionBuilder()
                 .setLabel(option.label)
@@ -1115,53 +1087,6 @@ function buildCharacterFactionView({ character, ownerDiscordId }) {
     return { embed, components };
 }
 
-function buildCharacterStatusView({ character, ownerDiscordId }) {
-    const status = normalizeGuildStatus(character.guild_status);
-    const statusLabel = formatGuildStatusLabel(status);
-    const editable = canEditGuildStatus(status);
-
-    const embed = new EmbedBuilder()
-        .setTitle('Status')
-        .setColor(0x4f46e5)
-        .setDescription(
-            editable
-                ? `Choose the approval status for ${character.name}.`
-                : `${character.name} is **${statusLabel}**. This status cannot be changed here.`,
-        );
-
-    const components = [];
-
-    if (editable) {
-        const select = new StringSelectMenuBuilder()
-            .setCustomId(`characterStatusSelect_${character.id}_${ownerDiscordId}`)
-            .setPlaceholder('Select status...')
-            .setMinValues(1)
-            .setMaxValues(1)
-            .addOptions([
-                { label: 'Active', value: 'pending' },
-                { label: 'Draft', value: 'draft' },
-            ].map(option =>
-                new StringSelectMenuOptionBuilder()
-                    .setLabel(option.label)
-                    .setValue(option.value)
-                    .setDefault(option.value === status),
-            ));
-
-        components.push(new ActionRowBuilder().addComponents(select));
-    }
-
-    components.push(
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
-                .setLabel('Back')
-                .setStyle(ButtonStyle.Secondary),
-        ),
-    );
-
-    return { embed, components };
-}
-
 function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -1203,7 +1128,17 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
 
 function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
     const primaryRow = new ActionRowBuilder();
-    const canLogActivity = guildStatus !== 'draft';
+    const isDraft = String(guildStatus || '').trim().toLowerCase() === 'draft';
+    const canLogActivity = !isDraft;
+    if (isDraft) {
+        primaryRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
+                .setLabel('Register with Magiergilde')
+                .setStyle(ButtonStyle.Success)
+                .setDisabled(!isCharacterStatusSwitchEnabled),
+        );
+    }
     if (!simplifiedTracking && canLogActivity) {
         primaryRow.addComponents(
             new ButtonBuilder()
@@ -2063,7 +1998,6 @@ module.exports = {
     getStartTierSelection,
     buildFactionRow,
     buildVersionRow,
-    buildStatusRow,
     buildCreationConfirmRows,
     buildCreationBasicsRows,
     buildCreationStepActionRows,
@@ -2074,7 +2008,6 @@ module.exports = {
     buildCreationBasicModal,
     buildCharacterClassesView,
     buildCharacterFactionView,
-    buildCharacterStatusView,
     buildDeleteConfirmRow,
     buildAdventureDeleteConfirmRow,
     buildDowntimeDeleteConfirmRow,
@@ -2114,7 +2047,6 @@ module.exports = {
     allowedFactions,
     formatFactionLabel,
     formatGuildStatusLabel,
-    canEditGuildStatus,
     safeInt,
     participantSearchKey,
     setParticipantSearch,
