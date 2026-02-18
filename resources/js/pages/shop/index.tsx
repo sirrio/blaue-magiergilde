@@ -42,7 +42,16 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const isAdmin = Boolean(auth?.user?.is_admin)
 
   useEffect(() => {
-    setSelectedShop(resolveFallbackShop(shops, shopSettings?.draft_shop_id ?? null))
+    setSelectedShop((current) => {
+      if (current) {
+        const sameShop = shops.find((shop) => shop.id === current.id)
+        if (sameShop) {
+          return sameShop
+        }
+      }
+
+      return resolveFallbackShop(shops, shopSettings?.draft_shop_id ?? null)
+    })
   }, [resolveFallbackShop, shops, shopSettings?.draft_shop_id])
 
   useEffect(() => {
@@ -310,6 +319,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const hasPostDestination = Boolean(settings.post_channel_id)
   const currentShopId = settings.current_shop_id ?? null
   const draftShopId = settings.draft_shop_id ?? null
+  const canUpdateSelectedShopLine = Boolean(
+    selectedShop && currentShopId && settings.last_post_channel_id && selectedShop.id === currentShopId,
+  )
   const operationRunning = !isTerminalBotOperation(activeOperation)
   const canUpdatePost = Boolean(settings.current_shop_id && settings.last_post_channel_id)
   const handleOperationCompleted = useCallback((operation: BotOperation) => {
@@ -325,16 +337,30 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         `Published draft #${operation.result_shop_id ?? 'n/a'}. Current: #${newCurrentShopId ?? 'n/a'}, Draft: #${newDraftShopId ?? 'n/a'}.`,
         'info',
       )
-      setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        router.visit(window.location.href, {
+          only: ['shops', 'shopSettings'],
+          preserveState: true,
+          preserveScroll: true,
+          replace: true,
+        })
+      } else {
         router.reload({ only: ['shops', 'shopSettings'] })
-      }, 1500)
+      }
       return
     }
 
     toast.show('Current shop post updated.', 'info')
-    setTimeout(() => {
+    if (typeof window !== 'undefined') {
+      router.visit(window.location.href, {
+        only: ['shopSettings'],
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+      })
+    } else {
       router.reload({ only: ['shopSettings'] })
-    }, 1500)
+    }
   }, [])
   const handleOperationFailed = useCallback((operation: BotOperation) => {
     toast.show(String(operation.error ?? 'Shop operation failed.'), 'error')
@@ -514,7 +540,12 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         ) : null}
         <List>
           {selectedShop?.shop_items.map((si) => (
-            <ItemRow key={si.id} item={getShopItemSnapshot(si)} shopItem={si} />
+            <ItemRow
+              key={si.id}
+              item={getShopItemSnapshot(si)}
+              shopItem={si}
+              canUpdatePostLine={canUpdateSelectedShopLine}
+            />
           ))}
         </List>
       </div>

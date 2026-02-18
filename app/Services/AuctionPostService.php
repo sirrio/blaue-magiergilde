@@ -20,6 +20,13 @@ class AuctionPostService
         return $this->request('/auction-post', $payload);
     }
 
+    public function updateLine(int $auctionItemId): array
+    {
+        return $this->request('/auction-line-update', [
+            'auction_item_id' => $auctionItemId,
+        ]);
+    }
+
     private function request(string $path, array $payload): array
     {
         $botUrl = trim((string) config('services.bot.http_url', ''));

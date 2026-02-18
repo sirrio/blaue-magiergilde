@@ -257,6 +257,36 @@ async function fetchShopItems(shopId) {
     return rows;
 }
 
+async function fetchShopItemById(shopItemId) {
+    const [rows] = await db.execute(
+        `
+            SELECT
+                si.id AS shop_item_id,
+                si.shop_id,
+                si.item_id,
+                COALESCE(si.item_name, i.name) AS name,
+                COALESCE(si.item_url, i.url) AS url,
+                COALESCE(si.item_cost, i.cost) AS cost,
+                COALESCE(si.item_rarity, i.rarity) AS rarity,
+                COALESCE(si.item_type, i.type) AS type,
+                si.notes,
+                si.spell_id,
+                COALESCE(si.spell_name, s.name) AS spell_name,
+                COALESCE(si.spell_url, s.url) AS spell_url,
+                COALESCE(si.spell_legacy_url, s.legacy_url) AS spell_legacy_url,
+                COALESCE(si.spell_level, s.spell_level) AS spell_level
+            FROM item_shop si
+            LEFT JOIN items i ON i.id = si.item_id
+            LEFT JOIN spells s ON s.id = si.spell_id
+            WHERE si.id = ?
+            LIMIT 1
+        `,
+        [shopItemId],
+    );
+
+    return rows[0] ?? null;
+}
+
 async function resolveDestination({ client, channelId, shop, threadName }) {
     let target;
     try {
@@ -655,7 +685,75 @@ async function updateShopPost({ client, shopId, operationId }) {
     };
 }
 
+async function updateShopItemPost({ client, shopItemId }) {
+    attachRateLimitListener(client);
+    const postState = await fetchShopPostState();
+    if (!postState?.lastPostChannelId) {
+        return { ok: false, status: 409, error: 'No previous shop post found.' };
+    }
+
+    if (!postState.itemMessageIds || Object.keys(postState.itemMessageIds).length === 0) {
+        return { ok: false, status: 409, error: 'Previous shop post does not support line updates. Re-post the shop.' };
+    }
+
+    const row = await fetchShopItemById(shopItemId);
+    if (!row) {
+        return { ok: false, status: 404, error: 'Shop line not found.' };
+    }
+
+    if (postState.shopId && Number(postState.shopId) !== Number(row.shop_id)) {
+        return { ok: false, status: 409, error: `Last posted shop is #${postState.shopId}.` };
+    }
+
+    const messageId = postState.itemMessageIds[String(shopItemId)];
+    if (!messageId) {
+        return { ok: false, status: 404, error: 'Posted line for this shop entry was not found.' };
+    }
+
+    let destination;
+    try {
+        await waitForDiscordRateLimit(client);
+        destination = await client.channels.fetch(postState.lastPostChannelId);
+    } catch {
+        return { ok: false, status: 404, error: 'Destination channel not found.' };
+    }
+
+    if (!destination?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Destination channel is not text-based.' };
+    }
+
+    const updatedItemMessageIds = { ...postState.itemMessageIds };
+    const content = formatItemLine(row);
+    try {
+        await waitForDiscordRateLimit(client);
+        await destination.messages.edit(messageId, content);
+    } catch {
+        const fallbackId = await sendOneLine(destination, content);
+        if (!fallbackId) {
+            return { ok: false, status: 500, error: 'Failed to update shop line.' };
+        }
+        updatedItemMessageIds[String(shopItemId)] = fallbackId;
+    }
+
+    await saveShopPostState({
+        settingsId: postState.id ?? null,
+        channelId: postState.lastPostChannelId,
+        shopId: postState.shopId || row.shop_id || null,
+        headerMessageIds: postState.headerMessageIds ?? [],
+        itemMessageIds: updatedItemMessageIds,
+    });
+
+    return {
+        ok: true,
+        destinationId: destination.id,
+        destinationName: destination.name || destination.id,
+        shopId: row.shop_id,
+        shopItemId: Number(shopItemId),
+    };
+}
+
 module.exports = {
     postShopToChannel,
     updateShopPost,
+    updateShopItemPost,
 };

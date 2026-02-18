@@ -34,6 +34,13 @@ class ShopPostService
         return $this->request('/shop-update', $payload);
     }
 
+    public function updateLine(int $shopItemId): array
+    {
+        return $this->request('/shop-line-update', [
+            'shop_item_id' => $shopItemId,
+        ]);
+    }
+
     private function request(string $path, array $payload): array
     {
         $botUrl = trim((string) config('services.bot.http_url', ''));

@@ -31,6 +31,48 @@ const parseLongTime = (value: string) => {
   return Math.max(0, Math.round(parsedHours * 60 + parsedMinutes))
 }
 
+const compactDurationFromMinutes = (minutes: number) => {
+  const clamped = Math.max(0, Math.round(minutes))
+  const hours = Math.floor(clamped / 60)
+  const mins = clamped % 60
+
+  if (mins === 0) {
+    return String(hours)
+  }
+
+  return `${hours}${String(mins).padStart(2, '0')}`
+}
+
+const parseCompactDuration = (digits: string) => {
+  const normalized = digits.replace(/\D/g, '').slice(0, 4)
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized.length <= 2) {
+    const hours = Number(normalized)
+    if (!Number.isFinite(hours)) {
+      return null
+    }
+
+    return clamp(hours * 60, MAX_SESSION_MINUTES)
+  }
+
+  const hhmm = normalized.padStart(4, '0')
+  const hoursPart = hhmm.slice(0, 2)
+  const minutesPart = hhmm.slice(2, 4)
+  const hours = Number(hoursPart)
+  const minutes = Number(minutesPart)
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null
+  }
+
+  const safeMinutes = clamp(minutes, 59)
+
+  return clamp(hours * 60 + safeMinutes, MAX_SESSION_MINUTES)
+}
+
 const usePressRepeat = (action: () => void) => {
   const repeatRef = useRef<{ timeoutId: number | null; intervalId: number | null; didRepeat: boolean }>({
     timeoutId: null,
@@ -106,6 +148,8 @@ const DurationInputStack = ({
   const sessionMinutes = clamp(totalMinutes || DEFAULT_SESSION_MINUTES, MAX_SESSION_MINUTES)
   const sessionDisplay = useMemo(() => formatLongTime(sessionMinutes), [sessionMinutes])
   const sessionMinutesRef = useRef(sessionMinutes)
+  const [sessionInput, setSessionInput] = useState(compactDurationFromMinutes(sessionMinutes))
+  const [sessionFocused, setSessionFocused] = useState(false)
   const [downtimeInput, setDowntimeInput] = useState(formatLongTime(totalMinutes))
   const [downtimeFocused, setDowntimeFocused] = useState(false)
 
@@ -135,6 +179,11 @@ const DurationInputStack = ({
   }, [sessionMinutes])
 
   useEffect(() => {
+    if (!isSession || sessionFocused) return
+    setSessionInput(compactDurationFromMinutes(sessionMinutes))
+  }, [isSession, sessionMinutes, sessionFocused])
+
+  useEffect(() => {
     if (isSession || downtimeFocused) return
     setDowntimeInput(formatLongTime(totalMinutes))
   }, [isSession, totalMinutes, downtimeFocused])
@@ -156,9 +205,44 @@ const DurationInputStack = ({
               -1h
             </Button>
           </div>
-          <div className="rounded-xl bg-base-200 px-4 py-2 text-3xl font-semibold tracking-[0.12em] text-base-content tabular-nums">
-            {sessionDisplay}
-          </div>
+          <input
+            type="text"
+            value={sessionFocused ? sessionInput : sessionDisplay}
+            onFocus={(event) => {
+              setSessionFocused(true)
+              setSessionInput(compactDurationFromMinutes(sessionMinutesRef.current))
+              event.currentTarget.select()
+            }}
+            onClick={(event) => event.currentTarget.select()}
+            onBlur={() => {
+              setSessionFocused(false)
+              const normalizedInput = sessionInput.replace(/\D/g, '')
+              if (normalizedInput.length === 0 || /^0+$/.test(normalizedInput)) {
+                setSessionInput(compactDurationFromMinutes(sessionMinutesRef.current))
+                return
+              }
+
+              const parsed = parseCompactDuration(normalizedInput)
+              if (parsed !== null) {
+                setMinutes(parsed)
+                setSessionInput(compactDurationFromMinutes(parsed))
+              } else {
+                setSessionInput(compactDurationFromMinutes(sessionMinutesRef.current))
+              }
+            }}
+            onChange={(event) => setSessionInput(event.target.value.replace(/\D/g, '').slice(0, 4))}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                event.currentTarget.blur()
+              }
+            }}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            className="w-32 rounded-xl bg-base-200 px-4 py-2 text-center text-3xl font-semibold tracking-[0.12em] text-base-content tabular-nums outline-none"
+            aria-label="Duration (hh:mm)"
+          />
           <div className="flex gap-2">
             <Button type="button" size="xs" color="success" {...plusQuarterHandlers}>
               +15m

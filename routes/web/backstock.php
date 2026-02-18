@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Backstock\BackstockController;
 use App\Http\Controllers\Backstock\BackstockItemController;
+use App\Http\Controllers\Backstock\BackstockItemPostLineUpdateController;
 use App\Http\Controllers\Backstock\BackstockPostController;
 use App\Http\Controllers\Backstock\BackstockSettingController;
 use App\Http\Controllers\Backstock\RefreshBackstockItemSnapshotController;
@@ -32,4 +33,7 @@ Route::middleware(['auth', 'admin'])
 
         Route::post('backstock/items/{backstockItem}/snapshot/refresh', RefreshBackstockItemSnapshotController::class)
             ->name('backstock-items.snapshot.refresh');
+
+        Route::post('backstock/items/{backstockItem}/update-post-line', BackstockItemPostLineUpdateController::class)
+            ->name('backstock-items.update-post-line');
     });

@@ -79,6 +79,8 @@ class AuctionController extends Controller
                 'post_channel_type',
                 'post_channel_guild_id',
                 'post_channel_is_thread',
+                'last_post_channel_id',
+                'last_post_item_message_ids',
                 'voice_channel_id',
                 'voice_channel_name',
                 'voice_channel_type',

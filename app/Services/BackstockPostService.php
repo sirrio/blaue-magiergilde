@@ -19,6 +19,13 @@ class BackstockPostService
         return $this->request('/backstock-post', $payload);
     }
 
+    public function updateLine(int $backstockItemId): array
+    {
+        return $this->request('/backstock-line-update', [
+            'backstock_item_id' => $backstockItemId,
+        ]);
+    }
+
     private function request(string $path, array $payload): array
     {
         $botUrl = trim((string) config('services.bot.http_url', ''));

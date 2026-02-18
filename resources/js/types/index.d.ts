@@ -162,6 +162,7 @@ export interface BackstockSettings {
   post_channel_guild_id?: string | null
   post_channel_is_thread?: boolean | null
   last_post_channel_id?: string | null
+  last_post_item_message_ids?: Record<string, string> | null
 }
 
 export interface AuctionSettings {
@@ -170,6 +171,8 @@ export interface AuctionSettings {
   post_channel_type?: string | null
   post_channel_guild_id?: string | null
   post_channel_is_thread?: boolean | null
+  last_post_channel_id?: string | null
+  last_post_item_message_ids?: Record<string, string> | null
   voice_channel_id?: string | null
   voice_channel_name?: string | null
   voice_channel_type?: string | null

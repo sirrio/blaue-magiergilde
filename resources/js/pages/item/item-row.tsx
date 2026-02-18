@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Dices, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Shield, Store, Sword, Trash } from 'lucide-react'
+import { Copy, Dices, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Send, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -54,6 +54,19 @@ const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
 const copyToClipboard = (text: string, message = 'Copied to clipboard.') => {
   navigator.clipboard.writeText(text).then(() => {
     toast.show(message, 'info')
+  })
+}
+
+const reloadCurrentPage = () => {
+  if (typeof window === 'undefined') {
+    router.reload()
+    return
+  }
+
+  router.visit(window.location.href, {
+    preserveScroll: true,
+    preserveState: true,
+    replace: true,
   })
 }
 
@@ -165,7 +178,7 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload()
+        reloadCurrentPage()
       },
     })
   }
@@ -267,7 +280,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
-        router.reload()
+        reloadCurrentPage()
       },
       onError: (errors) => {
         const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type || errors.notes
@@ -332,7 +345,17 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   )
 }
 
-export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; shopItem?: ShopItem; sources?: Source[] }) {
+export default function ItemRow({
+  item,
+  shopItem,
+  sources = [],
+  canUpdatePostLine = false,
+}: {
+  item: Item
+  shopItem?: ShopItem
+  sources?: Source[]
+  canUpdatePostLine?: boolean
+}) {
   const formData = {
     id: item.id,
     name: item.name,
@@ -433,7 +456,7 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Listing refreshed.', 'info')
-        router.reload()
+        reloadCurrentPage()
       },
       onError: (errors) => {
         const message = errors.snapshot || 'Listing could not be refreshed.'
@@ -450,7 +473,7 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Shop line rerolled.', 'info')
-        router.reload()
+        reloadCurrentPage()
       },
       onError: (errors) => {
         const message = errors.shop_item || 'Shop line could not be rerolled.'
@@ -466,7 +489,7 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
     router.delete(route('admin.shop-items.spell.destroy', { shopItem: shopItem.id }), {
       preserveScroll: true,
       onSuccess: () => {
-        router.reload()
+        reloadCurrentPage()
       },
       onError: () => {
         toast.show('Spell could not be removed.', 'error')
@@ -484,6 +507,43 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
         toast.show('Item could not be deleted.', 'error')
       },
     })
+  }
+  const [isUpdatingPostLine, setIsUpdatingPostLine] = useState(false)
+  const handleUpdatePostedLine = async () => {
+    if (!shopItem || isUpdatingPostLine) return
+
+    const csrfToken = typeof document !== 'undefined'
+      ? (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? ''
+      : ''
+
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setIsUpdatingPostLine(true)
+    try {
+      const response = await fetch(route('admin.shop-items.update-post-line', { shopItem: shopItem.id }), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.error ?? 'Posted line could not be updated.'), 'error')
+        return
+      }
+      toast.show('Posted line updated.', 'info')
+    } catch {
+      toast.show('Posted line could not be updated.', 'error')
+    } finally {
+      setIsUpdatingPostLine(false)
+    }
   }
 
   return (
@@ -575,6 +635,17 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
         {shopItem ? (
           <>
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleUpdatePostedLine}
+              disabled={!canUpdatePostLine || isUpdatingPostLine}
+              title={canUpdatePostLine ? 'Update posted line in Discord' : 'Post this shop first'}
+              aria-label="Update posted line in Discord"
+            >
+              <Send size={14} />
+            </Button>
             <Button
               size="xs"
               variant="ghost"

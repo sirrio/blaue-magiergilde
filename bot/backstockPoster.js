@@ -63,46 +63,117 @@ function formatBackstockLine(row) {
     return `${itemLabel}${cost}`;
 }
 
-function parseMessageIds(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return value.filter(Boolean).map(String);
-    if (typeof value !== 'string') return [];
-    try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-    } catch {
-        return [];
+function normalizeMessageId(value) {
+    if (value === null || value === undefined) return null;
+    const id = String(value).trim();
+    return id ? id : null;
+}
+
+function parseItemMessageMap(value) {
+    if (!value) return {};
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        } catch {
+            return {};
+        }
     }
-    return [];
+
+    if (!parsed || typeof parsed !== 'object') return {};
+
+    const map = {};
+    for (const [key, entryValue] of Object.entries(parsed)) {
+        const messageId = normalizeMessageId(entryValue);
+        if (messageId) {
+            map[String(key)] = messageId;
+        }
+    }
+
+    return map;
+}
+
+function parseBackstockPostPayload(value) {
+    if (!value) {
+        return {
+            messageIds: [],
+            itemMessageIds: {},
+        };
+    }
+
+    if (Array.isArray(value)) {
+        return {
+            messageIds: value.filter(Boolean).map(String),
+            itemMessageIds: {},
+        };
+    }
+
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        } catch {
+            parsed = null;
+        }
+    }
+
+    if (Array.isArray(parsed)) {
+        return {
+            messageIds: parsed.filter(Boolean).map(String),
+            itemMessageIds: {},
+        };
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+        return {
+            messageIds: [],
+            itemMessageIds: {},
+        };
+    }
+
+    const messageIds = Array.isArray(parsed.message_ids)
+        ? parsed.message_ids.map(normalizeMessageId).filter(Boolean)
+        : [];
+
+    const itemMessageIds = parseItemMessageMap(parsed.item_message_ids);
+
+    return {
+        messageIds,
+        itemMessageIds,
+    };
 }
 
 async function fetchBackstockPostState() {
     const [rows] = await db.execute(
-        'SELECT id, last_post_channel_id, last_post_message_ids FROM backstock_settings ORDER BY id ASC LIMIT 1',
+        'SELECT id, last_post_channel_id, last_post_message_ids, last_post_item_message_ids FROM backstock_settings ORDER BY id ASC LIMIT 1',
     );
     if (!rows[0]) return null;
+    const parsed = parseBackstockPostPayload(rows[0].last_post_message_ids);
+    const itemMessageIds = parseItemMessageMap(rows[0].last_post_item_message_ids);
     return {
         id: rows[0].id,
         lastPostChannelId: rows[0].last_post_channel_id,
-        lastPostMessageIds: parseMessageIds(rows[0].last_post_message_ids),
+        lastPostMessageIds: parsed.messageIds,
+        lastPostItemMessageIds: Object.keys(itemMessageIds).length > 0 ? itemMessageIds : parsed.itemMessageIds,
     };
 }
 
-async function saveBackstockPostState({ settingsId, channelId, messageIds }) {
+async function saveBackstockPostState({ settingsId, channelId, messageIds, itemMessageIds }) {
     const payload = JSON.stringify(messageIds ?? []);
+    const itemPayload = JSON.stringify(itemMessageIds ?? {});
     const timestamp = nowSql();
 
     if (!settingsId) {
         await db.execute(
-            'INSERT INTO backstock_settings (last_post_channel_id, last_post_message_ids, created_at, updated_at) VALUES (?, ?, ?, ?)',
-            [channelId, payload, timestamp, timestamp],
+            'INSERT INTO backstock_settings (last_post_channel_id, last_post_message_ids, last_post_item_message_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            [channelId, payload, itemPayload, timestamp, timestamp],
         );
         return;
     }
 
     await db.execute(
-        'UPDATE backstock_settings SET last_post_channel_id = ?, last_post_message_ids = ?, updated_at = ? WHERE id = ?',
-        [channelId, payload, timestamp, settingsId],
+        'UPDATE backstock_settings SET last_post_channel_id = ?, last_post_message_ids = ?, last_post_item_message_ids = ?, updated_at = ? WHERE id = ?',
+        [channelId, payload, itemPayload, timestamp, settingsId],
     );
 }
 
@@ -155,6 +226,28 @@ async function fetchBackstockItems() {
         `,
     );
     return rows;
+}
+
+async function fetchBackstockItemById(backstockItemId) {
+    const [rows] = await db.execute(
+        `
+            SELECT
+                bi.id,
+                bi.notes,
+                COALESCE(bi.item_name, i.name) AS name,
+                COALESCE(bi.item_url, i.url) AS url,
+                COALESCE(bi.item_cost, i.cost) AS cost,
+                COALESCE(bi.item_rarity, i.rarity) AS rarity,
+                COALESCE(bi.item_type, i.type) AS type
+            FROM backstock_items bi
+            LEFT JOIN items i ON i.id = bi.item_id
+            WHERE bi.id = ?
+            LIMIT 1
+        `,
+        [backstockItemId],
+    );
+
+    return rows[0] ?? null;
 }
 
 async function resolveDestination({ client, channelId }) {
@@ -276,6 +369,7 @@ async function postBackstockToChannel({ client, channelId, operationId }) {
 
     const destination = destinationResult.destination;
     const messageIds = [];
+    const itemMessageIds = {};
 
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
@@ -363,6 +457,7 @@ async function postBackstockToChannel({ client, channelId, operationId }) {
                 );
                 if (messageId) {
                     messageIds.push(messageId);
+                    itemMessageIds[String(row.id)] = messageId;
                 }
             }
         }
@@ -372,6 +467,7 @@ async function postBackstockToChannel({ client, channelId, operationId }) {
         settingsId: postState?.id ?? null,
         channelId: destination.id,
         messageIds,
+        itemMessageIds,
     });
 
     return {
@@ -381,6 +477,68 @@ async function postBackstockToChannel({ client, channelId, operationId }) {
     };
 }
 
+async function updateBackstockItemPost({ client, backstockItemId }) {
+    attachRateLimitListener(client);
+    const postState = await fetchBackstockPostState();
+    if (!postState?.lastPostChannelId) {
+        return { ok: false, status: 409, error: 'No previous backstock post found.' };
+    }
+
+    if (!postState.lastPostItemMessageIds || Object.keys(postState.lastPostItemMessageIds).length === 0) {
+        return { ok: false, status: 409, error: 'Previous backstock post does not support line updates. Re-post backstock.' };
+    }
+
+    const row = await fetchBackstockItemById(backstockItemId);
+    if (!row) {
+        return { ok: false, status: 404, error: 'Backstock line not found.' };
+    }
+
+    const messageId = postState.lastPostItemMessageIds[String(backstockItemId)];
+    if (!messageId) {
+        return { ok: false, status: 404, error: 'Posted line for this backstock entry was not found.' };
+    }
+
+    let destination;
+    try {
+        await waitForDiscordRateLimit(client);
+        destination = await client.channels.fetch(postState.lastPostChannelId);
+    } catch {
+        return { ok: false, status: 404, error: 'Destination channel not found.' };
+    }
+
+    if (!destination?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Destination channel is not text-based.' };
+    }
+
+    const updatedItemMessageIds = { ...postState.lastPostItemMessageIds };
+    const content = formatBackstockLine(row);
+    try {
+        await waitForDiscordRateLimit(client);
+        await destination.messages.edit(messageId, content);
+    } catch {
+        const fallbackId = await sendOneLine(destination, content);
+        if (!fallbackId) {
+            return { ok: false, status: 500, error: 'Failed to update backstock line.' };
+        }
+        updatedItemMessageIds[String(backstockItemId)] = fallbackId;
+    }
+
+    await saveBackstockPostState({
+        settingsId: postState.id ?? null,
+        channelId: postState.lastPostChannelId,
+        messageIds: postState.lastPostMessageIds ?? [],
+        itemMessageIds: updatedItemMessageIds,
+    });
+
+    return {
+        ok: true,
+        destinationId: destination.id,
+        destinationName: destination.name || destination.id,
+        backstockItemId: Number(backstockItemId),
+    };
+}
+
 module.exports = {
     postBackstockToChannel,
+    updateBackstockItemPost,
 };
