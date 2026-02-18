@@ -342,22 +342,27 @@ async function sendOneLine(destination, line) {
 }
 
 function countPlannedShopLines(grouped, rarityOrder) {
-    let total = 1; // Top header line.
+    // Top header line.
+    let total = 1;
 
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
         if (!byType) continue;
 
-        total += 1; // Rarity section header.
+        // Rarity section header.
+        total += 1;
         total += (byType.get('item') || []).length;
 
         if (rarity === 'common' || rarity === 'uncommon') {
-            total += 1; // Consumable header.
+            // Consumable header.
+            total += 1;
             total += (byType.get('consumable') || []).length;
-            total += 1; // Spell scroll header.
+            // Spell scroll header.
+            total += 1;
             total += (byType.get('spellscroll') || []).length;
         } else {
-            total += 1; // Mixed header.
+            // Mixed header.
+            total += 1;
             total += (byType.get('consumable') || []).length + (byType.get('spellscroll') || []).length;
         }
     }

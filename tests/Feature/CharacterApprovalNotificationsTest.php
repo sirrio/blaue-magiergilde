@@ -7,6 +7,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
+beforeEach(function () {
+    Config::set('features.character_status_switch', true);
+});
+
 it('sends a discord DM when a character is approved', function () {
     Config::set('services.bot.http_url', 'http://bot.test');
     Config::set('services.bot.http_token', 'token');
@@ -30,7 +34,7 @@ it('sends a discord DM when a character is approved', function () {
     });
 });
 
-it('posts a discord announcement when a pending character is created', function () {
+it('posts a discord announcement when a newly created draft character is submitted', function () {
     Config::set('services.bot.http_url', 'http://bot.test');
     Config::set('services.bot.http_token', 'token');
 
@@ -59,10 +63,15 @@ it('posts a discord announcement when a pending character is created', function 
         'dm_coins' => 0,
         'is_filler' => false,
         'bubble_shop_spend' => 0,
-        'guild_status' => 'pending',
     ];
 
     $this->actingAs($owner)->post(route('characters.store'), $payload)->assertRedirect();
+
+    $character = Character::query()->where('user_id', $owner->id)->latest('id')->firstOrFail();
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character))
+        ->assertRedirect();
 
     Http::assertSent(function ($request) {
         return $request->url() === 'http://bot.test/character-approval/pending'
@@ -71,7 +80,7 @@ it('posts a discord announcement when a pending character is created', function 
     });
 });
 
-it('posts a discord announcement when a draft character is submitted for review', function () {
+it('posts a discord announcement when an existing draft character is submitted for review', function () {
     Config::set('services.bot.http_url', 'http://bot.test');
     Config::set('services.bot.http_token', 'token');
 
@@ -92,23 +101,8 @@ it('posts a discord announcement when a draft character is submitted for review'
     ]);
     $character->characterClasses()->sync([$characterClass->id]);
 
-    $payload = [
-        'name' => $character->name,
-        'class' => [$characterClass->id],
-        'external_link' => $character->external_link,
-        'start_tier' => $character->start_tier,
-        'version' => $character->version,
-        'faction' => $character->faction,
-        'notes' => $character->notes,
-        'dm_bubbles' => $character->dm_bubbles,
-        'dm_coins' => $character->dm_coins,
-        'is_filler' => $character->is_filler,
-        'bubble_shop_spend' => $character->bubble_shop_spend,
-        'guild_status' => 'pending',
-    ];
-
     $this->actingAs($owner)
-        ->post(route('characters.update', ['character' => $character, '_method' => 'put']), $payload)
+        ->post(route('characters.submit-approval', $character))
         ->assertRedirect();
 
     Http::assertSent(function ($request) use ($character) {

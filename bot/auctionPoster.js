@@ -376,13 +376,15 @@ async function sendOneLine(destination, line) {
 }
 
 function countPlannedAuctionLines(grouped, rarityOrder, typeOrder) {
-    let total = 2; // Auction header + update footer.
+    // Auction header + update footer.
+    let total = 2;
 
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
         if (!byType) continue;
 
-        total += 1; // Rarity section.
+        // Rarity section.
+        total += 1;
         for (const type of typeOrder) {
             total += (byType.get(type) ?? []).length;
         }
