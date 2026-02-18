@@ -66,6 +66,12 @@ class AuctionBidController extends Controller
                     ]);
                 }
 
+                if ($lockedItem->sold_at) {
+                    throw ValidationException::withMessages([
+                        'auction_item' => 'Item is already sold.',
+                    ]);
+                }
+
                 $step = $this->getBidStep($lockedItem->item);
                 $startingBid = $this->getStartingBid($lockedItem, $step);
                 $highestBid = (int) $lockedItem->bids()->max('amount');

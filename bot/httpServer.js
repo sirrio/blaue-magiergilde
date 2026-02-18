@@ -665,15 +665,38 @@ function startHttpServer(client) {
                 return;
             }
 
+            let postUpdated = false;
+            let postError = null;
             const updateResult = await updateAuctionItemPost({
                 client,
                 auctionItemId,
             });
-
             if (!updateResult.ok) {
-                logReject(req, updateResult.error || 'auction item update failed');
-                respondJson(res, updateResult.status || 500, { error: updateResult.error || 'Auction item update failed.' });
-                return;
+                postError = updateResult.error || 'Auction item update failed.';
+                console.warn(`[bot] Auction item post update failed for ${auctionItemId}: ${postError}`);
+            } else {
+                postUpdated = true;
+            }
+
+            let voiceCleared = false;
+            let voiceError = null;
+            try {
+                const voiceResult = await postVoiceHighestBid({
+                    client,
+                    channelId: '',
+                    auctionItemId,
+                    clear: true,
+                });
+
+                if (!voiceResult.ok) {
+                    voiceError = voiceResult.error || 'Auction voice bid clear failed.';
+                    console.warn(`[bot] Auction voice bid clear failed for ${auctionItemId}: ${voiceError}`);
+                } else {
+                    voiceCleared = true;
+                }
+            } catch (error) {
+                voiceError = error instanceof Error ? error.message : 'Auction voice bid clear failed.';
+                console.warn('[bot] Auction voice bid clear failed.', error);
             }
 
             let dmSent = false;
@@ -706,7 +729,15 @@ function startHttpServer(client) {
                 console.warn('[bot] Auction winner DM failed.', error);
             }
 
-            respondJson(res, 200, { status: 'updated', dm_sent: dmSent, dm_error: dmError });
+            respondJson(res, 200, {
+                status: 'updated',
+                post_updated: postUpdated,
+                post_error: postError,
+                voice_cleared: voiceCleared,
+                voice_error: voiceError,
+                dm_sent: dmSent,
+                dm_error: dmError,
+            });
             return;
         }
 

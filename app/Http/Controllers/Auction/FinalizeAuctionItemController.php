@@ -8,6 +8,7 @@ use App\Models\AuctionItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class FinalizeAuctionItemController extends Controller
@@ -60,15 +61,16 @@ class FinalizeAuctionItemController extends Controller
                     ]);
 
                 if (! $response->ok()) {
-                    throw ValidationException::withMessages([
-                        'auction_item' => 'Bot update failed.',
+                    Log::warning('Auction finalize bot update failed.', [
+                        'auction_item_id' => $auctionItem->id,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
                     ]);
                 }
-            } catch (ValidationException $error) {
-                throw $error;
             } catch (\Throwable $error) {
-                throw ValidationException::withMessages([
-                    'auction_item' => 'Bot is not reachable.',
+                Log::warning('Auction finalize bot unreachable.', [
+                    'auction_item_id' => $auctionItem->id,
+                    'error' => $error->getMessage(),
                 ]);
             }
         }

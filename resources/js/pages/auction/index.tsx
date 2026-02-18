@@ -204,11 +204,13 @@ const AuctionItemBidControls = ({
   currency,
   candidates,
   highestBidderId,
+  isSold,
 }: {
   auctionItem: AuctionItem
   currency: string
   candidates: AuctionVoiceCandidate[]
   highestBidderId?: string | null
+  isSold: boolean
 }) => {
   const item = getAuctionItemSnapshot(auctionItem)
   const step = getBidStep(item)
@@ -216,8 +218,14 @@ const AuctionItemBidControls = ({
   const highestBid = getHighestBid(auctionItem)
   const minBid = highestBid ? Math.max(startingBid, highestBid.amount + step) : startingBid
   const isAmountValid = (minBid - startingBid) % step === 0
+  const biddingDisabled = isSold
 
   const handleBid = (candidateId: string, candidateName: string) => {
+    if (biddingDisabled) {
+      toast.show('Bidding is closed. Item already sold.', 'error')
+      return
+    }
+
     if (!isAmountValid) {
       toast.show(`Minimum ${minBid} ${currency} in steps of ${step}.`, 'error')
       return
@@ -267,9 +275,9 @@ const AuctionItemBidControls = ({
                 key={candidate.id}
                 size="xs"
                 variant="outline"
-                disabled={!isAmountValid}
+                disabled={!isAmountValid || biddingDisabled}
                 onClick={() => handleBid(candidate.id, candidate.name)}
-                title={isOverMax ? disableReason : undefined}
+                title={biddingDisabled ? 'Item already sold' : isOverMax ? disableReason : undefined}
                 className={cn(
                   'gap-2',
                   isLeader && 'border-success text-success',
@@ -285,9 +293,13 @@ const AuctionItemBidControls = ({
           })}
         </div>
       )}
-      <p className="text-[11px] text-base-content/50">
-        Next bid: {minBid} {currency} - Step {step}
-      </p>
+      {biddingDisabled ? (
+        <p className="text-[11px] text-base-content/50">Bidding closed (sold).</p>
+      ) : (
+        <p className="text-[11px] text-base-content/50">
+          Next bid: {minBid} {currency} - Step {step}
+        </p>
+      )}
     </div>
   )
 }
@@ -400,10 +412,12 @@ const HiddenBidModal = ({
   auctionItem,
   currency,
   candidates,
+  disabled = false,
 }: {
   auctionItem: AuctionItem
   currency: string
   candidates: AuctionVoiceCandidate[]
+  disabled?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const defaultMaxAmount = Math.max(getStartingBid(auctionItem), 1)
@@ -477,7 +491,14 @@ const HiddenBidModal = ({
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          onClick={() => setIsOpen(true)}
+          disabled={disabled}
+          title={disabled ? 'Item already sold' : undefined}
+        >
           <EyeOff size={16} />
         </Button>
       </ModalTrigger>
@@ -717,20 +738,22 @@ const AuctionItemRow = ({
             <div className={cn(textColor, 'flex h-4 w-4 shrink-0 items-center justify-center')}>
               {renderIcon(item.type)}
             </div>
-            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <span className={cn(textColor, 'text-sm font-semibold leading-none')}>
-                {getAuctionItemLabel(item.name, auctionItem)}
-              </span>
-              {isSold ? (
-                <span className="rounded-full border border-success/40 px-2 py-0.5 text-[9px] uppercase text-success">
-                  Sold
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className={cn(textColor, 'truncate text-sm font-semibold leading-none', isSold && 'line-through opacity-70')}>
+                  {getAuctionItemLabel(item.name, auctionItem)}
                 </span>
-              ) : null}
-              {isCustomListing ? (
-                <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
-                  Custom listing
-                </span>
-              ) : null}
+                {isSold ? (
+                  <span className="rounded-full border border-success/40 px-2 py-0.5 text-[9px] uppercase text-success">
+                    Sold
+                  </span>
+                ) : null}
+                {isCustomListing ? (
+                  <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
+                    Custom listing
+                  </span>
+                ) : null}
+              </div>
               <span className="text-xs font-normal leading-none text-base-content/70">
                 Auctions left: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
               </span>
@@ -752,7 +775,7 @@ const AuctionItemRow = ({
             <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
               <RotateCcw size={16} />
             </Button>
-            <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} />
+            <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} disabled={isSold} />
             <BidHistoryModal auctionItem={auctionItem} currency={currency} />
           </div>
         </div>
@@ -784,6 +807,7 @@ const AuctionItemRow = ({
               currency={currency}
               candidates={bidCandidates}
               highestBidderId={highestBid?.bidder_discord_id}
+              isSold={isSold}
             />
           </div>
         </div>

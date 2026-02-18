@@ -49,6 +49,92 @@ it('rejects bids above a hidden max', function () {
     expect(AuctionBid::count())->toBe(0);
 });
 
+it('rejects bids for sold auction items', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => 100,
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+    $winningBid = AuctionBid::query()->create([
+        'auction_item_id' => $auctionItem->id,
+        'bidder_name' => 'Winner',
+        'bidder_discord_id' => '11111',
+        'amount' => 80,
+        'created_by' => $admin->id,
+    ]);
+
+    $auctionItem->forceFill([
+        'sold_at' => now(),
+        'sold_bid_id' => $winningBid->id,
+    ])->save();
+
+    $this->actingAs($admin)
+        ->post(route('admin.auction-items.bids.store', ['auctionItem' => $auctionItem->id]), [
+            'bidder_name' => 'Late Bidder',
+            'bidder_discord_id' => '22222',
+            'amount' => 90,
+        ])
+        ->assertSessionHasErrors('auction_item');
+
+    expect(AuctionBid::query()->where('auction_item_id', $auctionItem->id)->count())->toBe(1);
+});
+
+it('rejects hidden bids for sold auction items', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => 100,
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+    $winningBid = AuctionBid::query()->create([
+        'auction_item_id' => $auctionItem->id,
+        'bidder_name' => 'Winner',
+        'bidder_discord_id' => '11111',
+        'amount' => 80,
+        'created_by' => $admin->id,
+    ]);
+
+    $auctionItem->forceFill([
+        'sold_at' => now(),
+        'sold_bid_id' => $winningBid->id,
+    ])->save();
+
+    $this->actingAs($admin)
+        ->post(route('admin.auction-items.hidden-bids.store', ['auctionItem' => $auctionItem->id]), [
+            'bidder_name' => 'Late Hidden Bidder',
+            'bidder_discord_id' => '22222',
+            'max_amount' => 200,
+        ])
+        ->assertSessionHasErrors('auction_item');
+
+    expect(AuctionHiddenBid::query()->where('auction_item_id', $auctionItem->id)->count())->toBe(0);
+});
+
 it('rolls over eligible items when closing an auction', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $auction = Auction::query()->create([
@@ -142,6 +228,45 @@ it('marks an auction item as sold and notifies the bot', function () {
 
     Http::fake([
         'http://bot.test/auction-item-sold' => Http::response(['status' => 'updated'], 200),
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.auction-items.finalize', ['auctionItem' => $auctionItem->id]))
+        ->assertRedirect();
+
+    $auctionItem->refresh();
+    expect($auctionItem->sold_at)->not->toBeNull()
+        ->and($auctionItem->sold_bid_id)->toBe($bid->id);
+});
+
+it('marks an auction item as sold even when bot update fails', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create(['rarity' => 'common', 'type' => 'item']);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+    $bid = AuctionBid::query()->create([
+        'auction_item_id' => $auctionItem->id,
+        'bidder_name' => 'Winner',
+        'bidder_discord_id' => '12345',
+        'amount' => 250,
+        'created_by' => $admin->id,
+    ]);
+
+    config()->set('services.bot.http_url', 'http://bot.test');
+    config()->set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/auction-item-sold' => Http::response(['error' => 'failed'], 500),
     ]);
 
     $this->actingAs($admin)
