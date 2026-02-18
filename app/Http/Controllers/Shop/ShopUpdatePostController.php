@@ -3,25 +3,57 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
-use App\Models\Shop;
-use App\Services\ShopPostService;
+use App\Jobs\ProcessBotOperationJob;
+use App\Models\BotOperation;
 use Illuminate\Http\JsonResponse;
 
 class ShopUpdatePostController extends Controller
 {
-    public function __invoke(Shop $shop, ShopPostService $service): JsonResponse
+    public function __invoke(): JsonResponse
     {
-        $result = $service->update($shop);
+        $operation = BotOperation::query()->create([
+            'resource' => BotOperation::RESOURCE_SHOP,
+            'action' => BotOperation::ACTION_UPDATE_CURRENT_POST,
+            'status' => BotOperation::STATUS_PENDING,
+            'step' => BotOperation::STATUS_PENDING,
+            'user_id' => request()->user()?->id,
+        ]);
 
-        if (! ($result['ok'] ?? false)) {
+        try {
+            ProcessBotOperationJob::dispatchForOperation($operation);
+        } catch (\Throwable $error) {
+            $operation->status = BotOperation::STATUS_FAILED;
+            $operation->step = BotOperation::STATUS_FAILED;
+            $operation->error = 'Queue dispatch failed. Start a queue worker and try again. '.$error->getMessage();
+            $operation->finished_at = now();
+            $operation->save();
+
             return response()->json([
-                'error' => $result['error'] ?? 'Bot request failed.',
-            ], $result['status'] ?? 500);
+                'error' => 'Shop operation could not be queued.',
+                'operation' => $operation->only([
+                    'id',
+                    'resource',
+                    'resource_id',
+                    'action',
+                    'status',
+                    'step',
+                    'error',
+                    'created_at',
+                ]),
+            ], 500);
         }
 
         return response()->json([
-            'status' => 'updated',
-            'shop_id' => $shop->id,
-        ]);
+            'status' => 'started',
+            'operation' => $operation->only([
+                'id',
+                'resource',
+                'resource_id',
+                'action',
+                'status',
+                'step',
+                'created_at',
+            ]),
+        ], 202);
     }
 }

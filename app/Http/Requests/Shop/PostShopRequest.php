@@ -17,7 +17,7 @@ class PostShopRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'channel_id' => ['required', 'string', 'regex:/^[0-9]{5,}$/'],
+            'channel_id' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{5,}$/'],
         ];
     }
 }

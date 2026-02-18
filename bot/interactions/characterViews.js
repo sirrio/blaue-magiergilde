@@ -1129,7 +1129,7 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
 function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
     const primaryRow = new ActionRowBuilder();
     const isDraft = String(guildStatus || '').trim().toLowerCase() === 'draft';
-    const canLogActivity = !isDraft;
+    const canLogActivity = !isDraft || !isCharacterStatusSwitchEnabled;
     if (isDraft) {
         primaryRow.addComponents(
             new ButtonBuilder()
@@ -1152,7 +1152,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
                 .setDisabled(Boolean(isFiller)),
         );
     }
-    if (simplifiedTracking) {
+    if (simplifiedTracking && canLogActivity) {
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_manual_level_${characterId}_${ownerDiscordId}`)

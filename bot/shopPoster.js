@@ -1,6 +1,7 @@
 const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
+const { resolveOperationId, updateOperationProgress } = require('./operationProgress');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -180,8 +181,8 @@ async function saveShopPostState({ settingsId, channelId, shopId, headerMessageI
     );
 }
 
-async function deletePreviousPosts({ client, settings }) {
-    if (!settings?.lastPostChannelId) return;
+async function deletePreviousPosts({ client, settings, onProgress }) {
+    if (!settings?.lastPostChannelId) return { total: 0, processed: 0 };
 
     const allMessageIds = new Set(
         [
@@ -191,18 +192,19 @@ async function deletePreviousPosts({ client, settings }) {
         ].filter(Boolean),
     );
 
-    if (!allMessageIds.size) return;
+    if (!allMessageIds.size) return { total: 0, processed: 0 };
 
     let channel;
     try {
         await waitForDiscordRateLimit(client);
         channel = await client.channels.fetch(settings.lastPostChannelId);
     } catch {
-        return;
+        return { total: allMessageIds.size, processed: 0 };
     }
 
-    if (!channel?.isTextBased?.()) return;
+    if (!channel?.isTextBased?.()) return { total: allMessageIds.size, processed: 0 };
 
+    let processed = 0;
     for (const messageId of allMessageIds) {
         try {
             await waitForDiscordRateLimit(client);
@@ -210,8 +212,15 @@ async function deletePreviousPosts({ client, settings }) {
             await channel.messages.delete(messageId);
         } catch {
             // Ignore missing permissions or deleted messages.
+        } finally {
+            processed += 1;
+            if (typeof onProgress === 'function') {
+                await onProgress({ processed, total: allMessageIds.size });
+            }
         }
     }
+
+    return { total: allMessageIds.size, processed };
 }
 
 async function fetchShop(shopId) {
@@ -332,13 +341,42 @@ async function sendOneLine(destination, line) {
     return message?.id ?? null;
 }
 
-async function sendItemLine(destination, row) {
-    const line = formatItemLine(row);
-    return sendOneLine(destination, line);
+function countPlannedShopLines(grouped, rarityOrder) {
+    // Top header line.
+    let total = 1;
+
+    for (const rarity of rarityOrder) {
+        const byType = grouped.get(rarity);
+        if (!byType) continue;
+
+        // Rarity section header.
+        total += 1;
+        total += (byType.get('item') || []).length;
+
+        if (rarity === 'common' || rarity === 'uncommon') {
+            // Consumable header.
+            total += 1;
+            total += (byType.get('consumable') || []).length;
+            // Spell scroll header.
+            total += 1;
+            total += (byType.get('spellscroll') || []).length;
+        } else {
+            // Mixed header.
+            total += 1;
+            total += (byType.get('consumable') || []).length + (byType.get('spellscroll') || []).length;
+        }
+    }
+
+    return total;
 }
 
-async function postShopToChannel({ client, channelId, shopId, threadName }) {
+async function postShopToChannel({ client, channelId, shopId, operationId, threadName }) {
     attachRateLimitListener(client);
+    const resolvedOperationId = await resolveOperationId({
+        operationId,
+        action: 'publish_draft',
+        channelId,
+    });
     const postState = await fetchShopPostState();
     const shop = await fetchShop(shopId);
     if (!shop) {
@@ -359,13 +397,6 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
     const headerMessageIds = [];
     const itemMessageIds = {};
 
-    await deletePreviousPosts({ client, settings: postState });
-
-    const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
-    const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
-    const headerId = await sendOneLine(destination, `**Shop #${String(shop.id).padStart(3, '0')}** - Rolled: ${createdAtText}`);
-    if (headerId) headerMessageIds.push(headerId);
-
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
     const grouped = new Map();
@@ -379,6 +410,71 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
         byType.get(type).push(row);
     }
 
+    const previousMessageIds = new Set(
+        [
+            ...(postState?.legacyMessageIds || []),
+            ...(postState?.headerMessageIds || []),
+            ...Object.values(postState?.itemMessageIds || {}),
+        ].filter(Boolean),
+    );
+    const deleteCount = previousMessageIds.size;
+    const postCount = countPlannedShopLines(grouped, rarityOrder);
+    const totalLines = Math.max(1, deleteCount + postCount);
+    let postedLines = 0;
+    await updateOperationProgress(resolvedOperationId, {
+        totalLines,
+        postedLines,
+        lastLine: `Preparing shop #${String(shop.id).padStart(3, '0')}`,
+    });
+
+    if (deleteCount > 0) {
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: `Deleting old shop messages (0/${deleteCount})`,
+        });
+    }
+
+    const deleteResult = await deletePreviousPosts({
+        client,
+        settings: postState,
+        onProgress: async ({ processed, total }) => {
+            postedLines = Math.min(totalLines, processed);
+            await updateOperationProgress(resolvedOperationId, {
+                totalLines,
+                postedLines,
+                lastLine: `Deleting old shop messages (${processed}/${total})`,
+            });
+        },
+    });
+    if (deleteCount > 0 && postedLines < deleteCount) {
+        postedLines = Math.min(totalLines, deleteCount);
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: `Deleting old shop messages (${deleteResult.processed}/${deleteCount})`,
+        });
+    }
+
+    const sendTrackedLine = async (line, label) => {
+        const messageId = await sendOneLine(destination, line);
+        postedLines = Math.min(totalLines, postedLines + 1);
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: label || null,
+        });
+        return messageId;
+    };
+
+    const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
+    const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
+    const headerId = await sendTrackedLine(
+        `**Shop #${String(shop.id).padStart(3, '0')}** - Rolled: ${createdAtText}`,
+        `Header: Shop #${String(shop.id).padStart(3, '0')}`,
+    );
+    if (headerId) headerMessageIds.push(headerId);
+
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
         if (!byType) continue;
@@ -391,36 +487,48 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
             if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
 
-        const sectionId = await sendOneLine(destination, `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`);
+        const sectionId = await sendTrackedLine(
+            `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`,
+            `${rarityLabel} section`,
+        );
         if (sectionId) headerMessageIds.push(sectionId);
         for (const row of byType.get('item') ?? []) {
              
-            const messageId = await sendItemLine(destination, row);
+            const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
             if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
         }
 
         if (rarity === 'common' || rarity === 'uncommon') {
-            const consumableHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable`);
+            const consumableHeaderId = await sendTrackedLine(
+                `### ${rarityLabel} Consumable`,
+                `${rarityLabel} consumables`,
+            );
             if (consumableHeaderId) headerMessageIds.push(consumableHeaderId);
             for (const row of byType.get('consumable') ?? []) {
                  
-                const messageId = await sendItemLine(destination, row);
+                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Consumable');
                 if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
             }
 
-            const scrollHeaderId = await sendOneLine(destination, `### ${rarityLabel} Spell Scroll`);
+            const scrollHeaderId = await sendTrackedLine(
+                `### ${rarityLabel} Spell Scroll`,
+                `${rarityLabel} spell scrolls`,
+            );
             if (scrollHeaderId) headerMessageIds.push(scrollHeaderId);
             for (const row of byType.get('spellscroll') ?? []) {
                  
-                const messageId = await sendItemLine(destination, row);
+                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Spell scroll');
                 if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
             }
         } else {
-            const mixedHeaderId = await sendOneLine(destination, `### ${rarityLabel} Consumable/Spell Scroll`);
+            const mixedHeaderId = await sendTrackedLine(
+                `### ${rarityLabel} Consumable/Spell Scroll`,
+                `${rarityLabel} mixed`,
+            );
             if (mixedHeaderId) headerMessageIds.push(mixedHeaderId);
             for (const row of [...(byType.get('consumable') ?? []), ...(byType.get('spellscroll') ?? [])]) {
                  
-                const messageId = await sendItemLine(destination, row);
+                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Consumable/Scroll');
                 if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
             }
         }
@@ -442,8 +550,12 @@ async function postShopToChannel({ client, channelId, shopId, threadName }) {
     };
 }
 
-async function updateShopPost({ client, shopId }) {
+async function updateShopPost({ client, shopId, operationId }) {
     attachRateLimitListener(client);
+    const resolvedOperationId = await resolveOperationId({
+        operationId,
+        action: 'update_current_post',
+    });
     const postState = await fetchShopPostState();
     if (!postState?.lastPostChannelId) {
         return { ok: false, status: 409, error: 'No previous shop post found.' };
@@ -480,6 +592,13 @@ async function updateShopPost({ client, shopId }) {
     }
 
     const updatedItemMessageIds = { ...postState.itemMessageIds };
+    const totalLines = items.length;
+    let postedLines = 0;
+    await updateOperationProgress(resolvedOperationId, {
+        totalLines,
+        postedLines,
+        lastLine: `Preparing update for shop #${String(shop.id).padStart(3, '0')}`,
+    });
 
     for (const row of items) {
         const messageId = updatedItemMessageIds[String(row.shop_item_id)];
@@ -491,6 +610,12 @@ async function updateShopPost({ client, shopId }) {
             if (newMessageId) {
                 updatedItemMessageIds[String(row.shop_item_id)] = newMessageId;
             }
+            postedLines += 1;
+            await updateOperationProgress(resolvedOperationId, {
+                totalLines,
+                postedLines,
+                lastLine: row.name || 'Item',
+            });
             continue;
         }
 
@@ -505,6 +630,13 @@ async function updateShopPost({ client, shopId }) {
                 updatedItemMessageIds[String(row.shop_item_id)] = fallbackId;
             }
         }
+
+        postedLines += 1;
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: row.name || 'Item',
+        });
     }
 
     await saveShopPostState({

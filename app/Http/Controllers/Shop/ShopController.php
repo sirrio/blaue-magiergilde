@@ -6,8 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Shop;
-use App\Models\ShopSetting;
-use App\Services\ShopRollService;
+use App\Services\ShopLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,8 +16,10 @@ class ShopController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): Response
+    public function index(ShopLifecycleService $shopLifecycleService): Response
     {
+        $shopSettings = $shopLifecycleService->ensureInitialized();
+
         $shops = Shop::query()
             ->with([
                 'shopItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
@@ -30,7 +31,7 @@ class ShopController extends Controller
 
         return Inertia::render('shop/index', [
             'shops' => $shops,
-            'shopSettings' => ShopSetting::current()->only([
+            'shopSettings' => $shopSettings->only([
                 'post_channel_id',
                 'post_channel_name',
                 'post_channel_type',
@@ -41,6 +42,8 @@ class ShopController extends Controller
                 'auto_post_weekday',
                 'auto_post_time',
                 'last_auto_posted_at',
+                'current_shop_id',
+                'draft_shop_id',
             ]),
         ]);
     }
@@ -56,12 +59,9 @@ class ShopController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreShopRequest $request, ShopRollService $shopRoller): RedirectResponse
+    public function store(StoreShopRequest $request, ShopLifecycleService $shopLifecycleService): RedirectResponse
     {
-        // Previously the shop creation looped 200 times, producing hundreds
-        // of shops in a single request. Removing that loop ensures only a
-        // single shop is rolled per request.
-        $shopRoller->roll();
+        $shopLifecycleService->rollNewDraft();
 
         return redirect()->back();
     }

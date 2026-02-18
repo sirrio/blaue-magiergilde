@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
@@ -8,10 +9,10 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
+import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, BotOperation, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, EyeOff, FlaskRound, History, Mic, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash, XCircle } from 'lucide-react'
 import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -204,11 +205,13 @@ const AuctionItemBidControls = ({
   currency,
   candidates,
   highestBidderId,
+  isSold,
 }: {
   auctionItem: AuctionItem
   currency: string
   candidates: AuctionVoiceCandidate[]
   highestBidderId?: string | null
+  isSold: boolean
 }) => {
   const item = getAuctionItemSnapshot(auctionItem)
   const step = getBidStep(item)
@@ -216,8 +219,14 @@ const AuctionItemBidControls = ({
   const highestBid = getHighestBid(auctionItem)
   const minBid = highestBid ? Math.max(startingBid, highestBid.amount + step) : startingBid
   const isAmountValid = (minBid - startingBid) % step === 0
+  const biddingDisabled = isSold
 
   const handleBid = (candidateId: string, candidateName: string) => {
+    if (biddingDisabled) {
+      toast.show('Bidding is closed. Item already sold.', 'error')
+      return
+    }
+
     if (!isAmountValid) {
       toast.show(`Minimum ${minBid} ${currency} in steps of ${step}.`, 'error')
       return
@@ -267,9 +276,9 @@ const AuctionItemBidControls = ({
                 key={candidate.id}
                 size="xs"
                 variant="outline"
-                disabled={!isAmountValid}
+                disabled={!isAmountValid || biddingDisabled}
                 onClick={() => handleBid(candidate.id, candidate.name)}
-                title={isOverMax ? disableReason : undefined}
+                title={biddingDisabled ? 'Item already sold' : isOverMax ? disableReason : undefined}
                 className={cn(
                   'gap-2',
                   isLeader && 'border-success text-success',
@@ -285,9 +294,13 @@ const AuctionItemBidControls = ({
           })}
         </div>
       )}
-      <p className="text-[11px] text-base-content/50">
-        Next bid: {minBid} {currency} - Step {step}
-      </p>
+      {biddingDisabled ? (
+        <p className="text-[11px] text-base-content/50">Bidding closed (sold).</p>
+      ) : (
+        <p className="text-[11px] text-base-content/50">
+          Next bid: {minBid} {currency} - Step {step}
+        </p>
+      )}
     </div>
   )
 }
@@ -326,7 +339,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
-          <History size={16} />
+          <History size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Bid history</ModalTitle>
@@ -383,7 +396,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
                       color="error"
                       onClick={() => handleDelete(bid.id)}
                     >
-                      <Trash2 size={14} />
+                      <Trash size={14} />
                     </Button>
                   </div>
                 </div>
@@ -400,10 +413,12 @@ const HiddenBidModal = ({
   auctionItem,
   currency,
   candidates,
+  disabled = false,
 }: {
   auctionItem: AuctionItem
   currency: string
   candidates: AuctionVoiceCandidate[]
+  disabled?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const defaultMaxAmount = Math.max(getStartingBid(auctionItem), 1)
@@ -477,8 +492,15 @@ const HiddenBidModal = ({
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
-          <EyeOff size={16} />
+        <Button
+          size="xs"
+          variant="ghost"
+          modifier="square"
+          onClick={() => setIsOpen(true)}
+          disabled={disabled}
+          title={disabled ? 'Item already sold' : undefined}
+        >
+          <EyeOff size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Hidden bids</ModalTitle>
@@ -537,7 +559,7 @@ const HiddenBidModal = ({
                     color="error"
                     onClick={() => handleDelete(hiddenBid.id)}
                   >
-                    <Trash2 size={14} />
+                    <Trash size={14} />
                   </Button>
                 </div>
               ))}
@@ -558,6 +580,8 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     notes: auctionItem.notes ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
+    repair_current: auctionItem.repair_current ?? '',
+    repair_max: auctionItem.repair_max ?? '',
   })
   const [isOpen, setIsOpen] = useState(false)
 
@@ -570,8 +594,10 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
       notes: auctionItem.notes ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
+      repair_current: auctionItem.repair_current ?? '',
+      repair_max: auctionItem.repair_max ?? '',
     })
-  }, [isOpen, auctionItem.notes, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, auctionItem.notes, auctionItem.repair_current, auctionItem.repair_max, item.cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.auction-items.snapshot.update', { auctionItem: auctionItem.id }), {
@@ -581,7 +607,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
         router.reload()
       },
       onError: (errors) => {
-        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
+        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type || errors.repair_current || errors.repair_max
         if (message) {
           toast.show(String(message), 'error')
         }
@@ -593,40 +619,65 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
-          <Edit size={16} />
+          <Pencil size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
       <ModalContent>
-        <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
-          Name
-        </Input>
-        <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
-          URL
-        </Input>
-        <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
-          Cost
-        </Input>
-        <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-          Notes
-        </Input>
-        <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-          <SelectLabel>Rarity</SelectLabel>
-          <SelectOptions>
-            <option value="common">Common</option>
-            <option value="uncommon">Uncommon</option>
-            <option value="rare">Rare</option>
-            <option value="very_rare">Very Rare</option>
-          </SelectOptions>
-        </Select>
-        <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-          <SelectLabel>Type</SelectLabel>
-          <SelectOptions>
-            <option value="item">Item</option>
-            <option value="spellscroll">Spell Scroll</option>
-            <option value="consumable">Consumable</option>
-          </SelectOptions>
-        </Select>
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Item snapshot</p>
+            <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+              Name
+            </Input>
+            <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
+              URL
+            </Input>
+            <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
+              Cost
+            </Input>
+            <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+              <SelectLabel>Rarity</SelectLabel>
+              <SelectOptions>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="very_rare">Very Rare</option>
+              </SelectOptions>
+            </Select>
+            <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+              <SelectLabel>Type</SelectLabel>
+              <SelectOptions>
+                <option value="item">Item</option>
+                <option value="spellscroll">Spell Scroll</option>
+                <option value="consumable">Consumable</option>
+              </SelectOptions>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Auction listing</p>
+            <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+              Notes
+            </Input>
+            <Input
+              type="number"
+              min={0}
+              value={data.repair_current}
+              onChange={(e) => setData('repair_current', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              Repair current
+            </Input>
+            <Input
+              type="number"
+              min={0}
+              value={data.repair_max}
+              onChange={(e) => setData('repair_max', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              Repair max
+            </Input>
+          </div>
+        </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
         Save
@@ -647,6 +698,7 @@ const AuctionItemRow = ({
   const item = getAuctionItemSnapshot(auctionItem)
   const textColor = getRarityTextColor(item.rarity)
   const highestBid = getHighestBid(auctionItem)
+  const isSold = Boolean(auctionItem.sold_at)
   const isCustomListing = Boolean(auctionItem.snapshot_custom)
   const bidCandidates = useMemo(() => {
     const merged = new Map<string, AuctionVoiceCandidate>()
@@ -670,6 +722,7 @@ const AuctionItemRow = ({
     ? bidCandidates.find((candidate) => candidate.id === highestBid.bidder_discord_id)
     : null
   const highestBidderName = highestBid?.bidder_name ?? ''
+  const canFinalize = Boolean(highestBid) && !isSold
 
   const handleSnapshotRefresh = () => {
     if (!window.confirm('Refresh this listing from the compendium?')) return
@@ -687,6 +740,41 @@ const AuctionItemRow = ({
     })
   }
 
+  const handleFinalizeSold = () => {
+    if (!highestBid) {
+      toast.show('No bids available.', 'error')
+      return
+    }
+    if (!window.confirm('Mark this item as sold?')) return
+
+    router.post(route('admin.auction-items.finalize', { auctionItem: auctionItem.id }), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Item marked as sold.', 'info')
+        router.reload()
+      },
+      onError: (errors) => {
+        const message = errors.auction_item || 'Item could not be finalized.'
+        toast.show(String(message), 'error')
+      },
+    })
+  }
+
+  const handleDeleteAuctionItem = () => {
+    if (!window.confirm(`Delete "${item.name}" from this auction?`)) return
+
+    router.delete(route('admin.auction-items.destroy', { auctionItem: auctionItem.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Auction line deleted.', 'info')
+        router.reload()
+      },
+      onError: () => {
+        toast.show('Auction line could not be deleted.', 'error')
+      },
+    })
+  }
+
   return (
     <ListRow className="grid-cols-1">
       <div className="col-span-full flex w-full flex-col gap-2">
@@ -695,27 +783,57 @@ const AuctionItemRow = ({
             <div className={cn(textColor, 'flex h-4 w-4 shrink-0 items-center justify-center')}>
               {renderIcon(item.type)}
             </div>
-            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <span className={cn(textColor, 'text-sm font-semibold leading-none')}>
-                {getAuctionItemLabel(item.name, auctionItem)}
-              </span>
-              {isCustomListing ? (
-                <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
-                  Custom listing
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className={cn(textColor, 'truncate text-sm font-semibold leading-none', isSold && 'line-through opacity-70')}>
+                  {getAuctionItemLabel(item.name, auctionItem)}
                 </span>
-              ) : null}
+                {isSold ? (
+                  <span className="rounded-full border border-success/40 px-2 py-0.5 text-[9px] uppercase text-success">
+                    Sold
+                  </span>
+                ) : null}
+                {isCustomListing ? (
+                  <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
+                    Custom listing
+                  </span>
+                ) : null}
+              </div>
               <span className="text-xs font-normal leading-none text-base-content/70">
                 Auctions left: {auctionItem.remaining_auctions} - Repair {getRepairLabel(auctionItem)}
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1 border-l border-base-200 pl-2">
-            <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
-            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
-              <RotateCcw size={16} />
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleFinalizeSold}
+              aria-label="Finalize sold"
+              title={isSold ? 'Already sold' : highestBid ? 'Finalize sold' : 'No bids'}
+              disabled={!canFinalize}
+            >
+              <CheckCircle2 size={14} />
             </Button>
-            <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} />
+            <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} disabled={isSold} />
             <BidHistoryModal auctionItem={auctionItem} currency={currency} />
+            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
+              <RotateCcw size={14} />
+            </Button>
+            <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              color="error"
+              onClick={handleDeleteAuctionItem}
+              aria-label="Delete auction line"
+              title="Delete auction line"
+            >
+              <Trash size={14} />
+            </Button>
           </div>
         </div>
 
@@ -746,6 +864,7 @@ const AuctionItemRow = ({
               currency={currency}
               candidates={bidCandidates}
               highestBidderId={highestBid?.bidder_discord_id}
+              isSold={isSold}
             />
           </div>
         </div>
@@ -876,6 +995,7 @@ export default function Index({
   const [isPostingAuction, setIsPostingAuction] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingVoiceChannel, setIsSavingVoiceChannel] = useState(false)
+  const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
@@ -1018,6 +1138,13 @@ export default function Index({
         return
       }
 
+      const operation = (payload?.operation ?? null) as BotOperation | null
+      if (!operation?.id) {
+        toast.show('Auction operation could not be started.', 'error')
+        return
+      }
+
+      setActiveOperation(operation)
       toast.show('Auction post started.', 'info')
     } catch {
       toast.show('Auction could not be posted.', 'error')
@@ -1034,6 +1161,13 @@ export default function Index({
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const operationRunning = !isTerminalBotOperation(activeOperation)
+  const handleOperationCompleted = useCallback(() => {
+    toast.show('Auction posted to Discord.', 'info')
+  }, [])
+  const handleOperationFailed = useCallback((operation: BotOperation) => {
+    toast.show(String(operation.error ?? 'Auction operation failed.'), 'error')
+  }, [])
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
     const confirmed = window.confirm(
@@ -1313,6 +1447,12 @@ export default function Index({
                   </Modal>
                 ) : null}
               </div>
+              <BotOperationProgress
+                operation={activeOperation}
+                onOperationChange={setActiveOperation}
+                onCompleted={handleOperationCompleted}
+                onFailed={handleOperationFailed}
+              />
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {selectedAuction ? (
                   <AddAuctionItemModal auction={selectedAuction} items={items} />
@@ -1322,7 +1462,7 @@ export default function Index({
                     size="sm"
                     variant="outline"
                     onClick={handlePostAuction}
-                    disabled={!settings.post_channel_id || isPostingAuction}
+                    disabled={!settings.post_channel_id || isPostingAuction || operationRunning}
                     className="gap-2"
                   >
                     <Send size={16} />

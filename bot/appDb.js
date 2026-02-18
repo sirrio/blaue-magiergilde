@@ -50,6 +50,14 @@ const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'retire
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
+function guildCharacterStatusesForAllies() {
+    const statuses = ['pending', 'approved'];
+    if (!isCharacterStatusSwitchEnabled) {
+        statuses.push('draft');
+    }
+    return statuses;
+}
+
 function normalizeTier(value, fallback = 'bt') {
     const tier = String(value || '').trim().toLowerCase();
     return allowedTiers.has(tier) ? tier : fallback;
@@ -905,17 +913,19 @@ async function listAlliesForDiscord(discordUser, characterId) {
 async function listGuildCharactersForDiscord(discordUser, characterId) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
+    const statuses = guildCharacterStatusesForAllies();
+    const statusPlaceholders = statuses.map(() => '?').join(', ');
 
     const [rows] = await db.execute(
         `
             SELECT id, name
             FROM characters
-            WHERE guild_status = 'approved'
+            WHERE guild_status IN (${statusPlaceholders})
               AND deleted_at IS NULL
               AND id <> ?
             ORDER BY name ASC, id ASC
         `,
-        [characterId],
+        [...statuses, characterId],
     );
 
     return rows;
@@ -967,15 +977,18 @@ async function resolveGuildAlliesForDiscord(discordUser, characterId, guildChara
     );
     const existingByLinked = new Map(existingRows.map(row => [Number(row.linked_character_id), Number(row.id)]));
 
+    const statuses = guildCharacterStatusesForAllies();
+    const statusPlaceholders = statuses.map(() => '?').join(', ');
+
     const [characters] = await executor.execute(
         `
             SELECT id, name
             FROM characters
             WHERE id IN (${placeholders})
-              AND guild_status = 'approved'
+              AND guild_status IN (${statusPlaceholders})
               AND deleted_at IS NULL
         `,
-        safeIds,
+        [...safeIds, ...statuses],
     );
 
     const createdAt = nowSql();

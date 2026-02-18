@@ -1,8 +1,7 @@
 <?php
 
 use App\Models\ShopSetting;
-use App\Services\ShopPostService;
-use App\Services\ShopRollService;
+use App\Services\ShopLifecycleService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -11,28 +10,15 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('shop:post-weekly', function (ShopRollService $shopRoller, ShopPostService $service) {
-    $settings = ShopSetting::current();
-    $channelId = $settings->post_channel_id;
-
-    if (! $channelId) {
-        $this->error('No shop posting channel configured.');
-
-        return 1;
-    }
-
-    $shop = $shopRoller->roll();
-
-    $result = $service->post($shop, $channelId);
+Artisan::command('shop:post-weekly', function (ShopLifecycleService $service) {
+    $result = $service->publishDraft(markAsAutoPosted: true);
     if (! ($result['ok'] ?? false)) {
         $this->error((string) ($result['error'] ?? 'Shop post failed.'));
 
         return 1;
     }
 
-    $settings->forceFill(['last_auto_posted_at' => now()])->save();
-
-    $this->info(sprintf('Posted shop #%d.', $shop->id));
+    $this->info(sprintf('Posted shop #%d.', (int) ($result['posted_shop_id'] ?? 0)));
 
     return 0;
 })->purpose('Post the latest shop to Discord.');

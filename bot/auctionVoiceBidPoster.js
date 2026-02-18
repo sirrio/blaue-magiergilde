@@ -54,10 +54,14 @@ async function fetchAuctionItemInfo(auctionItemId) {
                 ai.id,
                 ai.notes,
                 a.currency,
-                i.name
+                i.name,
+                sb.bidder_discord_id AS sold_bidder_discord_id,
+                sb.bidder_name AS sold_bidder_name,
+                sb.amount AS sold_amount
             FROM auction_items ai
             INNER JOIN auctions a ON a.id = ai.auction_id
             INNER JOIN items i ON i.id = ai.item_id
+            LEFT JOIN auction_bids sb ON sb.id = ai.sold_bid_id
             WHERE ai.id = ?
             LIMIT 1
         `,
@@ -155,6 +159,44 @@ async function sendOneLine(destination, line) {
     return message?.id ?? null;
 }
 
+async function editMessage({ client, channelId, messageId, line }) {
+    if (!channelId || !messageId || !line) return false;
+    try {
+        await waitForDiscordRateLimit(client);
+        const channel = await client.channels.fetch(channelId);
+        if (!channel?.isTextBased?.()) return false;
+        await waitForDiscordRateLimit(client);
+        const message = await channel.messages.fetch(messageId);
+        if (!message) return false;
+        await waitForDiscordRateLimit(client);
+        await message.edit(String(line));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function formatAuctionVoiceLine({
+    itemLabel,
+    currency,
+    bidderDiscordId,
+    bidderName,
+    amount,
+    sold,
+}) {
+    const hasDiscordId = bidderDiscordId && /^[0-9]{5,}$/.test(String(bidderDiscordId));
+    const mention = hasDiscordId ? `<@${bidderDiscordId}>` : '';
+    const nameSuffix = bidderName ? (mention ? ` (${bidderName})` : bidderName) : '';
+    const bidderLabel = mention ? `${mention}${nameSuffix}` : (nameSuffix || 'Unknown bidder');
+    const amountSuffix = Number.isFinite(amount) && amount > 0 ? ` - ${amount} ${currency}` : '';
+
+    if (sold) {
+        return `✅ Sold **${itemLabel}**: ${bidderLabel}${amountSuffix}`;
+    }
+
+    return `🏆 Highest bid for **${itemLabel}**: ${bidderLabel}${amountSuffix}`;
+}
+
 async function postVoiceHighestBid({
     client,
     channelId,
@@ -163,14 +205,17 @@ async function postVoiceHighestBid({
     bidderName,
     amount,
     clear,
+    sold,
 }) {
     attachRateLimitListener(client);
 
     const postState = await fetchVoiceBidState();
     const messageMap = postState?.messageMap ?? {};
     const existing = messageMap[String(auctionItemId)];
+    const shouldClear = Boolean(clear);
+    const soldState = Boolean(sold);
 
-    if (clear) {
+    if (shouldClear) {
         if (existing?.message_id) {
             await deleteMessage({
                 client,
@@ -186,38 +231,82 @@ async function postVoiceHighestBid({
         return { ok: true, cleared: true };
     }
 
-    if (!bidderDiscordId || !/^[0-9]{5,}$/.test(String(bidderDiscordId))) {
-        return { ok: false, status: 422, error: 'Invalid bidder_discord_id.' };
-    }
-
     const info = await fetchAuctionItemInfo(auctionItemId);
     if (!info) {
         return { ok: false, status: 404, error: 'Auction item not found.' };
     }
 
-    const destinationResult = await resolveDestination({ client, channelId });
-    if (!destinationResult.destination) {
-        return { ok: false, status: destinationResult.status || 422, error: destinationResult.error };
+    const effectiveBidderDiscordId = bidderDiscordId || (soldState ? String(info.sold_bidder_discord_id || '') : '');
+    const effectiveBidderName = bidderName || (soldState ? String(info.sold_bidder_name || '') : '');
+    const rawAmount = Number(amount || 0);
+    const soldAmount = Number(info.sold_amount || 0);
+    const effectiveAmount = Number.isFinite(rawAmount) && rawAmount > 0
+        ? rawAmount
+        : (Number.isFinite(soldAmount) && soldAmount > 0 ? soldAmount : 0);
+
+    if (!soldState && (!effectiveBidderDiscordId || !/^[0-9]{5,}$/.test(String(effectiveBidderDiscordId)))) {
+        return { ok: false, status: 422, error: 'Invalid bidder_discord_id.' };
     }
 
-    if (existing?.message_id) {
-        await deleteMessage({
-            client,
-            channelId: existing.channel_id || channelId,
-            messageId: existing.message_id,
-        });
+    if (!soldState && (!Number.isFinite(effectiveAmount) || effectiveAmount <= 0)) {
+        return { ok: false, status: 422, error: 'Invalid amount.' };
+    }
+
+    const effectiveChannelId = channelId || existing?.channel_id || '';
+    if (!effectiveChannelId) {
+        return { ok: false, status: 404, error: 'No destination channel available.' };
+    }
+
+    const destinationResult = await resolveDestination({ client, channelId: effectiveChannelId });
+    if (!destinationResult.destination) {
+        return { ok: false, status: destinationResult.status || 422, error: destinationResult.error };
     }
 
     const notes = info.notes ? String(info.notes).trim() : '';
     const itemLabel = notes ? `${info.name} - ${notes}` : info.name;
     const currency = info.currency || 'GP';
-    const mention = `<@${bidderDiscordId}>`;
-    const bidderLabel = bidderName ? ` (${bidderName})` : '';
-    const line = `🏆 Highest bid for **${itemLabel}**: ${mention}${bidderLabel} - ${amount} ${currency}`;
+    const line = formatAuctionVoiceLine({
+        itemLabel,
+        currency,
+        bidderDiscordId: effectiveBidderDiscordId,
+        bidderName: effectiveBidderName,
+        amount: effectiveAmount,
+        sold: soldState,
+    });
+
+    if (existing?.message_id && soldState) {
+        const didEdit = await editMessage({
+            client,
+            channelId: existing.channel_id || effectiveChannelId,
+            messageId: existing.message_id,
+            line,
+        });
+        if (didEdit) {
+            messageMap[String(auctionItemId)] = {
+                channel_id: existing.channel_id || effectiveChannelId,
+                message_id: existing.message_id,
+            };
+
+            await saveVoiceBidState({
+                settingsId: postState?.id ?? null,
+                messageMap,
+            });
+
+            return { ok: true, message_id: existing.message_id, updated: true };
+        }
+    }
+
+    if (existing?.message_id && !soldState) {
+        await deleteMessage({
+            client,
+            channelId: existing.channel_id || effectiveChannelId,
+            messageId: existing.message_id,
+        });
+    }
 
     const messageId = await sendOneLine(destinationResult.destination, line);
     if (!messageId) {
-        return { ok: false, status: 500, error: 'Failed to post highest bid.' };
+        return { ok: false, status: 500, error: soldState ? 'Failed to post sold status.' : 'Failed to post highest bid.' };
     }
 
     messageMap[String(auctionItemId)] = {
@@ -234,5 +323,6 @@ async function postVoiceHighestBid({
 }
 
 module.exports = {
+    formatAuctionVoiceLine,
     postVoiceHighestBid,
 };

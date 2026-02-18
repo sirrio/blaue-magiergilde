@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
@@ -7,9 +8,9 @@ import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
-import { BackstockItem, BackstockSettings, DiscordBackupChannel, Item } from '@/types'
+import { BackstockItem, BackstockSettings, BotOperation, DiscordBackupChannel, Item } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { Edit, ExternalLink, FlaskRound, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2 } from 'lucide-react'
+import { FlaskRound, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useState, JSX } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -139,7 +140,7 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
-          <Edit size={14} />
+          <Pencil size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
@@ -192,6 +193,7 @@ export default function BackstockIndex({
   const [isPosting, setIsPosting] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
 
   const { data, setData, post, processing } = useForm({
     item_id: items[0]?.id ?? 0,
@@ -302,8 +304,14 @@ export default function BackstockIndex({
         return
       }
 
+      const operation = (payload?.operation ?? null) as BotOperation | null
+      if (!operation?.id) {
+        toast.show('Backstock operation could not be started.', 'error')
+        return
+      }
+
+      setActiveOperation(operation)
       toast.show('Backstock post started.', 'info')
-      router.reload({ only: ['backstockSettings'] })
     } catch {
       toast.show('Backstock could not be posted.', 'error')
     } finally {
@@ -343,6 +351,16 @@ export default function BackstockIndex({
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const operationRunning = !isTerminalBotOperation(activeOperation)
+  const handleOperationCompleted = useCallback(() => {
+    toast.show('Backstock posted to Discord.', 'info')
+    setTimeout(() => {
+      router.reload({ only: ['backstockSettings'] })
+    }, 1200)
+  }, [])
+  const handleOperationFailed = useCallback((operation: BotOperation) => {
+    toast.show(String(operation.error ?? 'Backstock operation failed.'), 'error')
+  }, [])
 
   return (
     <AppLayout>
@@ -408,6 +426,12 @@ export default function BackstockIndex({
               </ModalContent>
             </Modal>
           </div>
+          <BotOperationProgress
+            operation={activeOperation}
+            onOperationChange={setActiveOperation}
+            onCompleted={handleOperationCompleted}
+            onFailed={handleOperationFailed}
+          />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
               <ModalTrigger>
@@ -444,7 +468,7 @@ export default function BackstockIndex({
               size="sm"
               variant="outline"
               onClick={handlePostBackstock}
-              disabled={isPosting || !settings.post_channel_id}
+              disabled={isPosting || operationRunning || !settings.post_channel_id}
               className="gap-2"
             >
               <Send size={16} />
@@ -491,7 +515,13 @@ export default function BackstockIndex({
                         <div className={cn(textColor)}>{renderIcon(item.type)}</div>
                         <div className={cn(textColor, 'text-xs sm:text-sm flex flex-col')}>
                           <span>
-                            {itemName}
+                            {item.url ? (
+                              <a href={item.url} target="_blank" rel="noreferrer" className="link link-hover font-medium" title="Open item URL">
+                                {itemName}
+                              </a>
+                            ) : (
+                              itemName
+                            )}
                             {isCustomListing ? (
                               <span className="ml-2 rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
                                 Custom listing
@@ -503,37 +533,28 @@ export default function BackstockIndex({
                           {item.cost ? item.cost : <span className="text-error">No cost</span>}
                         </div>
                         <div className="flex items-center gap-1 border-l border-base-200 pl-2">
-                          <BackstockItemSnapshotModal entry={entry} item={item} />
                           <Button
                             size="xs"
                             variant="ghost"
                             modifier="square"
                             aria-label="Refresh listing"
+                            title="Refresh listing from base item"
                             onClick={handleSnapshotRefresh}
                           >
                             <RotateCcw size={14} />
                           </Button>
-                          {item.url ? (
-                            <Button
-                              as="a"
-                              href={item.url}
-                              target="_blank"
-                              size="xs"
-                              variant="ghost"
-                              modifier="square"
-                              aria-label="Open item"
-                            >
-                              <ExternalLink size={14} />
-                            </Button>
-                          ) : null}
+                          <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+                          <BackstockItemSnapshotModal entry={entry} item={item} />
                           <Button
                             size="xs"
                             variant="ghost"
                             modifier="square"
                             aria-label="Remove from backstock"
+                            color="error"
+                            title="Delete backstock line"
                             onClick={() => handleRemove(entry.id)}
                           >
-                            <Trash2 size={14} />
+                            <Trash size={14} />
                           </Button>
                         </div>
                       </ListRow>

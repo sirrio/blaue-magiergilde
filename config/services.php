@@ -30,7 +30,7 @@ return [
         'public_url' => env('BOT_PUBLIC_APP_URL'),
         'http_url' => env('BOT_HTTP_URL'),
         'http_token' => env('BOT_HTTP_TOKEN'),
-        'http_timeout' => env('BOT_HTTP_TIMEOUT', 10),
+        'http_timeout' => env('BOT_HTTP_TIMEOUT', 120),
         'games_channel_id' => env('DISCORD_GAMES_CHANNEL_ID'),
     ],
 

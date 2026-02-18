@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ShopSetting extends Model
 {
@@ -18,6 +19,8 @@ class ShopSetting extends Model
         'auto_post_weekday',
         'auto_post_time',
         'last_auto_posted_at',
+        'current_shop_id',
+        'draft_shop_id',
     ];
 
     protected $casts = [
@@ -26,10 +29,22 @@ class ShopSetting extends Model
         'auto_post_enabled' => 'boolean',
         'auto_post_weekday' => 'integer',
         'last_auto_posted_at' => 'datetime',
+        'current_shop_id' => 'integer',
+        'draft_shop_id' => 'integer',
     ];
 
     public static function current(): self
     {
         return static::query()->firstOrCreate([]);
+    }
+
+    public function currentShop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class, 'current_shop_id');
+    }
+
+    public function draftShop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class, 'draft_shop_id');
     }
 }

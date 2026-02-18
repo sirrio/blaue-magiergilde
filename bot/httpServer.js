@@ -1,6 +1,6 @@
 const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
-const { postAuctionToChannel } = require('./auctionPoster');
+const { postAuctionToChannel, updateAuctionItemPost, fetchAuctionItemById } = require('./auctionPoster');
 const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postBackstockToChannel } = require('./backstockPoster');
 const { postShopToChannel, updateShopPost } = require('./shopPoster');
@@ -126,6 +126,7 @@ function startHttpServer(client) {
         const isBackstockPost = path === '/backstock-post';
         const isAuctionPost = path === '/auction-post';
         const isAuctionVoiceBid = path === '/auction-voice-bid';
+        const isAuctionItemSold = path === '/auction-item-sold';
         const isGamesSync = path === '/games-sync';
 
         const allowedPost =
@@ -144,6 +145,7 @@ function startHttpServer(client) {
             isBackstockPost ||
             isAuctionPost ||
             isAuctionVoiceBid ||
+            isAuctionItemSold ||
             isGamesSync;
 
         if (
@@ -452,6 +454,7 @@ function startHttpServer(client) {
         if (isShopPost) {
             const channelId = String(payload?.channel_id || '').trim();
             const shopId = Number(payload?.shop_id || 0);
+            const operationId = Number(payload?.operation_id || 0);
             const threadName = typeof payload?.thread_name === 'string' ? payload.thread_name.trim() : '';
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
@@ -465,12 +468,18 @@ function startHttpServer(client) {
                 respondJson(res, 422, { error: 'Invalid shop_id.' });
                 return;
             }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
+                return;
+            }
 
             try {
                 const result = await postShopToChannel({
                     client,
                     channelId,
                     shopId,
+                    operationId: operationId > 0 ? operationId : null,
                     threadName,
                 });
 
@@ -495,14 +504,24 @@ function startHttpServer(client) {
 
         if (isShopUpdate) {
             const shopId = Number(payload?.shop_id || 0);
+            const operationId = Number(payload?.operation_id || 0);
             if (!Number.isFinite(shopId) || shopId <= 0) {
                 logReject(req, 'invalid shop_id');
                 respondJson(res, 422, { error: 'Invalid shop_id.' });
                 return;
             }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
+                return;
+            }
 
             try {
-                const result = await updateShopPost({ client, shopId });
+                const result = await updateShopPost({
+                    client,
+                    shopId,
+                    operationId: operationId > 0 ? operationId : null,
+                });
                 if (!result.ok) {
                     logReject(req, result.error || 'shop update failed');
                     respondJson(res, result.status || 500, { error: result.error || 'Shop update failed.' });
@@ -524,10 +543,16 @@ function startHttpServer(client) {
 
         if (isBackstockPost) {
             const channelId = String(payload?.channel_id || '').trim();
+            const operationId = Number(payload?.operation_id || 0);
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
                 logReject(req, 'invalid channel_id');
                 respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
                 return;
             }
 
@@ -535,6 +560,7 @@ function startHttpServer(client) {
                 const result = await postBackstockToChannel({
                     client,
                     channelId,
+                    operationId: operationId > 0 ? operationId : null,
                 });
 
                 if (!result.ok) {
@@ -559,6 +585,7 @@ function startHttpServer(client) {
         if (isAuctionPost) {
             const channelId = String(payload?.channel_id || '').trim();
             const auctionId = Number(payload?.auction_id || 0);
+            const operationId = Number(payload?.operation_id || 0);
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
                 logReject(req, 'invalid channel_id');
@@ -571,12 +598,18 @@ function startHttpServer(client) {
                 respondJson(res, 422, { error: 'Invalid auction_id.' });
                 return;
             }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
+                return;
+            }
 
             try {
                 const result = await postAuctionToChannel({
                     client,
                     channelId,
                     auctionId,
+                    operationId: operationId > 0 ? operationId : null,
                 });
 
                 if (!result.ok) {
@@ -653,12 +686,108 @@ function startHttpServer(client) {
             }
         }
 
+        if (isAuctionItemSold) {
+            const auctionItemId = Number(payload?.auction_item_id || 0);
+            const winnerDiscordId = payload?.winner_discord_id ? String(payload.winner_discord_id).trim() : '';
+
+            if (!Number.isFinite(auctionItemId) || auctionItemId <= 0) {
+                logReject(req, 'invalid auction_item_id');
+                respondJson(res, 422, { error: 'Invalid auction_item_id.' });
+                return;
+            }
+
+            let postUpdated = false;
+            let postError = null;
+            const updateResult = await updateAuctionItemPost({
+                client,
+                auctionItemId,
+            });
+            if (!updateResult.ok) {
+                postError = updateResult.error || 'Auction item update failed.';
+                console.warn(`[bot] Auction item post update failed for ${auctionItemId}: ${postError}`);
+            } else {
+                postUpdated = true;
+            }
+
+            let voiceUpdated = false;
+            let voiceError = null;
+            let auctionItem = null;
+            try {
+                auctionItem = await fetchAuctionItemById(auctionItemId);
+            } catch {
+                auctionItem = null;
+            }
+
+            try {
+                const voiceResult = await postVoiceHighestBid({
+                    client,
+                    channelId: '',
+                    auctionItemId,
+                    bidderDiscordId: winnerDiscordId || auctionItem?.sold_bidder_discord_id || '',
+                    bidderName: auctionItem?.sold_bidder_name || '',
+                    amount: auctionItem?.sold_amount ?? 0,
+                    sold: true,
+                });
+
+                if (!voiceResult.ok) {
+                    voiceError = voiceResult.error || 'Auction voice bid sold update failed.';
+                    console.warn(`[bot] Auction voice bid sold update failed for ${auctionItemId}: ${voiceError}`);
+                } else {
+                    voiceUpdated = true;
+                }
+            } catch (error) {
+                voiceError = error instanceof Error ? error.message : 'Auction voice bid sold update failed.';
+                console.warn('[bot] Auction voice bid sold update failed.', error);
+            }
+
+            let dmSent = false;
+            let dmError = null;
+            try {
+                const discordId = winnerDiscordId || auctionItem?.sold_bidder_discord_id;
+
+                if (discordId && /^[0-9]{5,}$/.test(String(discordId))) {
+                    const user = await client.users.fetch(String(discordId));
+                    const amount = auctionItem?.sold_amount ?? null;
+                    const currency = auctionItem?.auction_currency || 'GP';
+                    const itemName = auctionItem?.name || 'item';
+                    const auctionId = auctionItem?.auction_id || null;
+
+                    let message = `You won **${itemName}**`;
+                    if (amount) {
+                        message += ` for **${amount} ${currency}**`;
+                    }
+                    if (auctionId) {
+                        message += ` in Auction #${String(auctionId).padStart(3, '0')}.`;
+                    } else {
+                        message += '.';
+                    }
+                    await user.send(message);
+                    dmSent = true;
+                }
+            } catch (error) {
+                dmError = error instanceof Error ? error.message : 'DM failed';
+                console.warn('[bot] Auction winner DM failed.', error);
+            }
+
+            respondJson(res, 200, {
+                status: 'updated',
+                post_updated: postUpdated,
+                post_error: postError,
+                voice_updated: voiceUpdated,
+                voice_cleared: voiceUpdated,
+                voice_error: voiceError,
+                dm_sent: dmSent,
+                dm_error: dmError,
+            });
+            return;
+        }
+
         if (isGamesSync) {
             try {
                 await runGameAnnouncementSync(client);
                 respondJson(res, 200, { status: 'synced' });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'games sync failed');
                 respondJson(res, 500, { error: 'Games sync failed.' });
                 return;

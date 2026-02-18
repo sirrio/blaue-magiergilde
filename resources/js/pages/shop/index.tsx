@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
 import { List } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
@@ -7,18 +8,32 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
 import { cn } from '@/lib/utils'
-import { DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopSettings } from '@/types'
+import { BotOperation, DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopSettings } from '@/types'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Plus, RotateCcw, Send, Settings } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
-  const [selectedShop, setSelectedShop] = useState<Shop | null>(shops[0] ?? null)
+  const resolveFallbackShop = useCallback(
+    (availableShops: Shop[], preferredShopId?: number | null): Shop | null => {
+      if (!availableShops.length) return null
+      if (preferredShopId) {
+        const preferred = availableShops.find((shop) => shop.id === preferredShopId)
+        if (preferred) return preferred
+      }
+      return availableShops[0] ?? null
+    },
+    [],
+  )
+  const [selectedShop, setSelectedShop] = useState<Shop | null>(
+    resolveFallbackShop(shops, shopSettings?.draft_shop_id ?? null),
+  )
   const [isPosting, setIsPosting] = useState(false)
   const [isUpdatingPost, setIsUpdatingPost] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
   const [settings, setSettings] = useState<ShopSettings>(shopSettings ?? {})
   const [autoPostEnabled, setAutoPostEnabled] = useState(Boolean(shopSettings?.auto_post_enabled))
   const [autoPostWeekday, setAutoPostWeekday] = useState<number>(shopSettings?.auto_post_weekday ?? 0)
@@ -27,13 +42,8 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const isAdmin = Boolean(auth?.user?.is_admin)
 
   useEffect(() => {
-    setSelectedShop((prev) => {
-      if (prev) {
-        return shops.find((s) => s.id === prev.id) || null
-      }
-      return shops[0] ?? null
-    })
-  }, [shops, selectedShop?.id])
+    setSelectedShop(resolveFallbackShop(shops, shopSettings?.draft_shop_id ?? null))
+  }, [resolveFallbackShop, shops, shopSettings?.draft_shop_id])
 
   useEffect(() => {
     setSettings(shopSettings ?? {})
@@ -64,7 +74,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   }
 
   const handleCreateShop = (): void => {
-    if (!window.confirm('Roll a new shop?')) {
+    if (!window.confirm('Roll a new draft shop?')) {
       return
     }
     router.post(route('admin.shops.store'), {}, { preserveState: false, preserveScroll: true })
@@ -183,16 +193,16 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   }, [autoPostEnabled, autoPostTime, autoPostWeekday, getCsrfToken, isSavingSchedule])
 
   const handlePostShop = useCallback(async () => {
-    if (!selectedShop) {
-      toast.show('Select a shop first.', 'error')
-      return
-    }
     if (isPosting) return
     if (!settings.post_channel_id) {
       toast.show('Select a posting channel first.', 'error')
       return
     }
-    if (!window.confirm('Post this shop to Discord now?')) {
+    if (!settings.draft_shop_id) {
+      toast.show('No draft shop available.', 'error')
+      return
+    }
+    if (!window.confirm('Publish the draft shop to Discord now? This promotes it to current and rolls a new draft.')) {
       return
     }
 
@@ -204,7 +214,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
     setIsPosting(true)
     try {
-      const response = await fetch(route('admin.shops.post', selectedShop.id), {
+      const response = await fetch(route('admin.shops.post'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,23 +231,29 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         return
       }
 
-      toast.show('Shop post started.', 'info')
-      router.reload({ only: ['shopSettings'] })
+      const operation = (payload?.operation ?? null) as BotOperation | null
+      if (!operation?.id) {
+        toast.show('Shop operation could not be started.', 'error')
+        return
+      }
+
+      setActiveOperation(operation)
+      toast.show('Publishing draft started.', 'info')
     } catch {
       toast.show('Shop could not be posted.', 'error')
     } finally {
       setIsPosting(false)
     }
-  }, [getCsrfToken, isPosting, selectedShop, settings.post_channel_id])
+  }, [getCsrfToken, isPosting, settings.draft_shop_id, settings.post_channel_id])
 
   const handleUpdatePost = useCallback(async () => {
-    if (!selectedShop) {
-      toast.show('Select a shop first.', 'error')
-      return
-    }
     if (isUpdatingPost) return
     if (!settings.last_post_channel_id) {
       toast.show('No previously posted shop to update.', 'error')
+      return
+    }
+    if (!settings.current_shop_id) {
+      toast.show('No current shop available.', 'error')
       return
     }
     if (!window.confirm('Update the posted shop in Discord?')) {
@@ -252,7 +268,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
     setIsUpdatingPost(true)
     try {
-      const response = await fetch(route('admin.shops.update-post', selectedShop.id), {
+      const response = await fetch(route('admin.shops.update-post'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -269,14 +285,20 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         return
       }
 
-      toast.show('Shop updated.', 'info')
-      router.reload({ only: ['shopSettings'] })
+      const operation = (payload?.operation ?? null) as BotOperation | null
+      if (!operation?.id) {
+        toast.show('Shop operation could not be started.', 'error')
+        return
+      }
+
+      setActiveOperation(operation)
+      toast.show('Updating current post started.', 'info')
     } catch {
       toast.show('Shop could not be updated.', 'error')
     } finally {
       setIsUpdatingPost(false)
     }
-  }, [getCsrfToken, isUpdatingPost, selectedShop, settings.last_post_channel_id])
+  }, [getCsrfToken, isUpdatingPost, settings.current_shop_id, settings.last_post_channel_id])
 
   const destinationLabel = settings.post_channel_name ?? settings.post_channel_id ?? 'Not set'
   const destinationKind = settings.post_channel_id
@@ -286,7 +308,37 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
-  const canUpdatePost = Boolean(settings.last_post_channel_id)
+  const currentShopId = settings.current_shop_id ?? null
+  const draftShopId = settings.draft_shop_id ?? null
+  const operationRunning = !isTerminalBotOperation(activeOperation)
+  const canUpdatePost = Boolean(settings.current_shop_id && settings.last_post_channel_id)
+  const handleOperationCompleted = useCallback((operation: BotOperation) => {
+    if (operation.action === 'publish_draft') {
+      const newCurrentShopId = Number(operation.current_shop_id || operation.result_shop_id || 0) || null
+      const newDraftShopId = Number(operation.draft_shop_id || 0) || null
+      setSettings((current) => ({
+        ...current,
+        current_shop_id: newCurrentShopId ?? current.current_shop_id ?? null,
+        draft_shop_id: newDraftShopId ?? current.draft_shop_id ?? null,
+      }))
+      toast.show(
+        `Published draft #${operation.result_shop_id ?? 'n/a'}. Current: #${newCurrentShopId ?? 'n/a'}, Draft: #${newDraftShopId ?? 'n/a'}.`,
+        'info',
+      )
+      setTimeout(() => {
+        router.reload({ only: ['shops', 'shopSettings'] })
+      }, 1500)
+      return
+    }
+
+    toast.show('Current shop post updated.', 'info')
+    setTimeout(() => {
+      router.reload({ only: ['shopSettings'] })
+    }, 1500)
+  }, [])
+  const handleOperationFailed = useCallback((operation: BotOperation) => {
+    toast.show(String(operation.error ?? 'Shop operation failed.'), 'error')
+  }, [])
 
   const weekdayOptions = [
     { value: 0, label: 'Sunday' },
@@ -318,7 +370,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
             <SelectOptions>
               {shops.map((shop) => (
                 <option key={shop.id} value={shop.id}>
-                  {`Shop ID ${String(shop.id).padStart(3, '0')} - ${formatShopCreatedAt(shop.created_at)}`}
+                  {`Shop ID ${String(shop.id).padStart(3, '0')} - ${formatShopCreatedAt(shop.created_at)}${
+                    shop.id === draftShopId ? ' [Draft]' : shop.id === currentShopId ? ' [Current]' : ''
+                  }`}
                 </option>
               ))}
             </SelectOptions>
@@ -338,6 +392,12 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 </span>
                 <span className="rounded-full border border-base-200 px-2 py-1">
                   Items: {selectedShop?.shop_items.length ?? 0}
+                </span>
+                <span className="rounded-full border border-base-200 px-2 py-1">
+                  Current: {currentShopId ? `#${String(currentShopId).padStart(3, '0')}` : 'n/a'}
+                </span>
+                <span className="rounded-full border border-base-200 px-2 py-1">
+                  Draft: {draftShopId ? `#${String(draftShopId).padStart(3, '0')}` : 'n/a'}
                 </span>
                 <span className="rounded-full border border-base-200 px-2 py-1">
                   {autoPostLabel}
@@ -418,30 +478,36 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 </ModalContent>
               </Modal>
             </div>
+            <BotOperationProgress
+              operation={activeOperation}
+              onOperationChange={setActiveOperation}
+              onCompleted={handleOperationCompleted}
+              onFailed={handleOperationFailed}
+            />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handlePostShop}
-                disabled={!selectedShop || isPosting || !settings.post_channel_id}
+                disabled={isPosting || operationRunning || !settings.post_channel_id || !settings.draft_shop_id}
                 className="gap-2"
               >
                 <Send size={16} />
-                Post shop
+                Publish draft
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleUpdatePost}
-                disabled={!selectedShop || isUpdatingPost || !canUpdatePost}
+                disabled={isUpdatingPost || operationRunning || !canUpdatePost}
                 className="gap-2"
               >
                 <RotateCcw size={16} />
-                Update post
+                Update current post
               </Button>
-              <Button size="sm" variant="outline" onClick={handleCreateShop} className="gap-2">
+              <Button size="sm" variant="outline" onClick={handleCreateShop} className="gap-2" disabled={operationRunning}>
                 <Plus size={16} />
-                Roll new shop
+                Roll new draft
               </Button>
             </div>
           </div>

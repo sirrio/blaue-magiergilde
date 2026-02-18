@@ -34,6 +34,12 @@ class AuctionHiddenBidController extends Controller
                 ]);
             }
 
+            if ($lockedItem->sold_at) {
+                throw ValidationException::withMessages([
+                    'auction_item' => 'Item is already sold.',
+                ]);
+            }
+
             $lockedItem->hiddenBids()->updateOrCreate(
                 [
                     'bidder_discord_id' => $request->bidder_discord_id,
