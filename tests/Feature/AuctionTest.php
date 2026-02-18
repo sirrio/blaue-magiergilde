@@ -4,12 +4,31 @@ use App\Models\Auction;
 use App\Models\AuctionBid;
 use App\Models\AuctionHiddenBid;
 use App\Models\AuctionItem;
+use App\Models\AuctionSetting;
 use App\Models\Item;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+it('exposes auction post state fields in inertia settings payload', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    AuctionSetting::query()->create([
+        'post_channel_id' => '12345',
+        'last_post_channel_id' => '67890',
+        'last_post_item_message_ids' => ['1' => '999'],
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.auctions.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('auctionSettings.last_post_channel_id', '67890')
+            ->where('auctionSettings.last_post_item_message_ids.1', '999')
+        );
+});
 
 it('rejects bids above a hidden max', function () {
     $admin = User::factory()->create(['is_admin' => true]);

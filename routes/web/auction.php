@@ -4,6 +4,7 @@ use App\Http\Controllers\Auction\AuctionBidController;
 use App\Http\Controllers\Auction\AuctionController;
 use App\Http\Controllers\Auction\AuctionHiddenBidController;
 use App\Http\Controllers\Auction\AuctionItemController;
+use App\Http\Controllers\Auction\AuctionItemPostLineUpdateController;
 use App\Http\Controllers\Auction\AuctionPostController;
 use App\Http\Controllers\Auction\AuctionSettingController;
 use App\Http\Controllers\Auction\AuctionVoiceSyncController;
@@ -53,6 +54,9 @@ Route::middleware(['auth', 'admin'])
 
         Route::post('auction-items/{auctionItem}/finalize', FinalizeAuctionItemController::class)
             ->name('auction-items.finalize');
+
+        Route::post('auction-items/{auctionItem}/update-post-line', AuctionItemPostLineUpdateController::class)
+            ->name('auction-items.update-post-line');
 
         Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
             ->name('auction-bids.destroy');

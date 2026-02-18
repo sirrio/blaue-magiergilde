@@ -2,8 +2,8 @@ const http = require('node:http');
 const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBackup, startDiscordBackupChannel } = require('./discordBackup');
 const { postAuctionToChannel, updateAuctionItemPost, fetchAuctionItemById } = require('./auctionPoster');
 const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
-const { postBackstockToChannel } = require('./backstockPoster');
-const { postShopToChannel, updateShopPost } = require('./shopPoster');
+const { postBackstockToChannel, updateBackstockItemPost } = require('./backstockPoster');
+const { postShopToChannel, updateShopPost, updateShopItemPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 const { runGameAnnouncementSync } = require('./discordGameSync');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
@@ -123,8 +123,11 @@ function startHttpServer(client) {
         const isCharacterApprovalDelete = path === '/character-approval/delete';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
+        const isShopLineUpdate = path === '/shop-line-update';
         const isBackstockPost = path === '/backstock-post';
+        const isBackstockLineUpdate = path === '/backstock-line-update';
         const isAuctionPost = path === '/auction-post';
+        const isAuctionLineUpdate = path === '/auction-line-update';
         const isAuctionVoiceBid = path === '/auction-voice-bid';
         const isAuctionItemSold = path === '/auction-item-sold';
         const isGamesSync = path === '/games-sync';
@@ -142,8 +145,11 @@ function startHttpServer(client) {
             isCharacterApprovalDelete ||
             isShopPost ||
             isShopUpdate ||
+            isShopLineUpdate ||
             isBackstockPost ||
+            isBackstockLineUpdate ||
             isAuctionPost ||
+            isAuctionLineUpdate ||
             isAuctionVoiceBid ||
             isAuctionItemSold ||
             isGamesSync;
@@ -541,6 +547,38 @@ function startHttpServer(client) {
             }
         }
 
+        if (isShopLineUpdate) {
+            const shopItemId = Number(payload?.shop_item_id || 0);
+            if (!Number.isFinite(shopItemId) || shopItemId <= 0) {
+                logReject(req, 'invalid shop_item_id');
+                respondJson(res, 422, { error: 'Invalid shop_item_id.' });
+                return;
+            }
+
+            try {
+                const result = await updateShopItemPost({
+                    client,
+                    shopItemId,
+                });
+                if (!result.ok) {
+                    logReject(req, result.error || 'shop line update failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Shop line update failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'updated',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch {
+                logReject(req, 'shop line update failed');
+                respondJson(res, 500, { error: 'Shop line update failed.' });
+                return;
+            }
+        }
+
         if (isBackstockPost) {
             const channelId = String(payload?.channel_id || '').trim();
             const operationId = Number(payload?.operation_id || 0);
@@ -578,6 +616,39 @@ function startHttpServer(client) {
             } catch {
                 logReject(req, 'backstock post failed');
                 respondJson(res, 500, { error: 'Backstock post failed.' });
+                return;
+            }
+        }
+
+        if (isBackstockLineUpdate) {
+            const backstockItemId = Number(payload?.backstock_item_id || 0);
+            if (!Number.isFinite(backstockItemId) || backstockItemId <= 0) {
+                logReject(req, 'invalid backstock_item_id');
+                respondJson(res, 422, { error: 'Invalid backstock_item_id.' });
+                return;
+            }
+
+            try {
+                const result = await updateBackstockItemPost({
+                    client,
+                    backstockItemId,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'backstock line update failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Backstock line update failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'updated',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch {
+                logReject(req, 'backstock line update failed');
+                respondJson(res, 500, { error: 'Backstock line update failed.' });
                 return;
             }
         }
@@ -627,6 +698,39 @@ function startHttpServer(client) {
             } catch {
                 logReject(req, 'auction post failed');
                 respondJson(res, 500, { error: 'Auction post failed.' });
+                return;
+            }
+        }
+
+        if (isAuctionLineUpdate) {
+            const auctionItemId = Number(payload?.auction_item_id || 0);
+            if (!Number.isFinite(auctionItemId) || auctionItemId <= 0) {
+                logReject(req, 'invalid auction_item_id');
+                respondJson(res, 422, { error: 'Invalid auction_item_id.' });
+                return;
+            }
+
+            try {
+                const result = await updateAuctionItemPost({
+                    client,
+                    auctionItemId,
+                });
+
+                if (!result.ok) {
+                    logReject(req, result.error || 'auction line update failed');
+                    respondJson(res, result.status || 500, { error: result.error || 'Auction line update failed.' });
+                    return;
+                }
+
+                respondJson(res, 200, {
+                    status: 'updated',
+                    destination_id: result.destinationId,
+                    destination_name: result.destinationName,
+                });
+                return;
+            } catch {
+                logReject(req, 'auction line update failed');
+                respondJson(res, 500, { error: 'Auction line update failed.' });
                 return;
             }
         }

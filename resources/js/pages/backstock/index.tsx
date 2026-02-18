@@ -194,6 +194,7 @@ export default function BackstockIndex({
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
+  const [updatingLineId, setUpdatingLineId] = useState<number | null>(null)
 
   const { data, setData, post, processing } = useForm({
     item_id: items[0]?.id ?? 0,
@@ -351,6 +352,7 @@ export default function BackstockIndex({
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const canUpdatePostLine = Boolean(settings.last_post_channel_id)
   const operationRunning = !isTerminalBotOperation(activeOperation)
   const handleOperationCompleted = useCallback(() => {
     toast.show('Backstock posted to Discord.', 'info')
@@ -510,6 +512,42 @@ export default function BackstockIndex({
                       })
                     }
 
+                    const handleUpdatePostedLine = async () => {
+                      if (updatingLineId !== null || !canUpdatePostLine) return
+
+                      const csrfToken = getCsrfToken()
+                      if (!csrfToken) {
+                        toast.show('Missing CSRF token.', 'error')
+                        return
+                      }
+
+                      setUpdatingLineId(entry.id)
+                      try {
+                        const response = await fetch(route('admin.backstock-items.update-post-line', { backstockItem: entry.id }), {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                          },
+                          credentials: 'same-origin',
+                          body: JSON.stringify({}),
+                        })
+
+                        const payload = await response.json().catch(() => ({}))
+                        if (!response.ok) {
+                          toast.show(String(payload?.error ?? 'Posted line could not be updated.'), 'error')
+                          return
+                        }
+
+                        toast.show('Posted line updated.', 'info')
+                      } catch {
+                        toast.show('Posted line could not be updated.', 'error')
+                      } finally {
+                        setUpdatingLineId(null)
+                      }
+                    }
+
                     return (
                       <ListRow key={entry.id}>
                         <div className={cn(textColor)}>{renderIcon(item.type)}</div>
@@ -542,6 +580,17 @@ export default function BackstockIndex({
                             onClick={handleSnapshotRefresh}
                           >
                             <RotateCcw size={14} />
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            modifier="square"
+                            aria-label="Update posted line"
+                            title={canUpdatePostLine ? 'Update posted line in Discord' : 'Post backstock first'}
+                            onClick={handleUpdatePostedLine}
+                            disabled={!canUpdatePostLine || updatingLineId === entry.id}
+                          >
+                            <Send size={14} />
                           </Button>
                           <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
                           <BackstockItemSnapshotModal entry={entry} item={item} />

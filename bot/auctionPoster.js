@@ -261,10 +261,7 @@ async function updateAuctionItemPost({ client, auctionItemId }) {
         return { ok: false, status: 404, error: 'Auction item not found.' };
     }
 
-    const messageId = postState.lastPostItemMessageIds?.[String(auctionItemId)];
-    if (!messageId) {
-        return { ok: false, status: 404, error: 'Auction post message not found.' };
-    }
+    const messageId = postState.lastPostItemMessageIds?.[String(auctionItemId)] || null;
 
     let channel;
     try {
@@ -278,19 +275,51 @@ async function updateAuctionItemPost({ client, auctionItemId }) {
         return { ok: false, status: 422, error: 'Channel is not text based.' };
     }
 
-    try {
-        await waitForDiscordRateLimit(client);
-        const message = await channel.messages.fetch(messageId);
-        if (!message) {
-            return { ok: false, status: 404, error: 'Message not found.' };
+    const updatedItemMessageIds = { ...(postState.lastPostItemMessageIds ?? {}) };
+    const updatedMessageIds = Array.isArray(postState.lastPostMessageIds) ? [...postState.lastPostMessageIds] : [];
+    const nextContent = formatAuctionLine(row, row.auction_currency || 'GP');
+    let resolvedMessageId = messageId;
+
+    if (resolvedMessageId) {
+        try {
+            await waitForDiscordRateLimit(client);
+            await channel.messages.edit(resolvedMessageId, nextContent);
+        } catch {
+            const fallbackId = await sendOneLine(channel, nextContent);
+            if (!fallbackId) {
+                return { ok: false, status: 500, error: 'Failed to update auction post.' };
+            }
+            resolvedMessageId = fallbackId;
         }
-        await waitForDiscordRateLimit(client);
-        await message.edit(formatAuctionLine(row, row.auction_currency || 'GP'));
-    } catch {
+    } else {
+        const fallbackId = await sendOneLine(channel, nextContent);
+        if (!fallbackId) {
+            return { ok: false, status: 500, error: 'Failed to update auction post.' };
+        }
+        resolvedMessageId = fallbackId;
+    }
+
+    if (!resolvedMessageId) {
         return { ok: false, status: 500, error: 'Failed to update auction post.' };
     }
 
-    return { ok: true, auctionItemId };
+    updatedItemMessageIds[String(auctionItemId)] = resolvedMessageId;
+    if (!updatedMessageIds.includes(resolvedMessageId)) {
+        updatedMessageIds.push(resolvedMessageId);
+    }
+    await saveAuctionPostState({
+        settingsId: postState.id ?? null,
+        channelId: postState.lastPostChannelId,
+        messageIds: updatedMessageIds,
+        itemMessageIds: updatedItemMessageIds,
+    });
+
+    return {
+        ok: true,
+        auctionItemId,
+        destinationId: channel.id,
+        destinationName: channel.name || channel.id,
+    };
 }
 async function resolveDestination({ client, channelId, auction }) {
     let target;

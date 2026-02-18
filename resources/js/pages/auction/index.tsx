@@ -690,10 +690,12 @@ const AuctionItemRow = ({
   auctionItem,
   currency,
   candidates,
+  canUpdatePostLine,
 }: {
   auctionItem: AuctionItem
   currency: string
   candidates: AuctionVoiceCandidate[]
+  canUpdatePostLine: boolean
 }) => {
   const item = getAuctionItemSnapshot(auctionItem)
   const textColor = getRarityTextColor(item.rarity)
@@ -723,6 +725,7 @@ const AuctionItemRow = ({
     : null
   const highestBidderName = highestBid?.bidder_name ?? ''
   const canFinalize = Boolean(highestBid) && !isSold
+  const [isUpdatingPostLine, setIsUpdatingPostLine] = useState(false)
 
   const handleSnapshotRefresh = () => {
     if (!window.confirm('Refresh this listing from the compendium?')) return
@@ -775,6 +778,42 @@ const AuctionItemRow = ({
     })
   }
 
+  const handleUpdatePostedLine = async () => {
+    if (isUpdatingPostLine || !canUpdatePostLine) return
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setIsUpdatingPostLine(true)
+    try {
+      const response = await fetch(route('admin.auction-items.update-post-line', { auctionItem: auctionItem.id }), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.error ?? 'Posted line could not be updated.'), 'error')
+        return
+      }
+
+      toast.show('Posted line updated.', 'info')
+    } catch {
+      toast.show('Posted line could not be updated.', 'error')
+    } finally {
+      setIsUpdatingPostLine(false)
+    }
+  }
+
   return (
     <ListRow className="grid-cols-1">
       <div className="col-span-full flex w-full flex-col gap-2">
@@ -821,6 +860,17 @@ const AuctionItemRow = ({
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
             <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
               <RotateCcw size={14} />
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleUpdatePostedLine}
+              aria-label="Update posted line"
+              title={canUpdatePostLine ? 'Update posted line in Discord' : 'Post this auction first'}
+              disabled={!canUpdatePostLine || isUpdatingPostLine}
+            >
+              <Send size={14} />
             </Button>
             <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
             <Button
@@ -1161,6 +1211,7 @@ export default function Index({
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const canUpdatePostLine = Boolean(settings.last_post_channel_id)
   const operationRunning = !isTerminalBotOperation(activeOperation)
   const handleOperationCompleted = useCallback(() => {
     toast.show('Auction posted to Discord.', 'info')
@@ -1531,12 +1582,13 @@ export default function Index({
                       {rarityLabels[group.rarity]}
                     </li>
                     {group.items.map((auctionItem) => (
-                      <AuctionItemRow
-                        key={auctionItem.id}
-                        auctionItem={auctionItem}
-                        currency={selectedAuction.currency}
-                        candidates={candidates}
-                      />
+                    <AuctionItemRow
+                      key={auctionItem.id}
+                      auctionItem={auctionItem}
+                      currency={selectedAuction.currency}
+                      candidates={candidates}
+                      canUpdatePostLine={canUpdatePostLine}
+                    />
                     ))}
                   </React.Fragment>
                 ))}

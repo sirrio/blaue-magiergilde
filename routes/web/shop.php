@@ -6,6 +6,7 @@ use App\Http\Controllers\Shop\RefreshShopItemSnapshotController;
 use App\Http\Controllers\Shop\RemoveSpellFromItemController;
 use App\Http\Controllers\Shop\RerollShopItemController;
 use App\Http\Controllers\Shop\ShopController;
+use App\Http\Controllers\Shop\ShopItemPostLineUpdateController;
 use App\Http\Controllers\Shop\ShopPostController;
 use App\Http\Controllers\Shop\ShopSettingController;
 use App\Http\Controllers\Shop\ShopUpdatePostController;
@@ -47,4 +48,7 @@ Route::middleware(['auth', 'admin'])
 
         Route::post('shop-items/{shopItem}/snapshot/refresh', RefreshShopItemSnapshotController::class)
             ->name('shop-items.snapshot.refresh');
+
+        Route::post('shop-items/{shopItem}/update-post-line', ShopItemPostLineUpdateController::class)
+            ->name('shop-items.update-post-line');
     });
