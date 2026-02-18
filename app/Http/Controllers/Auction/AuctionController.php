@@ -46,6 +46,8 @@ class AuctionController extends Controller
                         'repair_current',
                         'repair_max',
                         'remaining_auctions',
+                        'sold_at',
+                        'sold_bid_id',
                     ])
                     ->orderBy('id'),
                 'auctionItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),

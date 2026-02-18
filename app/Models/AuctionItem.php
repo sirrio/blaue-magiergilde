@@ -24,10 +24,13 @@ class AuctionItem extends Model
         'repair_current',
         'repair_max',
         'remaining_auctions',
+        'sold_at',
+        'sold_bid_id',
     ];
 
     protected $casts = [
         'snapshot_custom' => 'boolean',
+        'sold_at' => 'datetime',
     ];
 
     public function auction(): BelongsTo
@@ -48,5 +51,10 @@ class AuctionItem extends Model
     public function hiddenBids(): HasMany
     {
         return $this->hasMany(AuctionHiddenBid::class);
+    }
+
+    public function soldBid(): BelongsTo
+    {
+        return $this->belongsTo(AuctionBid::class, 'sold_bid_id');
     }
 }

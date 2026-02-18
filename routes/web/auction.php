@@ -7,6 +7,7 @@ use App\Http\Controllers\Auction\AuctionItemController;
 use App\Http\Controllers\Auction\AuctionPostController;
 use App\Http\Controllers\Auction\AuctionSettingController;
 use App\Http\Controllers\Auction\AuctionVoiceSyncController;
+use App\Http\Controllers\Auction\FinalizeAuctionItemController;
 use App\Http\Controllers\Auction\RefreshAuctionItemSnapshotController;
 use App\Http\Controllers\Auction\UpdateAuctionItemSnapshotController;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +47,9 @@ Route::middleware(['auth', 'admin'])
 
         Route::post('auction-items/{auctionItem}/snapshot/refresh', RefreshAuctionItemSnapshotController::class)
             ->name('auction-items.snapshot.refresh');
+
+        Route::post('auction-items/{auctionItem}/finalize', FinalizeAuctionItemController::class)
+            ->name('auction-items.finalize');
 
         Route::delete('auction-bids/{auctionBid}', [AuctionBidController::class, 'destroy'])
             ->name('auction-bids.destroy');
