@@ -678,31 +678,40 @@ function startHttpServer(client) {
                 postUpdated = true;
             }
 
-            let voiceCleared = false;
+            let voiceUpdated = false;
             let voiceError = null;
+            let auctionItem = null;
+            try {
+                auctionItem = await fetchAuctionItemById(auctionItemId);
+            } catch {
+                auctionItem = null;
+            }
+
             try {
                 const voiceResult = await postVoiceHighestBid({
                     client,
                     channelId: '',
                     auctionItemId,
-                    clear: true,
+                    bidderDiscordId: winnerDiscordId || auctionItem?.sold_bidder_discord_id || '',
+                    bidderName: auctionItem?.sold_bidder_name || '',
+                    amount: auctionItem?.sold_amount ?? 0,
+                    sold: true,
                 });
 
                 if (!voiceResult.ok) {
-                    voiceError = voiceResult.error || 'Auction voice bid clear failed.';
-                    console.warn(`[bot] Auction voice bid clear failed for ${auctionItemId}: ${voiceError}`);
+                    voiceError = voiceResult.error || 'Auction voice bid sold update failed.';
+                    console.warn(`[bot] Auction voice bid sold update failed for ${auctionItemId}: ${voiceError}`);
                 } else {
-                    voiceCleared = true;
+                    voiceUpdated = true;
                 }
             } catch (error) {
-                voiceError = error instanceof Error ? error.message : 'Auction voice bid clear failed.';
-                console.warn('[bot] Auction voice bid clear failed.', error);
+                voiceError = error instanceof Error ? error.message : 'Auction voice bid sold update failed.';
+                console.warn('[bot] Auction voice bid sold update failed.', error);
             }
 
             let dmSent = false;
             let dmError = null;
             try {
-                const auctionItem = await fetchAuctionItemById(auctionItemId);
                 const discordId = winnerDiscordId || auctionItem?.sold_bidder_discord_id;
 
                 if (discordId && /^[0-9]{5,}$/.test(String(discordId))) {
@@ -733,7 +742,8 @@ function startHttpServer(client) {
                 status: 'updated',
                 post_updated: postUpdated,
                 post_error: postError,
-                voice_cleared: voiceCleared,
+                voice_updated: voiceUpdated,
+                voice_cleared: voiceUpdated,
                 voice_error: voiceError,
                 dm_sent: dmSent,
                 dm_error: dmError,
@@ -746,7 +756,7 @@ function startHttpServer(client) {
                 await runGameAnnouncementSync(client);
                 respondJson(res, 200, { status: 'synced' });
                 return;
-            } catch (error) {
+            } catch {
                 logReject(req, 'games sync failed');
                 respondJson(res, 500, { error: 'Games sync failed.' });
                 return;
