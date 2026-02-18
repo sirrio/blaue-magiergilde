@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { CheckCircle2, Edit, EyeOff, FlaskRound, History, Mic, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, EyeOff, FlaskRound, History, Mic, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash, XCircle } from 'lucide-react'
 import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -338,7 +338,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)}>
-          <History size={16} />
+          <History size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Bid history</ModalTitle>
@@ -395,7 +395,7 @@ const BidHistoryModal = ({ auctionItem, currency }: { auctionItem: AuctionItem; 
                       color="error"
                       onClick={() => handleDelete(bid.id)}
                     >
-                      <Trash2 size={14} />
+                      <Trash size={14} />
                     </Button>
                   </div>
                 </div>
@@ -499,7 +499,7 @@ const HiddenBidModal = ({
           disabled={disabled}
           title={disabled ? 'Item already sold' : undefined}
         >
-          <EyeOff size={16} />
+          <EyeOff size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Hidden bids</ModalTitle>
@@ -558,7 +558,7 @@ const HiddenBidModal = ({
                     color="error"
                     onClick={() => handleDelete(hiddenBid.id)}
                   >
-                    <Trash2 size={14} />
+                    <Trash size={14} />
                   </Button>
                 </div>
               ))}
@@ -614,7 +614,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Edit listing">
-          <Edit size={16} />
+          <Pencil size={14} />
         </Button>
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
@@ -730,6 +730,21 @@ const AuctionItemRow = ({
     })
   }
 
+  const handleDeleteAuctionItem = () => {
+    if (!window.confirm(`Delete "${item.name}" from this auction?`)) return
+
+    router.delete(route('admin.auction-items.destroy', { auctionItem: auctionItem.id }), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Auction line deleted.', 'info')
+        router.reload()
+      },
+      onError: () => {
+        toast.show('Auction line could not be deleted.', 'error')
+      },
+    })
+  }
+
   return (
     <ListRow className="grid-cols-1">
       <div className="col-span-full flex w-full flex-col gap-2">
@@ -759,7 +774,7 @@ const AuctionItemRow = ({
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1 border-l border-base-200 pl-2">
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               size="xs"
               variant="ghost"
@@ -769,14 +784,26 @@ const AuctionItemRow = ({
               title={isSold ? 'Already sold' : highestBid ? 'Finalize sold' : 'No bids'}
               disabled={!canFinalize}
             >
-              <CheckCircle2 size={16} />
-            </Button>
-            <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
-            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
-              <RotateCcw size={16} />
+              <CheckCircle2 size={14} />
             </Button>
             <HiddenBidModal auctionItem={auctionItem} currency={currency} candidates={candidates} disabled={isSold} />
             <BidHistoryModal auctionItem={auctionItem} currency={currency} />
+            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <Button size="xs" variant="ghost" modifier="square" onClick={handleSnapshotRefresh} aria-label="Refresh listing">
+              <RotateCcw size={14} />
+            </Button>
+            <AuctionItemSnapshotModal auctionItem={auctionItem} item={item} />
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              color="error"
+              onClick={handleDeleteAuctionItem}
+              aria-label="Delete auction line"
+              title="Delete auction line"
+            >
+              <Trash size={14} />
+            </Button>
           </div>
         </div>
 

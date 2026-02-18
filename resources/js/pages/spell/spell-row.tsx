@@ -159,7 +159,7 @@ export default function SpellRow({ spell, sources = [] }: { spell: Spell; source
       <div className="flex items-center justify-center text-xs" title={rulingLabel} aria-label={rulingLabel}>
         <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
       </div>
-      <div className="flex items-center gap-1 border-l border-base-200 pl-2">
+      <div className="flex items-center gap-1">
         <details className="dropdown dropdown-end">
           <summary className="btn btn-xs btn-ghost btn-square" aria-label="Spell link options" title="Spell link options">
             <Copy size={14} />
@@ -200,6 +200,7 @@ export default function SpellRow({ spell, sources = [] }: { spell: Spell; source
             </li>
           </ul>
         </details>
+        <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
         <Modal>
           <ModalTrigger>
             <Button size="xs" variant="ghost" modifier="square" title="Edit spell" aria-label="Edit spell">

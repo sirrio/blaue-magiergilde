@@ -135,6 +135,50 @@ it('rejects hidden bids for sold auction items', function () {
     expect(AuctionHiddenBid::query()->where('auction_item_id', $auctionItem->id)->count())->toBe(0);
 });
 
+it('deletes an auction line and cascades related bids', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => 100,
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+
+    AuctionBid::query()->create([
+        'auction_item_id' => $auctionItem->id,
+        'bidder_name' => 'Bidder',
+        'bidder_discord_id' => '11111',
+        'amount' => 90,
+        'created_by' => $admin->id,
+    ]);
+
+    AuctionHiddenBid::query()->create([
+        'auction_item_id' => $auctionItem->id,
+        'bidder_discord_id' => '22222',
+        'bidder_name' => 'Hidden Bidder',
+        'max_amount' => 120,
+    ]);
+
+    $this->actingAs($admin)
+        ->delete(route('admin.auction-items.destroy', ['auctionItem' => $auctionItem->id]))
+        ->assertRedirect();
+
+    expect(AuctionItem::query()->whereKey($auctionItem->id)->exists())->toBeFalse()
+        ->and(AuctionBid::query()->where('auction_item_id', $auctionItem->id)->exists())->toBeFalse()
+        ->and(AuctionHiddenBid::query()->where('auction_item_id', $auctionItem->id)->exists())->toBeFalse();
+});
+
 it('rolls over eligible items when closing an auction', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $auction = Auction::query()->create([

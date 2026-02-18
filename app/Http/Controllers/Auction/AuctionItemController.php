@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Auction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\StoreAuctionItemRequest;
 use App\Models\Auction;
+use App\Models\AuctionItem;
 use App\Models\Item;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -89,6 +91,19 @@ class AuctionItemController extends Controller
                 'repair_max' => $repairMax,
             ]);
         });
+
+        return redirect()->back();
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Request $request, AuctionItem $auctionItem): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user && $user->is_admin, 403);
+
+        $auctionItem->delete();
 
         return redirect()->back();
     }
