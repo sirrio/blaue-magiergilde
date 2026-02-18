@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Shield, Store, Sword, Trash } from 'lucide-react'
+import { Copy, Dices, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -434,6 +434,23 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
     })
   }
 
+  const handleRerollShopLine = () => {
+    if (!shopItem) return
+    if (!window.confirm('Reroll this shop line?')) return
+
+    router.post(route('admin.shop-items.reroll', { shopItem: shopItem.id }), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Shop line rerolled.', 'info')
+        router.reload()
+      },
+      onError: (errors) => {
+        const message = errors.shop_item || 'Shop line could not be rerolled.'
+        toast.show(String(message), 'error')
+      },
+    })
+  }
+
   const handleRemoveSpell = () => {
     if (!shopItem) return
     if (!window.confirm('Remove the attached spell from this shop item?')) return
@@ -550,6 +567,16 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
         {shopItem ? (
           <>
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              onClick={handleRerollShopLine}
+              title="Reroll line"
+              aria-label="Reroll line"
+            >
+              <Dices size={14} />
+            </Button>
             <Button
               size="xs"
               variant="ghost"

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Shop\AddSpellToItemController;
 use App\Http\Controllers\Shop\RefreshShopItemSnapshotController;
 use App\Http\Controllers\Shop\RemoveSpellFromItemController;
+use App\Http\Controllers\Shop\RerollShopItemController;
 use App\Http\Controllers\Shop\ShopController;
 use App\Http\Controllers\Shop\ShopPostController;
 use App\Http\Controllers\Shop\ShopSettingController;
@@ -30,6 +31,9 @@ Route::middleware(['auth', 'admin'])
 
         Route::post('shop-items/{shopItem}/add-spell', AddSpellToItemController::class)
             ->name('shop-items.add-spell');
+
+        Route::post('shop-items/{shopItem}/reroll', RerollShopItemController::class)
+            ->name('shop-items.reroll');
 
         Route::delete('shop-items/{shopItem}/spell', RemoveSpellFromItemController::class)
             ->name('shop-items.spell.destroy');
