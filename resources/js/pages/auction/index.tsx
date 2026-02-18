@@ -579,6 +579,8 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     notes: auctionItem.notes ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
+    repair_current: auctionItem.repair_current ?? '',
+    repair_max: auctionItem.repair_max ?? '',
   })
   const [isOpen, setIsOpen] = useState(false)
 
@@ -591,8 +593,10 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
       notes: auctionItem.notes ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
+      repair_current: auctionItem.repair_current ?? '',
+      repair_max: auctionItem.repair_max ?? '',
     })
-  }, [isOpen, auctionItem.notes, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, auctionItem.notes, auctionItem.repair_current, auctionItem.repair_max, item.cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.auction-items.snapshot.update', { auctionItem: auctionItem.id }), {
@@ -602,7 +606,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
         router.reload()
       },
       onError: (errors) => {
-        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
+        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type || errors.repair_current || errors.repair_max
         if (message) {
           toast.show(String(message), 'error')
         }
@@ -619,35 +623,60 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
       <ModalContent>
-        <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
-          Name
-        </Input>
-        <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
-          URL
-        </Input>
-        <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
-          Cost
-        </Input>
-        <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-          Notes
-        </Input>
-        <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-          <SelectLabel>Rarity</SelectLabel>
-          <SelectOptions>
-            <option value="common">Common</option>
-            <option value="uncommon">Uncommon</option>
-            <option value="rare">Rare</option>
-            <option value="very_rare">Very Rare</option>
-          </SelectOptions>
-        </Select>
-        <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-          <SelectLabel>Type</SelectLabel>
-          <SelectOptions>
-            <option value="item">Item</option>
-            <option value="spellscroll">Spell Scroll</option>
-            <option value="consumable">Consumable</option>
-          </SelectOptions>
-        </Select>
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Item snapshot</p>
+            <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+              Name
+            </Input>
+            <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
+              URL
+            </Input>
+            <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
+              Cost
+            </Input>
+            <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+              <SelectLabel>Rarity</SelectLabel>
+              <SelectOptions>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="very_rare">Very Rare</option>
+              </SelectOptions>
+            </Select>
+            <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+              <SelectLabel>Type</SelectLabel>
+              <SelectOptions>
+                <option value="item">Item</option>
+                <option value="spellscroll">Spell Scroll</option>
+                <option value="consumable">Consumable</option>
+              </SelectOptions>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Auction listing</p>
+            <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+              Notes
+            </Input>
+            <Input
+              type="number"
+              min={0}
+              value={data.repair_current}
+              onChange={(e) => setData('repair_current', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              Repair current
+            </Input>
+            <Input
+              type="number"
+              min={0}
+              value={data.repair_max}
+              onChange={(e) => setData('repair_max', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              Repair max
+            </Input>
+          </div>
+        </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
         Save

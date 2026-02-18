@@ -16,14 +16,31 @@ class UpdateAuctionItemSnapshotController extends Controller
         $url = trim((string) ($payload['url'] ?? ''));
         $cost = trim((string) ($payload['cost'] ?? ''));
         $notes = trim((string) ($payload['notes'] ?? ''));
+        $repairCurrent = $payload['repair_current'] ?? null;
+        $repairMax = $payload['repair_max'] ?? null;
+        $nextUrl = $url === '' ? null : $url;
+        $nextCost = $cost === '' ? null : $cost;
+
+        $itemSnapshotChanged =
+            (string) ($auctionItem->item_name ?? '') !== $name
+            || (string) ($auctionItem->item_url ?? '') !== (string) ($nextUrl ?? '')
+            || (string) ($auctionItem->item_cost ?? '') !== (string) ($nextCost ?? '')
+            || (string) ($auctionItem->item_rarity ?? '') !== (string) $payload['rarity']
+            || (string) ($auctionItem->item_type ?? '') !== (string) $payload['type'];
 
         $auctionItem->item_name = $name;
-        $auctionItem->item_url = $url === '' ? null : $url;
-        $auctionItem->item_cost = $cost === '' ? null : $cost;
+        $auctionItem->item_url = $nextUrl;
+        $auctionItem->item_cost = $nextCost;
         $auctionItem->item_rarity = $payload['rarity'];
         $auctionItem->item_type = $payload['type'];
         $auctionItem->notes = $notes === '' ? null : $notes;
-        $auctionItem->snapshot_custom = true;
+        $auctionItem->repair_current = $repairCurrent === '' ? null : $repairCurrent;
+        $auctionItem->repair_max = $repairMax === '' ? null : $repairMax;
+
+        if ($itemSnapshotChanged) {
+            $auctionItem->snapshot_custom = true;
+        }
+
         $auctionItem->save();
 
         return redirect()->back();

@@ -179,6 +179,188 @@ it('deletes an auction line and cascades related bids', function () {
         ->and(AuctionHiddenBid::query()->where('auction_item_id', $auctionItem->id)->exists())->toBeFalse();
 });
 
+it('updates auction snapshot including auction specific repair values', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'name' => 'Brawler Ring',
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => '100 GP',
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'item_name' => $item->name,
+        'item_url' => $item->url,
+        'item_cost' => $item->cost,
+        'item_rarity' => $item->rarity,
+        'item_type' => $item->type,
+        'repair_current' => 15,
+        'repair_max' => 100,
+        'remaining_auctions' => 3,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.auction-items.snapshot.update', ['auctionItem' => $auctionItem->id]), [
+            'name' => 'Updated Brawler Ring',
+            'url' => 'https://example.test/ring',
+            'cost' => '250 GP',
+            'notes' => 'Updated notes',
+            'rarity' => 'rare',
+            'type' => 'item',
+            'repair_current' => 40,
+            'repair_max' => 250,
+        ])
+        ->assertRedirect();
+
+    $auctionItem->refresh();
+    expect($auctionItem->item_name)->toBe('Updated Brawler Ring')
+        ->and($auctionItem->item_url)->toBe('https://example.test/ring')
+        ->and($auctionItem->item_cost)->toBe('250 GP')
+        ->and($auctionItem->item_rarity)->toBe('rare')
+        ->and($auctionItem->notes)->toBe('Updated notes')
+        ->and($auctionItem->repair_current)->toBe(40)
+        ->and($auctionItem->repair_max)->toBe(250)
+        ->and($auctionItem->snapshot_custom)->toBeTrue();
+});
+
+it('does not mark snapshot custom when only auction line fields are changed', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'name' => 'Brawler Ring',
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => '100 GP',
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'item_name' => $item->name,
+        'item_url' => $item->url,
+        'item_cost' => $item->cost,
+        'item_rarity' => $item->rarity,
+        'item_type' => $item->type,
+        'notes' => 'Old notes',
+        'repair_current' => 15,
+        'repair_max' => 100,
+        'snapshot_custom' => false,
+        'remaining_auctions' => 3,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.auction-items.snapshot.update', ['auctionItem' => $auctionItem->id]), [
+            'name' => $item->name,
+            'url' => $item->url,
+            'cost' => $item->cost,
+            'notes' => 'Only auction data changed',
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'repair_current' => 20,
+            'repair_max' => 120,
+        ])
+        ->assertRedirect();
+
+    $auctionItem->refresh();
+    expect($auctionItem->notes)->toBe('Only auction data changed')
+        ->and($auctionItem->repair_current)->toBe(20)
+        ->and($auctionItem->repair_max)->toBe(120)
+        ->and($auctionItem->snapshot_custom)->toBeFalse();
+});
+
+it('rejects repair max lower than current repair when updating auction snapshot', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => '100 GP',
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'item_name' => $item->name,
+        'item_url' => $item->url,
+        'item_cost' => $item->cost,
+        'item_rarity' => $item->rarity,
+        'item_type' => $item->type,
+        'repair_current' => 20,
+        'repair_max' => 100,
+        'remaining_auctions' => 3,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.auction-items.snapshot.update', ['auctionItem' => $auctionItem->id]), [
+            'name' => $item->name,
+            'url' => $item->url,
+            'cost' => $item->cost,
+            'notes' => '',
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'repair_max' => 10,
+        ])
+        ->assertSessionHasErrors('repair_max');
+
+    $auctionItem->refresh();
+    expect($auctionItem->repair_max)->toBe(100);
+});
+
+it('rejects repair current above repair max when updating auction snapshot', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'rarity' => 'common',
+        'type' => 'item',
+        'cost' => '100 GP',
+    ]);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+    $auctionItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'item_name' => $item->name,
+        'item_url' => $item->url,
+        'item_cost' => $item->cost,
+        'item_rarity' => $item->rarity,
+        'item_type' => $item->type,
+        'repair_current' => 20,
+        'repair_max' => 100,
+        'remaining_auctions' => 3,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.auction-items.snapshot.update', ['auctionItem' => $auctionItem->id]), [
+            'name' => $item->name,
+            'url' => $item->url,
+            'cost' => $item->cost,
+            'notes' => '',
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'repair_current' => 250,
+            'repair_max' => 100,
+        ])
+        ->assertSessionHasErrors('repair_current');
+
+    $auctionItem->refresh();
+    expect($auctionItem->repair_current)->toBe(20)
+        ->and($auctionItem->repair_max)->toBe(100);
+});
+
 it('rolls over eligible items when closing an auction', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $auction = Auction::query()->create([
