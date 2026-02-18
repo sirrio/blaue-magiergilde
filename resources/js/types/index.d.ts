@@ -127,6 +127,25 @@ export interface ShopSettings {
   auto_post_weekday?: number | null
   auto_post_time?: string | null
   last_auto_posted_at?: string | null
+  current_shop_id?: number | null
+  draft_shop_id?: number | null
+}
+
+export interface ShopOperation {
+  id: number
+  action: 'publish_draft' | 'update_current_post'
+  status: 'pending' | 'posting_to_discord' | 'rotating_pointers' | 'completed' | 'failed' | string
+  step?: 'pending' | 'posting_to_discord' | 'rotating_pointers' | 'completed' | string | null
+  channel_id?: string | null
+  shop_id?: number | null
+  result_shop_id?: number | null
+  current_shop_id?: number | null
+  draft_shop_id?: number | null
+  error?: string | null
+  started_at?: string | null
+  finished_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export interface BackstockSettings {

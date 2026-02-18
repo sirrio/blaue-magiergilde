@@ -45,11 +45,16 @@ class ShopPostService
         } catch (\Throwable $error) {
             $detail = trim((string) $error->getMessage());
             $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
+            $normalizedDetail = strtolower($detail);
+            $isTimeout = str_contains($normalizedDetail, 'curl error 28')
+                || str_contains($normalizedDetail, 'operation timed out')
+                || str_contains($normalizedDetail, 'timed out');
 
             return [
                 'ok' => false,
                 'status' => 503,
                 'error' => $message,
+                'timed_out' => $isTimeout,
             ];
         }
 

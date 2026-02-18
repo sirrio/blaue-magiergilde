@@ -5,6 +5,7 @@ use App\Http\Controllers\Shop\RefreshShopItemSnapshotController;
 use App\Http\Controllers\Shop\RemoveSpellFromItemController;
 use App\Http\Controllers\Shop\RerollShopItemController;
 use App\Http\Controllers\Shop\ShopController;
+use App\Http\Controllers\Shop\ShopOperationStatusController;
 use App\Http\Controllers\Shop\ShopPostController;
 use App\Http\Controllers\Shop\ShopSettingController;
 use App\Http\Controllers\Shop\ShopUpdatePostController;
@@ -20,11 +21,14 @@ Route::middleware(['auth', 'admin'])
             'store',
         ]);
 
-        Route::post('shops/{shop}/post', ShopPostController::class)
+        Route::post('shops/publish-draft', ShopPostController::class)
             ->name('shops.post');
 
-        Route::post('shops/{shop}/update-post', ShopUpdatePostController::class)
+        Route::post('shops/update-post', ShopUpdatePostController::class)
             ->name('shops.update-post');
+
+        Route::get('shops/operations/{shopOperation}', ShopOperationStatusController::class)
+            ->name('shops.operations.show');
 
         Route::patch('shops/settings', ShopSettingController::class)
             ->name('shop-settings.update');

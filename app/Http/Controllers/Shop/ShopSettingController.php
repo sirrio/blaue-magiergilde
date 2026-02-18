@@ -29,6 +29,8 @@ class ShopSettingController extends Controller
                 'auto_post_weekday',
                 'auto_post_time',
                 'last_auto_posted_at',
+                'current_shop_id',
+                'draft_shop_id',
             ]),
         ]);
     }
