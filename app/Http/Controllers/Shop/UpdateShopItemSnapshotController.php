@@ -16,14 +16,27 @@ class UpdateShopItemSnapshotController extends Controller
         $url = trim((string) ($payload['url'] ?? ''));
         $cost = trim((string) ($payload['cost'] ?? ''));
         $notes = trim((string) ($payload['notes'] ?? ''));
+        $nextUrl = $url === '' ? null : $url;
+        $nextCost = $cost === '' ? null : $cost;
+
+        $itemSnapshotChanged =
+            (string) ($shopItem->item_name ?? '') !== $name
+            || (string) ($shopItem->item_url ?? '') !== (string) ($nextUrl ?? '')
+            || (string) ($shopItem->item_cost ?? '') !== (string) ($nextCost ?? '')
+            || (string) ($shopItem->item_rarity ?? '') !== (string) $payload['rarity']
+            || (string) ($shopItem->item_type ?? '') !== (string) $payload['type'];
 
         $shopItem->item_name = $name;
-        $shopItem->item_url = $url === '' ? null : $url;
-        $shopItem->item_cost = $cost === '' ? null : $cost;
+        $shopItem->item_url = $nextUrl;
+        $shopItem->item_cost = $nextCost;
         $shopItem->item_rarity = $payload['rarity'];
         $shopItem->item_type = $payload['type'];
         $shopItem->notes = $notes === '' ? null : $notes;
-        $shopItem->snapshot_custom = true;
+
+        if ($itemSnapshotChanged) {
+            $shopItem->snapshot_custom = true;
+        }
+
         $shopItem->save();
 
         return redirect()->back();

@@ -270,7 +270,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
         router.reload()
       },
       onError: (errors) => {
-        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type
+        const message = errors.name || errors.url || errors.cost || errors.rarity || errors.type || errors.notes
         if (message) {
           toast.show(String(message), 'error')
         }
@@ -287,35 +287,43 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
       </ModalTrigger>
       <ModalTitle>Edit listing</ModalTitle>
       <ModalContent>
-        <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
-          Name
-        </Input>
-        <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
-          URL
-        </Input>
-        <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
-          Cost
-        </Input>
-        <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-          Notes
-        </Input>
-        <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-          <SelectLabel>Rarity</SelectLabel>
-          <SelectOptions>
-            <option value="common">Common</option>
-            <option value="uncommon">Uncommon</option>
-            <option value="rare">Rare</option>
-            <option value="very_rare">Very Rare</option>
-          </SelectOptions>
-        </Select>
-        <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-          <SelectLabel>Type</SelectLabel>
-          <SelectOptions>
-            <option value="item">Item</option>
-            <option value="spellscroll">Spell Scroll</option>
-            <option value="consumable">Consumable</option>
-          </SelectOptions>
-        </Select>
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Item snapshot</p>
+            <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+              Name
+            </Input>
+            <Input value={data.url ?? ''} onChange={(e) => setData('url', e.target.value)}>
+              URL
+            </Input>
+            <Input value={data.cost ?? ''} onChange={(e) => setData('cost', e.target.value)}>
+              Cost
+            </Input>
+            <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+              <SelectLabel>Rarity</SelectLabel>
+              <SelectOptions>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="very_rare">Very Rare</option>
+              </SelectOptions>
+            </Select>
+            <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+              <SelectLabel>Type</SelectLabel>
+              <SelectOptions>
+                <option value="item">Item</option>
+                <option value="spellscroll">Spell Scroll</option>
+                <option value="consumable">Consumable</option>
+              </SelectOptions>
+            </Select>
+          </div>
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Shop listing</p>
+            <Input value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+              Notes
+            </Input>
+          </div>
+        </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
         Save
@@ -571,16 +579,6 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
               size="xs"
               variant="ghost"
               modifier="square"
-              onClick={handleRerollShopLine}
-              title="Reroll line"
-              aria-label="Reroll line"
-            >
-              <Dices size={14} />
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              modifier="square"
               onClick={handleSnapshotRefresh}
               title="Refresh listing from base item"
               aria-label="Refresh listing from base item"
@@ -588,6 +586,17 @@ export default function ItemRow({ item, shopItem, sources = [] }: { item: Item; 
               <RotateCcw size={14} />
             </Button>
             <ShopItemSnapshotModal shopItem={shopItem} item={item} />
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              color="error"
+              onClick={handleRerollShopLine}
+              title="Reroll line"
+              aria-label="Reroll line"
+            >
+              <Dices size={14} />
+            </Button>
           </>
         ) : null}
         {!shopItem ? (
