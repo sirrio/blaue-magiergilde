@@ -142,6 +142,11 @@ export interface ShopOperation {
   current_shop_id?: number | null
   draft_shop_id?: number | null
   error?: string | null
+  meta?: {
+    total_lines?: number | null
+    posted_lines?: number | null
+    last_line?: string | null
+  } | null
   started_at?: string | null
   finished_at?: string | null
   created_at?: string | null

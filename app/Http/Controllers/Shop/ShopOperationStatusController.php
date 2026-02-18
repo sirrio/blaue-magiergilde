@@ -22,6 +22,7 @@ class ShopOperationStatusController extends Controller
                 'current_shop_id',
                 'draft_shop_id',
                 'error',
+                'meta',
                 'started_at',
                 'finished_at',
                 'created_at',

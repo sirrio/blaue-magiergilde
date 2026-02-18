@@ -30,7 +30,7 @@ class ShopLifecycleService
     /**
      * @return array{ok: bool, status?: int, error?: string, posted_shop_id?: int, current_shop_id?: int, draft_shop_id?: int}
      */
-    public function publishDraft(?string $channelId = null, bool $markAsAutoPosted = false, ?callable $onStep = null): array
+    public function publishDraft(?string $channelId = null, bool $markAsAutoPosted = false, ?callable $onStep = null, ?int $operationId = null): array
     {
         $settings = $this->ensureInitialized();
         $resolvedChannelId = trim((string) ($channelId ?: $settings->post_channel_id));
@@ -61,7 +61,7 @@ class ShopLifecycleService
         }
 
         $this->notifyStep($onStep, 'posting_to_discord');
-        $postResult = $this->shopPostService->post($draftShop, $resolvedChannelId);
+        $postResult = $this->shopPostService->post($draftShop, $resolvedChannelId, $operationId);
         if (! ($postResult['ok'] ?? false) && ! $this->recoverAfterTimeout($settings->id, $draftShopId, $postResult)) {
             return $postResult;
         }
@@ -115,7 +115,7 @@ class ShopLifecycleService
     /**
      * @return array{ok: bool, status?: int, error?: string, shop_id?: int}
      */
-    public function updateCurrentPost(?callable $onStep = null): array
+    public function updateCurrentPost(?callable $onStep = null, ?int $operationId = null): array
     {
         $settings = $this->ensureInitialized();
         $currentShopId = (int) ($settings->current_shop_id ?? 0);
@@ -137,7 +137,7 @@ class ShopLifecycleService
         }
 
         $this->notifyStep($onStep, 'posting_to_discord');
-        $result = $this->shopPostService->update($currentShop);
+        $result = $this->shopPostService->update($currentShop, $operationId);
         if (! ($result['ok'] ?? false)) {
             return $result;
         }

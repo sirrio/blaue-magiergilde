@@ -454,6 +454,7 @@ function startHttpServer(client) {
         if (isShopPost) {
             const channelId = String(payload?.channel_id || '').trim();
             const shopId = Number(payload?.shop_id || 0);
+            const operationId = Number(payload?.operation_id || 0);
             const threadName = typeof payload?.thread_name === 'string' ? payload.thread_name.trim() : '';
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
@@ -467,12 +468,18 @@ function startHttpServer(client) {
                 respondJson(res, 422, { error: 'Invalid shop_id.' });
                 return;
             }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
+                return;
+            }
 
             try {
                 const result = await postShopToChannel({
                     client,
                     channelId,
                     shopId,
+                    operationId: operationId > 0 ? operationId : null,
                     threadName,
                 });
 
@@ -497,14 +504,24 @@ function startHttpServer(client) {
 
         if (isShopUpdate) {
             const shopId = Number(payload?.shop_id || 0);
+            const operationId = Number(payload?.operation_id || 0);
             if (!Number.isFinite(shopId) || shopId <= 0) {
                 logReject(req, 'invalid shop_id');
                 respondJson(res, 422, { error: 'Invalid shop_id.' });
                 return;
             }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
+                return;
+            }
 
             try {
-                const result = await updateShopPost({ client, shopId });
+                const result = await updateShopPost({
+                    client,
+                    shopId,
+                    operationId: operationId > 0 ? operationId : null,
+                });
                 if (!result.ok) {
                     logReject(req, result.error || 'shop update failed');
                     respondJson(res, result.status || 500, { error: result.error || 'Shop update failed.' });

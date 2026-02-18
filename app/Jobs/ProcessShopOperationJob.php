@@ -49,9 +49,11 @@ class ProcessShopOperationJob implements ShouldQueue
                     $operation->channel_id,
                     false,
                     fn (string $step) => $this->markStep($operation, $step),
+                    $operation->id,
                 ),
                 ShopOperation::ACTION_UPDATE_CURRENT_POST => $shopLifecycleService->updateCurrentPost(
                     fn (string $step) => $this->markStep($operation, $step),
+                    $operation->id,
                 ),
                 default => [
                     'ok' => false,

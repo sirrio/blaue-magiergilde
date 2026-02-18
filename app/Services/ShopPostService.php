@@ -7,19 +7,31 @@ use Illuminate\Support\Facades\Http;
 
 class ShopPostService
 {
-    public function post(Shop $shop, string $channelId): array
+    public function post(Shop $shop, string $channelId, ?int $operationId = null): array
     {
-        return $this->request('/shop-post', [
+        $payload = [
             'channel_id' => $channelId,
             'shop_id' => $shop->id,
-        ]);
+        ];
+
+        if ($operationId !== null && $operationId > 0) {
+            $payload['operation_id'] = $operationId;
+        }
+
+        return $this->request('/shop-post', $payload);
     }
 
-    public function update(Shop $shop): array
+    public function update(Shop $shop, ?int $operationId = null): array
     {
-        return $this->request('/shop-update', [
+        $payload = [
             'shop_id' => $shop->id,
-        ]);
+        ];
+
+        if ($operationId !== null && $operationId > 0) {
+            $payload['operation_id'] = $operationId;
+        }
+
+        return $this->request('/shop-update', $payload);
     }
 
     private function request(string $path, array $payload): array
@@ -35,7 +47,7 @@ class ShopPostService
             ];
         }
 
-        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+        $timeout = max(1, (int) config('services.bot.http_timeout', 60));
 
         try {
             $response = Http::timeout($timeout)
