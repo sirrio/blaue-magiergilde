@@ -56,7 +56,6 @@ class CharacterController extends Controller
      */
     public function store(
         StoreCharacterRequest $request,
-        CharacterApprovalNotificationService $notificationService,
     ): RedirectResponse {
         $character = new Character;
         $character->name = $request->name;
@@ -70,9 +69,7 @@ class CharacterController extends Controller
         $character->user_id = Auth::user()->getAuthIdentifier();
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
-        $character->guild_status = $this->isCharacterStatusSwitchEnabled()
-            ? ($request->guild_status ?? 'draft')
-            : 'draft';
+        $character->guild_status = 'draft';
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }
@@ -80,16 +77,6 @@ class CharacterController extends Controller
 
         $classIds = array_values(array_unique($request->class));
         $character->characterClasses()->sync($classIds);
-
-        if ($character->guild_status === 'pending') {
-            $result = $notificationService->syncAnnouncement($character);
-            if (! $result['ok']) {
-                Log::warning('Character approval channel notification failed.', [
-                    'character_id' => $character->id,
-                    'error' => $result['error'] ?? null,
-                ]);
-            }
-        }
 
         return to_route('characters.index');
     }
@@ -142,17 +129,6 @@ class CharacterController extends Controller
         $character->dm_coins = $request->dm_coins;
         $character->bubble_shop_spend = $request->bubble_shop_spend;
         $character->external_link = $request->external_link;
-        if (! $this->isCharacterStatusSwitchEnabled()) {
-            $character->guild_status = 'draft';
-        } elseif ($request->filled('guild_status')) {
-            $requestedStatus = $request->string('guild_status')->toString();
-            if (in_array((string) $previousStatus, ['approved', 'declined', 'retired'], true) && $requestedStatus !== $previousStatus) {
-                return redirect()->back()->withErrors([
-                    'guild_status' => 'Reviewed characters cannot be moved back to draft or pending.',
-                ]);
-            }
-            $character->guild_status = $requestedStatus;
-        }
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }

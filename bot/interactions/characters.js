@@ -127,6 +127,11 @@ function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
 }
 
+function canCharacterLogActivity(character) {
+    const status = String(character?.guild_status || '').trim().toLowerCase();
+    return !isCharacterStatusSwitchEnabled || status !== 'draft';
+}
+
 function getAvatarUpdateState(userId) {
     return pendingCharacterAvatarUpdates.get(String(userId)) || null;
 }
@@ -1983,6 +1988,11 @@ async function handle(interaction) {
             return true;
         }
 
+        if (!canCharacterLogActivity(character)) {
+            await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
         const rawLevel = interaction.fields.getTextInputValue('manualLevel');
         const parsedLevel = Number(rawLevel);
         const level = Number.isFinite(parsedLevel) ? Math.floor(parsedLevel) : NaN;
@@ -2096,12 +2106,20 @@ async function handle(interaction) {
         }
 
         if (action === 'adv') {
+            if (!canCharacterLogActivity(character)) {
+                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
             const row = buildAdventureMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
             return true;
         }
 
         if (action === 'dt') {
+            if (!canCharacterLogActivity(character)) {
+                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
             const row = buildDowntimeMenuRow(character, ownerDiscordId);
             await interaction.update({ components: [row], content: '' });
             return true;
@@ -2320,6 +2338,11 @@ async function handle(interaction) {
         }
 
         if (action === 'manual_level') {
+            if (!canCharacterLogActivity(character)) {
+                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
             const modal = new ModalBuilder()
                 .setCustomId(`characterManualLevelModal_${character.id}_${ownerDiscordId}`)
                 .setTitle('Set level');

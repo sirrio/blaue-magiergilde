@@ -25,7 +25,6 @@ it('allows owners to create draft characters', function () {
             'is_filler' => false,
             'faction' => 'none',
             'notes' => null,
-            'guild_status' => 'draft',
         ])
         ->assertRedirect(route('characters.index'));
 
@@ -53,39 +52,38 @@ it('rejects epic tier as start tier', function () {
             'is_filler' => false,
             'faction' => 'none',
             'notes' => null,
-            'guild_status' => 'draft',
         ])
         ->assertSessionHasErrors('start_tier');
 });
 
-it('lets owners switch between pending and draft', function () {
+it('forces draft on create even when owners submit pending directly', function () {
     Config::set('features.character_status_switch', true);
 
     $user = User::factory()->create();
     $class = CharacterClass::factory()->create();
-    $character = Character::factory()->for($user)->create([
-        'guild_status' => 'pending',
-        'is_filler' => false,
-    ]);
 
     $this->actingAs($user)
-        ->put(route('characters.update', $character), [
-            'name' => $character->name,
+        ->post(route('characters.store'), [
+            'name' => 'Forced Draft While Enabled',
             'class' => [$class->id],
-            'external_link' => $character->external_link,
-            'version' => $character->version,
-            'dm_bubbles' => $character->dm_bubbles,
-            'dm_coins' => $character->dm_coins,
-            'bubble_shop_spend' => $character->bubble_shop_spend,
-            'is_filler' => $character->is_filler,
-            'faction' => $character->faction,
-            'notes' => $character->notes,
-            'guild_status' => 'draft',
+            'external_link' => 'https://example.com',
+            'start_tier' => 'bt',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+            'guild_status' => 'pending',
         ])
         ->assertRedirect(route('characters.index'));
 
-    $character->refresh();
-    expect($character->guild_status)->toBe('draft');
+    $this->assertDatabaseHas('characters', [
+        'user_id' => $user->id,
+        'name' => 'Forced Draft While Enabled',
+        'guild_status' => 'draft',
+    ]);
 });
 
 it('forces draft on create when character status switching is disabled', function () {
@@ -118,7 +116,7 @@ it('forces draft on create when character status switching is disabled', functio
     ]);
 });
 
-it('forces draft on update when character status switching is disabled', function () {
+it('preserves existing status on update when character status switching is disabled', function () {
     Config::set('features.character_status_switch', false);
 
     $user = User::factory()->create();
@@ -140,12 +138,11 @@ it('forces draft on update when character status switching is disabled', functio
             'is_filler' => $character->is_filler,
             'faction' => $character->faction,
             'notes' => $character->notes,
-            'guild_status' => 'pending',
         ])
         ->assertRedirect(route('characters.index'));
 
     $character->refresh();
-    expect($character->guild_status)->toBe('draft');
+    expect($character->guild_status)->toBe('pending');
 });
 
 it('prevents admins from approving draft characters', function () {
@@ -194,7 +191,7 @@ it('does not allow draft submission when character status switching is disabled'
     expect($character->guild_status)->toBe('draft');
 });
 
-it('prevents owners from moving reviewed characters back to draft', function () {
+it('ignores direct status changes from owners on update', function () {
     Config::set('features.character_status_switch', true);
 
     $owner = User::factory()->create();
@@ -218,7 +215,7 @@ it('prevents owners from moving reviewed characters back to draft', function () 
             'notes' => $character->notes,
             'guild_status' => 'draft',
         ])
-        ->assertSessionHasErrors('guild_status');
+        ->assertRedirect(route('characters.index'));
 
     $character->refresh();
     expect($character->guild_status)->toBe('approved');
