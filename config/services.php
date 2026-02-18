@@ -19,10 +19,6 @@ return [
         'client_secret' => env('DISCORD_CLIENT_SECRET'),
         'redirect' => env('DISCORD_REDIRECT_URI'),
         'bot_token' => env('DISCORD_BOT_TOKEN'),
-
-        // optional
-        'allow_gif_avatars' => (bool) env('DISCORD_AVATAR_GIF', true),
-        'avatar_default_extension' => env('DISCORD_EXTENSION_DEFAULT', 'png'), // only pick from jpg, png, webp
     ],
 
     'bot' => [
@@ -31,7 +27,6 @@ return [
         'http_url' => env('BOT_HTTP_URL'),
         'http_token' => env('BOT_HTTP_TOKEN'),
         'http_timeout' => env('BOT_HTTP_TIMEOUT', 120),
-        'games_channel_id' => env('DISCORD_GAMES_CHANNEL_ID'),
     ],
 
 ];
