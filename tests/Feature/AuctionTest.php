@@ -522,3 +522,139 @@ it('marks an auction item as sold even when bot update fails', function () {
     expect($auctionItem->sold_at)->not->toBeNull()
         ->and($auctionItem->sold_bid_id)->toBe($bid->id);
 });
+
+it('transfers non-winning hidden bids to the next unsold identical item when finalizing', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create(['rarity' => 'common', 'type' => 'item']);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+
+    $soldItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+
+    $nextItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 90,
+        'repair_max' => 1000,
+        'remaining_auctions' => 2,
+    ]);
+
+    $winningBid = AuctionBid::query()->create([
+        'auction_item_id' => $soldItem->id,
+        'bidder_name' => 'Winner',
+        'bidder_discord_id' => '12345',
+        'amount' => 250,
+        'created_by' => $admin->id,
+    ]);
+
+    AuctionHiddenBid::query()->create([
+        'auction_item_id' => $soldItem->id,
+        'bidder_discord_id' => '11111',
+        'bidder_name' => 'Carry One',
+        'max_amount' => 180,
+    ]);
+
+    AuctionHiddenBid::query()->create([
+        'auction_item_id' => $soldItem->id,
+        'bidder_discord_id' => '22222',
+        'bidder_name' => 'Carry Two',
+        'max_amount' => 160,
+    ]);
+
+    AuctionHiddenBid::query()->create([
+        'auction_item_id' => $nextItem->id,
+        'bidder_discord_id' => '11111',
+        'bidder_name' => 'Carry One',
+        'max_amount' => 140,
+    ]);
+
+    config()->set('services.bot.http_url', 'http://bot.test');
+    config()->set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/auction-item-sold' => Http::response(['status' => 'updated'], 200),
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.auction-items.finalize', ['auctionItem' => $soldItem->id]))
+        ->assertRedirect();
+
+    $soldItem->refresh();
+    expect($soldItem->sold_at)->not->toBeNull()
+        ->and($soldItem->sold_bid_id)->toBe($winningBid->id);
+
+    expect(AuctionHiddenBid::query()->where('auction_item_id', $soldItem->id)->count())->toBe(0);
+
+    $transferredForFirstBidder = AuctionHiddenBid::query()
+        ->where('auction_item_id', $nextItem->id)
+        ->where('bidder_discord_id', '11111')
+        ->first();
+    $transferredForSecondBidder = AuctionHiddenBid::query()
+        ->where('auction_item_id', $nextItem->id)
+        ->where('bidder_discord_id', '22222')
+        ->first();
+
+    expect($transferredForFirstBidder)->not->toBeNull()
+        ->and($transferredForFirstBidder?->max_amount)->toBe(180)
+        ->and($transferredForSecondBidder)->not->toBeNull()
+        ->and($transferredForSecondBidder?->max_amount)->toBe(160);
+});
+
+it('does not transfer hidden bids when there is no next unsold identical item', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create(['rarity' => 'common', 'type' => 'item']);
+    $auction = Auction::query()->create([
+        'title' => null,
+        'status' => 'open',
+        'currency' => 'GP',
+    ]);
+
+    $soldItem = AuctionItem::query()->create([
+        'auction_id' => $auction->id,
+        'item_id' => $item->id,
+        'repair_current' => 100,
+        'repair_max' => 1000,
+        'remaining_auctions' => 3,
+    ]);
+
+    $winningBid = AuctionBid::query()->create([
+        'auction_item_id' => $soldItem->id,
+        'bidder_name' => 'Winner',
+        'bidder_discord_id' => '12345',
+        'amount' => 250,
+        'created_by' => $admin->id,
+    ]);
+
+    AuctionHiddenBid::query()->create([
+        'auction_item_id' => $soldItem->id,
+        'bidder_discord_id' => '11111',
+        'bidder_name' => 'Carry One',
+        'max_amount' => 180,
+    ]);
+
+    config()->set('services.bot.http_url', 'http://bot.test');
+    config()->set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/auction-item-sold' => Http::response(['status' => 'updated'], 200),
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.auction-items.finalize', ['auctionItem' => $soldItem->id]))
+        ->assertRedirect();
+
+    $soldItem->refresh();
+    expect($soldItem->sold_at)->not->toBeNull()
+        ->and($soldItem->sold_bid_id)->toBe($winningBid->id);
+
+    expect(AuctionHiddenBid::query()->where('auction_item_id', $soldItem->id)->count())->toBe(1);
+});

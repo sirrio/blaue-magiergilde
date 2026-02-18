@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuctionBid;
+use App\Models\AuctionHiddenBid;
 use App\Models\AuctionItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +44,10 @@ class FinalizeAuctionItemController extends Controller
             $lockedItem->sold_at = now();
             $lockedItem->sold_bid_id = $highest->id;
             $lockedItem->save();
+            $this->transferNonWinningHiddenBidsToNextIdenticalItem(
+                $lockedItem,
+                (string) $highest->bidder_discord_id,
+            );
 
             return $highest;
         });
@@ -76,5 +81,53 @@ class FinalizeAuctionItemController extends Controller
         }
 
         return redirect()->back();
+    }
+
+    private function transferNonWinningHiddenBidsToNextIdenticalItem(
+        AuctionItem $soldItem,
+        string $winnerDiscordId,
+    ): void {
+        if ($winnerDiscordId === '') {
+            return;
+        }
+
+        $nextItem = AuctionItem::query()
+            ->where('auction_id', $soldItem->auction_id)
+            ->where('item_id', $soldItem->item_id)
+            ->where('id', '!=', $soldItem->id)
+            ->whereNull('sold_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->first();
+
+        if (! $nextItem) {
+            return;
+        }
+
+        $hiddenBidsToTransfer = $soldItem->hiddenBids()
+            ->where('bidder_discord_id', '!=', $winnerDiscordId)
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($hiddenBidsToTransfer as $hiddenBid) {
+            $targetHiddenBid = AuctionHiddenBid::query()
+                ->where('auction_item_id', $nextItem->id)
+                ->where('bidder_discord_id', $hiddenBid->bidder_discord_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($targetHiddenBid) {
+                $nextMaxAmount = max((int) $targetHiddenBid->max_amount, (int) $hiddenBid->max_amount);
+                $targetHiddenBid->bidder_name = $hiddenBid->bidder_name;
+                $targetHiddenBid->max_amount = $nextMaxAmount;
+                $targetHiddenBid->save();
+                $hiddenBid->delete();
+
+                continue;
+            }
+
+            $hiddenBid->auction_item_id = $nextItem->id;
+            $hiddenBid->save();
+        }
     }
 }
