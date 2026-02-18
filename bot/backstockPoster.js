@@ -1,6 +1,7 @@
 const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
+const { resolveOperationId, updateOperationProgress } = require('./operationProgress');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -105,19 +106,20 @@ async function saveBackstockPostState({ settingsId, channelId, messageIds }) {
     );
 }
 
-async function deletePreviousPosts({ client, settings }) {
-    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return;
+async function deletePreviousPosts({ client, settings, onProgress }) {
+    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return { total: 0, processed: 0 };
 
     let channel;
     try {
         await waitForDiscordRateLimit(client);
         channel = await client.channels.fetch(settings.lastPostChannelId);
     } catch {
-        return;
+        return { total: settings.lastPostMessageIds.length, processed: 0 };
     }
 
-    if (!channel?.isTextBased?.()) return;
+    if (!channel?.isTextBased?.()) return { total: settings.lastPostMessageIds.length, processed: 0 };
 
+    let processed = 0;
     for (const messageId of settings.lastPostMessageIds) {
         try {
             await waitForDiscordRateLimit(client);
@@ -125,8 +127,15 @@ async function deletePreviousPosts({ client, settings }) {
             await channel.messages.delete(messageId);
         } catch {
             // Ignore missing permissions or deleted messages.
+        } finally {
+            processed += 1;
+            if (typeof onProgress === 'function') {
+                await onProgress({ processed, total: settings.lastPostMessageIds.length });
+            }
         }
     }
+
+    return { total: settings.lastPostMessageIds.length, processed };
 }
 
 async function fetchBackstockItems() {
@@ -231,18 +240,29 @@ async function sendOneLine(destination, line) {
     return message?.id ?? null;
 }
 
-async function sendLines(destination, lines) {
-    const messageIds = [];
-    for (const line of lines) {
-         
-        const messageId = await sendOneLine(destination, line);
-        if (messageId) messageIds.push(messageId);
+function countPlannedBackstockLines(grouped, rarityOrder, typeOrder) {
+    let total = 0;
+
+    for (const rarity of rarityOrder) {
+        const byType = grouped.get(rarity);
+        if (!byType) continue;
+
+        total += 1;
+        for (const type of typeOrder) {
+            total += (byType.get(type) ?? []).length;
+        }
     }
-    return messageIds;
+
+    return total;
 }
 
-async function postBackstockToChannel({ client, channelId }) {
+async function postBackstockToChannel({ client, channelId, operationId }) {
     attachRateLimitListener(client);
+    const resolvedOperationId = await resolveOperationId({
+        operationId,
+        action: 'post_backstock',
+        channelId,
+    });
     const postState = await fetchBackstockPostState();
     const items = await fetchBackstockItems();
     if (items.length === 0) {
@@ -257,8 +277,6 @@ async function postBackstockToChannel({ client, channelId }) {
     const destination = destinationResult.destination;
     const messageIds = [];
 
-    await deletePreviousPosts({ client, settings: postState });
-
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
     const grouped = new Map();
@@ -272,6 +290,56 @@ async function postBackstockToChannel({ client, channelId }) {
         byType.get(type).push(row);
     }
 
+    const deleteCount = Array.isArray(postState?.lastPostMessageIds) ? postState.lastPostMessageIds.length : 0;
+    const postCount = countPlannedBackstockLines(grouped, rarityOrder, typeOrder);
+    const totalLines = Math.max(1, deleteCount + postCount);
+    let postedLines = 0;
+    await updateOperationProgress(resolvedOperationId, {
+        totalLines,
+        postedLines,
+        lastLine: 'Preparing backstock post',
+    });
+
+    if (deleteCount > 0) {
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: `Deleting old backstock messages (0/${deleteCount})`,
+        });
+    }
+
+    const deleteResult = await deletePreviousPosts({
+        client,
+        settings: postState,
+        onProgress: async ({ processed, total }) => {
+            postedLines = Math.min(totalLines, processed);
+            await updateOperationProgress(resolvedOperationId, {
+                totalLines,
+                postedLines,
+                lastLine: `Deleting old backstock messages (${processed}/${total})`,
+            });
+        },
+    });
+    if (deleteCount > 0 && postedLines < deleteCount) {
+        postedLines = Math.min(totalLines, deleteCount);
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: `Deleting old backstock messages (${deleteResult.processed}/${deleteCount})`,
+        });
+    }
+
+    const sendTrackedLine = async (line, label) => {
+        const messageId = await sendOneLine(destination, line);
+        postedLines = Math.min(totalLines, postedLines + 1);
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: label || null,
+        });
+        return messageId;
+    };
+
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
         if (!byType) continue;
@@ -283,17 +351,21 @@ async function postBackstockToChannel({ client, channelId }) {
 
         const tierText = tierRequirementForRarity(rarity);
         const header = `## ${rarityDisplayName(rarity)}${tierText ? ` (${tierText})` : ''}`;
-        const headerId = await sendOneLine(destination, header);
+        const headerId = await sendTrackedLine(header, `${rarityDisplayName(rarity)} section`);
         if (headerId) messageIds.push(headerId);
 
-        const lines = [];
-        typeOrder.forEach((type) => {
+        for (const type of typeOrder) {
             const rows = byType.get(type) ?? [];
-            rows.forEach((row) => {
-                lines.push(formatBackstockLine(row));
-            });
-        });
-        messageIds.push(...await sendLines(destination, lines));
+            for (const row of rows) {
+                const messageId = await sendTrackedLine(
+                    formatBackstockLine(row),
+                    row.name || 'Backstock item',
+                );
+                if (messageId) {
+                    messageIds.push(messageId);
+                }
+            }
+        }
     }
 
     await saveBackstockPostState({

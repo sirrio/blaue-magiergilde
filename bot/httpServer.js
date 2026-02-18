@@ -543,10 +543,16 @@ function startHttpServer(client) {
 
         if (isBackstockPost) {
             const channelId = String(payload?.channel_id || '').trim();
+            const operationId = Number(payload?.operation_id || 0);
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
                 logReject(req, 'invalid channel_id');
                 respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
                 return;
             }
 
@@ -554,6 +560,7 @@ function startHttpServer(client) {
                 const result = await postBackstockToChannel({
                     client,
                     channelId,
+                    operationId: operationId > 0 ? operationId : null,
                 });
 
                 if (!result.ok) {
@@ -578,6 +585,7 @@ function startHttpServer(client) {
         if (isAuctionPost) {
             const channelId = String(payload?.channel_id || '').trim();
             const auctionId = Number(payload?.auction_id || 0);
+            const operationId = Number(payload?.operation_id || 0);
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
                 logReject(req, 'invalid channel_id');
@@ -590,12 +598,18 @@ function startHttpServer(client) {
                 respondJson(res, 422, { error: 'Invalid auction_id.' });
                 return;
             }
+            if (payload?.operation_id !== undefined && (!Number.isFinite(operationId) || operationId <= 0)) {
+                logReject(req, 'invalid operation_id');
+                respondJson(res, 422, { error: 'Invalid operation_id.' });
+                return;
+            }
 
             try {
                 const result = await postAuctionToChannel({
                     client,
                     channelId,
                     auctionId,
+                    operationId: operationId > 0 ? operationId : null,
                 });
 
                 if (!result.ok) {

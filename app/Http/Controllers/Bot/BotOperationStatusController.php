@@ -1,18 +1,20 @@
 <?php
 
-namespace App\Http\Controllers\Shop;
+namespace App\Http\Controllers\Bot;
 
 use App\Http\Controllers\Controller;
-use App\Models\ShopOperation;
+use App\Models\BotOperation;
 use Illuminate\Http\JsonResponse;
 
-class ShopOperationStatusController extends Controller
+class BotOperationStatusController extends Controller
 {
-    public function __invoke(ShopOperation $shopOperation): JsonResponse
+    public function __invoke(BotOperation $botOperation): JsonResponse
     {
         return response()->json([
-            'operation' => $shopOperation->only([
+            'operation' => $botOperation->only([
                 'id',
+                'resource',
+                'resource_id',
                 'action',
                 'status',
                 'step',

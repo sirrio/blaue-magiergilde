@@ -131,9 +131,11 @@ export interface ShopSettings {
   draft_shop_id?: number | null
 }
 
-export interface ShopOperation {
+export interface BotOperation {
   id: number
-  action: 'publish_draft' | 'update_current_post'
+  resource: 'shop' | 'auction' | 'backstock' | string
+  resource_id?: number | null
+  action: 'publish_draft' | 'update_current_post' | 'post_auction' | 'post_backstock' | string
   status: 'pending' | 'posting_to_discord' | 'rotating_pointers' | 'completed' | 'failed' | string
   step?: 'pending' | 'posting_to_discord' | 'rotating_pointers' | 'completed' | string | null
   channel_id?: string | null

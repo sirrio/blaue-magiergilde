@@ -3,26 +3,27 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessShopOperationJob;
-use App\Models\ShopOperation;
+use App\Jobs\ProcessBotOperationJob;
+use App\Models\BotOperation;
 use Illuminate\Http\JsonResponse;
 
 class ShopUpdatePostController extends Controller
 {
     public function __invoke(): JsonResponse
     {
-        $operation = ShopOperation::query()->create([
-            'action' => ShopOperation::ACTION_UPDATE_CURRENT_POST,
-            'status' => ShopOperation::STATUS_PENDING,
-            'step' => ShopOperation::STATUS_PENDING,
+        $operation = BotOperation::query()->create([
+            'resource' => BotOperation::RESOURCE_SHOP,
+            'action' => BotOperation::ACTION_UPDATE_CURRENT_POST,
+            'status' => BotOperation::STATUS_PENDING,
+            'step' => BotOperation::STATUS_PENDING,
             'user_id' => request()->user()?->id,
         ]);
 
         try {
-            ProcessShopOperationJob::dispatchForOperation($operation);
+            ProcessBotOperationJob::dispatchForOperation($operation);
         } catch (\Throwable $error) {
-            $operation->status = ShopOperation::STATUS_FAILED;
-            $operation->step = ShopOperation::STATUS_FAILED;
+            $operation->status = BotOperation::STATUS_FAILED;
+            $operation->step = BotOperation::STATUS_FAILED;
             $operation->error = 'Queue dispatch failed. Start a queue worker and try again. '.$error->getMessage();
             $operation->finished_at = now();
             $operation->save();
@@ -31,6 +32,8 @@ class ShopUpdatePostController extends Controller
                 'error' => 'Shop operation could not be queued.',
                 'operation' => $operation->only([
                     'id',
+                    'resource',
+                    'resource_id',
                     'action',
                     'status',
                     'step',
@@ -44,6 +47,8 @@ class ShopUpdatePostController extends Controller
             'status' => 'started',
             'operation' => $operation->only([
                 'id',
+                'resource',
+                'resource_id',
                 'action',
                 'status',
                 'step',

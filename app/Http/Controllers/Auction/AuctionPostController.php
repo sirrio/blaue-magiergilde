@@ -4,65 +4,61 @@ namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\PostAuctionRequest;
+use App\Jobs\ProcessBotOperationJob;
 use App\Models\Auction;
+use App\Models\BotOperation;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Http;
 
 class AuctionPostController extends Controller
 {
     public function __invoke(PostAuctionRequest $request, Auction $auction): JsonResponse
     {
-        $botUrl = trim((string) config('services.bot.http_url', ''));
-        $botToken = trim((string) config('services.bot.http_token', ''));
-
-        if ($botUrl === '' || $botToken === '') {
-            return response()->json([
-                'error' => 'Bot HTTP is not configured.',
-            ], 422);
-        }
-
         $channelId = $request->validated()['channel_id'];
-
-        $timeout = max(1, (int) config('services.bot.http_timeout', 10));
+        $operation = BotOperation::query()->create([
+            'resource' => BotOperation::RESOURCE_AUCTION,
+            'resource_id' => $auction->id,
+            'action' => BotOperation::ACTION_POST_AUCTION,
+            'status' => BotOperation::STATUS_PENDING,
+            'step' => BotOperation::STATUS_PENDING,
+            'channel_id' => $channelId,
+            'user_id' => $request->user()?->id,
+        ]);
 
         try {
-            $response = Http::timeout($timeout)
-                ->acceptJson()
-                ->withHeaders(['X-Bot-Token' => $botToken])
-                ->post(rtrim($botUrl, '/').'/auction-post', [
-                    'channel_id' => $channelId,
-                    'auction_id' => $auction->id,
-                ]);
+            ProcessBotOperationJob::dispatchForOperation($operation);
         } catch (\Throwable $error) {
-            return response()->json([
-                'error' => 'Bot is not reachable.',
-            ], 503);
-        }
-
-        if (! $response->ok()) {
-            $errorDetail = null;
-            try {
-                $payload = $response->json();
-                $errorDetail = is_array($payload) ? ($payload['error'] ?? null) : null;
-            } catch (\Throwable $error) {
-                $errorDetail = null;
-            }
-
-            $fallbackDetail = trim((string) $response->body());
-            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
-            $message = 'Bot request failed.';
-            if ($detail) {
-                $message .= ' '.$detail;
-            }
+            $operation->status = BotOperation::STATUS_FAILED;
+            $operation->step = BotOperation::STATUS_FAILED;
+            $operation->error = 'Queue dispatch failed. Start a queue worker and try again. '.$error->getMessage();
+            $operation->finished_at = now();
+            $operation->save();
 
             return response()->json([
-                'error' => $message,
-            ], $response->status());
+                'error' => 'Auction operation could not be queued.',
+                'operation' => $operation->only([
+                    'id',
+                    'resource',
+                    'resource_id',
+                    'action',
+                    'status',
+                    'step',
+                    'error',
+                    'created_at',
+                ]),
+            ], 500);
         }
 
         return response()->json([
-            'status' => 'posted',
-            'auction_id' => $auction->id,
-        ]);
+            'status' => 'started',
+            'operation' => $operation->only([
+                'id',
+                'resource',
+                'resource_id',
+                'action',
+                'status',
+                'step',
+                'created_at',
+            ]),
+        ], 202);
     }
 }

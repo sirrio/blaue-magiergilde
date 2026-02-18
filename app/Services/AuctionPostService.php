@@ -4,19 +4,20 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 
-class BackstockPostService
+class AuctionPostService
 {
-    public function post(string $channelId, ?int $operationId = null): array
+    public function post(int $auctionId, string $channelId, ?int $operationId = null): array
     {
         $payload = [
             'channel_id' => $channelId,
+            'auction_id' => $auctionId,
         ];
 
         if ($operationId !== null && $operationId > 0) {
             $payload['operation_id'] = $operationId;
         }
 
-        return $this->request('/backstock-post', $payload);
+        return $this->request('/auction-post', $payload);
     }
 
     private function request(string $path, array $payload): array

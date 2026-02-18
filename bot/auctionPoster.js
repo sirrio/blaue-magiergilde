@@ -1,6 +1,7 @@
 const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
+const { resolveOperationId, updateOperationProgress } = require('./operationProgress');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -145,19 +146,20 @@ async function saveAuctionPostState({ settingsId, channelId, messageIds, itemMes
     );
 }
 
-async function deletePreviousPosts({ client, settings }) {
-    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return;
+async function deletePreviousPosts({ client, settings, onProgress }) {
+    if (!settings?.lastPostChannelId || !settings?.lastPostMessageIds?.length) return { total: 0, processed: 0 };
 
     let channel;
     try {
         await waitForDiscordRateLimit(client);
         channel = await client.channels.fetch(settings.lastPostChannelId);
     } catch {
-        return;
+        return { total: settings.lastPostMessageIds.length, processed: 0 };
     }
 
-    if (!channel?.isTextBased?.()) return;
+    if (!channel?.isTextBased?.()) return { total: settings.lastPostMessageIds.length, processed: 0 };
 
+    let processed = 0;
     for (const messageId of settings.lastPostMessageIds) {
         try {
             await waitForDiscordRateLimit(client);
@@ -165,8 +167,15 @@ async function deletePreviousPosts({ client, settings }) {
             await channel.messages.delete(messageId);
         } catch {
             // Ignore missing permissions or deleted messages.
+        } finally {
+            processed += 1;
+            if (typeof onProgress === 'function') {
+                await onProgress({ processed, total: settings.lastPostMessageIds.length });
+            }
         }
     }
+
+    return { total: settings.lastPostMessageIds.length, processed };
 }
 
 async function fetchAuction(auctionId) {
@@ -366,23 +375,29 @@ async function sendOneLine(destination, line) {
     return message?.id ?? null;
 }
 
-async function sendLines(destination, lines) {
-    const messageIds = [];
-    const itemMessageIds = {};
-    for (const line of lines) {
-        const messageId = await sendOneLine(destination, line.text);
-        if (messageId) {
-            messageIds.push(messageId);
-            if (line.auctionItemId) {
-                itemMessageIds[String(line.auctionItemId)] = messageId;
-            }
+function countPlannedAuctionLines(grouped, rarityOrder, typeOrder) {
+    let total = 2; // Auction header + update footer.
+
+    for (const rarity of rarityOrder) {
+        const byType = grouped.get(rarity);
+        if (!byType) continue;
+
+        total += 1; // Rarity section.
+        for (const type of typeOrder) {
+            total += (byType.get(type) ?? []).length;
         }
     }
-    return { messageIds, itemMessageIds };
+
+    return total;
 }
 
-async function postAuctionToChannel({ client, channelId, auctionId }) {
+async function postAuctionToChannel({ client, channelId, auctionId, operationId }) {
     attachRateLimitListener(client);
+    const resolvedOperationId = await resolveOperationId({
+        operationId,
+        action: 'post_auction',
+        channelId,
+    });
     const postState = await fetchAuctionPostState();
     const auction = await fetchAuction(auctionId);
     if (!auction) {
@@ -403,13 +418,7 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
     const messageIds = [];
     const itemMessageIds = {};
 
-    await deletePreviousPosts({ client, settings: postState });
-
     const createdAtUnix = Math.floor(new Date(auction.created_at).getTime() / 1000);
-    const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(auction.created_at);
-    const headerId = await sendOneLine(destination, `**Auction #${String(auction.id).padStart(3, '0')}** - Created: ${createdAtText}`);
-    if (headerId) messageIds.push(headerId);
-
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
     const grouped = new Map();
@@ -423,6 +432,63 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
         byType.get(type).push(row);
     }
 
+    const deleteCount = Array.isArray(postState?.lastPostMessageIds) ? postState.lastPostMessageIds.length : 0;
+    const postCount = countPlannedAuctionLines(grouped, rarityOrder, typeOrder);
+    const totalLines = Math.max(1, deleteCount + postCount);
+    let postedLines = 0;
+    await updateOperationProgress(resolvedOperationId, {
+        totalLines,
+        postedLines,
+        lastLine: `Preparing auction #${String(auction.id).padStart(3, '0')}`,
+    });
+
+    if (deleteCount > 0) {
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: `Deleting old auction messages (0/${deleteCount})`,
+        });
+    }
+
+    const deleteResult = await deletePreviousPosts({
+        client,
+        settings: postState,
+        onProgress: async ({ processed, total }) => {
+            postedLines = Math.min(totalLines, processed);
+            await updateOperationProgress(resolvedOperationId, {
+                totalLines,
+                postedLines,
+                lastLine: `Deleting old auction messages (${processed}/${total})`,
+            });
+        },
+    });
+    if (deleteCount > 0 && postedLines < deleteCount) {
+        postedLines = Math.min(totalLines, deleteCount);
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: `Deleting old auction messages (${deleteResult.processed}/${deleteCount})`,
+        });
+    }
+
+    const sendTrackedLine = async (line, label) => {
+        const messageId = await sendOneLine(destination, line);
+        postedLines = Math.min(totalLines, postedLines + 1);
+        await updateOperationProgress(resolvedOperationId, {
+            totalLines,
+            postedLines,
+            lastLine: label || null,
+        });
+        return messageId;
+    };
+
+    const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(auction.created_at);
+    const headerId = await sendTrackedLine(
+        `**Auction #${String(auction.id).padStart(3, '0')}** - Created: ${createdAtText}`,
+        `Header: Auction #${String(auction.id).padStart(3, '0')}`,
+    );
+    if (headerId) messageIds.push(headerId);
+
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
         if (!byType) continue;
@@ -432,26 +498,29 @@ async function postAuctionToChannel({ client, channelId, auctionId }) {
             if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
 
-        const sectionId = await sendOneLine(destination, `## ${rarityDisplayName(rarity)}`);
+        const sectionId = await sendTrackedLine(`## ${rarityDisplayName(rarity)}`, `${rarityDisplayName(rarity)} section`);
         if (sectionId) messageIds.push(sectionId);
 
-        const lines = [];
-        typeOrder.forEach((type) => {
+        for (const type of typeOrder) {
             const rows = byType.get(type) ?? [];
-            rows.forEach((row) => {
-                lines.push({
-                    auctionItemId: row.auction_item_id,
-                    text: formatAuctionLine(row, auction.currency || 'GP'),
-                });
-            });
-        });
-        const { messageIds: lineMessageIds, itemMessageIds: lineItemMap } = await sendLines(destination, lines);
-        messageIds.push(...lineMessageIds);
-        Object.assign(itemMessageIds, lineItemMap);
+            for (const row of rows) {
+                const messageId = await sendTrackedLine(
+                    formatAuctionLine(row, auction.currency || 'GP'),
+                    row.name || 'Auction item',
+                );
+                if (messageId) {
+                    messageIds.push(messageId);
+                    itemMessageIds[String(row.auction_item_id)] = messageId;
+                }
+            }
+        }
     }
 
     const updateUnix = Math.floor(Date.now() / 1000);
-    const updateId = await sendOneLine(destination, `# :exclamation: Letzte aktuallisierung <t:${updateUnix}:R> :exclamation:`);
+    const updateId = await sendTrackedLine(
+        `# :exclamation: Letzte aktuallisierung <t:${updateUnix}:R> :exclamation:`,
+        'Updated footer',
+    );
     if (updateId) messageIds.push(updateId);
 
     await saveAuctionPostState({

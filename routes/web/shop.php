@@ -1,11 +1,11 @@
 <?php
 
+use App\Http\Controllers\Bot\BotOperationStatusController;
 use App\Http\Controllers\Shop\AddSpellToItemController;
 use App\Http\Controllers\Shop\RefreshShopItemSnapshotController;
 use App\Http\Controllers\Shop\RemoveSpellFromItemController;
 use App\Http\Controllers\Shop\RerollShopItemController;
 use App\Http\Controllers\Shop\ShopController;
-use App\Http\Controllers\Shop\ShopOperationStatusController;
 use App\Http\Controllers\Shop\ShopPostController;
 use App\Http\Controllers\Shop\ShopSettingController;
 use App\Http\Controllers\Shop\ShopUpdatePostController;
@@ -27,8 +27,8 @@ Route::middleware(['auth', 'admin'])
         Route::post('shops/update-post', ShopUpdatePostController::class)
             ->name('shops.update-post');
 
-        Route::get('shops/operations/{shopOperation}', ShopOperationStatusController::class)
-            ->name('shops.operations.show');
+        Route::get('bot-operations/{botOperation}', BotOperationStatusController::class)
+            ->name('bot-operations.show');
 
         Route::patch('shops/settings', ShopSettingController::class)
             ->name('shop-settings.update');

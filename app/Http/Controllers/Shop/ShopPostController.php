@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\PostShopRequest;
-use App\Jobs\ProcessShopOperationJob;
-use App\Models\ShopOperation;
+use App\Jobs\ProcessBotOperationJob;
+use App\Models\BotOperation;
 use Illuminate\Http\JsonResponse;
 
 class ShopPostController extends Controller
@@ -13,19 +13,20 @@ class ShopPostController extends Controller
     public function __invoke(PostShopRequest $request): JsonResponse
     {
         $channelId = $request->validated()['channel_id'] ?? null;
-        $operation = ShopOperation::query()->create([
-            'action' => ShopOperation::ACTION_PUBLISH_DRAFT,
-            'status' => ShopOperation::STATUS_PENDING,
-            'step' => ShopOperation::STATUS_PENDING,
+        $operation = BotOperation::query()->create([
+            'resource' => BotOperation::RESOURCE_SHOP,
+            'action' => BotOperation::ACTION_PUBLISH_DRAFT,
+            'status' => BotOperation::STATUS_PENDING,
+            'step' => BotOperation::STATUS_PENDING,
             'channel_id' => $channelId,
             'user_id' => $request->user()?->id,
         ]);
 
         try {
-            ProcessShopOperationJob::dispatchForOperation($operation);
+            ProcessBotOperationJob::dispatchForOperation($operation);
         } catch (\Throwable $error) {
-            $operation->status = ShopOperation::STATUS_FAILED;
-            $operation->step = ShopOperation::STATUS_FAILED;
+            $operation->status = BotOperation::STATUS_FAILED;
+            $operation->step = BotOperation::STATUS_FAILED;
             $operation->error = 'Queue dispatch failed. Start a queue worker and try again. '.$error->getMessage();
             $operation->finished_at = now();
             $operation->save();
@@ -34,6 +35,8 @@ class ShopPostController extends Controller
                 'error' => 'Shop operation could not be queued.',
                 'operation' => $operation->only([
                     'id',
+                    'resource',
+                    'resource_id',
                     'action',
                     'status',
                     'step',
@@ -47,6 +50,8 @@ class ShopPostController extends Controller
             'status' => 'started',
             'operation' => $operation->only([
                 'id',
+                'resource',
+                'resource_id',
                 'action',
                 'status',
                 'step',

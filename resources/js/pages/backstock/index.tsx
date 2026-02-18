@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
@@ -7,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
-import { BackstockItem, BackstockSettings, DiscordBackupChannel, Item } from '@/types'
+import { BackstockItem, BackstockSettings, BotOperation, DiscordBackupChannel, Item } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
 import { FlaskRound, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useState, JSX } from 'react'
@@ -192,6 +193,7 @@ export default function BackstockIndex({
   const [isPosting, setIsPosting] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
 
   const { data, setData, post, processing } = useForm({
     item_id: items[0]?.id ?? 0,
@@ -302,8 +304,14 @@ export default function BackstockIndex({
         return
       }
 
+      const operation = (payload?.operation ?? null) as BotOperation | null
+      if (!operation?.id) {
+        toast.show('Backstock operation could not be started.', 'error')
+        return
+      }
+
+      setActiveOperation(operation)
       toast.show('Backstock post started.', 'info')
-      router.reload({ only: ['backstockSettings'] })
     } catch {
       toast.show('Backstock could not be posted.', 'error')
     } finally {
@@ -343,6 +351,16 @@ export default function BackstockIndex({
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const operationRunning = !isTerminalBotOperation(activeOperation)
+  const handleOperationCompleted = useCallback(() => {
+    toast.show('Backstock posted to Discord.', 'info')
+    setTimeout(() => {
+      router.reload({ only: ['backstockSettings'] })
+    }, 1200)
+  }, [])
+  const handleOperationFailed = useCallback((operation: BotOperation) => {
+    toast.show(String(operation.error ?? 'Backstock operation failed.'), 'error')
+  }, [])
 
   return (
     <AppLayout>
@@ -408,6 +426,12 @@ export default function BackstockIndex({
               </ModalContent>
             </Modal>
           </div>
+          <BotOperationProgress
+            operation={activeOperation}
+            onOperationChange={setActiveOperation}
+            onCompleted={handleOperationCompleted}
+            onFailed={handleOperationFailed}
+          />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
               <ModalTrigger>
@@ -444,7 +468,7 @@ export default function BackstockIndex({
               size="sm"
               variant="outline"
               onClick={handlePostBackstock}
-              disabled={isPosting || !settings.post_channel_id}
+              disabled={isPosting || operationRunning || !settings.post_channel_id}
               className="gap-2"
             >
               <Send size={16} />

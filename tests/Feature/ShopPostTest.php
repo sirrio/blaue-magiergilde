@@ -1,8 +1,8 @@
 <?php
 
-use App\Jobs\ProcessShopOperationJob;
+use App\Jobs\ProcessBotOperationJob;
+use App\Models\BotOperation;
 use App\Models\Shop;
-use App\Models\ShopOperation;
 use App\Models\ShopSetting;
 use App\Models\User;
 use App\Services\ShopPostService;
@@ -42,7 +42,7 @@ it('lets admins start and complete publish-draft operation with pointer rotation
     $operationId = (int) $response->json('operation.id');
     expect($operationId)->toBeGreaterThan(0);
 
-    ProcessShopOperationJob::dispatchSync($operationId);
+    ProcessBotOperationJob::dispatchSync($operationId);
 
     Http::assertSent(function ($request) use ($draftShop) {
         return $request->url() === 'http://bot.test/shop-post'
@@ -51,9 +51,9 @@ it('lets admins start and complete publish-draft operation with pointer rotation
             && $request['shop_id'] === $draftShop->id;
     });
 
-    $operation = ShopOperation::query()->findOrFail($operationId);
-    expect($operation->status)->toBe(ShopOperation::STATUS_COMPLETED)
-        ->and($operation->step)->toBe(ShopOperation::STATUS_COMPLETED)
+    $operation = BotOperation::query()->findOrFail($operationId);
+    expect($operation->status)->toBe(BotOperation::STATUS_COMPLETED)
+        ->and($operation->step)->toBe(BotOperation::STATUS_COMPLETED)
         ->and($operation->result_shop_id)->toBe($draftShop->id)
         ->and($operation->current_shop_id)->toBe($draftShop->id)
         ->and($operation->draft_shop_id)->not->toBe($draftShop->id);
@@ -100,11 +100,11 @@ it('marks publish operation as failed and does not rotate pointers when bot post
         ->assertAccepted();
 
     $operationId = (int) $response->json('operation.id');
-    ProcessShopOperationJob::dispatchSync($operationId);
+    ProcessBotOperationJob::dispatchSync($operationId);
 
-    $operation = ShopOperation::query()->findOrFail($operationId);
-    expect($operation->status)->toBe(ShopOperation::STATUS_FAILED)
-        ->and($operation->step)->toBe(ShopOperation::STATUS_POSTING_TO_DISCORD)
+    $operation = BotOperation::query()->findOrFail($operationId);
+    expect($operation->status)->toBe(BotOperation::STATUS_FAILED)
+        ->and($operation->step)->toBe(BotOperation::STATUS_POSTING_TO_DISCORD)
         ->and($operation->error)->toContain('failed');
 
     $settings = ShopSetting::current();
@@ -170,13 +170,13 @@ it('replaces stale draft pointers before publish operation runs', function () {
         ->assertAccepted();
 
     $operationId = (int) $response->json('operation.id');
-    ProcessShopOperationJob::dispatchSync($operationId);
+    ProcessBotOperationJob::dispatchSync($operationId);
 
-    $operation = ShopOperation::query()->findOrFail($operationId);
+    $operation = BotOperation::query()->findOrFail($operationId);
     $postedShopId = (int) $operation->result_shop_id;
     expect($postedShopId)->not->toBe($staleDraftShop->id)
         ->and($postedShopId)->not->toBe($currentShop->id)
-        ->and($operation->status)->toBe(ShopOperation::STATUS_COMPLETED);
+        ->and($operation->status)->toBe(BotOperation::STATUS_COMPLETED);
 
     Http::assertSent(function ($request) use ($postedShopId) {
         return $request->url() === 'http://bot.test/shop-post'
@@ -241,10 +241,10 @@ it('recovers from timeout when bot post state confirms draft was posted', functi
         ->assertAccepted();
 
     $operationId = (int) $response->json('operation.id');
-    ProcessShopOperationJob::dispatchSync($operationId);
+    ProcessBotOperationJob::dispatchSync($operationId);
 
-    $operation = ShopOperation::query()->findOrFail($operationId);
-    expect($operation->status)->toBe(ShopOperation::STATUS_COMPLETED)
+    $operation = BotOperation::query()->findOrFail($operationId);
+    expect($operation->status)->toBe(BotOperation::STATUS_COMPLETED)
         ->and($operation->result_shop_id)->toBe($draftShop->id);
 
     $settings = ShopSetting::current();
@@ -256,17 +256,18 @@ it('recovers from timeout when bot post state confirms draft was posted', functi
 
 it('returns shop operation status for polling', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $operation = ShopOperation::query()->create([
-        'action' => ShopOperation::ACTION_PUBLISH_DRAFT,
-        'status' => ShopOperation::STATUS_POSTING_TO_DISCORD,
-        'step' => ShopOperation::STATUS_POSTING_TO_DISCORD,
+    $operation = BotOperation::query()->create([
+        'resource' => BotOperation::RESOURCE_SHOP,
+        'action' => BotOperation::ACTION_PUBLISH_DRAFT,
+        'status' => BotOperation::STATUS_POSTING_TO_DISCORD,
+        'step' => BotOperation::STATUS_POSTING_TO_DISCORD,
         'user_id' => $admin->id,
     ]);
 
     $this->actingAs($admin)
-        ->getJson(route('admin.shops.operations.show', ['shopOperation' => $operation->id]))
+        ->getJson(route('admin.bot-operations.show', ['botOperation' => $operation->id]))
         ->assertOk()
         ->assertJsonPath('operation.id', $operation->id)
-        ->assertJsonPath('operation.action', ShopOperation::ACTION_PUBLISH_DRAFT)
-        ->assertJsonPath('operation.status', ShopOperation::STATUS_POSTING_TO_DISCORD);
+        ->assertJsonPath('operation.action', BotOperation::ACTION_PUBLISH_DRAFT)
+        ->assertJsonPath('operation.status', BotOperation::STATUS_POSTING_TO_DISCORD);
 });

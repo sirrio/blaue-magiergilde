@@ -1,80 +1,10 @@
 const { ChannelType } = require('discord.js');
 const { attachRateLimitListener, waitForDiscordRateLimit } = require('./discordRateLimit');
 const db = require('./db');
+const { resolveOperationId, updateOperationProgress } = require('./operationProgress');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
-}
-
-function normalizeOperationId(value) {
-    const parsed = Number(value || 0);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-        return null;
-    }
-
-    return Math.floor(parsed);
-}
-
-async function updateShopOperationProgress(operationId, progress) {
-    const normalizedOperationId = normalizeOperationId(operationId);
-    if (!normalizedOperationId) {
-        return;
-    }
-
-    const payload = JSON.stringify({
-        total_lines: Number(progress?.totalLines || 0),
-        posted_lines: Number(progress?.postedLines || 0),
-        last_line: progress?.lastLine ? String(progress.lastLine).slice(0, 220) : null,
-    });
-
-    try {
-        const [result] = await db.execute(
-            'UPDATE shop_operations SET meta = ?, updated_at = ? WHERE id = ?',
-            [payload, nowSql(), normalizedOperationId],
-        );
-        if (!result || Number(result.affectedRows || 0) < 1) {
-            console.warn(`[shop-progress] No operation row updated for operation #${normalizedOperationId}.`);
-        }
-    } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        console.warn(`[shop-progress] Failed to update operation #${normalizedOperationId}: ${detail}`);
-    }
-}
-
-async function resolveOperationId({ operationId, action, channelId = null }) {
-    const normalizedOperationId = normalizeOperationId(operationId);
-    if (normalizedOperationId) {
-        return normalizedOperationId;
-    }
-
-    const params = [action];
-    let sql = `
-        SELECT id
-        FROM shop_operations
-        WHERE action = ?
-          AND status IN ('pending', 'posting_to_discord', 'rotating_pointers')
-    `;
-
-    if (channelId) {
-        sql += ' AND channel_id = ?';
-        params.push(String(channelId));
-    }
-
-    sql += ' ORDER BY id DESC LIMIT 1';
-
-    try {
-        const [rows] = await db.execute(sql, params);
-        const fallbackId = normalizeOperationId(rows?.[0]?.id);
-        if (fallbackId) {
-            console.warn(`[shop-progress] Falling back to open operation #${fallbackId} for action ${action}.`);
-            return fallbackId;
-        }
-    } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        console.warn(`[shop-progress] Failed to resolve fallback operation for action ${action}: ${detail}`);
-    }
-
-    return null;
 }
 
 function missingPermissions(permissions, required) {
@@ -486,14 +416,14 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     const postCount = countPlannedShopLines(grouped, rarityOrder);
     const totalLines = Math.max(1, deleteCount + postCount);
     let postedLines = 0;
-    await updateShopOperationProgress(resolvedOperationId, {
+    await updateOperationProgress(resolvedOperationId, {
         totalLines,
         postedLines,
         lastLine: `Preparing shop #${String(shop.id).padStart(3, '0')}`,
     });
 
     if (deleteCount > 0) {
-        await updateShopOperationProgress(resolvedOperationId, {
+        await updateOperationProgress(resolvedOperationId, {
             totalLines,
             postedLines,
             lastLine: `Deleting old shop messages (0/${deleteCount})`,
@@ -505,7 +435,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
         settings: postState,
         onProgress: async ({ processed, total }) => {
             postedLines = Math.min(totalLines, processed);
-            await updateShopOperationProgress(resolvedOperationId, {
+            await updateOperationProgress(resolvedOperationId, {
                 totalLines,
                 postedLines,
                 lastLine: `Deleting old shop messages (${processed}/${total})`,
@@ -514,7 +444,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     });
     if (deleteCount > 0 && postedLines < deleteCount) {
         postedLines = Math.min(totalLines, deleteCount);
-        await updateShopOperationProgress(resolvedOperationId, {
+        await updateOperationProgress(resolvedOperationId, {
             totalLines,
             postedLines,
             lastLine: `Deleting old shop messages (${deleteResult.processed}/${deleteCount})`,
@@ -524,7 +454,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     const sendTrackedLine = async (line, label) => {
         const messageId = await sendOneLine(destination, line);
         postedLines = Math.min(totalLines, postedLines + 1);
-        await updateShopOperationProgress(resolvedOperationId, {
+        await updateOperationProgress(resolvedOperationId, {
             totalLines,
             postedLines,
             lastLine: label || null,
@@ -659,7 +589,7 @@ async function updateShopPost({ client, shopId, operationId }) {
     const updatedItemMessageIds = { ...postState.itemMessageIds };
     const totalLines = items.length;
     let postedLines = 0;
-    await updateShopOperationProgress(resolvedOperationId, {
+    await updateOperationProgress(resolvedOperationId, {
         totalLines,
         postedLines,
         lastLine: `Preparing update for shop #${String(shop.id).padStart(3, '0')}`,
@@ -676,7 +606,7 @@ async function updateShopPost({ client, shopId, operationId }) {
                 updatedItemMessageIds[String(row.shop_item_id)] = newMessageId;
             }
             postedLines += 1;
-            await updateShopOperationProgress(resolvedOperationId, {
+            await updateOperationProgress(resolvedOperationId, {
                 totalLines,
                 postedLines,
                 lastLine: row.name || 'Item',
@@ -697,7 +627,7 @@ async function updateShopPost({ client, shopId, operationId }) {
         }
 
         postedLines += 1;
-        await updateShopOperationProgress(resolvedOperationId, {
+        await updateOperationProgress(resolvedOperationId, {
             totalLines,
             postedLines,
             lastLine: row.name || 'Item',

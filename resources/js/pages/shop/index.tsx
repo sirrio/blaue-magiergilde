@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
 import { List } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
@@ -7,38 +8,13 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
 import { cn } from '@/lib/utils'
-import { DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopOperation, ShopSettings } from '@/types'
+import { BotOperation, DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopSettings } from '@/types'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { Plus, RotateCcw, Send, Settings } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
-  const stepLabels: Record<string, string> = {
-    pending: 'Queued',
-    posting_to_discord: 'Posting to Discord',
-    rotating_pointers: 'Updating Current/Draft',
-    completed: 'Completed',
-  }
-  const stepsByAction: Record<string, string[]> = {
-    publish_draft: ['pending', 'posting_to_discord', 'rotating_pointers', 'completed'],
-    update_current_post: ['pending', 'posting_to_discord', 'completed'],
-  }
-  const progressRangesByAction: Record<string, Record<string, [number, number]>> = {
-    publish_draft: {
-      pending: [0, 10],
-      posting_to_discord: [10, 90],
-      rotating_pointers: [90, 98],
-      completed: [100, 100],
-    },
-    update_current_post: {
-      pending: [0, 15],
-      posting_to_discord: [15, 95],
-      completed: [100, 100],
-    },
-  }
-  const isTerminalOperation = (operation: ShopOperation | null) =>
-    operation ? operation.status === 'completed' || operation.status === 'failed' : true
   const resolveFallbackShop = useCallback(
     (availableShops: Shop[], preferredShopId?: number | null): Shop | null => {
       if (!availableShops.length) return null
@@ -57,7 +33,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const [isUpdatingPost, setIsUpdatingPost] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingSchedule, setIsSavingSchedule] = useState(false)
-  const [activeOperation, setActiveOperation] = useState<ShopOperation | null>(null)
+  const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
   const [settings, setSettings] = useState<ShopSettings>(shopSettings ?? {})
   const [autoPostEnabled, setAutoPostEnabled] = useState(Boolean(shopSettings?.auto_post_enabled))
   const [autoPostWeekday, setAutoPostWeekday] = useState<number>(shopSettings?.auto_post_weekday ?? 0)
@@ -75,109 +51,6 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     setAutoPostWeekday(shopSettings?.auto_post_weekday ?? 0)
     setAutoPostTime(shopSettings?.auto_post_time ?? '09:00')
   }, [shopSettings])
-
-  useEffect(() => {
-    if (!activeOperation || isTerminalOperation(activeOperation)) {
-      return
-    }
-
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-    let reloadTimer: ReturnType<typeof setTimeout> | null = null
-
-    const pollOperation = async () => {
-      let nextPollDelayMs = 900
-
-      try {
-        const response = await fetch(route('admin.shops.operations.show', activeOperation.id), {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            'Cache-Control': 'no-cache',
-            Pragma: 'no-cache',
-          },
-          credentials: 'same-origin',
-          cache: 'no-store',
-        })
-
-        const payload = await response.json().catch(() => ({}))
-        if (!response.ok) {
-          if (!cancelled) {
-            setActiveOperation((current) => (current ? { ...current, status: 'failed', error: String(payload?.error ?? 'Operation polling failed.') } : null))
-            toast.show(String(payload?.error ?? 'Could not read operation status.'), 'error')
-          }
-
-          return
-        }
-
-        const nextOperation = (payload?.operation ?? null) as ShopOperation | null
-        if (!nextOperation || cancelled) {
-          return
-        }
-
-        setActiveOperation(nextOperation)
-        nextPollDelayMs = nextOperation.status === 'posting_to_discord' ? 180 : 800
-
-        if (nextOperation.status === 'completed') {
-          if (nextOperation.action === 'publish_draft') {
-            const newCurrentShopId = Number(nextOperation.current_shop_id || nextOperation.result_shop_id || 0) || null
-            const newDraftShopId = Number(nextOperation.draft_shop_id || 0) || null
-            setSettings((current) => ({
-              ...current,
-              current_shop_id: newCurrentShopId ?? current.current_shop_id ?? null,
-              draft_shop_id: newDraftShopId ?? current.draft_shop_id ?? null,
-            }))
-            toast.show(
-              `Published draft #${nextOperation.result_shop_id ?? 'n/a'}. Current: #${newCurrentShopId ?? 'n/a'}, Draft: #${newDraftShopId ?? 'n/a'}.`,
-              'info',
-            )
-            if (!cancelled) {
-              reloadTimer = setTimeout(() => {
-                router.reload({ only: ['shops', 'shopSettings'] })
-              }, 1500)
-            }
-          } else {
-            toast.show('Current shop post updated.', 'info')
-            if (!cancelled) {
-              reloadTimer = setTimeout(() => {
-                router.reload({ only: ['shopSettings'] })
-              }, 1500)
-            }
-          }
-
-          return
-        }
-
-        if (nextOperation.status === 'failed') {
-          toast.show(String(nextOperation.error ?? 'Shop operation failed.'), 'error')
-          return
-        }
-      } catch {
-        if (!cancelled) {
-          setActiveOperation((current) => (current ? { ...current, status: 'failed', error: 'Could not read operation status.' } : null))
-          toast.show('Could not read operation status.', 'error')
-        }
-
-        return
-      }
-
-      if (!cancelled) {
-        timer = setTimeout(pollOperation, nextPollDelayMs)
-      }
-    }
-
-    timer = setTimeout(pollOperation, 180)
-
-    return () => {
-      cancelled = true
-      if (timer) {
-        clearTimeout(timer)
-      }
-      if (reloadTimer) {
-        clearTimeout(reloadTimer)
-      }
-    }
-  }, [activeOperation])
 
   const formatShopCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
 
@@ -358,7 +231,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         return
       }
 
-      const operation = (payload?.operation ?? null) as ShopOperation | null
+      const operation = (payload?.operation ?? null) as BotOperation | null
       if (!operation?.id) {
         toast.show('Shop operation could not be started.', 'error')
         return
@@ -412,7 +285,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         return
       }
 
-      const operation = (payload?.operation ?? null) as ShopOperation | null
+      const operation = (payload?.operation ?? null) as BotOperation | null
       if (!operation?.id) {
         toast.show('Shop operation could not be started.', 'error')
         return
@@ -437,60 +310,35 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const hasPostDestination = Boolean(settings.post_channel_id)
   const currentShopId = settings.current_shop_id ?? null
   const draftShopId = settings.draft_shop_id ?? null
-  const operationRunning = !isTerminalOperation(activeOperation)
-  const operationSteps = activeOperation ? (stepsByAction[activeOperation.action] ?? ['pending', 'completed']) : []
-  const operationStep = activeOperation
-    ? activeOperation.status === 'failed'
-      ? (activeOperation.step ?? 'pending')
-      : (activeOperation.step ?? activeOperation.status)
-    : null
-  const operationStepIndex = operationStep ? operationSteps.indexOf(operationStep) : -1
-  const resolvedOperationStepIndex = operationStepIndex < 0 ? 0 : operationStepIndex
-  const postedLines = Number(activeOperation?.meta?.posted_lines ?? 0)
-  const totalLines = Number(activeOperation?.meta?.total_lines ?? 0)
-  const isPostingToDiscord = activeOperation?.status === 'posting_to_discord'
-  const hasLineProgress = Boolean(isPostingToDiscord && totalLines > 0)
-  const actionProgressRanges = activeOperation ? (progressRangesByAction[activeOperation.action] ?? {}) : {}
-  const activeRange = operationStep ? (actionProgressRanges[operationStep] ?? null) : null
-  const operationProgress = activeOperation
-    ? activeOperation.status === 'completed'
-      ? 100
-      : (() => {
-          if (isPostingToDiscord && !hasLineProgress) {
-            return 28
-          }
-
-          const stepCount = Math.max(1, operationSteps.length)
-          const fallbackStart = (resolvedOperationStepIndex / stepCount) * 100
-          const fallbackEnd = ((resolvedOperationStepIndex + 1) / stepCount) * 100
-          const stepStart = activeRange ? activeRange[0] : fallbackStart
-          const stepEnd = activeRange ? activeRange[1] : fallbackEnd
-
-          if (hasLineProgress) {
-            const ratio = Math.max(0, Math.min(1, postedLines / totalLines))
-            return Math.round(stepStart + (stepEnd - stepStart) * ratio)
-          }
-
-          return Math.round(stepEnd)
-        })()
-    : 0
-  const operationPendingTooLong = (() => {
-    if (!activeOperation || activeOperation.status !== 'pending') {
-      return false
-    }
-
-    if (!activeOperation.created_at) {
-      return false
-    }
-
-    const createdAtMs = new Date(activeOperation.created_at).getTime()
-    if (!Number.isFinite(createdAtMs)) {
-      return false
-    }
-
-    return Date.now() - createdAtMs > 10_000
-  })()
+  const operationRunning = !isTerminalBotOperation(activeOperation)
   const canUpdatePost = Boolean(settings.current_shop_id && settings.last_post_channel_id)
+  const handleOperationCompleted = useCallback((operation: BotOperation) => {
+    if (operation.action === 'publish_draft') {
+      const newCurrentShopId = Number(operation.current_shop_id || operation.result_shop_id || 0) || null
+      const newDraftShopId = Number(operation.draft_shop_id || 0) || null
+      setSettings((current) => ({
+        ...current,
+        current_shop_id: newCurrentShopId ?? current.current_shop_id ?? null,
+        draft_shop_id: newDraftShopId ?? current.draft_shop_id ?? null,
+      }))
+      toast.show(
+        `Published draft #${operation.result_shop_id ?? 'n/a'}. Current: #${newCurrentShopId ?? 'n/a'}, Draft: #${newDraftShopId ?? 'n/a'}.`,
+        'info',
+      )
+      setTimeout(() => {
+        router.reload({ only: ['shops', 'shopSettings'] })
+      }, 1500)
+      return
+    }
+
+    toast.show('Current shop post updated.', 'info')
+    setTimeout(() => {
+      router.reload({ only: ['shopSettings'] })
+    }, 1500)
+  }, [])
+  const handleOperationFailed = useCallback((operation: BotOperation) => {
+    toast.show(String(operation.error ?? 'Shop operation failed.'), 'error')
+  }, [])
 
   const weekdayOptions = [
     { value: 0, label: 'Sunday' },
@@ -630,91 +478,12 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 </ModalContent>
               </Modal>
             </div>
-            {activeOperation ? (
-              <div className="mt-3 rounded-box border border-base-200 bg-base-50/40 p-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
-                  <span className="font-semibold">Bot action</span>
-                  <span className="rounded-full border border-base-200 px-2 py-0.5">
-                    #{String(activeOperation.id).padStart(3, '0')}
-                  </span>
-                  <span className="rounded-full border border-base-200 px-2 py-0.5">
-                    {activeOperation.action === 'publish_draft' ? 'Publish draft' : 'Update current post'}
-                  </span>
-                  <span
-                    className={cn(
-                      'rounded-full border px-2 py-0.5 capitalize',
-                      activeOperation.status === 'completed'
-                        ? 'border-success/40 text-success'
-                        : activeOperation.status === 'failed'
-                          ? 'border-error/40 text-error'
-                          : 'border-info/40 text-info',
-                    )}
-                  >
-                    {activeOperation.status.replaceAll('_', ' ')}
-                  </span>
-                </div>
-                <div className="mt-2">
-                  <div className="mb-1 flex items-center justify-between text-[11px] text-base-content/70">
-                    <span>
-                      {stepLabels[operationStep ?? 'pending'] ?? String(operationStep ?? 'pending').replaceAll('_', ' ')}
-                      {hasLineProgress ? ` (${postedLines}/${totalLines})` : ''}
-                    </span>
-                    <span>{operationProgress}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-base-200">
-                    <div
-                      className={cn(
-                        'h-full transition-all duration-300',
-                        isPostingToDiscord && !hasLineProgress ? 'animate-pulse' : '',
-                        activeOperation.status === 'failed' ? 'bg-error' : activeOperation.status === 'completed' ? 'bg-success' : 'bg-info',
-                      )}
-                      style={{ width: `${operationProgress}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {operationSteps.map((step, index) => {
-                    const isCompleted = activeOperation.status === 'completed' ? index <= resolvedOperationStepIndex : index < resolvedOperationStepIndex
-                    const isCurrent = activeOperation.status !== 'completed' && activeOperation.status !== 'failed' && index === resolvedOperationStepIndex
-
-                    return (
-                      <span
-                        key={`${activeOperation.id}-${step}`}
-                        className={cn(
-                          'rounded-full border px-2 py-1 text-[11px]',
-                          isCompleted
-                            ? 'border-success/40 bg-success/10 text-success'
-                            : isCurrent
-                              ? 'border-info/40 bg-info/10 text-info'
-                              : 'border-base-200 text-base-content/60',
-                        )}
-                      >
-                        {stepLabels[step] ?? step.replaceAll('_', ' ')}
-                      </span>
-                    )
-                  })}
-                  {activeOperation.status === 'failed' ? (
-                    <span className="rounded-full border border-error/40 bg-error/10 px-2 py-1 text-[11px] text-error">
-                      Failed
-                    </span>
-                  ) : null}
-                </div>
-                {activeOperation.error ? (
-                  <p className="mt-2 text-xs text-error">{activeOperation.error}</p>
-                ) : null}
-                {hasLineProgress && activeOperation?.meta?.last_line ? (
-                  <p className="mt-2 text-xs text-base-content/70">Last line: {activeOperation.meta.last_line}</p>
-                ) : null}
-                {isPostingToDiscord && !hasLineProgress ? (
-                  <p className="mt-2 text-xs text-base-content/70">Waiting for live line progress from bot...</p>
-                ) : null}
-                {operationPendingTooLong ? (
-                  <p className="mt-2 text-xs text-warning">
-                    Operation is still queued. If this persists, start the queue worker (`php artisan queue:work`).
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+            <BotOperationProgress
+              operation={activeOperation}
+              onOperationChange={setActiveOperation}
+              onCompleted={handleOperationCompleted}
+              onFailed={handleOperationFailed}
+            />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Button
                 size="sm"

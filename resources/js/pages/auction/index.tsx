@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
@@ -8,7 +9,7 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, DiscordBackupChannel, Item, PageProps } from '@/types'
+import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, BotOperation, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { CheckCircle2, EyeOff, FlaskRound, History, Mic, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash, XCircle } from 'lucide-react'
@@ -994,6 +995,7 @@ export default function Index({
   const [isPostingAuction, setIsPostingAuction] = useState(false)
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingVoiceChannel, setIsSavingVoiceChannel] = useState(false)
+  const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
   const [manualCooldownRemaining, setManualCooldownRemaining] = useState(0)
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
@@ -1136,6 +1138,13 @@ export default function Index({
         return
       }
 
+      const operation = (payload?.operation ?? null) as BotOperation | null
+      if (!operation?.id) {
+        toast.show('Auction operation could not be started.', 'error')
+        return
+      }
+
+      setActiveOperation(operation)
       toast.show('Auction post started.', 'info')
     } catch {
       toast.show('Auction could not be posted.', 'error')
@@ -1152,6 +1161,13 @@ export default function Index({
     : null
   const destinationText = `Destination: ${destinationKind ? `${destinationKind} ${destinationLabel}` : destinationLabel}`
   const hasPostDestination = Boolean(settings.post_channel_id)
+  const operationRunning = !isTerminalBotOperation(activeOperation)
+  const handleOperationCompleted = useCallback(() => {
+    toast.show('Auction posted to Discord.', 'info')
+  }, [])
+  const handleOperationFailed = useCallback((operation: BotOperation) => {
+    toast.show(String(operation.error ?? 'Auction operation failed.'), 'error')
+  }, [])
   const handleCloseAuction = () => {
     if (!selectedAuction || selectedAuction.status === 'closed') return
     const confirmed = window.confirm(
@@ -1431,6 +1447,12 @@ export default function Index({
                   </Modal>
                 ) : null}
               </div>
+              <BotOperationProgress
+                operation={activeOperation}
+                onOperationChange={setActiveOperation}
+                onCompleted={handleOperationCompleted}
+                onFailed={handleOperationFailed}
+              />
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {selectedAuction ? (
                   <AddAuctionItemModal auction={selectedAuction} items={items} />
@@ -1440,7 +1462,7 @@ export default function Index({
                     size="sm"
                     variant="outline"
                     onClick={handlePostAuction}
-                    disabled={!settings.post_channel_id || isPostingAuction}
+                    disabled={!settings.post_channel_id || isPostingAuction || operationRunning}
                     className="gap-2"
                   >
                     <Send size={16} />

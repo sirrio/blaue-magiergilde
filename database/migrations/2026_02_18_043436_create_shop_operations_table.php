@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('shop_operations', function (Blueprint $table) {
+        Schema::create('bot_operations', function (Blueprint $table) {
             $table->id();
             $table->string('action', 64);
             $table->string('status', 64)->index();
@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamp('finished_at')->nullable();
             $table->timestamps();
 
-            $table->index(['action', 'created_at'], 'shop_operations_action_created_at_index');
+            $table->index(['action', 'created_at'], 'bot_operations_action_created_at_index');
         });
     }
 
@@ -37,6 +37,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('bot_operations');
         Schema::dropIfExists('shop_operations');
     }
 };

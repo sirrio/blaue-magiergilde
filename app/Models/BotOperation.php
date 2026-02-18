@@ -5,11 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ShopOperation extends Model
+class BotOperation extends Model
 {
+    protected $table = 'bot_operations';
+
+    public const RESOURCE_SHOP = 'shop';
+
+    public const RESOURCE_AUCTION = 'auction';
+
+    public const RESOURCE_BACKSTOCK = 'backstock';
+
     public const ACTION_PUBLISH_DRAFT = 'publish_draft';
 
     public const ACTION_UPDATE_CURRENT_POST = 'update_current_post';
+
+    public const ACTION_POST_AUCTION = 'post_auction';
+
+    public const ACTION_POST_BACKSTOCK = 'post_backstock';
 
     public const STATUS_PENDING = 'pending';
 
@@ -22,6 +34,8 @@ class ShopOperation extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
+        'resource',
+        'resource_id',
         'action',
         'status',
         'step',
@@ -38,6 +52,7 @@ class ShopOperation extends Model
     ];
 
     protected $casts = [
+        'resource_id' => 'integer',
         'meta' => 'array',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',

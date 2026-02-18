@@ -47,7 +47,7 @@ class ShopPostService
             ];
         }
 
-        $timeout = max(1, (int) config('services.bot.http_timeout', 60));
+        $timeout = max(120, (int) config('services.bot.http_timeout', 60));
 
         try {
             $response = Http::timeout($timeout)
