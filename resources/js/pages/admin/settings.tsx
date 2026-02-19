@@ -49,6 +49,9 @@ export default function Settings({
     character_approval_channel_id: discordBotSettings.character_approval_channel_id ?? '',
     character_approval_channel_name: discordBotSettings.character_approval_channel_name ?? '',
     character_approval_channel_guild_id: discordBotSettings.character_approval_channel_guild_id ?? '',
+    support_ticket_channel_id: discordBotSettings.support_ticket_channel_id ?? '',
+    support_ticket_channel_name: discordBotSettings.support_ticket_channel_name ?? '',
+    support_ticket_channel_guild_id: discordBotSettings.support_ticket_channel_guild_id ?? '',
   })
   const createSourceForm = useForm({
     name: '',
@@ -446,11 +449,11 @@ export default function Settings({
     ownerIdsForm.patch(route('admin.settings.bot.owners.update'), {
       preserveScroll: true,
       onSuccess: () => {
-        toast.show('Bot owner list saved.', 'info')
+        toast.show('Bot settings saved.', 'info')
         void fetchOwnerStatus()
       },
       onError: () => {
-        toast.show('Bot owner list could not be saved.', 'error')
+        toast.show('Bot settings could not be saved.', 'error')
       },
     })
   }
@@ -624,13 +627,26 @@ export default function Settings({
     ownerIdsForm.data.character_approval_channel_name,
   ])
 
-  type ApprovalChannelSelection =
+  const supportTicketChannelLabel = useMemo(() => {
+    if (ownerIdsForm.data.support_ticket_channel_name) {
+      return ownerIdsForm.data.support_ticket_channel_name
+    }
+    if (ownerIdsForm.data.support_ticket_channel_id) {
+      return ownerIdsForm.data.support_ticket_channel_id
+    }
+    return 'Not configured'
+  }, [
+    ownerIdsForm.data.support_ticket_channel_id,
+    ownerIdsForm.data.support_ticket_channel_name,
+  ])
+
+  type BotChannelSelection =
     | DiscordBackupChannel
     | null
     | { guild_id: string; channel_ids: string[] }[]
 
   const handleApprovalChannelSelect = useCallback(
-    (selection: ApprovalChannelSelection) => {
+    (selection: BotChannelSelection) => {
       if (!selection || Array.isArray(selection)) return
       ownerIdsForm.setData('character_approval_channel_id', selection.id)
       ownerIdsForm.setData('character_approval_channel_name', selection.name)
@@ -643,6 +659,22 @@ export default function Settings({
     ownerIdsForm.setData('character_approval_channel_id', '')
     ownerIdsForm.setData('character_approval_channel_name', '')
     ownerIdsForm.setData('character_approval_channel_guild_id', '')
+  }, [ownerIdsForm])
+
+  const handleSupportTicketChannelSelect = useCallback(
+    (selection: BotChannelSelection) => {
+      if (!selection || Array.isArray(selection)) return
+      ownerIdsForm.setData('support_ticket_channel_id', selection.id)
+      ownerIdsForm.setData('support_ticket_channel_name', selection.name)
+      ownerIdsForm.setData('support_ticket_channel_guild_id', selection.guild_id)
+    },
+    [ownerIdsForm],
+  )
+
+  const handleSupportTicketChannelClear = useCallback(() => {
+    ownerIdsForm.setData('support_ticket_channel_id', '')
+    ownerIdsForm.setData('support_ticket_channel_name', '')
+    ownerIdsForm.setData('support_ticket_channel_guild_id', '')
   }, [ownerIdsForm])
 
   return (
@@ -1054,6 +1086,42 @@ export default function Settings({
             {ownerIdsForm.errors.character_approval_channel_id ? (
               <span className="text-error">{ownerIdsForm.errors.character_approval_channel_id}</span>
             ) : null}
+          </div>
+          <div className="mt-4 border-t border-base-200 pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Support tickets</h3>
+                <p className="text-xs text-base-content/60">
+                  User DMs to the bot create ticket threads in this channel.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <DiscordChannelPickerModal
+                  title="Support ticket channel"
+                  description="Select a text channel where support ticket threads should be created."
+                  confirmLabel="Use channel"
+                  channelsRouteName="admin.settings.backup.channels.refresh"
+                  mode="single"
+                  allowedChannelTypes={['GuildText', 'GuildAnnouncement']}
+                  onConfirm={handleSupportTicketChannelSelect}
+                >
+                  Select channel
+                </DiscordChannelPickerModal>
+                {ownerIdsForm.data.support_ticket_channel_id ? (
+                  <Button size="sm" variant="ghost" onClick={handleSupportTicketChannelClear}>
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
+              <span>
+                Current: <span className="font-semibold text-base-content">{supportTicketChannelLabel}</span>
+              </span>
+              {ownerIdsForm.errors.support_ticket_channel_id ? (
+                <span className="text-error">{ownerIdsForm.errors.support_ticket_channel_id}</span>
+              ) : null}
+            </div>
           </div>
           <div className="mt-3 flex justify-end">
             <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>

@@ -5,11 +5,13 @@ const appJoin = require('../interactions/appJoin');
 const characterApproval = require('../interactions/characterApproval');
 const characters = require('../interactions/characters');
 const newGame = require('../interactions/newGame');
+const { handleSupportTicketInteraction } = require('../supportTickets');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
         try {
+            if (await handleSupportTicketInteraction(interaction)) return;
             if (await appJoin.handle(interaction)) return;
             if (await characterApproval.handle(interaction)) return;
             if (await characters.handle(interaction)) return;

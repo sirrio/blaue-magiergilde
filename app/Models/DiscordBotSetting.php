@@ -16,6 +16,9 @@ class DiscordBotSetting extends Model
         'games_channel_guild_id',
         'games_scan_years',
         'games_scan_interval_minutes',
+        'support_ticket_channel_id',
+        'support_ticket_channel_name',
+        'support_ticket_channel_guild_id',
     ];
 
     protected $casts = [

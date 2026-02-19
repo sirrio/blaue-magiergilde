@@ -23,6 +23,7 @@ class BackupController extends Controller
         $user = request()->user();
 
         abort_unless($user && $user->is_admin, 403);
+        $botSettings = DiscordBotSetting::current();
 
         return Inertia::render('admin/settings', [
             'discordBackup' => [
@@ -60,10 +61,13 @@ class BackupController extends Controller
                 })(),
             ],
             'discordBotSettings' => [
-                'owner_ids' => DiscordBotSetting::current()->owner_ids ?? [],
-                'character_approval_channel_id' => DiscordBotSetting::current()->character_approval_channel_id,
-                'character_approval_channel_name' => DiscordBotSetting::current()->character_approval_channel_name,
-                'character_approval_channel_guild_id' => DiscordBotSetting::current()->character_approval_channel_guild_id,
+                'owner_ids' => $botSettings->owner_ids ?? [],
+                'character_approval_channel_id' => $botSettings->character_approval_channel_id,
+                'character_approval_channel_name' => $botSettings->character_approval_channel_name,
+                'character_approval_channel_guild_id' => $botSettings->character_approval_channel_guild_id,
+                'support_ticket_channel_id' => $botSettings->support_ticket_channel_id,
+                'support_ticket_channel_name' => $botSettings->support_ticket_channel_name,
+                'support_ticket_channel_guild_id' => $botSettings->support_ticket_channel_guild_id,
             ],
             'sources' => Source::query()
                 ->orderBy('shortcode')

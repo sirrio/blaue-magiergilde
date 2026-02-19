@@ -102,6 +102,21 @@ class DiscordBotSettingsController extends Controller
             $updates['games_scan_interval_minutes'] = $minutes !== null ? (int) $minutes : null;
         }
 
+        if (array_key_exists('support_ticket_channel_id', $validated)) {
+            $channelId = trim((string) ($validated['support_ticket_channel_id'] ?? ''));
+            $updates['support_ticket_channel_id'] = $channelId !== '' ? $channelId : null;
+        }
+
+        if (array_key_exists('support_ticket_channel_name', $validated)) {
+            $channelName = trim((string) ($validated['support_ticket_channel_name'] ?? ''));
+            $updates['support_ticket_channel_name'] = $channelName !== '' ? $channelName : null;
+        }
+
+        if (array_key_exists('support_ticket_channel_guild_id', $validated)) {
+            $guildId = trim((string) ($validated['support_ticket_channel_guild_id'] ?? ''));
+            $updates['support_ticket_channel_guild_id'] = $guildId !== '' ? $guildId : null;
+        }
+
         if ($updates !== []) {
             DiscordBotSetting::current()->update($updates);
         }
