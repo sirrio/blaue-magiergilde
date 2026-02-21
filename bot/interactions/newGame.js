@@ -11,6 +11,7 @@ const { attachRateLimitListener, waitForDiscordRateLimit } = require('../discord
 const { formatLocalIsoDate, formatTimeHHMM } = require('../dateUtils');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
+const { buildErrorEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 const { pendingGames } = require('../state');
 const { isThreadChannel, threadRestrictionMessage } = require('./newGameHelpers');
 
@@ -25,7 +26,11 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await updateManageMessage(interaction, { content: 'No data found.', components: [] });
+            await updateManageMessage(interaction, {
+                content: '',
+                embeds: [buildErrorEmbed('No data found')],
+                components: [],
+            });
             return true;
         }
 
@@ -57,7 +62,11 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await updateManageMessage(interaction, { content: 'No data found.', components: [] });
+            await updateManageMessage(interaction, {
+                content: '',
+                embeds: [buildErrorEmbed('No data found')],
+                components: [],
+            });
             return true;
         }
 
@@ -107,14 +116,18 @@ async function handle(interaction) {
         const data = pendingGames.get(id);
 
         if (!data) {
-            await updateManageMessage(interaction, { content: 'No data found.', components: [] });
+            await updateManageMessage(interaction, {
+                content: '',
+                embeds: [buildErrorEmbed('No data found')],
+                components: [],
+            });
             return true;
         }
 
         if (isThreadChannel(interaction.channel)) {
             pendingGames.delete(id);
             await interaction.reply({
-                content: threadRestrictionMessage(),
+                embeds: [buildWarningEmbed('Cannot create from thread', threadRestrictionMessage())],
                 flags: MessageFlags.Ephemeral,
             });
             return true;
@@ -123,7 +136,8 @@ async function handle(interaction) {
         if (!interaction.channel?.threads) {
             pendingGames.delete(id);
             await updateManageMessage(interaction, {
-                content: 'Announcements can only be created in server text or announcement channels.',
+                content: '',
+                embeds: [buildWarningEmbed('Unsupported channel', 'Announcements can only be created in server text or announcement channels.')],
                 components: [],
             });
             return true;
@@ -166,7 +180,11 @@ async function handle(interaction) {
             await data.commandInteraction.deleteReply().catch(() => undefined);
         }
 
-        await updateManageMessage(interaction, { content: 'Announcement created.', components: [] });
+        await updateManageMessage(interaction, {
+            content: '',
+            embeds: [buildSuccessEmbed('Announcement created')],
+            components: [],
+        });
         return true;
     }
 

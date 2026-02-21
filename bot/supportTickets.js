@@ -16,6 +16,12 @@ const STATUS_META = {
     pending_user: { label: 'Pending user', emoji: '🔵', color: 0x3b82f6 },
     closed: { label: 'Closed', emoji: '⚫', color: 0x6b7280 },
 };
+const NOTICE_COLORS = {
+    info: 0x4f46e5,
+    success: 0x22c55e,
+    warning: 0xf59e0b,
+    error: 0xef4444,
+};
 
 let cachedSupportTicketChannelId = '';
 let settingsLoadedAt = 0;
@@ -301,12 +307,38 @@ function markTicketUpdated(ticket) {
     ticket.updated_at = new Date().toISOString();
 }
 
-function supportDmNotice(title, details = '') {
-    const cleanTitle = normalizeWhitespace(title) || 'Support Ticket';
+function detectNoticeKind(details) {
     const cleanDetails = String(details || '').trim();
+    if (cleanDetails.startsWith('❌') || cleanDetails.startsWith('⛔')) {
+        return 'error';
+    }
+    if (cleanDetails.startsWith('⚠')) {
+        return 'warning';
+    }
+    if (cleanDetails.startsWith('✅')) {
+        return 'success';
+    }
+
+    return 'info';
+}
+
+function withErrorPrefix(title) {
+    const cleanTitle = normalizeWhitespace(title) || 'Support Ticket';
+    if (cleanTitle.startsWith('⚠') || cleanTitle.startsWith('❌') || cleanTitle.startsWith('⛔')) {
+        return cleanTitle;
+    }
+
+    return `⚠️ ${cleanTitle}`;
+}
+
+function supportDmNotice(title, details = '', kind = null) {
+    const cleanDetails = String(details || '').trim();
+    const noticeKind = kind || detectNoticeKind(cleanDetails);
+    const baseTitle = normalizeWhitespace(title) || 'Support Ticket';
+    const finalTitle = noticeKind === 'error' ? withErrorPrefix(baseTitle) : baseTitle;
     const embed = new EmbedBuilder()
-        .setColor(0x4f46e5)
-        .setTitle(cleanTitle)
+        .setColor(NOTICE_COLORS[noticeKind] || NOTICE_COLORS.info)
+        .setTitle(finalTitle)
         .setTimestamp(new Date());
 
     if (cleanDetails !== '') {
@@ -318,7 +350,7 @@ function supportDmNotice(title, details = '') {
 
 async function sendThreadAck(channel, content) {
     await channel.send({
-        embeds: [supportDmNotice('Ticket action', content)],
+        embeds: [supportDmNotice('Ticket action', content, detectNoticeKind(content))],
     }).catch(() => null);
 }
 
@@ -329,7 +361,8 @@ async function sendTemporaryMessage(channel, content) {
     } else if (content && typeof content === 'object' && !Array.isArray(content)) {
         payload = content;
     } else {
-        payload = { embeds: [supportDmNotice('Support Ticket', String(content || ''))] };
+        const text = String(content || '');
+        payload = { embeds: [supportDmNotice('Support Ticket', text, detectNoticeKind(text))] };
     }
 
     return channel.send(payload).catch(() => null);
@@ -964,7 +997,7 @@ async function replyInteractionNotice(interaction, content) {
     }
 
     const payload = {
-        embeds: [supportDmNotice('Ticket action', content)],
+        embeds: [supportDmNotice('Ticket action', content, detectNoticeKind(content))],
     };
     if (interaction.deferred || interaction.replied) {
         await interaction.followUp(payload).catch(() => undefined);

@@ -1,5 +1,6 @@
 const { createUserForDiscord } = require('../appDb');
 const { buildJoinConfirmButtons, notLinkedContent } = require('../linkingUi');
+const { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
@@ -15,17 +16,22 @@ async function handle(interaction) {
     const [action, ownerDiscordId] = interaction.customId.split('_');
 
     if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-        await updateManageMessage(interaction, { content: 'You cannot perform this action.', components: [] });
+        await updateManageMessage(interaction, {
+            content: '',
+            embeds: [buildErrorEmbed('Action denied', 'You cannot perform this action.')],
+            components: [],
+        });
         return true;
     }
 
     if (action === 'appLinkInfo') {
         await interaction.update({
-            content: [
+            content: '',
+            embeds: [buildInfoEmbed('Connect existing app account', [
                 notLinkedContent(),
                 '',
                 'If you already use the app: please connect Discord in your profile (Connect Discord).',
-            ].join('\n'),
+            ].join('\n'))],
             components: [],
         });
         return true;
@@ -33,20 +39,25 @@ async function handle(interaction) {
 
     if (action === 'appJoinStart') {
         await interaction.update({
-            content: [
+            content: '',
+            embeds: [buildWarningEmbed('Create a new app account?', [
                 '**Create a new app account?**',
                 '',
                 'This creates a new user account linked to your Discord ID.',
                 '',
                 '**Do not do this** if you already have an app account (otherwise you will end up with two accounts).',
-            ].join('\n'),
+            ].join('\n'))],
             components: [buildJoinConfirmButtons(ownerDiscordId)],
         });
         return true;
     }
 
     if (action === 'appJoinCancel') {
-        await interaction.update({ content: 'Canceled.', components: [] });
+        await interaction.update({
+            content: '',
+            embeds: [buildInfoEmbed('Canceled')],
+            components: [],
+        });
         return true;
     }
 
@@ -54,20 +65,31 @@ async function handle(interaction) {
         try {
             const result = await createUserForDiscord(interaction.user);
             await interaction.update({
-                content: result.created
-                    ? 'Account created and linked to Discord. You can run the command again now.'
-                    : 'Your Discord is already linked to an account. You can run the command again now.',
+                content: '',
+                embeds: [
+                    result.created
+                        ? buildSuccessEmbed('Account created', 'Account created and linked to Discord. You can run the command again now.')
+                        : buildInfoEmbed('Already linked', 'Your Discord is already linked to an account. You can run the command again now.'),
+                ],
                 components: [],
             });
         } catch (error) {
              
             console.error(error);
-            await interaction.update({ content: `Failed to create: ${error.message}`, components: [] });
+            await interaction.update({
+                content: '',
+                embeds: [buildErrorEmbed('Create failed', `Failed to create: ${error.message}`)],
+                components: [],
+            });
         }
         return true;
     }
 
-    await updateManageMessage(interaction, { content: 'Unknown action.', components: [] });
+    await updateManageMessage(interaction, {
+        content: '',
+        embeds: [buildErrorEmbed('Unknown action')],
+        components: [],
+    });
     return true;
 }
 
