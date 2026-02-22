@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Dices, FlaskRound, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Send, Shield, Store, Sword, Trash } from 'lucide-react'
+import { Copy, Dices, FlaskRound, MessageSquarePlus, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Send, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -345,16 +345,191 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   )
 }
 
+const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source[] }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { data, setData, reset } = useForm({
+    name: item.name ?? '',
+    url: item.url ?? '',
+    cost: item.cost ?? '',
+    rarity: item.rarity ?? 'common',
+    type: item.type ?? 'item',
+    source_id: item.source_id ?? '',
+    source_url: '',
+    notes: '',
+  })
+
+  useEffect(() => {
+    if (!isOpen) return
+    reset()
+    setData('name', item.name ?? '')
+    setData('url', item.url ?? '')
+    setData('cost', item.cost ?? '')
+    setData('rarity', item.rarity ?? 'common')
+    setData('type', item.type ?? 'item')
+    setData('source_id', item.source_id ?? '')
+    setData('source_url', '')
+    setData('notes', '')
+  }, [isOpen, item, reset, setData])
+
+  const normalizeText = (value: string) => {
+    const trimmed = value.trim()
+    return trimmed === '' ? null : trimmed
+  }
+
+  const handleSubmit = () => {
+    const changes: Record<string, string | number | null> = {}
+
+    const normalizedName = (data.name ?? '').trim()
+    if (normalizedName !== (item.name ?? '').trim()) {
+      changes.name = normalizedName
+    }
+
+    const normalizedUrl = normalizeText(data.url ?? '')
+    const currentUrl = normalizeText(item.url ?? '')
+    if (normalizedUrl !== currentUrl) {
+      changes.url = normalizedUrl
+    }
+
+    const normalizedCost = normalizeText(data.cost ?? '')
+    const currentCost = normalizeText(item.cost ?? '')
+    if (normalizedCost !== currentCost) {
+      changes.cost = normalizedCost
+    }
+
+    if ((data.rarity ?? 'common') !== (item.rarity ?? 'common')) {
+      changes.rarity = data.rarity
+    }
+
+    if ((data.type ?? 'item') !== (item.type ?? 'item')) {
+      changes.type = data.type
+    }
+
+    const normalizedSource = data.source_id === '' ? null : Number(data.source_id)
+    const currentSource = item.source_id ?? null
+    if (normalizedSource !== currentSource) {
+      changes.source_id = normalizedSource
+    }
+
+    const normalizedNotes = normalizeText(data.notes ?? '')
+    if (Object.keys(changes).length === 0 && !normalizedNotes) {
+      toast.show('Please change at least one field or add a note.', 'error')
+      return
+    }
+
+    setIsSubmitting(true)
+    router.post(route('compendium-suggestions.store'), {
+      kind: 'item',
+      target_id: item.id,
+      changes,
+      source_url: normalizeText(data.source_url ?? ''),
+      notes: normalizedNotes,
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        toast.show('Suggestion submitted. Thank you!', 'info')
+      },
+      onError: (formErrors) => {
+        const message = formErrors.changes
+          || formErrors.target_id
+          || formErrors.kind
+          || formErrors.notes
+          || formErrors.source_url
+          || formErrors.name
+          || formErrors.url
+          || formErrors.cost
+          || formErrors.rarity
+          || formErrors.type
+          || formErrors.source_id
+
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+      onFinish: () => {
+        setIsSubmitting(false)
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} title="Suggest update" aria-label="Suggest update">
+          <MessageSquarePlus size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Suggest item update</ModalTitle>
+      <ModalContent>
+        <div className="space-y-3">
+          <p className="text-xs text-base-content/70">
+            Suggest corrections. Your changes will be reviewed by the admin team before being applied.
+          </p>
+          <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+            Name
+          </Input>
+          <Input value={data.url} onChange={(e) => setData('url', e.target.value)}>
+            URL
+          </Input>
+          <Input value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
+            Cost
+          </Input>
+          <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+            <SelectLabel>Rarity</SelectLabel>
+            <SelectOptions>
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+              <option value="very_rare">Very Rare</option>
+            </SelectOptions>
+          </Select>
+          <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+            <SelectLabel>Type</SelectLabel>
+            <SelectOptions>
+              <option value="item">Item</option>
+              <option value="spellscroll">Spell Scroll</option>
+              <option value="consumable">Consumable</option>
+            </SelectOptions>
+          </Select>
+          <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
+            <SelectLabel>Source</SelectLabel>
+            <SelectOptions>
+              <option value="">No source</option>
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.shortcode} - {source.name}
+                </option>
+              ))}
+            </SelectOptions>
+          </Select>
+          <Input value={data.source_url} onChange={(e) => setData('source_url', e.target.value)}>
+            Reference URL (optional)
+          </Input>
+          <TextArea value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+            Note for reviewers (optional)
+          </TextArea>
+        </div>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={isSubmitting}>
+        Submit
+      </ModalAction>
+    </Modal>
+  )
+}
+
 export default function ItemRow({
   item,
   shopItem,
   sources = [],
   canUpdatePostLine = false,
+  canManage = true,
 }: {
   item: Item
   shopItem?: ShopItem
   sources?: Source[]
   canUpdatePostLine?: boolean
+  canManage?: boolean
 }) {
   const formData = {
     id: item.id,
@@ -498,7 +673,7 @@ export default function ItemRow({
   }
 
   const handleDeleteItem = () => {
-    if (shopItem) return
+    if (shopItem || !canManage) return
     if (!window.confirm(`Delete item "${item.name}"?`)) return
 
     router.delete(route('admin.items.destroy', { item }), {
@@ -670,7 +845,7 @@ export default function ItemRow({
             </Button>
           </>
         ) : null}
-        {!shopItem ? (
+        {!shopItem && canManage ? (
           <>
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
             <Modal>
@@ -857,10 +1032,16 @@ export default function ItemRow({
             </Modal>
           </>
         ) : null}
-        {!shopItem ? (
+        {!shopItem && canManage ? (
           <Button size="xs" variant="ghost" modifier="square" color="error" onClick={handleDeleteItem} title="Delete item" aria-label="Delete item">
             <Trash size={14} />
           </Button>
+        ) : null}
+        {!shopItem && !canManage ? (
+          <>
+            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <SuggestItemUpdateModal item={item} sources={sources} />
+          </>
         ) : null}
       </div>
     </ListRow>

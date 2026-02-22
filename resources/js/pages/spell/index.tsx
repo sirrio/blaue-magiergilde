@@ -174,7 +174,17 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
   )
 }
 
-export default function Index({ spells, sources }: { spells: Spell[]; sources: Source[] }) {
+export default function Index({
+  spells,
+  sources,
+  canManage = false,
+  indexRoute = 'compendium.spells.index',
+}: {
+  spells: Spell[]
+  sources: Source[]
+  canManage?: boolean
+  indexRoute?: string
+}) {
   const spellSchoolFilters: FilterOption[] = [
     { label: 'Abjuration', value: 'abjuration' },
     { label: 'Conjuration', value: 'conjuration' },
@@ -199,22 +209,19 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
     { label: 'Restricted', value: 'blocked' },
   ]
 
-  const infoFilters: FilterOption[] = [
-    { label: 'Complete', value: 'complete' },
-    { label: 'Missing', value: 'missing' },
-  ]
-
   const rulingFilters: FilterOption[] = [
     { label: 'Changed', value: 'changed' },
     { label: 'Standard', value: 'none' },
   ]
 
   const currentQueryParams = route().params as Record<string, string | number | undefined>
+  const queryParamsWithoutLegacyInfo = Object.fromEntries(
+    Object.entries(currentQueryParams).filter(([key]) => key !== 'info'),
+  ) as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
   const schoolLabelMap = Object.fromEntries(spellSchoolFilters.map((entry) => [entry.value, entry.label]))
   const levelLabelMap = Object.fromEntries(spellLevelFilters.map((entry) => [entry.value, entry.label]))
   const guildLabelMap = Object.fromEntries(guildFilters.map((entry) => [entry.value, entry.label]))
-  const infoLabelMap = Object.fromEntries(infoFilters.map((entry) => [entry.value, entry.label]))
   const rulingLabelMap = Object.fromEntries(rulingFilters.map((entry) => [entry.value, entry.label]))
 
   const navigateTo = (href: string) => {
@@ -223,8 +230,8 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
     const buildHref = (filterValue: string | null): string =>
-      route('admin.spells.index', {
-        ...currentQueryParams,
+      route(indexRoute, {
+        ...queryParamsWithoutLegacyInfo,
         [filterKey]: filterValue,
       })
 
@@ -257,7 +264,7 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    navigateTo(route('admin.spells.index', { ...currentQueryParams, search: value }))
+    navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value }))
   }
 
   const activeFilters = [
@@ -271,9 +278,6 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
     currentQueryParams.guild
       ? `Guild: ${guildLabelMap[String(currentQueryParams.guild)] ?? currentQueryParams.guild}`
       : null,
-    currentQueryParams.info
-      ? `Details: ${infoLabelMap[String(currentQueryParams.info)] ?? currentQueryParams.info}`
-      : null,
     currentQueryParams.ruling
       ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
       : null,
@@ -286,9 +290,15 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold">Spells</h1>
-            <p className="text-sm text-base-content/70">Search the spell list by school or level.</p>
+            <p className="text-sm text-base-content/70">
+              {canManage
+                ? 'Search the spell list by school or level.'
+                : 'Browse the compendium and suggest spell updates for review.'}
+            </p>
           </div>
-          <StoreSpellModal sources={sources} />
+          <div className="flex items-center gap-2">
+            {canManage ? <StoreSpellModal sources={sources} /> : null}
+          </div>
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -328,10 +338,6 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
                 {renderFilterOptions('guild', guildFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Details:</span>
-                {renderFilterOptions('info', infoFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-base-content/60">Ruling:</span>
                 {renderFilterOptions('ruling', rulingFilters)}
               </div>
@@ -348,7 +354,7 @@ export default function Index({ spells, sources }: { spells: Spell[]; sources: S
           }
           data={['spells']}
         >
-          <List>{spells?.map((spell) => <SpellRow key={spell.id} spell={spell} sources={sources} />)}</List>
+          <List>{spells?.map((spell) => <SpellRow key={spell.id} spell={spell} sources={sources} canManage={canManage} />)}</List>
         </Deferred>
       </div>
     </AppLayout>

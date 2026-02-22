@@ -29,9 +29,15 @@ interface AppLayoutProps {
 const menuLinks = [
   { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
   { name: 'Game Master Log', route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
+  { name: 'Compendium', route: 'compendium.items.index', method: 'get' as const, icon: Package },
   { name: 'Rooms', route: 'rooms.index', method: 'get' as const, icon: Map },
   { name: 'Games', route: 'games.index', method: 'get' as const, icon: CalendarDays },
   { name: 'Guild Handbook', route: 'handbook.index', method: 'get' as const, icon: BookOpen },
+]
+
+const compendiumLinks = [
+  { name: 'Items', route: 'compendium.items.index', method: 'get' as const, icon: Package },
+  { name: 'Spells', route: 'compendium.spells.index', method: 'get' as const, icon: Sparkles },
 ]
 
 const accountLinks = [
@@ -61,6 +67,7 @@ const adminSections = [
     links: [
       { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
       { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
+      { name: 'Suggestions', route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: Sparkles },
     ],
   },
   {
@@ -84,10 +91,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
     usePage<PageProps>().props
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
+  const compendiumDesktopRef = useRef<HTMLDetailsElement>(null)
+  const compendiumMobileRef = useRef<HTMLDetailsElement>(null)
   const handbookDesktopRef = useRef<HTMLDetailsElement>(null)
   const handbookMobileRef = useRef<HTMLDetailsElement>(null)
   useClickOutside(adminDetailsRef, () =>
     adminDetailsRef.current?.removeAttribute('open')
+  )
+  useClickOutside(compendiumDesktopRef, () =>
+    compendiumDesktopRef.current?.removeAttribute('open')
+  )
+  useClickOutside(compendiumMobileRef, () =>
+    compendiumMobileRef.current?.removeAttribute('open')
   )
   useClickOutside(handbookDesktopRef, () =>
     handbookDesktopRef.current?.removeAttribute('open')
@@ -98,6 +113,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const handbookChannelList = handbookChannels ?? []
   const showHandbookDropdown = handbookChannelList.length > 0
+  const showCompendiumDropdown = compendiumLinks.length > 0
+  const isCompendiumActive = route().current('compendium.items.index') || route().current('compendium.spells.index')
+  const compendiumLabel = 'Compendium'
   const handbookLabel = 'Guild Handbook'
   const filteredMenuLinks = menuLinks.filter((menuLink) => {
     if (menuLink.route === 'games.index') {
@@ -130,7 +148,34 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {filteredMenuLinks.map((menuLink) => (
-                menuLink.route === 'handbook.index' && showHandbookDropdown ? (
+                menuLink.route === 'compendium.items.index' && showCompendiumDropdown ? (
+                  <li key={menuLink.route} role="none">
+                    <details ref={compendiumMobileRef}>
+                      <summary className={cn('flex items-center', isCompendiumActive ? 'menu-active' : '')}>
+                        <menuLink.icon size={16} className="mr-2" />
+                        {compendiumLabel}
+                      </summary>
+                      <ul className="p-2">
+                        {compendiumLinks.map((link) => (
+                          <li key={link.route} role="none">
+                            <Link
+                              role="menuitem"
+                              method={link.method}
+                              className={cn(
+                                'flex items-center',
+                                route().current(link.route) ? 'menu-active' : ''
+                              )}
+                              href={route(link.route)}
+                            >
+                              <link.icon size={16} className="mr-2" />
+                              {link.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                ) : menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                   <li key={menuLink.route} role="none">
                     <details ref={handbookMobileRef}>
                       <summary className="flex items-center">
@@ -212,7 +257,34 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </Link>
           <ul className="menu menu-horizontal items-center space-x-1 px-1 hidden lg:flex ml-4" role="menubar">
             {filteredMenuLinks.map((menuLink) => (
-              menuLink.route === 'handbook.index' && showHandbookDropdown ? (
+              menuLink.route === 'compendium.items.index' && showCompendiumDropdown ? (
+                <li key={menuLink.route} role="none">
+                  <details ref={compendiumDesktopRef}>
+                    <summary className={cn('flex items-center', isCompendiumActive ? 'menu-active' : '')}>
+                      <menuLink.icon size={16} className="mr-2" />
+                      {compendiumLabel}
+                    </summary>
+                    <ul className="z-30 w-44 p-2">
+                      {compendiumLinks.map((link) => (
+                        <li key={link.route} role="none">
+                          <Link
+                            role="menuitem"
+                            method={link.method}
+                            href={route(link.route)}
+                            className={cn(
+                              'flex items-center',
+                              route().current(link.route) ? 'menu-active' : ''
+                            )}
+                          >
+                            <link.icon size={16} className="mr-2" />
+                            {link.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </li>
+              ) : menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                 <li key={menuLink.route} role="none">
                   <details ref={handbookDesktopRef}>
                     <summary className="flex items-center">

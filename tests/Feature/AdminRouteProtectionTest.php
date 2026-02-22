@@ -15,6 +15,7 @@ it('blocks non-admin users from admin pages', function (string $routeName) {
     'admin.auctions.index',
     'admin.items.index',
     'admin.spells.index',
+    'admin.compendium-suggestions.index',
     'admin.character-approvals.index',
     'admin.rooms.index',
 ]);
@@ -32,6 +33,7 @@ it('allows admin users to access admin pages', function (string $routeName) {
     'admin.auctions.index',
     'admin.items.index',
     'admin.spells.index',
+    'admin.compendium-suggestions.index',
     'admin.character-approvals.index',
     'admin.rooms.index',
 ]);

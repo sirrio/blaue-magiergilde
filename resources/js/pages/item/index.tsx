@@ -297,7 +297,17 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
   )
 }
 
-export default function Index({ items, sources }: { items: Item[]; sources: Source[] }) {
+export default function Index({
+  items,
+  sources,
+  canManage = false,
+  indexRoute = 'compendium.items.index',
+}: {
+  items: Item[]
+  sources: Source[]
+  canManage?: boolean
+  indexRoute?: string
+}) {
   const rarityFilters: FilterOption[] = [
     { label: 'Common', value: 'common' },
     { label: 'Uncommon', value: 'uncommon' },
@@ -326,24 +336,21 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
     { label: 'No auto-roll', value: 'none' },
   ]
 
-  const infoFilters: FilterOption[] = [
-    { label: 'Complete', value: 'complete' },
-    { label: 'Missing', value: 'missing' },
-  ]
-
   const rulingFilters: FilterOption[] = [
     { label: 'Changed', value: 'changed' },
     { label: 'Standard', value: 'none' },
   ]
 
   const currentQueryParams = route().params as Record<string, string | number | undefined>
+  const queryParamsWithoutLegacyInfo = Object.fromEntries(
+    Object.entries(currentQueryParams).filter(([key]) => key !== 'info'),
+  ) as Record<string, string | number | undefined>
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
   const rarityLabelMap = Object.fromEntries(rarityFilters.map((entry) => [entry.value, entry.label]))
   const typeLabelMap = Object.fromEntries(typeFilters.map((entry) => [entry.value, entry.label]))
   const guildLabelMap = Object.fromEntries(guildFilters.map((entry) => [entry.value, entry.label]))
   const shopLabelMap = Object.fromEntries(shopFilters.map((entry) => [entry.value, entry.label]))
   const spellLabelMap = Object.fromEntries(spellFilters.map((entry) => [entry.value, entry.label]))
-  const infoLabelMap = Object.fromEntries(infoFilters.map((entry) => [entry.value, entry.label]))
   const rulingLabelMap = Object.fromEntries(rulingFilters.map((entry) => [entry.value, entry.label]))
 
   const navigateTo = (href: string) => {
@@ -352,8 +359,8 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
     const buildHref = (filterValue: string | null): string =>
-      route('admin.items.index', {
-        ...currentQueryParams,
+      route(indexRoute, {
+        ...queryParamsWithoutLegacyInfo,
         [filterKey]: filterValue,
       })
 
@@ -386,7 +393,7 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    navigateTo(route('admin.items.index', { ...currentQueryParams, search: value }))
+    navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value }))
   }
 
   const activeFilters = [
@@ -406,9 +413,6 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
     currentQueryParams.spell
       ? `Auto-roll: ${spellLabelMap[String(currentQueryParams.spell)] ?? currentQueryParams.spell}`
       : null,
-    currentQueryParams.info
-      ? `Details: ${infoLabelMap[String(currentQueryParams.info)] ?? currentQueryParams.info}`
-      : null,
     currentQueryParams.ruling
       ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
       : null,
@@ -421,16 +425,22 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold">Items</h1>
-            <p className="text-sm text-base-content/70">Browse and filter the guild inventory.</p>
+            <p className="text-sm text-base-content/70">
+              {canManage
+                ? 'Browse and filter the guild inventory.'
+                : 'Browse the compendium and suggest improvements for review.'}
+            </p>
           </div>
-          <StoreItemModal sources={sources} />
+          <div className="flex items-center gap-2">
+            {canManage ? <StoreItemModal sources={sources} /> : null}
+          </div>
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="text-xs uppercase text-base-content/50">Filters</p>
               <h2 className="text-lg font-semibold">Inventory filters</h2>
-              <p className="text-xs text-base-content/70">Refine the list by status, rarity, or info.</p>
+              <p className="text-xs text-base-content/70">Refine the list by status, rarity, and rulings.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">{totalItems} items</span>
@@ -471,10 +481,6 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
                 {renderFilterOptions('spell', spellFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Details:</span>
-                {renderFilterOptions('info', infoFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-base-content/60">Ruling:</span>
                 {renderFilterOptions('ruling', rulingFilters)}
               </div>
@@ -491,7 +497,7 @@ export default function Index({ items, sources }: { items: Item[]; sources: Sour
           }
           data={['items']}
         >
-          <List>{items?.map((item) => <ItemRow key={item.id} item={item} sources={sources} />)}</List>
+          <List>{items?.map((item) => <ItemRow key={item.id} item={item} sources={sources} canManage={canManage} />)}</List>
         </Deferred>
       </div>
     </AppLayout>
