@@ -1468,6 +1468,77 @@ async function upsertHiddenBidForDiscord(discordIdentity, auctionItemId, maxAmou
     }
 }
 
+async function removeHiddenBidForDiscord(discordIdentity, auctionItemId) {
+    const identity = normalizeDiscordIdentity(discordIdentity);
+    if (!identity.id) {
+        return { ok: false, reason: 'invalid_discord_user' };
+    }
+
+    const safeAuctionItemId = Number(auctionItemId);
+    if (!Number.isFinite(safeAuctionItemId) || safeAuctionItemId <= 0) {
+        return { ok: false, reason: 'invalid_item' };
+    }
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const item = await findOpenAuctionItemForHiddenBid(identity, Math.floor(safeAuctionItemId), connection);
+        if (!item) {
+            await connection.rollback();
+            return { ok: false, reason: 'not_found' };
+        }
+
+        if (item.auction_status !== 'open') {
+            await connection.rollback();
+            return { ok: false, reason: 'auction_closed' };
+        }
+
+        if (item.sold_at) {
+            await connection.rollback();
+            return { ok: false, reason: 'item_sold' };
+        }
+
+        const [existingRows] = await connection.execute(
+            `
+                SELECT id, max_amount
+                FROM auction_hidden_bids
+                WHERE auction_item_id = ?
+                  AND bidder_discord_id = ?
+                LIMIT 1
+                FOR UPDATE
+            `,
+            [item.auction_item_id, identity.id],
+        );
+
+        if (!existingRows[0]) {
+            await connection.rollback();
+            return { ok: false, reason: 'hidden_bid_not_found' };
+        }
+
+        const previousMax = Number(existingRows[0].max_amount);
+        await connection.execute(
+            'DELETE FROM auction_hidden_bids WHERE id = ?',
+            [existingRows[0].id],
+        );
+
+        await connection.commit();
+
+        return {
+            ok: true,
+            auctionItemId: item.auction_item_id,
+            previousMax,
+            auctionCurrency: item.auction_currency,
+            itemName: item.item_name || `Item #${item.auction_item_id}`,
+        };
+    } catch {
+        await connection.rollback();
+        return { ok: false, reason: 'error' };
+    } finally {
+        connection.release();
+    }
+}
+
 module.exports = {
     DiscordNotLinkedError,
     getLinkedUserIdForDiscord,
@@ -1498,4 +1569,5 @@ module.exports = {
     listOpenAuctionItemsForHiddenBids,
     findOpenAuctionItemForHiddenBid,
     upsertHiddenBidForDiscord,
+    removeHiddenBidForDiscord,
 };
