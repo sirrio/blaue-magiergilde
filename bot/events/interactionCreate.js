@@ -4,6 +4,7 @@ const { isOwner } = require('../commandConfig');
 const appJoin = require('../interactions/appJoin');
 const characterApproval = require('../interactions/characterApproval');
 const characters = require('../interactions/characters');
+const hiddenBid = require('../interactions/hiddenBid');
 const newGame = require('../interactions/newGame');
 const { handleSupportTicketInteraction } = require('../supportTickets');
 const { buildErrorEmbed } = require('../utils/noticeEmbeds');
@@ -16,6 +17,7 @@ module.exports = {
             if (await appJoin.handle(interaction)) return;
             if (await characterApproval.handle(interaction)) return;
             if (await characters.handle(interaction)) return;
+            if (await hiddenBid.handle(interaction)) return;
             if (await newGame.handle(interaction)) return;
 
             if (!interaction.isChatInputCommand()) return;

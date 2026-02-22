@@ -1,5 +1,6 @@
 const db = require('./db');
 const { additionalBubblesForStartTier } = require('./utils/characterTier');
+const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
 const {
     calculateMinAllowedLevel,
     calculateRequiredAdventureBubbles,
@@ -1196,6 +1197,277 @@ async function softDeleteDowntimeForDiscord(discordUser, downtimeId) {
     return { ok: true };
 }
 
+function normalizeDiscordIdentity(discordIdentity) {
+    const id = String(discordIdentity?.id || '').trim();
+    if (!/^[0-9]{5,}$/.test(id)) {
+        return { id: null, name: null };
+    }
+
+    const preferredName = [
+        discordIdentity?.displayName,
+        discordIdentity?.globalName,
+        discordIdentity?.username,
+        discordIdentity?.tag,
+    ]
+        .map(value => String(value || '').trim())
+        .find(value => value.length > 0);
+
+    return {
+        id,
+        name: preferredName || id,
+    };
+}
+
+function mapAuctionHiddenBidRow(row) {
+    const step = getBidStepForItem({
+        rarity: row.item_rarity,
+        type: row.item_type,
+    });
+    const startingBid = getStartingBidFromRepair({
+        repairCurrent: row.repair_current,
+        step,
+    });
+    const highestBid = Math.max(0, Number(row.highest_bid) || 0);
+    const minBid = getMinimumBid({
+        startingBid,
+        highestBid,
+        step,
+    });
+
+    return {
+        auction_item_id: Number(row.auction_item_id),
+        auction_id: Number(row.auction_id),
+        auction_title: String(row.auction_title || '').trim(),
+        auction_currency: String(row.auction_currency || 'GP').trim() || 'GP',
+        auction_created_at: row.auction_created_at,
+        item_name: String(row.item_name || '').trim(),
+        item_rarity: String(row.item_rarity || 'common').trim(),
+        item_type: String(row.item_type || 'item').trim(),
+        notes: row.notes == null ? null : String(row.notes),
+        sold_at: row.sold_at,
+        user_hidden_max: row.user_hidden_max == null ? null : Number(row.user_hidden_max),
+        highest_bid: highestBid,
+        step,
+        starting_bid: startingBid,
+        min_bid: minBid,
+    };
+}
+
+async function listOpenAuctionItemsForHiddenBids(discordIdentity, limit = 100) {
+    const identity = normalizeDiscordIdentity(discordIdentity);
+    if (!identity.id) return [];
+
+    const safeLimit = Math.max(1, Math.min(250, Number(limit) || 100));
+    const [rows] = await db.execute(
+        `
+            SELECT
+                ai.id AS auction_item_id,
+                ai.auction_id,
+                ai.notes,
+                ai.repair_current,
+                ai.repair_max,
+                ai.sold_at,
+                COALESCE(ai.item_name, i.name) AS item_name,
+                COALESCE(ai.item_rarity, i.rarity) AS item_rarity,
+                COALESCE(ai.item_type, i.type) AS item_type,
+                a.title AS auction_title,
+                a.currency AS auction_currency,
+                a.created_at AS auction_created_at,
+                (
+                    SELECT MAX(ab.amount)
+                    FROM auction_bids ab
+                    WHERE ab.auction_item_id = ai.id
+                ) AS highest_bid,
+                hb.max_amount AS user_hidden_max
+            FROM auction_items ai
+            INNER JOIN auctions a ON a.id = ai.auction_id
+            LEFT JOIN items i ON i.id = ai.item_id
+            LEFT JOIN auction_hidden_bids hb
+                ON hb.auction_item_id = ai.id
+               AND hb.bidder_discord_id = ?
+            WHERE a.status = 'open'
+              AND ai.sold_at IS NULL
+            ORDER BY a.created_at DESC, ai.id ASC
+            LIMIT ${safeLimit}
+        `,
+        [identity.id],
+    );
+
+    return rows.map(mapAuctionHiddenBidRow);
+}
+
+async function findOpenAuctionItemForHiddenBid(discordIdentity, auctionItemId, connection = null) {
+    const identity = normalizeDiscordIdentity(discordIdentity);
+    if (!identity.id) return null;
+
+    const safeAuctionItemId = Number(auctionItemId);
+    if (!Number.isFinite(safeAuctionItemId) || safeAuctionItemId <= 0) {
+        return null;
+    }
+
+    const executor = connection ?? db;
+    const [rows] = await executor.execute(
+        `
+            SELECT
+                ai.id AS auction_item_id,
+                ai.auction_id,
+                ai.notes,
+                ai.repair_current,
+                ai.repair_max,
+                ai.sold_at,
+                COALESCE(ai.item_name, i.name) AS item_name,
+                COALESCE(ai.item_rarity, i.rarity) AS item_rarity,
+                COALESCE(ai.item_type, i.type) AS item_type,
+                a.status AS auction_status,
+                a.title AS auction_title,
+                a.currency AS auction_currency,
+                a.created_at AS auction_created_at,
+                (
+                    SELECT MAX(ab.amount)
+                    FROM auction_bids ab
+                    WHERE ab.auction_item_id = ai.id
+                ) AS highest_bid,
+                hb.id AS hidden_bid_id,
+                hb.max_amount AS user_hidden_max
+            FROM auction_items ai
+            INNER JOIN auctions a ON a.id = ai.auction_id
+            LEFT JOIN items i ON i.id = ai.item_id
+            LEFT JOIN auction_hidden_bids hb
+                ON hb.auction_item_id = ai.id
+               AND hb.bidder_discord_id = ?
+            WHERE ai.id = ?
+            LIMIT 1
+        `,
+        [identity.id, Math.floor(safeAuctionItemId)],
+    );
+
+    if (!rows[0]) return null;
+
+    const mapped = mapAuctionHiddenBidRow(rows[0]);
+    mapped.auction_status = String(rows[0].auction_status || '').trim().toLowerCase();
+    mapped.hidden_bid_id = rows[0].hidden_bid_id == null ? null : Number(rows[0].hidden_bid_id);
+    return mapped;
+}
+
+async function upsertHiddenBidForDiscord(discordIdentity, auctionItemId, maxAmountRaw) {
+    const identity = normalizeDiscordIdentity(discordIdentity);
+    if (!identity.id) {
+        return { ok: false, reason: 'invalid_discord_user' };
+    }
+
+    const safeAuctionItemId = Number(auctionItemId);
+    if (!Number.isFinite(safeAuctionItemId) || safeAuctionItemId <= 0) {
+        return { ok: false, reason: 'invalid_item' };
+    }
+
+    const maxAmount = Number(maxAmountRaw);
+    if (!Number.isFinite(maxAmount) || maxAmount <= 0 || !Number.isInteger(maxAmount)) {
+        return { ok: false, reason: 'invalid_amount' };
+    }
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const item = await findOpenAuctionItemForHiddenBid(identity, Math.floor(safeAuctionItemId), connection);
+        if (!item) {
+            await connection.rollback();
+            return { ok: false, reason: 'not_found' };
+        }
+
+        if (item.auction_status !== 'open') {
+            await connection.rollback();
+            return { ok: false, reason: 'auction_closed' };
+        }
+
+        if (item.sold_at) {
+            await connection.rollback();
+            return { ok: false, reason: 'item_sold' };
+        }
+
+        if (maxAmount < item.min_bid) {
+            await connection.rollback();
+            return {
+                ok: false,
+                reason: 'below_minimum',
+                minBid: item.min_bid,
+                step: item.step,
+                startingBid: item.starting_bid,
+            };
+        }
+
+        if ((maxAmount - item.starting_bid) % item.step !== 0) {
+            await connection.rollback();
+            return {
+                ok: false,
+                reason: 'invalid_step',
+                minBid: item.min_bid,
+                step: item.step,
+                startingBid: item.starting_bid,
+            };
+        }
+
+        const timestamp = nowSql();
+        const [existingRows] = await connection.execute(
+            `
+                SELECT id, max_amount
+                FROM auction_hidden_bids
+                WHERE auction_item_id = ?
+                  AND bidder_discord_id = ?
+                LIMIT 1
+                FOR UPDATE
+            `,
+            [item.auction_item_id, identity.id],
+        );
+
+        const previousMax = existingRows[0] ? Number(existingRows[0].max_amount) : null;
+
+        if (existingRows[0]) {
+            await connection.execute(
+                `
+                    UPDATE auction_hidden_bids
+                    SET bidder_name = ?, max_amount = ?, updated_at = ?
+                    WHERE id = ?
+                `,
+                [identity.name, maxAmount, timestamp, existingRows[0].id],
+            );
+        } else {
+            await connection.execute(
+                `
+                    INSERT INTO auction_hidden_bids (
+                        auction_item_id,
+                        bidder_discord_id,
+                        bidder_name,
+                        max_amount,
+                        created_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                `,
+                [item.auction_item_id, identity.id, identity.name, maxAmount, timestamp, timestamp],
+            );
+        }
+
+        await connection.commit();
+
+        return {
+            ok: true,
+            auctionItemId: item.auction_item_id,
+            previousMax,
+            maxAmount,
+            minBid: item.min_bid,
+            step: item.step,
+            startingBid: item.starting_bid,
+            auctionCurrency: item.auction_currency,
+            itemName: item.item_name || `Item #${item.auction_item_id}`,
+        };
+    } catch {
+        await connection.rollback();
+        return { ok: false, reason: 'error' };
+    } finally {
+        connection.release();
+    }
+}
+
 module.exports = {
     DiscordNotLinkedError,
     getLinkedUserIdForDiscord,
@@ -1223,4 +1495,7 @@ module.exports = {
     createDowntimeForDiscord,
     updateDowntimeForDiscord,
     softDeleteDowntimeForDiscord,
+    listOpenAuctionItemsForHiddenBids,
+    findOpenAuctionItemForHiddenBid,
+    upsertHiddenBidForDiscord,
 };
