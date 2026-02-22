@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, BotOperation, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { CheckCircle2, EyeOff, FlaskRound, History, Mic, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronsRight, EyeOff, FlaskRound, History, Mic, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash, XCircle } from 'lucide-react'
 import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -96,6 +96,14 @@ const getStartingBid = (auctionItem: AuctionItem): number => {
   const repairCurrent = auctionItem.repair_current ?? 0
   const halfRepair = Math.ceil(repairCurrent / 2)
   return Math.ceil(halfRepair / step) * step
+}
+
+const alignBidToStepFloor = (amount: number, startingBid: number, step: number): number => {
+  if (amount <= startingBid) {
+    return startingBid
+  }
+
+  return startingBid + Math.floor((amount - startingBid) / step) * step
 }
 
 const formatAuctionCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
@@ -221,7 +229,50 @@ const AuctionItemBidControls = ({
   const isAmountValid = (minBid - startingBid) % step === 0
   const biddingDisabled = isSold
 
-  const handleBid = (candidateId: string, candidateName: string) => {
+  const hiddenBidJump = useMemo(() => {
+    const eligibleHiddenCandidates = candidates
+      .map((candidate) => {
+        const hiddenBid = getHiddenBidForCandidate(auctionItem, candidate.id)
+        if (!hiddenBid) {
+          return null
+        }
+
+        const effectiveMax = alignBidToStepFloor(hiddenBid.max_amount, startingBid, step)
+        if (effectiveMax < minBid) {
+          return null
+        }
+
+        return {
+          id: candidate.id,
+          name: candidate.name,
+          max: effectiveMax,
+        }
+      })
+      .filter((candidate): candidate is { id: string; name: string; max: number } => candidate !== null)
+      .sort((a, b) => b.max - a.max)
+
+    if (eligibleHiddenCandidates.length < 2) {
+      return null
+    }
+
+    const leader = eligibleHiddenCandidates[0]
+    const runnerUp = eligibleHiddenCandidates[1]
+    const targetAmount = Math.max(minBid, Math.min(leader.max, runnerUp.max + step))
+
+    if (targetAmount <= minBid) {
+      return null
+    }
+
+    return {
+      candidateId: leader.id,
+      candidateName: leader.name,
+      amount: targetAmount,
+    }
+  }, [auctionItem, candidates, minBid, startingBid, step])
+
+  const handleBid = (candidateId: string, candidateName: string, amount: number = minBid) => {
+    const bidAmount = Math.max(amount, minBid)
+
     if (biddingDisabled) {
       toast.show('Bidding is closed. Item already sold.', 'error')
       return
@@ -233,14 +284,14 @@ const AuctionItemBidControls = ({
     }
 
     const hiddenBid = getHiddenBidForCandidate(auctionItem, candidateId)
-    if (hiddenBid && minBid > hiddenBid.max_amount) {
+    if (hiddenBid && bidAmount > hiddenBid.max_amount) {
       toast.show(`Max bid for ${candidateName} is ${hiddenBid.max_amount} ${currency}.`, 'error')
       return
     }
 
     router.post(
       route('admin.auction-items.bids.store', { auctionItem: auctionItem.id }),
-      { bidder_discord_id: candidateId, bidder_name: candidateName, amount: minBid },
+      { bidder_discord_id: candidateId, bidder_name: candidateName, amount: bidAmount },
       {
         preserveScroll: true,
         onSuccess: () => {
@@ -297,9 +348,23 @@ const AuctionItemBidControls = ({
       {biddingDisabled ? (
         <p className="text-[11px] text-base-content/50">Bidding closed (sold).</p>
       ) : (
-        <p className="text-[11px] text-base-content/50">
-          Next bid: {minBid} {currency} - Step {step}
-        </p>
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <p className="text-[11px] text-base-content/50">
+            Next bid: {minBid} {currency} - Step {step}
+          </p>
+          {hiddenBidJump ? (
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => handleBid(hiddenBidJump.candidateId, hiddenBidJump.candidateName, hiddenBidJump.amount)}
+              className="h-6 gap-1 px-2 text-[11px]"
+              title={`Fast-forward hidden bids to ${hiddenBidJump.amount} ${currency}`}
+            >
+              <ChevronsRight size={12} />
+              Pull hidden to {hiddenBidJump.amount}
+            </Button>
+          ) : null}
+        </div>
       )}
     </div>
   )
