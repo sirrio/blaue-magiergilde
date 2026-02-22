@@ -78,6 +78,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
   const [adventureSortDir, setAdventureSortDir] = useState<'desc' | 'asc'>('desc')
   const [downtimeSortDir, setDowntimeSortDir] = useState<'desc' | 'asc'>('desc')
+  const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
   const [isAdventuresPending, startAdventuresTransition] = useTransition()
   const [isDowntimesPending, startDowntimesTransition] = useTransition()
   const [isAlliesPending, startAlliesTransition] = useTransition()
@@ -126,6 +127,18 @@ export default function Show({ character, guildCharacters }: { character: Charac
       return (aDate - bDate) * direction
     })
   }, [character.downtimes, downtimeSortDir])
+
+  const sortedAllies = useMemo(() => {
+    const direction = allySortDir === 'desc' ? -1 : 1
+    return [...character.allies].sort((a, b) => {
+      const ratingDiff = (a.rating ?? 3) - (b.rating ?? 3)
+      if (ratingDiff !== 0) {
+        return ratingDiff * direction
+      }
+
+      return getAllyDisplayName(a).localeCompare(getAllyDisplayName(b))
+    })
+  }, [allySortDir, character.allies])
 
   const adventureParticipantMap = useMemo(() => {
     const map = new Map<number, string>()
@@ -674,8 +687,21 @@ export default function Show({ character, guildCharacters }: { character: Charac
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.allies.length > 0 ? (
                   <>
+                    <div className="flex justify-end pb-2">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        onClick={() =>
+                          setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                        }
+                      >
+                        Standing
+                        {allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                      </Button>
+                    </div>
                     <List className="md:hidden shadow-none">
-                      {character.allies.map((ally) => (
+                      {sortedAllies.map((ally) => (
                         <ListRow key={ally.id} className="block">
                           <div className="space-y-2 rounded-box border border-base-200 p-3">
                             <div className="flex min-w-0 items-center gap-3">
@@ -710,7 +736,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                           <span>Classes</span>
                         </div>
                         <List className="shadow-none">
-                          {character.allies.map((ally) => (
+                          {sortedAllies.map((ally) => (
                             <ListRow
                               key={ally.id}
                               className="grid w-full grid-cols-[minmax(0,1fr)_140px_200px] items-center gap-4"

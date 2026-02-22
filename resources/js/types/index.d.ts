@@ -221,6 +221,9 @@ export interface DiscordBotSettings {
   character_approval_channel_id?: string | null
   character_approval_channel_name?: string | null
   character_approval_channel_guild_id?: string | null
+  support_ticket_channel_id?: string | null
+  support_ticket_channel_name?: string | null
+  support_ticket_channel_guild_id?: string | null
   games_channel_id?: string | null
   games_channel_name?: string | null
   games_channel_guild_id?: string | null

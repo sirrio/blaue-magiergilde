@@ -38,6 +38,18 @@ If Discord is not connected, the bot shows a **Join** button in Discord to creat
 - Hidden bids are managed in the app; the bot has no role here.
 - The bot has no auction commands and is passive for auctions.
 
+### Support Tickets (Bot DMs)
+
+- If a user sends a DM to the bot, a support ticket thread is created in the channel configured in app `admin/settings` (Bot settings).
+- Avatar upload DM flows for character creation/update are handled first and do not create tickets.
+- Staff replies in the ticket thread are forwarded back to the user DM.
+- User and staff relays are posted as clear plain messages.
+- Each ticket has one pinned header embed that is auto-updated with current state + assignee.
+- The pinned header has buttons for `Claim`, `Unclaim`, `Close`, and `Reopen`.
+- States: `open`, `pending_staff`, `pending_user`, `closed`.
+- Ticket controls should be used via the header buttons.
+- DM shortcuts still exist: `close` and `reopen`.
+
 ## Configuration (single .env)
 
 The bot uses the **same** root `.env` as the Laravel app (one env file in the project root).
@@ -52,6 +64,7 @@ Set these in the root `.env`:
 - `DISCORD_GUILD_IDS` - comma-separated list (for guild commands, visible immediately)
 - `DISCORD_COMMAND_PREFIX` - for example `mg`
 - `DISCORD_OWNER_IDS` - fallback list of Discord user IDs (owner-only commands). The app can override this list.
+- `DISCORD_SUPPORT_STAFF_ROLE_IDS` - optional comma-separated role IDs allowed to relay/close tickets in threads. Empty means everyone with thread access.
 - `BOT_APP_URL` - internal base URL for bot → app API calls (for example `http://127.0.0.1:8000` or a private hostname).
 - `BOT_PUBLIC_APP_URL` - optional public base URL for links/avatars in Discord (for example `https://blaue-magiergilde.de`). Overrides `APP_URL` for links only.
 

@@ -8,6 +8,7 @@ const {
 const { pendingGames } = require('../../state');
 const { commandName } = require('../../commandConfig');
 const { isThreadChannel, threadRestrictionMessage } = require('../../interactions/newGameHelpers');
+const { buildInfoEmbed, buildWarningEmbed } = require('../../utils/noticeEmbeds');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -16,7 +17,7 @@ module.exports = {
     async execute(interaction) {
         if (isThreadChannel(interaction.channel)) {
             await interaction.reply({
-                content: threadRestrictionMessage(),
+                embeds: [buildWarningEmbed('Cannot create from thread', threadRestrictionMessage())],
                 flags: MessageFlags.Ephemeral,
             });
             return;
@@ -49,7 +50,8 @@ module.exports = {
         }
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply({
-                content: 'Tiers ausw\xC3\xA4hlen und dann "Weiter" klicken:',
+                content: '',
+                embeds: [buildInfoEmbed('Select tiers', 'Tiers auswählen und dann "Weiter" klicken:')],
                 components: [row1, row2],
             });
         }

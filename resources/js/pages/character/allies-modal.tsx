@@ -6,7 +6,7 @@ import { TextArea } from '@/components/ui/text-area'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
-import { BookHeart, Heart, Link2, PlusCircle, User } from 'lucide-react'
+import { BookHeart, ChevronDown, ChevronUp, Heart, Link2, PlusCircle, User, UserPlus } from 'lucide-react'
 import React, { useEffect, useMemo, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import type { FormDataConvertible } from '@inertiajs/core'
@@ -570,6 +570,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [search, setSearch] = useState('')
+  const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
+  const [quickAddCharacterId, setQuickAddCharacterId] = useState('')
   const linkedCharacterIds = useMemo(
     () => allies.map((ally) => ally.linked_character_id).filter(Boolean) as number[],
     [allies],
@@ -589,11 +591,11 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
 
     if (ally.id === 0) {
       router.post(route('allies.store'), payload, { preserveScroll: true })
-      const newAlly = { ...ally, id: Date.now() }
-      setAllies([...allies, newAlly])
+      const newAlly = { ...ally, id: Date.now() + Math.floor(Math.random() * 1000) }
+      setAllies((current) => [...current, newAlly])
     } else {
       router.post(route('allies.update', ally.id), payload, { preserveScroll: true })
-      setAllies(allies.map((a) => (a.id === ally.id ? ally : a)))
+      setAllies((current) => current.map((entry) => (entry.id === ally.id ? ally : entry)))
     }
     setEditingId(null)
   }
@@ -604,9 +606,48 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     const label = getAllyDisplayName(ally)
     if (window.confirm(`Are you sure you want to remove ${label}?`)) {
       router.delete(route('allies.destroy', ally.id), { preserveScroll: true })
-      setAllies(allies.filter((a) => a.id !== ally.id))
+      setAllies((current) => current.filter((entry) => entry.id !== ally.id))
       setEditingId(null)
     }
+  }
+
+  const availableGuildMembers = useMemo(() => {
+    const linkedSet = new Set(allies.map((ally) => ally.linked_character_id).filter(Boolean))
+
+    return guildCharacters
+      .filter((entry) => entry.id !== character.id && !linkedSet.has(entry.id))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+  }, [allies, character.id, guildCharacters])
+
+  const selectedQuickAddGuildMember = useMemo(
+    () => availableGuildMembers.find((entry) => String(entry.id) === quickAddCharacterId) ?? null,
+    [availableGuildMembers, quickAddCharacterId],
+  )
+
+  useEffect(() => {
+    if (quickAddCharacterId && !selectedQuickAddGuildMember) {
+      setQuickAddCharacterId('')
+    }
+  }, [quickAddCharacterId, selectedQuickAddGuildMember])
+
+  const handleQuickAddGuildMember = (guildMember: Character) => {
+    if (allies.some((ally) => ally.linked_character_id === guildMember.id)) {
+      return
+    }
+
+    handleSave({
+      id: 0,
+      character_id: character.id,
+      name: guildMember.name ?? '',
+      notes: '',
+      avatar: '',
+      classes: '',
+      species: '',
+      rating: 3,
+      linked_character_id: guildMember.id,
+      linked_character: guildMember,
+    })
+    setQuickAddCharacterId('')
   }
   const filteredAllies = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -624,10 +665,16 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
           return haystack.includes(query)
         })
       : allies
-    return [...filtered].sort((a, b) =>
-      getAllyDisplayName(a).localeCompare(getAllyDisplayName(b)),
-    )
-  }, [allies, search])
+    return [...filtered].sort((a, b) => {
+      const ratingDiff = (a.rating ?? 3) - (b.rating ?? 3)
+      if (ratingDiff !== 0) {
+        const direction = allySortDir === 'desc' ? -1 : 1
+        return ratingDiff * direction
+      }
+
+      return getAllyDisplayName(a).localeCompare(getAllyDisplayName(b))
+    })
+  }, [allies, allySortDir, search])
 
   const selectedAlly = useMemo(() => {
     if (editingId === null || editingId === 'new') {
@@ -659,19 +706,70 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
             </div>
 
             <div className="space-y-2">
-              <Input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search allies"
-                aria-label="Search allies"
-              >
-                Search allies
-              </Input>
+              <div className="flex items-end gap-2">
+                <Input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search allies"
+                  aria-label="Search allies"
+                  className="flex-1"
+                >
+                  Search allies
+                </Input>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost mb-1 shrink-0"
+                  onClick={() => setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))}
+                  title="Sort by standing"
+                >
+                  Standing
+                  {allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                </button>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-base-content/60">
                   {search.trim() !== '' ? `${filteredAllies.length} matches` : `${filteredAllies.length} shown`}
                 </span>
+              </div>
+              <div className="rounded-lg border border-base-200 bg-base-100 p-2">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase text-base-content/60">Quick add guild member</p>
+                  <span className="text-xs text-base-content/50">{availableGuildMembers.length} available</span>
+                </div>
+                {availableGuildMembers.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={quickAddCharacterId}
+                      onChange={(e) => setQuickAddCharacterId(e.target.value)}
+                      className="select select-sm select-bordered w-full"
+                    >
+                      <option value="">Select guild member</option>
+                      {availableGuildMembers.map((guildMember) => (
+                        <option key={`quick-add-${guildMember.id}`} value={guildMember.id}>
+                          {guildMember.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0"
+                      onClick={() => {
+                        if (selectedQuickAddGuildMember) {
+                          handleQuickAddGuildMember(selectedQuickAddGuildMember)
+                        }
+                      }}
+                      disabled={!selectedQuickAddGuildMember}
+                    >
+                      <UserPlus size={14} className="mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-base-content/60">No guild members available for quick add.</p>
+                )}
               </div>
             </div>
 

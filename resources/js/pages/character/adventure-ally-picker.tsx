@@ -48,17 +48,13 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
     const allyOptions = allies.map((ally) => {
       const ownerName = getAllyOwnerName(ally)
       return {
-      key: `ally-${ally.id}`,
-      type: 'ally' as const,
-      id: ally.id,
-      label: getAllyDisplayName(ally),
-      sublabel: ally.linked_character
-        ? ownerName
-          ? `Linked • ${ownerName}`
-          : 'Linked guild member'
-        : 'Custom ally',
-      ownerName,
-    }
+        key: `ally-${ally.id}`,
+        type: 'ally' as const,
+        id: ally.id,
+        label: getAllyDisplayName(ally),
+        sublabel: ally.linked_character ? (ownerName ? `Linked • ${ownerName}` : 'Linked guild member') : 'Custom ally',
+        ownerName,
+      }
     })
     const guildOptions = availableGuildCharacters.map((character) => ({
       key: `guild-${character.id}`,
@@ -67,7 +63,6 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
       label: character.name,
       sublabel: 'Guild member',
     }))
-
     const combined = [...allyOptions, ...guildOptions]
     const filtered = query
       ? combined.filter((option) =>

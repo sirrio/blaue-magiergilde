@@ -5,11 +5,14 @@ const appJoin = require('../interactions/appJoin');
 const characterApproval = require('../interactions/characterApproval');
 const characters = require('../interactions/characters');
 const newGame = require('../interactions/newGame');
+const { handleSupportTicketInteraction } = require('../supportTickets');
+const { buildErrorEmbed } = require('../utils/noticeEmbeds');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
         try {
+            if (await handleSupportTicketInteraction(interaction)) return;
             if (await appJoin.handle(interaction)) return;
             if (await characterApproval.handle(interaction)) return;
             if (await characters.handle(interaction)) return;
@@ -25,7 +28,11 @@ module.exports = {
                     await interaction.deferReply({ flags: 64 });
                 }
                 if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({ content: 'You are not allowed to use this command.', components: [] });
+                    await interaction.editReply({
+                        content: '',
+                        embeds: [buildErrorEmbed('Access denied', 'You are not allowed to use this command.')],
+                        components: [],
+                    });
                 }
                 return;
             }
@@ -39,7 +46,11 @@ module.exports = {
                 await interaction.deferReply({ flags: 64 });
             }
             if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ content: 'An error occurred.', components: [] });
+                await interaction.editReply({
+                    content: '',
+                    embeds: [buildErrorEmbed('Unexpected error', 'An error occurred.')],
+                    components: [],
+                });
             }
         }
     },

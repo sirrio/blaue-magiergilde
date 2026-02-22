@@ -1,6 +1,7 @@
 const { MessageFlags } = require('discord.js');
 const { resolveApiBaseUrl } = require('../appUrls');
 const { withInsecureDispatcher } = require('../httpClient');
+const { buildErrorEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
 
 function parseApprovalAction(customId) {
     if (!customId || !customId.startsWith('character-approval:')) return null;
@@ -29,7 +30,7 @@ async function handle(interaction) {
 
     if (!appUrl || !token) {
         await interaction.reply({
-            content: 'Bot HTTP is not configured. Set BOT_APP_URL and BOT_HTTP_TOKEN.',
+            embeds: [buildErrorEmbed('Bot HTTP not configured', 'Set BOT_APP_URL and BOT_HTTP_TOKEN.')],
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -55,7 +56,9 @@ async function handle(interaction) {
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error('[bot] Character approval request failed.', { endpoint, error: message });
-        await interaction.editReply({ content: `Failed to reach the app (${endpoint}).` });
+        await interaction.editReply({
+            embeds: [buildErrorEmbed('App request failed', `Failed to reach the app (${endpoint}).`)],
+        });
         return true;
     }
 
@@ -69,12 +72,16 @@ async function handle(interaction) {
         }
 
         const message = detail ? `Request failed: ${detail}` : 'Request failed.';
-        await interaction.editReply({ content: message });
+        await interaction.editReply({
+            embeds: [buildErrorEmbed('Approval update failed', message)],
+        });
         return true;
     }
 
     const verb = action.status === 'approved' ? 'Approved' : 'Declined';
-    await interaction.editReply({ content: `${verb} character.` });
+    await interaction.editReply({
+        embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
+    });
     return true;
 }
 
