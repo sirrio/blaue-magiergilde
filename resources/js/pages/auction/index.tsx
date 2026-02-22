@@ -424,7 +424,6 @@ const HiddenBidModal = ({
   const defaultMaxAmount = Math.max(getStartingBid(auctionItem), 1)
   const { data, setData, post, reset } = useForm({
     bidder_discord_id: '',
-    bidder_name: '',
     max_amount: defaultMaxAmount,
   })
   const hiddenBids = useMemo<AuctionHiddenBid[]>(
@@ -451,25 +450,24 @@ const HiddenBidModal = ({
 
     const existingHiddenBid = hiddenBids.find((entry) => entry.bidder_discord_id === candidate.id)
     setData('bidder_discord_id', candidate.id)
-    setData('bidder_name', candidate.name)
     setData('max_amount', existingHiddenBid?.max_amount ?? defaultMaxAmount)
   }
 
   const handleSubmit = () => {
-    if (!data.bidder_discord_id || !data.bidder_name) {
-      toast.show('Provide Discord ID and name.', 'error')
+    if (!data.bidder_discord_id) {
+      toast.show('Provide Discord ID.', 'error')
       return
     }
 
     post(route('admin.auction-items.hidden-bids.store', { auctionItem: auctionItem.id }), {
       preserveScroll: true,
       onSuccess: () => {
-        reset('bidder_discord_id', 'bidder_name')
+        reset('bidder_discord_id')
         setData('max_amount', defaultMaxAmount)
         router.reload()
       },
       onError: (errors) => {
-        const message = errors.max_amount || errors.bidder_discord_id || errors.bidder_name
+        const message = errors.max_amount || errors.bidder_discord_id
         if (message) {
           toast.show(String(message), 'error')
         }
@@ -505,7 +503,9 @@ const HiddenBidModal = ({
       </ModalTrigger>
       <ModalTitle>Hidden bids</ModalTitle>
       <ModalContent>
-        <p className="mb-3 text-xs text-base-content/60">Max bids before the auction, one per player.</p>
+        <p className="mb-3 text-xs text-base-content/60">
+          Max bids before the auction, one per player. Name is resolved automatically from Discord guilds.
+        </p>
         {candidates.length > 0 ? (
           <Select value={selectedCandidateId} onChange={handleCandidateChange}>
             <SelectLabel>Select live candidate</SelectLabel>
@@ -521,9 +521,6 @@ const HiddenBidModal = ({
         ) : null}
         <Input value={data.bidder_discord_id} onChange={(e) => setData('bidder_discord_id', e.target.value)}>
           Discord ID
-        </Input>
-        <Input value={data.bidder_name} onChange={(e) => setData('bidder_name', e.target.value)}>
-          Name
         </Input>
         <Input
           type="number"

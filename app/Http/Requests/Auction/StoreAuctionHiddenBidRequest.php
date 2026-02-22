@@ -26,9 +26,18 @@ class StoreAuctionHiddenBidRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'bidder_name' => ['required', 'string', 'max:255'],
             'bidder_discord_id' => ['required', 'string', 'regex:/^[0-9]{5,}$/', 'max:32'],
             'max_amount' => ['required', 'integer', 'min:1'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'bidder_discord_id.regex' => 'Discord ID must contain only digits.',
         ];
     }
 }

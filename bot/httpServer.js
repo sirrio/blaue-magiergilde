@@ -7,6 +7,7 @@ const { postShopToChannel, updateShopPost, updateShopItemPost } = require('./sho
 const { getSnapshot } = require('./voiceStateCache');
 const { runGameAnnouncementSync } = require('./discordGameSync');
 const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
+const { guildIds: configuredGuildIds } = require('./config');
 const {
     postCharacterApprovalAnnouncement,
     sendCharacterApprovalDm,
@@ -117,6 +118,7 @@ function startHttpServer(client) {
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
         const isDiscordOwnersStatus = path === '/discord-owners/status';
+        const isDiscordMemberLookup = path === '/discord-member-lookup';
         const isCharacterApprovalNotify = path === '/character-approval/notify';
         const isCharacterApprovalPending = path === '/character-approval/pending';
         const isCharacterApprovalUpdate = path === '/character-approval/update';
@@ -139,6 +141,7 @@ function startHttpServer(client) {
             isDiscordThreads ||
             isDiscordBackupStatus ||
             isDiscordBackupChannel ||
+            isDiscordMemberLookup ||
             isCharacterApprovalNotify ||
             isCharacterApprovalPending ||
             isCharacterApprovalUpdate ||
@@ -225,6 +228,57 @@ function startHttpServer(client) {
                 updated_at: ownerIdsUpdatedAt() ? ownerIdsUpdatedAt().toISOString() : null,
                 owners,
             });
+            return;
+        }
+
+        if (isDiscordMemberLookup) {
+            const discordUserId = String(payload?.discord_user_id || '').trim();
+            if (!discordUserId || !/^[0-9]{5,}$/.test(discordUserId)) {
+                logReject(req, 'invalid discord_user_id');
+                respondJson(res, 422, { error: 'Invalid discord_user_id.' });
+                return;
+            }
+
+            const requestedGuildIds = Array.isArray(payload?.guild_ids)
+                ? payload.guild_ids.map(id => String(id).trim()).filter(id => /^[0-9]{5,}$/.test(id))
+                : [];
+
+            const knownGuildIds = requestedGuildIds.length
+                ? requestedGuildIds
+                : (Array.isArray(configuredGuildIds) && configuredGuildIds.length
+                    ? configuredGuildIds
+                    : Array.from(client.guilds.cache.keys()));
+
+            if (!knownGuildIds.length) {
+                logReject(req, 'no guild scope for member lookup');
+                respondJson(res, 422, { error: 'No guild scope available for member lookup.' });
+                return;
+            }
+
+            for (const guildId of knownGuildIds) {
+                try {
+                    const guild = await client.guilds.fetch(guildId);
+                    const member = await guild.members.fetch(discordUserId);
+                    const displayName = member.displayName || member.user?.globalName || member.user?.username || '';
+                    const username = member.user?.username || '';
+
+                    if (displayName || username) {
+                        respondJson(res, 200, {
+                            status: 'found',
+                            guild_id: guild.id,
+                            discord_user_id: discordUserId,
+                            display_name: displayName || username,
+                            username,
+                        });
+                        return;
+                    }
+                } catch {
+                    // Try next guild.
+                }
+            }
+
+            logReject(req, 'discord member not found in configured guilds');
+            respondJson(res, 404, { error: 'Discord member not found in configured guilds.' });
             return;
         }
 
