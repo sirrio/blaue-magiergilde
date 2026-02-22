@@ -345,6 +345,7 @@ export default function Index({
   const queryParamsWithoutLegacyInfo = Object.fromEntries(
     Object.entries(currentQueryParams).filter(([key]) => key !== 'info'),
   ) as Record<string, string | number | undefined>
+  const selectedSource = String(currentQueryParams.source ?? '')
   const NAV_OPTIONS = { preserveState: true, preserveScroll: true }
   const rarityLabelMap = Object.fromEntries(rarityFilters.map((entry) => [entry.value, entry.label]))
   const typeLabelMap = Object.fromEntries(typeFilters.map((entry) => [entry.value, entry.label]))
@@ -352,6 +353,9 @@ export default function Index({
   const shopLabelMap = Object.fromEntries(shopFilters.map((entry) => [entry.value, entry.label]))
   const spellLabelMap = Object.fromEntries(spellFilters.map((entry) => [entry.value, entry.label]))
   const rulingLabelMap = Object.fromEntries(rulingFilters.map((entry) => [entry.value, entry.label]))
+  const sourceLabelMap = Object.fromEntries(
+    sources.map((source) => [String(source.id), `${source.shortcode} - ${source.name}`]),
+  )
 
   const navigateTo = (href: string) => {
     router.get(href, {}, NAV_OPTIONS)
@@ -396,6 +400,13 @@ export default function Index({
     navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value }))
   }
 
+  const handleSourceFilterChange = (value: string) => {
+    navigateTo(route(indexRoute, {
+      ...queryParamsWithoutLegacyInfo,
+      source: value || null,
+    }))
+  }
+
   const activeFilters = [
     search ? `Search: ${search}` : null,
     currentQueryParams.rarity
@@ -412,6 +423,11 @@ export default function Index({
       : null,
     currentQueryParams.spell
       ? `Auto-roll: ${spellLabelMap[String(currentQueryParams.spell)] ?? currentQueryParams.spell}`
+      : null,
+    currentQueryParams.source
+      ? `Source: ${String(currentQueryParams.source) === 'none'
+        ? 'No source'
+        : (sourceLabelMap[String(currentQueryParams.source)] ?? currentQueryParams.source)}`
       : null,
     currentQueryParams.ruling
       ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
@@ -440,7 +456,7 @@ export default function Index({
             <div className="space-y-1">
               <p className="text-xs uppercase text-base-content/50">Filters</p>
               <h2 className="text-lg font-semibold">Inventory filters</h2>
-              <p className="text-xs text-base-content/70">Refine the list by status, rarity, and rulings.</p>
+              <p className="text-xs text-base-content/70">Refine the list by status, source, rarity, and rulings.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">{totalItems} items</span>
@@ -460,6 +476,22 @@ export default function Index({
               Search
             </Input>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-base-content/60">Source:</span>
+                <select
+                  className="select select-xs w-56"
+                  value={selectedSource}
+                  onChange={(event) => handleSourceFilterChange(event.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="none">No source</option>
+                  {sources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.shortcode} - {source.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-base-content/60">Rarity:</span>
                 {renderFilterOptions('rarity', rarityFilters)}

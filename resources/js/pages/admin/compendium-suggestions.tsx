@@ -59,6 +59,23 @@ const formatValue = (value: unknown): string => {
   return String(value)
 }
 
+const formatFieldValue = (
+  field: string,
+  value: unknown,
+  sourceLabels: Record<string, string>,
+): string => {
+  if (field === 'source_id') {
+    if (value === null || value === undefined || value === '') {
+      return 'none'
+    }
+
+    const sourceKey = String(value)
+    return sourceLabels[sourceKey] ?? sourceKey
+  }
+
+  return formatValue(value)
+}
+
 const statusClass: Record<SuggestionStatus, string> = {
   pending: 'badge-warning',
   approved: 'badge-success',
@@ -126,10 +143,12 @@ export default function CompendiumSuggestionsPage({
   suggestions,
   filters,
   counts,
+  sourceLabels = {},
 }: {
   suggestions: CompendiumSuggestionRecord[]
   filters: SuggestionFilters
   counts: Record<string, number>
+  sourceLabels?: Record<string, string>
 }) {
   const currentParams = route().params as Record<string, string | number | undefined>
   const [search, setSearch] = useState(String(filters.search ?? ''))
@@ -254,9 +273,9 @@ export default function CompendiumSuggestionsPage({
                           {changeEntries.map(([field, value]) => (
                             <div key={field}>
                               <span className="font-medium">{fieldLabels[field] ?? field}:</span>{' '}
-                              <span className="text-base-content/70">{formatValue(suggestion.current_snapshot?.[field])}</span>{' '}
+                              <span className="text-base-content/70">{formatFieldValue(field, suggestion.current_snapshot?.[field], sourceLabels)}</span>{' '}
                               <span className="text-base-content/50">→</span>{' '}
-                              <span>{formatValue(value)}</span>
+                              <span>{formatFieldValue(field, value, sourceLabels)}</span>
                             </div>
                           ))}
                         </div>

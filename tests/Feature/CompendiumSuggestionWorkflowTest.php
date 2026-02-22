@@ -2,6 +2,7 @@
 
 use App\Models\CompendiumSuggestion;
 use App\Models\Item;
+use App\Models\Source;
 use App\Models\Spell;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -269,4 +270,22 @@ test('non admin users cannot review suggestions', function () {
     $this->actingAs($user)
         ->patch(route('admin.compendium-suggestions.reject', $suggestion), [])
         ->assertForbidden();
+});
+
+test('admin suggestions index includes source labels for display', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->get(route('admin.compendium-suggestions.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'] ?? [];
+    $sourceLabels = $props['sourceLabels'] ?? [];
+
+    expect($sourceLabels)->toBeArray();
+    expect($sourceLabels[(string) $source->id] ?? null)->toBe("Player's Handbook");
 });

@@ -24,6 +24,7 @@ class ItemController extends Controller
         $guild = request('guild');
         $shop = request('shop');
         $spell = request('spell');
+        $source = request('source');
         $ruling = request('ruling');
         $searchTerm = request('search');
 
@@ -59,6 +60,11 @@ class ItemController extends Controller
             $itemQuery->where(function ($query) {
                 $query->whereNull('default_spell_roll_enabled')->orWhere('default_spell_roll_enabled', false);
             });
+        }
+        if ($source === 'none') {
+            $itemQuery->whereNull('source_id');
+        } elseif (is_numeric($source)) {
+            $itemQuery->where('source_id', (int) $source);
         }
         if ($ruling === 'changed') {
             $itemQuery->where('ruling_changed', true);

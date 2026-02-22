@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Gavel,
   Map,
+  MessageSquarePlus,
   Menu,
   Package,
   ScrollText,
@@ -67,7 +68,7 @@ const adminSections = [
     links: [
       { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
       { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
-      { name: 'Suggestions', route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: Sparkles },
+      { name: 'Suggestions', route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: MessageSquarePlus },
     ],
   },
   {

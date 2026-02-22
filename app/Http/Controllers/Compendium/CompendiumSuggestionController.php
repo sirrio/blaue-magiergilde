@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\ReviewCompendiumSuggestionRequest;
 use App\Http\Requests\Compendium\StoreCompendiumSuggestionRequest;
 use App\Models\CompendiumSuggestion;
 use App\Models\Item;
+use App\Models\Source;
 use App\Models\Spell;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -123,6 +124,10 @@ class CompendiumSuggestionController extends Controller
 
         $itemNames = $this->itemNamesForSuggestions($suggestions);
         $spellNames = $this->spellNamesForSuggestions($suggestions);
+        $sourceLabels = Source::query()
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->map(static fn ($name): string => (string) $name);
 
         return Inertia::render('admin/compendium-suggestions', [
             'suggestions' => $suggestions->map(function (CompendiumSuggestion $suggestion) use ($itemNames, $spellNames): array {
@@ -163,6 +168,7 @@ class CompendiumSuggestionController extends Controller
                 CompendiumSuggestion::STATUS_APPROVED => CompendiumSuggestion::query()->where('status', CompendiumSuggestion::STATUS_APPROVED)->count(),
                 CompendiumSuggestion::STATUS_REJECTED => CompendiumSuggestion::query()->where('status', CompendiumSuggestion::STATUS_REJECTED)->count(),
             ],
+            'sourceLabels' => $sourceLabels,
         ]);
     }
 
