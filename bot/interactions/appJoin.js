@@ -1,5 +1,5 @@
 const { createUserForDiscord } = require('../appDb');
-const { buildJoinConfirmButtons, notLinkedContent } = require('../linkingUi');
+const { buildJoinConfirmButtons, legalLinksLine, notLinkedContent } = require('../linkingUi');
 const { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
@@ -46,6 +46,9 @@ async function handle(interaction) {
                 'This creates a new user account linked to your Discord ID.',
                 '',
                 '**Do not do this** if you already have an app account (otherwise you will end up with two accounts).',
+                '',
+                'By creating an account you confirm the legal notices below:',
+                legalLinksLine(),
             ].join('\n'))],
             components: [buildJoinConfirmButtons(ownerDiscordId)],
         });

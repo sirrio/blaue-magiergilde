@@ -1,4 +1,18 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { resolvePublicBaseUrl } = require('./appUrls');
+
+function legalLinksLine() {
+    const baseUrl = resolvePublicBaseUrl();
+    if (!baseUrl) {
+        return 'Rechtliches: Datenschutz und Impressum sind auf der Blaue-Magiergilde-Website verfuegbar.';
+    }
+
+    return [
+        '**Rechtliches**',
+        `Datenschutz: <${baseUrl}/datenschutz>`,
+        `Impressum: <${baseUrl}/impressum>`,
+    ].join('\n');
+}
 
 function notLinkedContent() {
     return [
@@ -9,6 +23,8 @@ function notLinkedContent() {
         'If you **do not have** an account yet, you can create a new app account here (linked to your Discord ID).',
         '',
         '**Important:** If you already use the app, *do not create a new account*; connect Discord in your profile instead.',
+        '',
+        legalLinksLine(),
     ].join('\n');
 }
 
@@ -65,5 +81,6 @@ module.exports = {
     replyNotLinked,
     buildNotLinkedButtons,
     buildJoinConfirmButtons,
+    legalLinksLine,
     notLinkedContent,
 };
