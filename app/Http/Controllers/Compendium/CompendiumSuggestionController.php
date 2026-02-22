@@ -181,10 +181,17 @@ class CompendiumSuggestionController extends Controller
         }
 
         DB::transaction(function () use ($request, $compendiumSuggestion): void {
+            $rawChanges = $this->extractRawChangesPayload($compendiumSuggestion->proposed_payload);
             $changes = $this->normalizeChanges(
                 $compendiumSuggestion->kind,
-                (array) ($compendiumSuggestion->proposed_payload ?? []),
+                $rawChanges,
             );
+
+            if ($changes === [] && $rawChanges !== []) {
+                throw ValidationException::withMessages([
+                    'suggestion' => 'No applicable fields were found in this suggestion payload.',
+                ]);
+            }
 
             if ($changes !== []) {
                 $target = $this->resolveTarget($compendiumSuggestion->kind, $compendiumSuggestion->target_id);
@@ -210,6 +217,41 @@ class CompendiumSuggestionController extends Controller
         });
 
         return redirect()->back();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractRawChangesPayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            if (isset($payload['changes']) && is_array($payload['changes'])) {
+                /** @var array<string, mixed> $nested */
+                $nested = $payload['changes'];
+
+                return $nested;
+            }
+
+            /** @var array<string, mixed> $payload */
+            return $payload;
+        }
+
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            if (is_array($decoded)) {
+                if (isset($decoded['changes']) && is_array($decoded['changes'])) {
+                    /** @var array<string, mixed> $nested */
+                    $nested = $decoded['changes'];
+
+                    return $nested;
+                }
+
+                /** @var array<string, mixed> $decoded */
+                return $decoded;
+            }
+        }
+
+        return [];
     }
 
     public function reject(ReviewCompendiumSuggestionRequest $request, CompendiumSuggestion $compendiumSuggestion): RedirectResponse

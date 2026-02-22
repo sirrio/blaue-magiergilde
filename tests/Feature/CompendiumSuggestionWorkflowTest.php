@@ -199,6 +199,83 @@ test('admin can approve pending spell suggestion and apply changes', function ()
         ->and($suggestion->reviewed_by)->toBe($admin->id);
 });
 
+test('admin can approve suggestion with legacy nested changes payload', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $submitter = User::factory()->create(['is_admin' => false]);
+    $item = Item::factory()->create([
+        'name' => 'Potion of Healing',
+        'cost' => '50 GP',
+        'rarity' => 'common',
+        'type' => 'consumable',
+    ]);
+
+    $suggestion = CompendiumSuggestion::query()->create([
+        'user_id' => $submitter->id,
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => $item->id,
+        'status' => CompendiumSuggestion::STATUS_PENDING,
+        'proposed_payload' => [
+            'changes' => [
+                'cost' => '75 GP',
+                'rarity' => 'uncommon',
+            ],
+        ],
+        'current_snapshot' => [
+            'name' => $item->name,
+            'url' => $item->url,
+            'cost' => $item->cost,
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'source_id' => $item->source_id,
+        ],
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.compendium-suggestions.approve', $suggestion), [])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $item->refresh();
+    $suggestion->refresh();
+
+    expect($item->cost)->toBe('75 GP')
+        ->and($item->rarity)->toBe('uncommon')
+        ->and($suggestion->status)->toBe(CompendiumSuggestion::STATUS_APPROVED);
+});
+
+test('approve fails when payload has no applicable fields', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $submitter = User::factory()->create(['is_admin' => false]);
+    $item = Item::factory()->create();
+
+    $suggestion = CompendiumSuggestion::query()->create([
+        'user_id' => $submitter->id,
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => $item->id,
+        'status' => CompendiumSuggestion::STATUS_PENDING,
+        'proposed_payload' => [
+            'unsupported_field' => 'value',
+        ],
+        'current_snapshot' => [
+            'name' => $item->name,
+            'url' => $item->url,
+            'cost' => $item->cost,
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'source_id' => $item->source_id,
+        ],
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.compendium-suggestions.approve', $suggestion), [])
+        ->assertRedirect()
+        ->assertSessionHasErrors(['suggestion']);
+
+    $suggestion->refresh();
+
+    expect($suggestion->status)->toBe(CompendiumSuggestion::STATUS_PENDING);
+});
+
 test('admin can reject pending suggestion without applying changes', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $submitter = User::factory()->create(['is_admin' => false]);
