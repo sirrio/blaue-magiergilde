@@ -15,6 +15,8 @@ const {
     upsertHiddenBidForDiscord,
 } = require('../appDb');
 const { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
+const { updateManageMessage } = require('../utils/updateManageMessage');
+const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
 const SELECT_ID_PREFIX = 'hiddenBidSelect_';
 const REFRESH_ID_PREFIX = 'hiddenBidRefresh_';
@@ -47,6 +49,81 @@ function summarizeAuctionItem(item) {
         label: truncateText(label, 100),
         description: truncateText(description, 100),
     };
+}
+
+function buildHiddenBidLine(item) {
+    const currency = String(item.auction_currency || 'GP').trim() || 'GP';
+    const itemName = item.item_name || `Item #${item.auction_item_id}`;
+    const notes = String(item.notes || '').trim();
+    const itemLabel = notes ? `${itemName} - ${notes}` : itemName;
+    const hiddenMax = item.user_hidden_max == null ? null : Number(item.user_hidden_max);
+    if (!Number.isFinite(hiddenMax)) {
+        return null;
+    }
+
+    const auctionTitle = String(item.auction_title || '').trim();
+    const context = auctionTitle ? ` (${auctionTitle})` : '';
+    const line = `• **${truncateText(itemLabel, 90)}**${context}\n  Max: **${hiddenMax} ${currency}** · Min now: ${item.min_bid} · Step: ${item.step}`;
+    return line;
+}
+
+function buildHiddenBidEmbeds(items) {
+    const configured = items
+        .filter(item => item.user_hidden_max != null)
+        .sort((a, b) => {
+            const amountDelta = Number(b.user_hidden_max || 0) - Number(a.user_hidden_max || 0);
+            if (amountDelta !== 0) return amountDelta;
+            const createdA = new Date(a.auction_created_at || 0).getTime();
+            const createdB = new Date(b.auction_created_at || 0).getTime();
+            return createdB - createdA;
+        })
+        .map(buildHiddenBidLine)
+        .filter(line => typeof line === 'string');
+
+    if (configured.length === 0) {
+        return [
+            buildInfoEmbed(
+                'Your hidden bids',
+                'You have no hidden bids yet.',
+            ),
+        ];
+    }
+
+    const embeds = [];
+    let currentChunk = [];
+    let currentLength = 0;
+    let chunkIndex = 1;
+    const MAX_DESCRIPTION = 3800;
+
+    for (const line of configured) {
+        const addition = (currentChunk.length === 0 ? 0 : 2) + line.length;
+        if (currentChunk.length > 0 && currentLength + addition > MAX_DESCRIPTION) {
+            embeds.push(
+                buildInfoEmbed(
+                    `Your hidden bids (${chunkIndex})`,
+                    currentChunk.join('\n\n'),
+                ),
+            );
+            chunkIndex += 1;
+            currentChunk = [line];
+            currentLength = line.length;
+            continue;
+        }
+
+        currentChunk.push(line);
+        currentLength += addition;
+    }
+
+    if (currentChunk.length > 0) {
+        embeds.push(
+            buildInfoEmbed(
+                `Your hidden bids${embeds.length > 0 ? ` (${chunkIndex})` : ''}`,
+                currentChunk.join('\n\n'),
+            ),
+        );
+    }
+
+    return embeds;
 }
 
 function parseOwnerIdFromCustomId(customId, prefix) {
@@ -96,7 +173,8 @@ async function buildPickerPayload({ ownerId, noticeEmbed = null }) {
         summaryLines.push(`Showing first **${MAX_OPTIONS}** items. Use \`/mg-hiddenbid\` after your auction advances.`);
     }
 
-    embeds.push(buildInfoEmbed('Hidden bids', summaryLines.join('\n')));
+    embeds.push(buildInfoEmbed('Hidden bid dashboard', summaryLines.join('\n')));
+    embeds.push(...buildHiddenBidEmbeds(items));
 
     const components = [];
     if (visibleItems.length > 0) {
@@ -227,17 +305,13 @@ async function handleModal(interaction) {
         return true;
     }
 
-    if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    }
-
     const rawInput = String(interaction.fields.getTextInputValue('hiddenBidMaxAmount') || '').replace(/\s+/g, '');
     if (!/^[0-9]+$/.test(rawInput)) {
         const payload = await buildPickerPayload({
             ownerId: parsed.ownerId,
             noticeEmbed: buildErrorEmbed('Invalid amount', 'Please enter a whole number.'),
         });
-        await interaction.editReply(payload);
+        await updateManageMessage(interaction, payload);
         return true;
     }
 
@@ -258,7 +332,7 @@ async function handleModal(interaction) {
             ownerId: parsed.ownerId,
             noticeEmbed: buildErrorEmbed('Hidden bid rejected', message),
         });
-        await interaction.editReply(payload);
+        await updateManageMessage(interaction, payload);
         return true;
     }
 
@@ -271,11 +345,15 @@ async function handleModal(interaction) {
         ownerId: parsed.ownerId,
         noticeEmbed: successEmbed,
     });
-    await interaction.editReply(payload);
+    await updateManageMessage(interaction, payload);
     return true;
 }
 
 async function handle(interaction) {
+    if (interaction.isMessageComponent?.()) {
+        setManageMessageTarget(interaction);
+    }
+
     if (interaction.isButton()) {
         if (await handleRefresh(interaction)) return true;
         return false;
