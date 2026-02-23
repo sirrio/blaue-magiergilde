@@ -232,7 +232,7 @@ export default function BotOperationProgress({
   }
 
   return (
-    <div className={cn('mt-3 rounded-box border border-base-200 bg-base-50/40 p-3', className)}>
+    <div className={cn('mt-3 rounded-box border border-base-200 bg-base-100/40 p-3', className)}>
       <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
         <span className="font-semibold">Bot action</span>
         <span className="rounded-full border border-base-200 px-2 py-0.5">

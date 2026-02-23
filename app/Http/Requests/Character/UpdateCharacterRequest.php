@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Character;
 
 use App\Models\Character;
+use App\Rules\ExternalCharacterLink;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -45,7 +46,7 @@ class UpdateCharacterRequest extends FormRequest
             'name' => 'required|string',
             'class' => 'required|array|min:1',
             'class.*' => 'integer|exists:character_classes,id',
-            'external_link' => 'required|url',
+            'external_link' => ['required', 'url', new ExternalCharacterLink],
             'version' => 'required|string',
             'dm_bubbles' => 'required|integer|min:0|max:1024',
             'dm_coins' => 'required|integer|min:0|max:1024',

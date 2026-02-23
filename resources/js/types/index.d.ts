@@ -25,15 +25,18 @@ export interface Auth {
 export interface User {
   id: number
   name: string
-  email: string
+  email: string | null
   discord_username?: string | null
   discord_display_name?: string | null
+  discord_id?: string | number | null
   avatar?: string
   created_at: string
   updated_at: string
   is_admin: boolean
   simplified_tracking?: boolean
   avatar_masked?: boolean
+  has_password?: boolean
+  needs_password_fallback?: boolean
 
   [key: string]: unknown // This allows for additional properties...
 }

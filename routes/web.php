@@ -22,6 +22,7 @@ require __DIR__.'/web/game.php';
 require __DIR__.'/web/games.php';
 require __DIR__.'/web/item.php';
 require __DIR__.'/web/spell.php';
+require __DIR__.'/web/compendium.php';
 require __DIR__.'/web/shop.php';
 require __DIR__.'/web/auction.php';
 require __DIR__.'/web/backstock.php';

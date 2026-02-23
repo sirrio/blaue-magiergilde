@@ -24,7 +24,7 @@ class ItemController extends Controller
         $guild = request('guild');
         $shop = request('shop');
         $spell = request('spell');
-        $info = request('info');
+        $source = request('source');
         $ruling = request('ruling');
         $searchTerm = request('search');
 
@@ -61,20 +61,10 @@ class ItemController extends Controller
                 $query->whereNull('default_spell_roll_enabled')->orWhere('default_spell_roll_enabled', false);
             });
         }
-        if ($info === 'complete') {
-            $itemQuery
-                ->whereNotNull('cost')
-                ->where('cost', '!=', '')
-                ->whereNotNull('url')
-                ->where('url', '!=', '');
-        } elseif ($info === 'missing') {
-            $itemQuery->where(function ($query) {
-                $query
-                    ->whereNull('cost')
-                    ->orWhere('cost', '')
-                    ->orWhereNull('url')
-                    ->orWhere('url', '');
-            });
+        if ($source === 'none') {
+            $itemQuery->whereNull('source_id');
+        } elseif (is_numeric($source)) {
+            $itemQuery->where('source_id', (int) $source);
         }
         if ($ruling === 'changed') {
             $itemQuery->where('ruling_changed', true);
@@ -113,6 +103,10 @@ class ItemController extends Controller
                 ->orderBy('shortcode')
                 ->orderBy('name')
                 ->get(['id', 'name', 'shortcode']),
+            'canManage' => request()->routeIs('admin.items.index'),
+            'indexRoute' => request()->routeIs('admin.items.index')
+                ? 'admin.items.index'
+                : 'compendium.items.index',
         ]);
     }
 

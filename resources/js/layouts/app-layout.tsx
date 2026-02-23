@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Gavel,
   Map,
+  MessageSquarePlus,
   Menu,
   Package,
   ScrollText,
@@ -29,9 +30,15 @@ interface AppLayoutProps {
 const menuLinks = [
   { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
   { name: 'Game Master Log', route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
+  { name: 'Compendium', route: 'compendium.items.index', method: 'get' as const, icon: Package },
   { name: 'Rooms', route: 'rooms.index', method: 'get' as const, icon: Map },
   { name: 'Games', route: 'games.index', method: 'get' as const, icon: CalendarDays },
   { name: 'Guild Handbook', route: 'handbook.index', method: 'get' as const, icon: BookOpen },
+]
+
+const compendiumLinks = [
+  { name: 'Items', route: 'compendium.items.index', method: 'get' as const, icon: Package },
+  { name: 'Spells', route: 'compendium.spells.index', method: 'get' as const, icon: Sparkles },
 ]
 
 const accountLinks = [
@@ -61,6 +68,7 @@ const adminSections = [
     links: [
       { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
       { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
+      { name: 'Suggestions', route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: MessageSquarePlus },
     ],
   },
   {
@@ -82,12 +90,21 @@ const adminSections = [
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth, discordConnected, handbookChannels, activeChannelId, features } =
     usePage<PageProps>().props
+  const needsPasswordFallback = Boolean(auth.user?.needs_password_fallback)
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
+  const compendiumDesktopRef = useRef<HTMLDetailsElement>(null)
+  const compendiumMobileRef = useRef<HTMLDetailsElement>(null)
   const handbookDesktopRef = useRef<HTMLDetailsElement>(null)
   const handbookMobileRef = useRef<HTMLDetailsElement>(null)
   useClickOutside(adminDetailsRef, () =>
     adminDetailsRef.current?.removeAttribute('open')
+  )
+  useClickOutside(compendiumDesktopRef, () =>
+    compendiumDesktopRef.current?.removeAttribute('open')
+  )
+  useClickOutside(compendiumMobileRef, () =>
+    compendiumMobileRef.current?.removeAttribute('open')
   )
   useClickOutside(handbookDesktopRef, () =>
     handbookDesktopRef.current?.removeAttribute('open')
@@ -98,6 +115,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const handbookChannelList = handbookChannels ?? []
   const showHandbookDropdown = handbookChannelList.length > 0
+  const showCompendiumDropdown = compendiumLinks.length > 0
+  const isCompendiumActive = route().current('compendium.items.index') || route().current('compendium.spells.index')
+  const isHandbookActive = route().current('handbook.index')
+  const compendiumLabel = 'Compendium'
   const handbookLabel = 'Guild Handbook'
   const filteredMenuLinks = menuLinks.filter((menuLink) => {
     if (menuLink.route === 'games.index') {
@@ -130,10 +151,37 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
               {filteredMenuLinks.map((menuLink) => (
-                menuLink.route === 'handbook.index' && showHandbookDropdown ? (
+                menuLink.route === 'compendium.items.index' && showCompendiumDropdown ? (
+                  <li key={menuLink.route} role="none">
+                    <details ref={compendiumMobileRef}>
+                      <summary className={cn('flex items-center', isCompendiumActive ? 'menu-active' : '')}>
+                        <menuLink.icon size={16} className="mr-2" />
+                        {compendiumLabel}
+                      </summary>
+                      <ul className="p-2">
+                        {compendiumLinks.map((link) => (
+                          <li key={link.route} role="none">
+                            <Link
+                              role="menuitem"
+                              method={link.method}
+                              className={cn(
+                                'flex items-center',
+                                route().current(link.route) ? 'menu-active' : ''
+                              )}
+                              href={route(link.route)}
+                            >
+                              <link.icon size={16} className="mr-2" />
+                              {link.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                ) : menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                   <li key={menuLink.route} role="none">
                     <details ref={handbookMobileRef}>
-                      <summary className="flex items-center">
+                      <summary className={cn('flex items-center', isHandbookActive ? 'menu-active' : '')}>
                         <menuLink.icon size={16} className="mr-2" />
                         {handbookLabel}
                       </summary>
@@ -210,12 +258,39 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <img className={cn('h-8 sm:h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
             <span className="hidden sm:inline">Blaue Magiergilde</span>
           </Link>
-          <ul className="menu menu-horizontal items-center space-x-1 px-1 hidden lg:flex ml-4" role="menubar">
+          <ul className="menu menu-horizontal ml-4 hidden items-center gap-1 px-1 lg:flex" role="menubar">
             {filteredMenuLinks.map((menuLink) => (
-              menuLink.route === 'handbook.index' && showHandbookDropdown ? (
+              menuLink.route === 'compendium.items.index' && showCompendiumDropdown ? (
+                <li key={menuLink.route} role="none">
+                  <details ref={compendiumDesktopRef}>
+                    <summary className={cn('flex items-center', isCompendiumActive ? 'menu-active' : '')}>
+                      <menuLink.icon size={16} className="mr-2" />
+                      {compendiumLabel}
+                    </summary>
+                    <ul className="z-30 w-44 p-2">
+                      {compendiumLinks.map((link) => (
+                        <li key={link.route} role="none">
+                          <Link
+                            role="menuitem"
+                            method={link.method}
+                            href={route(link.route)}
+                            className={cn(
+                              'flex items-center',
+                              route().current(link.route) ? 'menu-active' : ''
+                            )}
+                          >
+                            <link.icon size={16} className="mr-2" />
+                            {link.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </li>
+              ) : menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                 <li key={menuLink.route} role="none">
                   <details ref={handbookDesktopRef}>
-                    <summary className="flex items-center">
+                    <summary className={cn('flex items-center', isHandbookActive ? 'menu-active' : '')}>
                       <menuLink.icon size={16} className="mr-2" />
                       {handbookLabel}
                     </summary>
@@ -294,7 +369,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
         <div className="navbar-end flex-1 w-auto justify-end gap-2">
           <div className="dropdown dropdown-end">
-            <button tabIndex={0} aria-label="User menu" className="btn btn-ghost btn-circle avatar">
+            <button tabIndex={0} aria-label="User menu" className="btn btn-ghost btn-circle avatar relative overflow-visible">
               <div className="w-10 rounded-full">
                 {auth.user.avatar ? (
                   <img alt={auth.user.name} src={auth.user.avatar} />
@@ -304,9 +379,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </span>
                 )}
               </div>
+              {needsPasswordFallback ? (
+                <span className="badge badge-warning badge-xs absolute -right-0.5 -top-0.5" aria-label="Password fallback required">
+                  !
+                </span>
+              ) : null}
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
-              <li className="flex items-center space-x-3 px-4 py-2" role="none">
+              <li className="flex items-center gap-3 px-4 py-2" role="none">
                 <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-base-300 text-base-content flex items-center justify-center">
                   {auth.user.avatar ? (
                     <img alt={auth.user.name} src={auth.user.avatar} className="h-10 w-10 object-cover" />
@@ -330,8 +410,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </li>
               {accountLinks.map((link) => (
                 <li key={link.route} role="none">
-                  <Link role="menuitem" method={link.method} href={route(link.route)}>
-                    {link.name}
+                  <Link role="menuitem" method={link.method} href={route(link.route)} className="flex items-center justify-between gap-2">
+                    <span>{link.name}</span>
+                    {needsPasswordFallback && link.route === 'profile.edit' ? (
+                      <span className="badge badge-warning badge-xs">!</span>
+                    ) : null}
                   </Link>
                 </li>
               ))}

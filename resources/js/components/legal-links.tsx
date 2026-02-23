@@ -9,9 +9,9 @@ export default function LegalLinks({ variant = 'fixed', className }: { variant?:
 
   return (
     <div
-      className={cn(
-        variant === 'fixed'
-          ? 'fixed bottom-2 right-2 space-x-2 text-sm opacity-80'
+        className={cn(
+          variant === 'fixed'
+          ? 'fixed bottom-2 right-2 flex items-center gap-2 text-sm opacity-80'
           : 'flex items-center justify-center gap-4 text-sm opacity-70',
         className
       )}

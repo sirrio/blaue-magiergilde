@@ -16,7 +16,7 @@ it('allows owners to create draft characters', function () {
         ->post(route('characters.store'), [
             'name' => 'Draft Mage',
             'class' => [$class->id],
-            'external_link' => 'https://example.com',
+            'external_link' => 'https://www.dndbeyond.com/characters/100001',
             'start_tier' => 'bt',
             'version' => '2024',
             'dm_bubbles' => 0,
@@ -43,7 +43,7 @@ it('rejects epic tier as start tier', function () {
         ->post(route('characters.store'), [
             'name' => 'Invalid Start Tier',
             'class' => [$class->id],
-            'external_link' => 'https://example.com',
+            'external_link' => 'https://www.dndbeyond.com/characters/100002',
             'start_tier' => 'et',
             'version' => '2024',
             'dm_bubbles' => 0,
@@ -56,6 +56,76 @@ it('rejects epic tier as start tier', function () {
         ->assertSessionHasErrors('start_tier');
 });
 
+it('rejects dashboard URLs as external link on character create', function () {
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+
+    Config::set('app.url', 'https://blaue-magiergilde.test');
+
+    $this->actingAs($user)
+        ->post(route('characters.store'), [
+            'name' => 'Invalid External Link',
+            'class' => [$class->id],
+            'external_link' => 'https://blaue-magiergilde.test/characters',
+            'start_tier' => 'bt',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+        ])
+        ->assertSessionHasErrors('external_link');
+});
+
+it('rejects non dndbeyond URLs as external link on character create', function () {
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('characters.store'), [
+            'name' => 'Invalid External Link',
+            'class' => [$class->id],
+            'external_link' => 'https://example.com/characters/test-hero',
+            'start_tier' => 'bt',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+        ])
+        ->assertSessionHasErrors('external_link');
+});
+
+it('rejects dashboard URLs as external link on character update', function () {
+    $user = User::factory()->create();
+    $class = CharacterClass::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'is_filler' => false,
+        'external_link' => 'https://www.dndbeyond.com/characters/123456',
+    ]);
+
+    Config::set('app.url', 'https://blaue-magiergilde.test');
+
+    $this->actingAs($user)
+        ->put(route('characters.update', $character), [
+            'name' => $character->name,
+            'class' => [$class->id],
+            'external_link' => 'https://blaue-magiergilde.test/characters',
+            'version' => $character->version,
+            'dm_bubbles' => $character->dm_bubbles,
+            'dm_coins' => $character->dm_coins,
+            'bubble_shop_spend' => $character->bubble_shop_spend,
+            'is_filler' => $character->is_filler,
+            'faction' => $character->faction,
+            'notes' => $character->notes,
+        ])
+        ->assertSessionHasErrors('external_link');
+});
+
 it('forces draft on create even when owners submit pending directly', function () {
     Config::set('features.character_status_switch', true);
 
@@ -66,7 +136,7 @@ it('forces draft on create even when owners submit pending directly', function (
         ->post(route('characters.store'), [
             'name' => 'Forced Draft While Enabled',
             'class' => [$class->id],
-            'external_link' => 'https://example.com',
+            'external_link' => 'https://www.dndbeyond.com/characters/100003',
             'start_tier' => 'bt',
             'version' => '2024',
             'dm_bubbles' => 0,
@@ -96,7 +166,7 @@ it('forces draft on create when character status switching is disabled', functio
         ->post(route('characters.store'), [
             'name' => 'Forced Draft Mage',
             'class' => [$class->id],
-            'external_link' => 'https://example.com',
+            'external_link' => 'https://www.dndbeyond.com/characters/100004',
             'start_tier' => 'bt',
             'version' => '2024',
             'dm_bubbles' => 0,

@@ -502,7 +502,7 @@ export default function GamesIndex({ games, pagination, perPageOptions, lastSync
                                 {dayGames.slice(0, 2).map((game) => (
                                   <div key={game.discord_message_id} className="flex items-center gap-1">
                                     {game.tier ? <LogoTier tier={game.tier.toLowerCase()} width={12} /> : null}
-                                    <span className="text-base-content/70">{game.timeLabel ?? 'TBD'}</span>
+                                    <span className="text-base-content/70">{game.timeLabel ?? 'Unknown time'}</span>
                                     <span className="line-clamp-1">{game.title}</span>
                                   </div>
                                 ))}
@@ -551,7 +551,7 @@ export default function GamesIndex({ games, pagination, perPageOptions, lastSync
                                     ? game.timeLabel
                                       ? `${startsDate} · ${game.timeLabel}`
                                       : startsDate
-                                    : 'TBD'
+                                    : 'Unknown time'
                                   const isPast = game.startsDate ? game.startsDate < now : true
 
                                   return (

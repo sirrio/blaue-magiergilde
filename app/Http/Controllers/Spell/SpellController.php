@@ -20,7 +20,6 @@ class SpellController extends Controller
         $spellSchool = request('spell_school', null);
         $spellLevel = request('spell_level', null);
         $guild = request('guild');
-        $info = request('info');
         $ruling = request('ruling');
         $searchTerm = request('search', '');
 
@@ -43,21 +42,6 @@ class SpellController extends Controller
                 $query->whereNull('guild_enabled')->orWhere('guild_enabled', false);
             });
         }
-        if ($info === 'complete') {
-            $spellQuery
-                ->whereNotNull('url')
-                ->where('url', '!=', '')
-                ->whereNotNull('spell_school')
-                ->where('spell_school', '!=', '');
-        } elseif ($info === 'missing') {
-            $spellQuery->where(function ($query) {
-                $query
-                    ->whereNull('url')
-                    ->orWhere('url', '')
-                    ->orWhereNull('spell_school')
-                    ->orWhere('spell_school', '');
-            });
-        }
         if ($ruling === 'changed') {
             $spellQuery->where('ruling_changed', true);
         } elseif ($ruling === 'none') {
@@ -78,6 +62,10 @@ class SpellController extends Controller
                 ->orderBy('shortcode')
                 ->orderBy('name')
                 ->get(['id', 'name', 'shortcode']),
+            'canManage' => request()->routeIs('admin.spells.index'),
+            'indexRoute' => request()->routeIs('admin.spells.index')
+                ? 'admin.spells.index'
+                : 'compendium.spells.index',
         ]);
 
     }

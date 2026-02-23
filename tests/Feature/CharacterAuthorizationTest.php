@@ -16,7 +16,7 @@ test('users cannot update characters they do not own', function () {
     $response = $this->actingAs($otherUser)->patch(route('characters.update', $character), [
         'name' => 'Intruder Update',
         'class' => [$class->id],
-        'external_link' => 'https://example.com/character',
+        'external_link' => 'https://www.dndbeyond.com/characters/7654321',
         'version' => '2024',
         'dm_bubbles' => 1,
         'dm_coins' => 1,

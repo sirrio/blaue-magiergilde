@@ -435,7 +435,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-col gap-3 border-b border-base-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-lg font-bold sm:text-xl">
+            <h1 className="text-2xl font-bold">
               Game Master Log
               <span className="ml-3 inline-flex items-center rounded-full border border-base-200 px-2 py-0.5 text-xs text-base-content/60">
                 {totalSessions} Sessions
@@ -512,7 +512,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                       <Swords size={16} className="mr-2" />
                       Games
                     </div>
-                    <div className="flex items-center space-x-2 text-right text-xs">
+                    <div className="flex items-center gap-2 text-right text-xs">
                       <span className="w-16 inline-flex items-center justify-end gap-1 text-xs text-base-content/80">
                         {calculateBubbleByGames(games)} <Droplets size={14} />
                       </span>
@@ -526,7 +526,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                       <Plus size={14} className="mr-2" />
                       Filler Character
                     </div>
-                    <div className="flex items-center space-x-2 text-right text-xs">
+                    <div className="flex items-center gap-2 text-right text-xs">
                       <span className="w-16 inline-flex items-center justify-end gap-1 text-xs text-base-content/80">
                         {calculateBubbleByFillerCharacters(characters)} <Droplets size={14} />
                       </span>
@@ -540,7 +540,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                       <PartyPopper size={16} className="mr-2" />
                       Event Bonuses
                     </div>
-                    <div className="flex items-center space-x-2 text-right text-xs">
+                    <div className="flex items-center gap-2 text-right text-xs">
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs w-14 justify-end gap-1 px-0.5 normal-case"
@@ -559,7 +559,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">Other Bonuses</div>
-                    <div className="flex items-center space-x-2 text-right text-xs">
+                    <div className="flex items-center gap-2 text-right text-xs">
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs w-14 justify-end gap-1 px-0.5 normal-case"
@@ -589,7 +589,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                           {type === 'et' ? 'TotM/ Epic Bonuses' : 'TotM Bonus'}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2 text-right text-xs">
+                      <div className="flex items-center gap-2 text-right text-xs">
                         <button
                           type="button"
                           className="btn btn-ghost btn-xs w-14 justify-end gap-1 px-0.5 normal-case"
@@ -767,7 +767,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                           <div className="flex items-center gap-1">
                             <UpdateGameModal game={game}>
                               <Button size="xs" variant="ghost" modifier="square" aria-label="Edit game" title="Edit game">
-                                <Pencil size={13} />
+                                <Pencil size={14} />
                               </Button>
                             </UpdateGameModal>
                             <DestroyGameModal game={game}>
@@ -779,7 +779,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                                 aria-label="Delete game"
                                 title="Delete game"
                               >
-                                <Trash size={13} />
+                                <Trash size={14} />
                               </Button>
                             </DestroyGameModal>
                           </div>

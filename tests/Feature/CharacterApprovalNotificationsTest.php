@@ -54,7 +54,7 @@ it('posts a discord announcement when a newly created draft character is submitt
     $payload = [
         'name' => 'New Character',
         'class' => [$characterClass->id],
-        'external_link' => 'https://example.com/character',
+        'external_link' => 'https://www.dndbeyond.com/characters/3333333',
         'start_tier' => 'bt',
         'version' => '2024',
         'faction' => 'none',
@@ -109,6 +109,38 @@ it('posts a discord announcement when an existing draft character is submitted f
         return $request->url() === 'http://bot.test/character-approval/pending'
             && $request['channel_id'] === '9876543210'
             && $request['character_name'] === $character->name;
+    });
+});
+
+it('does not send dashboard URLs as external link in approval announcements', function () {
+    Config::set('app.url', 'https://blaue-magiergilde.test');
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/character-approval/pending' => Http::response(['status' => 'posted'], 200),
+    ]);
+
+    DiscordBotSetting::current()->update([
+        'character_approval_channel_id' => '9876543210',
+        'character_approval_channel_name' => 'approvals',
+        'character_approval_channel_guild_id' => '123123123',
+    ]);
+
+    $owner = User::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'external_link' => 'https://blaue-magiergilde.test/characters',
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character))
+        ->assertRedirect();
+
+    Http::assertSent(function ($request) use ($character) {
+        return $request->url() === 'http://bot.test/character-approval/pending'
+            && $request['character_name'] === $character->name
+            && ($request['external_link'] ?? null) === null;
     });
 });
 

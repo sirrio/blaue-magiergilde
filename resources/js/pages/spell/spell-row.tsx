@@ -8,8 +8,8 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { PageProps, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { ChevronDown, Copy, Pencil, Scale, Shield, Trash, XCircle } from 'lucide-react'
-import { type MouseEvent } from 'react'
+import { ChevronDown, Copy, MessageSquarePlus, Pencil, Scale, Shield, Trash, XCircle } from 'lucide-react'
+import { type MouseEvent, useEffect, useState } from 'react'
 
 const schoolColors: Record<string, string> = {
   abjuration: 'text-spell-abjuration',
@@ -39,7 +39,188 @@ const closeMenu = (event: MouseEvent<HTMLElement>) => {
   }
 }
 
-export default function SpellRow({ spell, sources = [] }: { spell: Spell; sources?: Source[] }) {
+const SuggestSpellUpdateModal = ({ spell, sources }: { spell: Spell; sources: Source[] }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { data, setData, reset, errors } = useForm({
+    name: spell.name ?? '',
+    url: spell.url ?? '',
+    legacy_url: spell.legacy_url ?? '',
+    spell_school: spell.spell_school ?? 'abjuration',
+    spell_level: spell.spell_level ?? 0,
+    source_id: spell.source_id ?? '',
+    source_url: '',
+    notes: '',
+  })
+
+  useEffect(() => {
+    if (!isOpen) return
+    reset()
+    setData('name', spell.name ?? '')
+    setData('url', spell.url ?? '')
+    setData('legacy_url', spell.legacy_url ?? '')
+    setData('spell_school', spell.spell_school ?? 'abjuration')
+    setData('spell_level', spell.spell_level ?? 0)
+    setData('source_id', spell.source_id ?? '')
+    setData('source_url', '')
+    setData('notes', '')
+  }, [isOpen, reset, setData, spell])
+
+  const normalizeText = (value: string) => {
+    const trimmed = value.trim()
+    return trimmed === '' ? null : trimmed
+  }
+
+  const handleSubmit = () => {
+    const changes: Record<string, string | number | null> = {}
+
+    const normalizedName = (data.name ?? '').trim()
+    if (normalizedName !== (spell.name ?? '').trim()) {
+      changes.name = normalizedName
+    }
+
+    const normalizedUrl = normalizeText(data.url ?? '')
+    const currentUrl = normalizeText(spell.url ?? '')
+    if (normalizedUrl !== currentUrl) {
+      changes.url = normalizedUrl
+    }
+
+    const normalizedLegacyUrl = normalizeText(data.legacy_url ?? '')
+    const currentLegacyUrl = normalizeText(spell.legacy_url ?? '')
+    if (normalizedLegacyUrl !== currentLegacyUrl) {
+      changes.legacy_url = normalizedLegacyUrl
+    }
+
+    if ((data.spell_school ?? 'abjuration') !== (spell.spell_school ?? 'abjuration')) {
+      changes.spell_school = data.spell_school
+    }
+
+    if (Number(data.spell_level ?? 0) !== Number(spell.spell_level ?? 0)) {
+      changes.spell_level = Number(data.spell_level)
+    }
+
+    const normalizedSource = data.source_id === '' ? null : Number(data.source_id)
+    const currentSource = spell.source_id ?? null
+    if (normalizedSource !== currentSource) {
+      changes.source_id = normalizedSource
+    }
+
+    const normalizedNotes = normalizeText(data.notes ?? '')
+    if (Object.keys(changes).length === 0 && !normalizedNotes) {
+      toast.show('Please change at least one field or add a note.', 'error')
+      return
+    }
+
+    setIsSubmitting(true)
+    router.post(route('compendium-suggestions.store'), {
+      kind: 'spell',
+      target_id: spell.id,
+      changes,
+      source_url: normalizeText(data.source_url ?? ''),
+      notes: normalizedNotes,
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        toast.show('Suggestion submitted. Thank you!', 'info')
+      },
+      onError: (formErrors) => {
+        const message = formErrors.changes
+          || formErrors.target_id
+          || formErrors.kind
+          || formErrors.notes
+          || formErrors.source_url
+          || formErrors.name
+          || formErrors.url
+          || formErrors.legacy_url
+          || formErrors.spell_school
+          || formErrors.spell_level
+          || formErrors.source_id
+
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+      onFinish: () => {
+        setIsSubmitting(false)
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} title="Suggest update" aria-label="Suggest update">
+          <MessageSquarePlus size={14} />
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Suggest spell update</ModalTitle>
+      <ModalContent>
+        <div className="space-y-3">
+          <p className="text-xs text-base-content/70">
+            Suggest corrections. Your changes will be reviewed by the admin team before being applied.
+          </p>
+          <Input value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name}>
+            Name
+          </Input>
+          <Input value={data.url} onChange={(e) => setData('url', e.target.value)} errors={errors.url}>
+            URL
+          </Input>
+          <Input value={data.legacy_url} onChange={(e) => setData('legacy_url', e.target.value)} errors={errors.legacy_url}>
+            Legacy URL
+          </Input>
+          <Input
+            type="number"
+            value={data.spell_level}
+            onChange={(e) => setData('spell_level', Number(e.target.value))}
+            errors={errors.spell_level}
+          >
+            Spell Level
+          </Input>
+          <Select
+            value={data.spell_school}
+            onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
+            errors={errors.spell_school}
+          >
+            <SelectLabel>School</SelectLabel>
+            <SelectOptions>
+              <option value="abjuration">Abjuration</option>
+              <option value="conjuration">Conjuration</option>
+              <option value="divination">Divination</option>
+              <option value="enchantment">Enchantment</option>
+              <option value="evocation">Evocation</option>
+              <option value="illusion">Illusion</option>
+              <option value="necromancy">Necromancy</option>
+              <option value="transmutation">Transmutation</option>
+            </SelectOptions>
+          </Select>
+          <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
+            <SelectLabel>Source</SelectLabel>
+            <SelectOptions>
+              <option value="">No source</option>
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.shortcode} - {source.name}
+                </option>
+              ))}
+            </SelectOptions>
+          </Select>
+          <Input value={data.source_url} onChange={(e) => setData('source_url', e.target.value)} errors={errors.source_url}>
+            Reference URL (optional)
+          </Input>
+          <TextArea value={data.notes} onChange={(e) => setData('notes', e.target.value)} errors={errors.notes}>
+            Note for reviewers (optional)
+          </TextArea>
+        </div>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={isSubmitting}>
+        Submit
+      </ModalAction>
+    </Modal>
+  )
+}
+
+export default function SpellRow({ spell, sources = [], canManage = true }: { spell: Spell; sources?: Source[]; canManage?: boolean }) {
   const formData = {
     id: spell.id,
     name: spell.name,
@@ -82,6 +263,7 @@ export default function SpellRow({ spell, sources = [] }: { spell: Spell; source
   const primaryLink = hasCurrentUrl ? spell.url : (hasLegacyUrl ? spell.legacy_url : '')
 
   const handleDeleteSpell = () => {
+    if (!canManage) return
     if (!window.confirm(`Delete spell "${spell.name}"?`)) return
 
     router.delete(route('admin.spells.destroy', { spell }), {
@@ -200,140 +382,149 @@ export default function SpellRow({ spell, sources = [] }: { spell: Spell; source
             </li>
           </ul>
         </details>
-        <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
-        <Modal>
-          <ModalTrigger>
-            <Button size="xs" variant="ghost" modifier="square" title="Edit spell" aria-label="Edit spell">
-              <Pencil size={14} />
+        {canManage ? (
+          <>
+            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <Modal>
+              <ModalTrigger>
+                <Button size="xs" variant="ghost" modifier="square" title="Edit spell" aria-label="Edit spell">
+                  <Pencil size={14} />
+                </Button>
+              </ModalTrigger>
+              <ModalTitle>
+                <div className="flex items-center">
+                  Update Spell
+                  <div className="tooltip tooltip-right w-16" data-tip="Search on D&D Beyond">
+                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center">
+                      <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
+                    </a>
+                  </div>
+                </div>
+              </ModalTitle>
+              <ModalContent>
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
+                    <Input errors={errors.name} placeholder="Fireball" value={data.name} onChange={(e) => setData('name', e.target.value)}>
+                      Name
+                    </Input>
+                    <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
+                      URL
+                    </Input>
+                    <Input
+                      errors={errors.legacy_url}
+                      placeholder="https://..."
+                      type="url"
+                      value={data.legacy_url}
+                      onChange={(e) => setData('legacy_url', e.target.value)}
+                    >
+                      Legacy URL
+                    </Input>
+                    <Select
+                      errors={errors.source_id}
+                      value={data.source_id}
+                      onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
+                    >
+                      <SelectLabel>Source</SelectLabel>
+                      <SelectOptions>
+                        <option value="">No source</option>
+                        {sources.map((source) => (
+                          <option key={source.id} value={source.id}>
+                            {source.shortcode} - {source.name}
+                          </option>
+                        ))}
+                      </SelectOptions>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
+                    <Input
+                      errors={errors.spell_level}
+                      placeholder="3"
+                      type="number"
+                      value={data.spell_level}
+                      onChange={(e) => setData('spell_level', Number(e.target.value))}
+                    >
+                      Spell Level
+                    </Input>
+                    <Select
+                      errors={errors.spell_school}
+                      value={data.spell_school}
+                      onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
+                    >
+                      <SelectLabel>School</SelectLabel>
+                      <SelectOptions>
+                        <option value="abjuration">Abjuration</option>
+                        <option value="conjuration">Conjuration</option>
+                        <option value="divination">Divination</option>
+                        <option value="enchantment">Enchantment</option>
+                        <option value="evocation">Evocation</option>
+                        <option value="illusion">Illusion</option>
+                        <option value="necromancy">Necromancy</option>
+                        <option value="transmutation">Transmutation</option>
+                      </SelectOptions>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-xs"
+                        checked={Boolean(data.guild_enabled)}
+                        onChange={(e) => setData('guild_enabled', e.target.checked)}
+                      />
+                      <span className="inline-flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-base-content/70" />
+                        Allowed in guild
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-xs"
+                        checked={Boolean(data.ruling_changed)}
+                        onChange={(e) => handleRulingToggle(e.target.checked)}
+                      />
+                      <span className="inline-flex items-center gap-2">
+                        <Scale className={cn('h-4 w-4', data.ruling_changed ? 'text-warning' : 'text-base-content/70')} />
+                        Ruling changed
+                      </span>
+                    </label>
+                    {data.ruling_changed ? (
+                      <TextArea
+                        value={data.ruling_note}
+                        onChange={(e) => setData('ruling_note', e.target.value)}
+                        placeholder="Describe the ruling change..."
+                      >
+                        Ruling note
+                      </TextArea>
+                    ) : null}
+                  </div>
+                </div>
+              </ModalContent>
+              <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
+            </Modal>
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
+              color="error"
+              title="Delete spell"
+              aria-label="Delete spell"
+              onClick={handleDeleteSpell}
+            >
+              <Trash size={14} />
             </Button>
-          </ModalTrigger>
-          <ModalTitle>
-            <div className="flex items-center">
-              Update Spell
-              <div className="tooltip tooltip-right w-16" data-tip="Search on D&D Beyond">
-                <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center">
-                  <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
-                </a>
-              </div>
-            </div>
-          </ModalTitle>
-          <ModalContent>
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
-                <Input errors={errors.name} placeholder="Fireball" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-                  Name
-                </Input>
-                <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
-                  URL
-                </Input>
-                <Input
-                  errors={errors.legacy_url}
-                  placeholder="https://..."
-                  type="url"
-                  value={data.legacy_url}
-                  onChange={(e) => setData('legacy_url', e.target.value)}
-                >
-                  Legacy URL
-                </Input>
-                <Select
-                  errors={errors.source_id}
-                  value={data.source_id}
-                  onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}
-                >
-                  <SelectLabel>Source</SelectLabel>
-                  <SelectOptions>
-                    <option value="">No source</option>
-                    {sources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.shortcode} - {source.name}
-                      </option>
-                    ))}
-                  </SelectOptions>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
-                <Input
-                  errors={errors.spell_level}
-                  placeholder="3"
-                  type="number"
-                  value={data.spell_level}
-                  onChange={(e) => setData('spell_level', Number(e.target.value))}
-                >
-                  Spell Level
-                </Input>
-                <Select
-                  errors={errors.spell_school}
-                  value={data.spell_school}
-                  onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
-                >
-                  <SelectLabel>School</SelectLabel>
-                  <SelectOptions>
-                    <option value="abjuration">Abjuration</option>
-                    <option value="conjuration">Conjuration</option>
-                    <option value="divination">Divination</option>
-                    <option value="enchantment">Enchantment</option>
-                    <option value="evocation">Evocation</option>
-                    <option value="illusion">Illusion</option>
-                    <option value="necromancy">Necromancy</option>
-                    <option value="transmutation">Transmutation</option>
-                  </SelectOptions>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-xs"
-                    checked={Boolean(data.guild_enabled)}
-                    onChange={(e) => setData('guild_enabled', e.target.checked)}
-                  />
-                  <span className="inline-flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-base-content/70" />
-                    Allowed in guild
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-xs"
-                    checked={Boolean(data.ruling_changed)}
-                    onChange={(e) => handleRulingToggle(e.target.checked)}
-                  />
-                  <span className="inline-flex items-center gap-2">
-                    <Scale className={cn('h-4 w-4', data.ruling_changed ? 'text-warning' : 'text-base-content/70')} />
-                    Ruling changed
-                  </span>
-                </label>
-                {data.ruling_changed ? (
-                  <TextArea
-                    value={data.ruling_note}
-                    onChange={(e) => setData('ruling_note', e.target.value)}
-                    placeholder="Describe the ruling change..."
-                  >
-                    Ruling note
-                  </TextArea>
-                ) : null}
-              </div>
-            </div>
-          </ModalContent>
-          <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
-        </Modal>
-        <Button
-          size="xs"
-          variant="ghost"
-          modifier="square"
-          color="error"
-          title="Delete spell"
-          aria-label="Delete spell"
-          onClick={handleDeleteSpell}
-        >
-          <Trash size={14} />
-        </Button>
+          </>
+        ) : (
+          <>
+            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <SuggestSpellUpdateModal spell={spell} sources={sources} />
+          </>
+        )}
       </div>
     </ListRow>
   )

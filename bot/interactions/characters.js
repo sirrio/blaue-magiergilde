@@ -73,6 +73,7 @@ const {
     buildParticipantOptions,
     buildCharacterCardPayload,
     buildCharacterCardRows,
+    buildCharacterRegisterConfirmView,
     buildCharacterClassesView,
     buildCharacterFactionView,
     buildCharacterManageView,
@@ -110,6 +111,7 @@ const {
     formatParticipantList,
     getParticipantSearch,
     getStartTierSelection,
+    isExternalCharacterLink,
     isHttpUrl,
     safeModalValue,
     setParticipantSearch,
@@ -1210,8 +1212,8 @@ async function handle(interaction) {
             await showCreationError(interaction, state, ownerDiscordId, 'Name fehlt.');
             return true;
         }
-        if (!isHttpUrl(externalLink)) {
-            await showCreationError(interaction, state, ownerDiscordId, 'Der External Link muss eine http/https URL sein.');
+        if (!isExternalCharacterLink(externalLink)) {
+            await showCreationError(interaction, state, ownerDiscordId, 'Bitte nutze einen DnDBeyond-Charakterlink (https://www.dndbeyond.com/characters/...).');
             return true;
         }
 
@@ -1848,8 +1850,11 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'Name fehlt.', flags: MessageFlags.Ephemeral });
             return true;
         }
-        if (!isHttpUrl(url)) {
-            await updateManageMessage(interaction, { content: 'Invalid URL (http/https only).', flags: MessageFlags.Ephemeral });
+        if (!isExternalCharacterLink(url)) {
+            await updateManageMessage(interaction, {
+                content: 'Please use a DnDBeyond character link (https://www.dndbeyond.com/characters/...).',
+                flags: MessageFlags.Ephemeral,
+            });
             return true;
         }
 
@@ -2086,20 +2091,8 @@ async function handle(interaction) {
                 return true;
             }
 
-            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus: 'pending' });
-            if (!result.ok) {
-                await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-
-            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
-            if (!refreshed) {
-                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-
             await interaction.update({
-                ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+                ...buildCharacterRegisterConfirmView({ character, ownerDiscordId }),
                 content: '',
             });
             return true;
@@ -2207,7 +2200,7 @@ async function handle(interaction) {
 
             const urlInput = new TextInputBuilder()
                 .setCustomId('basicUrl')
-                .setLabel('External Link (URL)')
+                .setLabel('DnDBeyond Link (URL)')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setValue(safeModalValue(character.external_link));
@@ -2394,6 +2387,69 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, { content: 'Unknown action.', flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterRegister')) {
+        const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(idRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (action === 'characterRegisterCancel') {
+            await interaction.update({
+                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action !== 'characterRegisterConfirm') {
+            return false;
+        }
+
+        if (!isCharacterStatusSwitchEnabled) {
+            await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const status = String(character.guild_status || '').trim().toLowerCase();
+        if (status !== 'draft') {
+            await interaction.update({
+                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus: 'pending' });
+        if (!result.ok) {
+            await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+            content: '',
+        });
         return true;
     }
 

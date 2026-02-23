@@ -158,13 +158,65 @@ class CharacterApprovalNotificationService
             'character_shop_spend' => $character->bubble_shop_spend,
             'character_classes' => $classes,
             'character_avatar_url' => $avatarUrl,
-            'external_link' => $character->external_link,
+            'external_link' => $this->sanitizeExternalLink($character->external_link),
             'user_id' => $character->user?->id,
             'user_name' => $character->user?->name,
             'user_discord_id' => $character->user?->discord_id,
             'approval_url' => route('admin.character-approvals.index'),
             'character_url' => route('characters.show', $character),
         ], $overrides);
+    }
+
+    private function sanitizeExternalLink(?string $value): ?string
+    {
+        $url = trim((string) $value);
+        if ($url === '' || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        if (! $this->isDnDBeyondCharacterUrl($url)) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    private function isDnDBeyondCharacterUrl(string $url): bool
+    {
+        $host = $this->extractHost($url);
+        if (! $host) {
+            return false;
+        }
+
+        if (! ($host === 'dndbeyond.com' || str_ends_with($host, '.dndbeyond.com'))) {
+            return false;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($path)) {
+            return false;
+        }
+
+        $normalizedPath = strtolower(trim($path));
+
+        return $normalizedPath === '/characters' || str_starts_with($normalizedPath, '/characters/');
+    }
+
+    private function extractHost(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($host));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return str_starts_with($normalized, 'www.')
+            ? substr($normalized, 4)
+            : $normalized;
     }
 
     private function request(string $path, array $payload): array

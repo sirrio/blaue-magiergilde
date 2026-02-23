@@ -15,7 +15,7 @@ it('allows admins to create characters for users', function () {
     $payload = [
         'name' => 'Admin Created',
         'class' => [$class->id],
-        'external_link' => 'https://example.test/character',
+        'external_link' => 'https://www.dndbeyond.com/characters/1111111',
         'start_tier' => 'bt',
         'version' => '2024',
         'dm_bubbles' => 2,
@@ -52,7 +52,7 @@ it('allows admins to update characters and marks them as admin managed', functio
     $payload = [
         'name' => 'Updated by admin',
         'class' => [$newClass->id],
-        'external_link' => 'https://example.test/updated',
+        'external_link' => 'https://www.dndbeyond.com/characters/2222222',
         'start_tier' => 'lt',
         'version' => '2024',
         'dm_bubbles' => 3,

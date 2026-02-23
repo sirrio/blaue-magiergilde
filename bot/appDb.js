@@ -126,6 +126,36 @@ function normalizeAvatar(value) {
     return text.length > 0 ? text : null;
 }
 
+function normalizeHost(rawHost) {
+    const host = String(rawHost || '').trim().toLowerCase();
+    if (!host) return '';
+    return host.startsWith('www.') ? host.slice(4) : host;
+}
+
+function isDnDBeyondCharacterUrl(urlString) {
+    const raw = String(urlString || '').trim();
+    if (!raw) return false;
+
+    let parsed;
+    try {
+        parsed = new URL(raw);
+    } catch {
+        return false;
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return false;
+    }
+
+    const host = normalizeHost(parsed.hostname);
+    if (!(host === 'dndbeyond.com' || host.endsWith('.dndbeyond.com'))) {
+        return false;
+    }
+
+    const path = String(parsed.pathname || '').toLowerCase();
+    return path === '/characters' || path.startsWith('/characters/');
+}
+
 class DiscordNotLinkedError extends Error {
     constructor() {
         super('DISCORD_NOT_LINKED');
@@ -476,7 +506,7 @@ async function createCharacterForDiscord(
     const safeVersion = normalizeVersion(version, '2024');
     const safeFaction = normalizeFaction(faction, 'none');
     const safeExternal = String(externalLink || '').trim();
-    if (!safeExternal) return { ok: false, reason: 'invalid_link' };
+    if (!safeExternal || !isDnDBeyondCharacterUrl(safeExternal)) return { ok: false, reason: 'invalid_link' };
     const safeAvatar = normalizeAvatar(avatar);
     const safeDmBubbles = normalizeNumber(dmBubbles, 0);
     const safeDmCoins = normalizeNumber(dmCoins, 0);
@@ -572,7 +602,14 @@ async function updateCharacterForDiscord(
     const updatedAt = nowSql();
     const newName = typeof name === 'string' ? name : existing.name;
     const newStartTier = typeof startTier === 'string' ? normalizeTier(startTier, existing.start_tier) : existing.start_tier;
-    const newExternalLink = typeof externalLink === 'string' ? externalLink : existing.external_link;
+    let newExternalLink = existing.external_link;
+    if (typeof externalLink === 'string') {
+        const candidateExternalLink = externalLink.trim();
+        if (!candidateExternalLink || !isDnDBeyondCharacterUrl(candidateExternalLink)) {
+            return { ok: false, reason: 'invalid_link' };
+        }
+        newExternalLink = candidateExternalLink;
+    }
     const newNotes = typeof notes === 'string' ? notes : existing.notes;
     const newFaction = typeof faction === 'string' ? normalizeFaction(faction, existing.faction) : existing.faction;
     const newVersion = typeof version === 'string' ? normalizeVersion(version, existing.version) : existing.version;
