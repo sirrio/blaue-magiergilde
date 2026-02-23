@@ -258,8 +258,8 @@ export function CharacterCard({
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
-  const totalDowntimeSeconds = factionDowntimeSeconds + otherDowntimeSeconds
-  const remainingDowntimeSeconds = calculateRemainingDowntime(character)
+  const remainingDowntimeSeconds = Math.max(0, calculateRemainingDowntime(character))
+  const totalDowntimeSeconds = factionDowntimeSeconds + otherDowntimeSeconds + remainingDowntimeSeconds
   const remainingDowntimeGold = Math.max(0, (remainingDowntimeSeconds / 3600) * 15)
   const remainingDowntimeGoldLabel = Number.isInteger(remainingDowntimeGold)
     ? remainingDowntimeGold.toString()

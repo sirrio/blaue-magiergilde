@@ -4,10 +4,12 @@ import { Input } from '@/components/ui/input'
 import AppLayout from '@/layouts/app-layout'
 import { PageProps } from '@/types'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
-import { Link2, Lock, Trash, User } from 'lucide-react'
+import { AlertTriangle, Link2, Lock, Trash, User } from 'lucide-react'
 
 export default function Profile() {
   const { auth, discordConnected, status, error } = usePage<PageProps & { status?: string; error?: string }>().props
+  const hasPassword = Boolean(auth.user.has_password)
+  const needsPasswordFallback = Boolean(auth.user.needs_password_fallback)
 
   const profileForm = useForm({
     name: auth.user.name,
@@ -47,6 +49,13 @@ export default function Profile() {
           <h1 className="text-xl font-bold sm:text-2xl">Profile</h1>
           <p className="text-sm text-base-content/70">Edit your account settings and connected services.</p>
         </section>
+
+        {needsPasswordFallback ? (
+          <div className="alert alert-warning">
+            <AlertTriangle size={16} />
+            <span>ALERT: Please set your password for fallback login.</span>
+          </div>
+        ) : null}
 
         <Card className="border border-base-200">
           <CardBody>
@@ -116,11 +125,13 @@ export default function Profile() {
             </CardTitle>
             <CardContent>
               <form onSubmit={submitPassword} className="space-y-4">
-                <Input type="password" value={passwordForm.data.current_password} onChange={(e) => passwordForm.setData('current_password', e.target.value)} errors={passwordForm.errors.current_password}>
-                  Current Password
-                </Input>
+                {hasPassword ? (
+                  <Input type="password" value={passwordForm.data.current_password} onChange={(e) => passwordForm.setData('current_password', e.target.value)} errors={passwordForm.errors.current_password}>
+                    Current Password
+                  </Input>
+                ) : null}
                 <Input type="password" value={passwordForm.data.password} onChange={(e) => passwordForm.setData('password', e.target.value)} errors={passwordForm.errors.password}>
-                  New Password
+                  {hasPassword ? 'New Password' : 'Set Password'}
                 </Input>
                 <Input type="password" value={passwordForm.data.password_confirmation} onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)} errors={passwordForm.errors.password_confirmation}>
                   Confirm Password

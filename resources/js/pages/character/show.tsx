@@ -1,14 +1,16 @@
 import { List, ListRow } from '@/components/ui/list'
 import { Button } from '@/components/ui/button'
+import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
+import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import { Character, Ally } from '@/types'
 import { Head, Link, router } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Pencil, Trash } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Pencil, ScrollText, Trash } from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
@@ -72,10 +74,9 @@ const formatParticipantSummary = (names: string[]) => {
 
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
   const avatarMasked = character.avatar_masked ?? true
-  const [expandedAdventures, setExpandedAdventures] = useState<number[]>([])
-  const [expandedDowntimes, setExpandedDowntimes] = useState<number[]>([])
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
+  const [activeNotes, setActiveNotes] = useState<{ title: string; notes: string } | null>(null)
   const [adventureSortDir, setAdventureSortDir] = useState<'desc' | 'asc'>('desc')
   const [downtimeSortDir, setDowntimeSortDir] = useState<'desc' | 'asc'>('desc')
   const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
@@ -161,12 +162,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
     () => character.downtimes.reduce((total, dt) => total + dt.duration, 0),
     [character.downtimes],
   )
-
-  const toggleAdventureNotes = (id: number) => {
-    setExpandedAdventures((current) =>
-      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
-    )
-  }
+  const remainingDowntimeDuration = useMemo(() => Math.max(0, calculateRemainingDowntime(character)), [character])
+  const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
 
   const handleAdventureDelete = (adventureId: number) => {
     if (!window.confirm('Delete this adventure?')) return
@@ -174,12 +171,6 @@ export default function Show({ character, guildCharacters }: { character: Charac
       preserveScroll: true,
     })
     setActiveAdventureModalId((current) => (current === adventureId ? null : current))
-  }
-
-  const toggleDowntimeNotes = (id: number) => {
-    setExpandedDowntimes((current) =>
-      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
-    )
   }
 
   const handleDowntimeDelete = (downtimeId: number) => {
@@ -190,10 +181,22 @@ export default function Show({ character, guildCharacters }: { character: Charac
     setActiveDowntimeModalId((current) => (current === downtimeId ? null : current))
   }
 
+  const openNotes = (title: string, notes: string) => {
+    setActiveNotes({ title, notes })
+  }
+
   return (
     <AppLayout>
       <Head title={character.name + ' Details'} />
       <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+        <Modal isOpen={Boolean(activeNotes)} onClose={() => setActiveNotes(null)}>
+          <ModalTitle>{activeNotes?.title || 'Notes'}</ModalTitle>
+          <ModalContent>
+            <p className="whitespace-pre-wrap text-sm text-base-content/80">
+              {activeNotes?.notes || ''}
+            </p>
+          </ModalContent>
+        </Modal>
         <div className="space-y-2 border-b border-base-200 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-bold sm:text-2xl">{character.name} Details</h1>
@@ -257,20 +260,35 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     <List className="md:hidden shadow-none">
                       {sortedAdventures.map((adv) => {
                         const notes = adventureNotesMap.get(adv.id) ?? ''
-                        const showToggle = notes.length > 140
-                        const isExpanded = expandedAdventures.includes(adv.id)
                         const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                        const gameMasterName = adv.game_master?.trim() || '-'
+                        const adventureTitle = adv.title || 'Adventure'
                         return (
                           <ListRow key={adv.id} className="block">
-                            <div className="space-y-2 rounded-box border border-base-200 p-3">
+                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <h3 className="truncate text-sm font-medium">{adv.title || 'Adventure'}</h3>
+                                  <div className="flex min-w-0 items-center gap-1">
+                                    <h3 className="min-w-0 truncate text-sm font-medium">{adventureTitle}</h3>
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      variant="ghost"
+                                      modifier="square"
+                                      aria-label="Show adventure notes"
+                                      title={notes ? 'Show adventure notes' : 'No notes'}
+                                      disabled={!notes}
+                                      onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
+                                    >
+                                      <ScrollText size={14} />
+                                    </Button>
+                                  </div>
                                   {participantSummary ? (
                                     <p className="text-xs text-base-content/50">Played with: {participantSummary}</p>
                                   ) : null}
+                                  <p className="text-xs text-base-content/50">DM: {gameMasterName}</p>
                                 </div>
-                                <span className="shrink-0 text-xs text-base-content/70">
+                                <span className="badge badge-ghost badge-sm shrink-0 font-normal">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
@@ -279,25 +297,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                   Simplified tracking
                                 </span>
                               ) : null}
-                              <p
-                                className={cn(
-                                  'text-base-content/60 text-xs whitespace-pre-wrap',
-                                  !isExpanded && 'line-clamp-3',
-                                )}
-                              >
-                                {notes || 'No notes'}
-                              </p>
-                              {showToggle ? (
-                                <button
-                                  type="button"
-                                  className="text-xs text-primary/70 hover:text-primary"
-                                  onClick={() => toggleAdventureNotes(adv.id)}
-                                >
-                                  {isExpanded ? 'Show less' : 'Show full notes'}
-                                </button>
-                              ) : null}
                               <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
-                                <span className="text-xs font-medium">
+                                <span className="badge badge-ghost badge-sm font-medium">
                                   {secondsToHourMinuteString(adv.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -345,9 +346,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     </List>
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
                           <span>Adventure</span>
-                          <span>Notes</span>
                           <span className="text-right">Time</span>
                           <span className="text-right">Date</span>
                           <span className="text-right">Actions</span>
@@ -355,55 +355,51 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         <List className="shadow-none">
                           {sortedAdventures.map((adv) => {
                             const notes = adventureNotesMap.get(adv.id) ?? ''
-                            const showToggle = notes.length > 140
-                            const isExpanded = expandedAdventures.includes(adv.id)
                             const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                            const gameMasterName = adv.game_master?.trim() || '-'
+                            const adventureTitle = adv.title || 'Adventure'
                             return (
                               <ListRow
                                 key={adv.id}
-                                className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] items-start gap-4"
+                                className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
                               >
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="min-w-0 flex-1 truncate text-sm font-medium">
-                                      {adv.title || 'Adventure'}
-                                    </h3>
+                                    <div className="flex min-w-0 items-center gap-1">
+                                      <h3 className="min-w-0 truncate text-sm font-medium">
+                                        {adventureTitle}
+                                      </h3>
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="ghost"
+                                        modifier="square"
+                                        aria-label="Show adventure notes"
+                                        title={notes ? 'Show adventure notes' : 'No notes'}
+                                        disabled={!notes}
+                                        onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
+                                      >
+                                        <ScrollText size={14} />
+                                      </Button>
+                                    </div>
                                     {adv.is_pseudo ? (
                                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
                                         Simplified tracking
                                       </span>
                                     ) : null}
                                   </div>
-                                  {participantSummary ? (
-                                    <p className="text-xs text-base-content/50">Played with: {participantSummary}</p>
-                                  ) : null}
+                                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+                                    <span>DM: {gameMasterName}</span>
+                                    {participantSummary ? <span>Played with: {participantSummary}</span> : null}
+                                  </div>
                                 </div>
-                                <div className="min-w-0 space-y-1">
-                                  <p
-                                    className={cn(
-                                      'text-base-content/60 text-xs whitespace-pre-wrap',
-                                      !isExpanded && 'line-clamp-2',
-                                    )}
-                                  >
-                                    {notes || 'No notes'}
-                                  </p>
-                                  {showToggle ? (
-                                    <button
-                                      type="button"
-                                      className="text-xs text-primary/70 hover:text-primary"
-                                      onClick={() => toggleAdventureNotes(adv.id)}
-                                    >
-                                      {isExpanded ? 'Show less' : 'Show full notes'}
-                                    </button>
-                                  ) : null}
-                                </div>
-                                <p className="text-right text-xs font-medium">
+                                <p className="self-center text-right text-xs font-medium">
                                   {secondsToHourMinuteString(adv.duration)}
                                 </p>
-                                <div className="text-right text-xs text-base-content/70">
+                                <div className="self-center text-right text-xs text-base-content/70">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </div>
-                                <div className="flex justify-end gap-2">
+                                <div className="flex self-center justify-end gap-2">
                                   {adv.is_pseudo ? (
                                     <span className="text-xs text-base-content/50">Auto</span>
                                   ) : (
@@ -475,8 +471,10 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     {character.downtimes.length === 0
                       ? 'No downtimes recorded'
                       : `${character.downtimes.length} entries • ${secondsToHourMinuteString(
-                          downtimeTotalDuration,
-                        )} total`}
+                          totalDowntimeDuration,
+                        )} total (${secondsToHourMinuteString(downtimeTotalDuration)} used + ${secondsToHourMinuteString(
+                          remainingDowntimeDuration,
+                        )} remaining)`}
                   </p>
                 </div>
               </div>
@@ -501,36 +499,31 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     <List className="md:hidden shadow-none">
                       {sortedDowntimes.map((dt) => {
                         const notes = downtimeNotesMap.get(dt.id) ?? ''
-                        const showToggle = notes.length > 140
-                        const isExpanded = expandedDowntimes.includes(dt.id)
                         return (
                           <ListRow key={dt.id} className="block">
-                            <div className="space-y-2 rounded-box border border-base-200 p-3">
+                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
                               <div className="flex items-start justify-between gap-3">
-                                <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
-                                <span className="shrink-0 text-xs text-base-content/70">
+                                <div className="flex min-w-0 items-center gap-1">
+                                  <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
+                                  <Button
+                                    type="button"
+                                    size="xs"
+                                    variant="ghost"
+                                    modifier="square"
+                                    aria-label="Show downtime notes"
+                                    title={notes ? 'Show downtime notes' : 'No notes'}
+                                    disabled={!notes}
+                                    onClick={() => openNotes(`${dt.type} Downtime Notes`, notes)}
+                                  >
+                                    <ScrollText size={14} />
+                                  </Button>
+                                </div>
+                                <span className="badge badge-ghost badge-sm shrink-0 font-normal">
                                   {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
-                              <p
-                                className={cn(
-                                  'text-base-content/60 text-xs whitespace-pre-wrap',
-                                  !isExpanded && 'line-clamp-3',
-                                )}
-                              >
-                                {notes || 'No notes'}
-                              </p>
-                              {showToggle ? (
-                                <button
-                                  type="button"
-                                  className="text-xs text-primary/70 hover:text-primary"
-                                  onClick={() => toggleDowntimeNotes(dt.id)}
-                                >
-                                  {isExpanded ? 'Show less' : 'Show full notes'}
-                                </button>
-                              ) : null}
                               <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
-                                <span className="text-xs font-medium">
+                                <span className="badge badge-ghost badge-sm font-medium">
                                   {secondsToHourMinuteString(dt.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -570,9 +563,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     </List>
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
                           <span>Type</span>
-                          <span>Notes</span>
                           <span className="text-right">Time</span>
                           <span className="text-right">Date</span>
                           <span className="text-right">Actions</span>
@@ -580,42 +572,35 @@ export default function Show({ character, guildCharacters }: { character: Charac
                         <List className="shadow-none">
                           {sortedDowntimes.map((dt) => {
                             const notes = downtimeNotesMap.get(dt.id) ?? ''
-                            const showToggle = notes.length > 140
-                            const isExpanded = expandedDowntimes.includes(dt.id)
                             return (
                               <ListRow
                                 key={dt.id}
-                                className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,2fr)_96px_110px_64px] items-start gap-4"
+                                className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
                               >
                                 <div className="min-w-0">
-                                  <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
-                                </div>
-                                <div className="min-w-0 space-y-1">
-                                  <p
-                                    className={cn(
-                                      'text-base-content/60 text-xs whitespace-pre-wrap',
-                                      !isExpanded && 'line-clamp-2',
-                                    )}
-                                  >
-                                    {notes || 'No notes'}
-                                  </p>
-                                  {showToggle ? (
-                                    <button
+                                  <div className="flex min-w-0 items-center gap-1">
+                                    <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
+                                    <Button
                                       type="button"
-                                      className="text-xs text-primary/70 hover:text-primary"
-                                      onClick={() => toggleDowntimeNotes(dt.id)}
+                                      size="xs"
+                                      variant="ghost"
+                                      modifier="square"
+                                      aria-label="Show downtime notes"
+                                      title={notes ? 'Show downtime notes' : 'No notes'}
+                                      disabled={!notes}
+                                      onClick={() => openNotes(`${dt.type} Downtime Notes`, notes)}
                                     >
-                                      {isExpanded ? 'Show less' : 'Show full notes'}
-                                    </button>
-                                  ) : null}
+                                      <ScrollText size={14} />
+                                    </Button>
+                                  </div>
                                 </div>
-                                <p className="text-right text-xs font-medium">
+                                <p className="self-center text-right text-xs font-medium">
                                   {secondsToHourMinuteString(dt.duration)}
                                 </p>
-                                <div className="text-right text-xs text-base-content/70">
+                                <div className="self-center text-right text-xs text-base-content/70">
                                   {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                                 </div>
-                                <div className="flex justify-end gap-2">
+                                <div className="flex self-center justify-end gap-2">
                                   <UpdateDowntimeModal
                                     downtime={dt}
                                     isOpen={activeDowntimeModalId === dt.id}
@@ -703,7 +688,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     <List className="md:hidden shadow-none">
                       {sortedAllies.map((ally) => (
                         <ListRow key={ally.id} className="block">
-                          <div className="space-y-2 rounded-box border border-base-200 p-3">
+                          <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
                             <div className="flex min-w-0 items-center gap-3">
                               <AllyPortrait ally={ally} className="h-10 w-10" />
                               <div className="flex min-w-0 flex-col gap-0.5">
@@ -722,7 +707,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                             </div>
                             <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-2">
                               <RatingHearts rating={ally.rating} />
-                              <span className="truncate text-sm text-base-content/70">{ally.classes || '-'}</span>
+                              <span className="truncate text-xs text-base-content/70">{ally.classes || '-'}</span>
                             </div>
                           </div>
                         </ListRow>
