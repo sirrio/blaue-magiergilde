@@ -20,14 +20,18 @@ test('items index filters by selected source', function () {
         'source_id' => $sourceB->id,
     ]);
 
+    $headers = [
+        'X-Inertia' => 'true',
+        'X-Requested-With' => 'XMLHttpRequest',
+        'X-Inertia-Partial-Component' => 'item/index',
+        'X-Inertia-Partial-Data' => 'items',
+    ];
+    if (is_string($inertiaVersion) && $inertiaVersion !== '') {
+        $headers['X-Inertia-Version'] = $inertiaVersion;
+    }
+
     $response = $this->actingAs($user)
-        ->withHeaders([
-            'X-Inertia' => 'true',
-            'X-Requested-With' => 'XMLHttpRequest',
-            'X-Inertia-Version' => $inertiaVersion,
-            'X-Inertia-Partial-Component' => 'item/index',
-            'X-Inertia-Partial-Data' => 'items',
-        ])
+        ->withHeaders($headers)
         ->get(route('compendium.items.index', ['source' => $sourceA->id]));
 
     $response->assertOk();
@@ -53,14 +57,18 @@ test('items index can filter entries without a source', function () {
         'source_id' => $source->id,
     ]);
 
+    $headers = [
+        'X-Inertia' => 'true',
+        'X-Requested-With' => 'XMLHttpRequest',
+        'X-Inertia-Partial-Component' => 'item/index',
+        'X-Inertia-Partial-Data' => 'items',
+    ];
+    if (is_string($inertiaVersion) && $inertiaVersion !== '') {
+        $headers['X-Inertia-Version'] = $inertiaVersion;
+    }
+
     $response = $this->actingAs($user)
-        ->withHeaders([
-            'X-Inertia' => 'true',
-            'X-Requested-With' => 'XMLHttpRequest',
-            'X-Inertia-Version' => $inertiaVersion,
-            'X-Inertia-Partial-Component' => 'item/index',
-            'X-Inertia-Partial-Data' => 'items',
-        ])
+        ->withHeaders($headers)
         ->get(route('compendium.items.index', ['source' => 'none']));
 
     $response->assertOk();
