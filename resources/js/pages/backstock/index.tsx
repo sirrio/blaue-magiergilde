@@ -570,7 +570,7 @@ export default function BackstockIndex({
                         <div className="max-w-24 font-mono text-xs">
                           {item.cost ? item.cost : <span className="text-error">No cost</span>}
                         </div>
-                        <div className="flex items-center gap-1 border-l border-base-200 pl-2">
+                        <div className="flex items-center gap-1">
                           <Button
                             size="xs"
                             variant="ghost"

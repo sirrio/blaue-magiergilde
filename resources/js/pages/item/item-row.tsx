@@ -814,22 +814,22 @@ export default function ItemRow({
               size="xs"
               variant="ghost"
               modifier="square"
+              onClick={handleSnapshotRefresh}
+              title="Refresh listing from base item"
+              aria-label="Refresh listing from base item"
+            >
+              <RotateCcw size={14} />
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              modifier="square"
               onClick={handleUpdatePostedLine}
               disabled={!canUpdatePostLine || isUpdatingPostLine}
               title={canUpdatePostLine ? 'Update posted line in Discord' : 'Post this shop first'}
               aria-label="Update posted line in Discord"
             >
               <Send size={14} />
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              modifier="square"
-              onClick={handleSnapshotRefresh}
-              title="Refresh listing from base item"
-              aria-label="Refresh listing from base item"
-            >
-              <RotateCcw size={14} />
             </Button>
             <ShopItemSnapshotModal shopItem={shopItem} item={item} />
             <Button

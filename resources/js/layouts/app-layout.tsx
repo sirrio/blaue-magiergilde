@@ -116,6 +116,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const showHandbookDropdown = handbookChannelList.length > 0
   const showCompendiumDropdown = compendiumLinks.length > 0
   const isCompendiumActive = route().current('compendium.items.index') || route().current('compendium.spells.index')
+  const isHandbookActive = route().current('handbook.index')
   const compendiumLabel = 'Compendium'
   const handbookLabel = 'Guild Handbook'
   const filteredMenuLinks = menuLinks.filter((menuLink) => {
@@ -179,7 +180,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 ) : menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                   <li key={menuLink.route} role="none">
                     <details ref={handbookMobileRef}>
-                      <summary className="flex items-center">
+                      <summary className={cn('flex items-center', isHandbookActive ? 'menu-active' : '')}>
                         <menuLink.icon size={16} className="mr-2" />
                         {handbookLabel}
                       </summary>
@@ -256,7 +257,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <img className={cn('h-8 sm:h-full')} alt={'Blaue Magiergilde'} src={'/images/icon_magiergilde.svg'} />
             <span className="hidden sm:inline">Blaue Magiergilde</span>
           </Link>
-          <ul className="menu menu-horizontal items-center space-x-1 px-1 hidden lg:flex ml-4" role="menubar">
+          <ul className="menu menu-horizontal ml-4 hidden items-center gap-1 px-1 lg:flex" role="menubar">
             {filteredMenuLinks.map((menuLink) => (
               menuLink.route === 'compendium.items.index' && showCompendiumDropdown ? (
                 <li key={menuLink.route} role="none">
@@ -288,7 +289,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               ) : menuLink.route === 'handbook.index' && showHandbookDropdown ? (
                 <li key={menuLink.route} role="none">
                   <details ref={handbookDesktopRef}>
-                    <summary className="flex items-center">
+                    <summary className={cn('flex items-center', isHandbookActive ? 'menu-active' : '')}>
                       <menuLink.icon size={16} className="mr-2" />
                       {handbookLabel}
                     </summary>
@@ -379,7 +380,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
-              <li className="flex items-center space-x-3 px-4 py-2" role="none">
+              <li className="flex items-center gap-3 px-4 py-2" role="none">
                 <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-base-300 text-base-content flex items-center justify-center">
                   {auth.user.avatar ? (
                     <img alt={auth.user.name} src={auth.user.avatar} className="h-10 w-10 object-cover" />

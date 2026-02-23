@@ -144,7 +144,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
       <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
         <section className="flex flex-col justify-between gap-3 border-b border-base-200 pb-3 sm:flex-row sm:items-start">
           <div>
-            <h1 className="text-lg font-bold sm:text-xl">
+            <h1 className="text-2xl font-bold">
               Your Characters{' '}
               <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{activeCharacterCount}/8 Active</span>
             </h1>
@@ -182,14 +182,14 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <p className="text-base-content/70 text-sm">Start by creating or syncing your characters.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <StoreCharacterModal>
-                <Button variant="outline" className="flex items-center space-x-2">
+                <Button variant="outline" className="flex items-center gap-2">
                   <Plus size={16} />
                   <span>Create Character</span>
                 </Button>
               </StoreCharacterModal>
               <Modal>
                 <ModalTrigger>
-                  <Button variant={'outline'} className="flex items-center space-x-2">
+                  <Button variant={'outline'} className="flex items-center gap-2">
                     <RefreshCw size={16} />
                     <span>Sync Characters</span>
                   </Button>

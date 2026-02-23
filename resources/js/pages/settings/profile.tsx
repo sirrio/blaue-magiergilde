@@ -57,7 +57,7 @@ export default function Profile() {
             <CardContent className="space-y-2 text-sm">
               {discordConnected ? (
                 <>
-                  <p className="text-base-content/80">Dein Account ist mit Discord verbunden.</p>
+                  <p className="text-base-content/80">Your account is connected to Discord.</p>
                   <Link as="button" method="delete" href={route('discord.disconnect')} className="btn btn-outline btn-sm w-fit">
                     Disconnect Discord
                   </Link>
@@ -65,7 +65,7 @@ export default function Profile() {
               ) : (
                 <>
                   <p className="text-base-content/80">
-                    Um den Discord Bot zu nutzen, musst du deinen Account einmalig mit Discord verbinden.
+                    Connect your account to Discord once to use bot features.
                   </p>
                   <Button as="a" href={route('discord.login')} color="primary" size="sm" className="w-fit">
                     Connect Discord
@@ -73,10 +73,10 @@ export default function Profile() {
                 </>
               )}
               {status === 'discord-connected' ? (
-                <div className="alert alert-success alert-soft py-2 text-sm">Discord verbunden.</div>
+                <div className="alert alert-success alert-soft py-2 text-sm">Discord connected.</div>
               ) : null}
               {status === 'discord-disconnected' ? (
-                <div className="alert alert-info alert-soft py-2 text-sm">Discord Verbindung entfernt.</div>
+                <div className="alert alert-info alert-soft py-2 text-sm">Discord connection removed.</div>
               ) : null}
               {error ? <div className="alert alert-error alert-soft py-2 text-sm">{error}</div> : null}
             </CardContent>

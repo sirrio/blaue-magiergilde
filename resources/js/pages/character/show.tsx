@@ -321,7 +321,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         title="Edit adventure"
                                         onClick={() => setActiveAdventureModalId(adv.id)}
                                       >
-                                        <Pencil size={13} />
+                                        <Pencil size={14} />
                                       </Button>
                                       <Button
                                         size="xs"
@@ -332,7 +332,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         title="Delete adventure"
                                         onClick={() => handleAdventureDelete(adv.id)}
                                       >
-                                        <Trash size={13} />
+                                        <Trash size={14} />
                                       </Button>
                                     </>
                                   )}
@@ -548,7 +548,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     title="Edit downtime"
                                     onClick={() => setActiveDowntimeModalId(dt.id)}
                                   >
-                                    <Pencil size={13} />
+                                    <Pencil size={14} />
                                   </Button>
                                   <Button
                                     size="xs"
@@ -559,7 +559,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     title="Delete downtime"
                                     onClick={() => handleDowntimeDelete(dt.id)}
                                   >
-                                    <Trash size={13} />
+                                    <Trash size={14} />
                                   </Button>
                                 </div>
                               </div>
