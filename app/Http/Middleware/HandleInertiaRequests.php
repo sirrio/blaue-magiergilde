@@ -40,10 +40,11 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
         $handbookChannels = collect();
 
-        if ($request->user()) {
+        if ($user) {
             $selectedChannelIds = DiscordBackupSetting::query()
                 ->pluck('channel_ids')
                 ->filter()
@@ -66,10 +67,16 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user
+                    ? [
+                        ...$user->toArray(),
+                        'has_password' => ! empty($user->password),
+                        'needs_password_fallback' => (bool) $user->discord_id && empty($user->password),
+                    ]
+                    : null,
             ],
             'features' => config('features'),
-            'discordConnected' => (bool) $request->user()?->discord_id,
+            'discordConnected' => (bool) $user?->discord_id,
             'appearance' => $request->cookie('appearance', 'system'),
             'ziggy' => fn (): array => [
                 ...(new Ziggy)->toArray(),
