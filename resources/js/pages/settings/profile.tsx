@@ -13,7 +13,7 @@ export default function Profile() {
 
   const profileForm = useForm({
     name: auth.user.name,
-    email: auth.user.email,
+    email: auth.user.email ?? '',
   })
 
   const passwordForm = useForm({
