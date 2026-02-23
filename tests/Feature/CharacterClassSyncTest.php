@@ -14,7 +14,7 @@ test('character class selections are stored without duplicates on create', funct
     $response = $this->actingAs($user)->post(route('characters.store'), [
         'name' => 'Test Hero',
         'class' => [$class->id, $class->id],
-        'external_link' => 'https://example.com/characters/test-hero',
+        'external_link' => 'https://www.dndbeyond.com/characters/1234567',
         'start_tier' => 'bt',
         'version' => '2024',
         'dm_bubbles' => 1,

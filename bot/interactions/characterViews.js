@@ -58,6 +58,39 @@ function isHttpUrl(urlString) {
     }
 }
 
+function normalizeHost(rawHost) {
+    const host = String(rawHost || '').trim().toLowerCase();
+    if (!host) return '';
+    return host.startsWith('www.') ? host.slice(4) : host;
+}
+
+function isDnDBeyondCharacterUrl(urlString) {
+    if (!isHttpUrl(urlString)) return false;
+
+    let parsed;
+    try {
+        parsed = new URL(urlString);
+    } catch {
+        return false;
+    }
+
+    const host = normalizeHost(parsed.hostname);
+    if (!host) {
+        return false;
+    }
+
+    if (!(host === 'dndbeyond.com' || host.endsWith('.dndbeyond.com'))) {
+        return false;
+    }
+
+    const path = String(parsed.pathname || '').toLowerCase();
+    return path === '/characters' || path.startsWith('/characters/');
+}
+
+function isExternalCharacterLink(urlString) {
+    return isDnDBeyondCharacterUrl(urlString);
+}
+
 function safeModalValue(value, max = 4000) {
     const text = String(value ?? '');
     if (text.length <= max) return text;
@@ -235,7 +268,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             { name: 'Starting tier', value: startTier, inline: true },
             { name: 'Avatar', value: avatar, inline: true },
             { name: 'Token mask', value: avatarMasked ? 'On' : 'Off', inline: true },
-            { name: 'External Link', value: linkValue, inline: false },
+            { name: 'DnDBeyond Link', value: linkValue, inline: false },
             { name: 'Notes', value: notes, inline: false },
             { name: 'DM Bubbles', value: dmBubbles, inline: true },
             { name: 'DM Coins', value: dmCoins, inline: true },
@@ -934,7 +967,7 @@ function buildCreationBasicsEmbed(state, message) {
     const embed = buildCreationEmbed(1, 'Create character', message || 'Bearbeite die Basisangaben.');
     embed.addFields(
         { name: 'Name', value: state?.data?.name || '-', inline: false },
-        { name: 'External Link', value: state?.data?.externalLink || '-', inline: false },
+        { name: 'DnDBeyond Link', value: state?.data?.externalLink || '-', inline: false },
         { name: 'Avatar', value: state?.data?.avatar || 'No avatar', inline: false },
         { name: 'Notes', value: state?.data?.notes || '-', inline: false },
     );
@@ -967,7 +1000,7 @@ async function buildCreationSummaryEmbed(state) {
         .setColor(0x4f46e5)
         .addFields(
             { name: 'Name', value: state.data.name || '-', inline: false },
-            { name: 'External Link', value: state.data.externalLink || '-', inline: false },
+            { name: 'DnDBeyond Link', value: state.data.externalLink || '-', inline: false },
             { name: 'Avatar', value: state.data.avatar || 'No avatar', inline: false },
             { name: 'Classes', value: classNames.length > 0 ? classNames.join(', ') : '-', inline: false },
             { name: 'Starting tier', value: tierLabel || '-', inline: true },
@@ -994,7 +1027,7 @@ function buildCreationBasicModal(ownerDiscordId, state) {
 
     const linkInput = new TextInputBuilder()
         .setCustomId('createLink')
-        .setLabel('External Link (URL)')
+        .setLabel('DnDBeyond Link (URL)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(state?.data?.externalLink));
@@ -1989,6 +2022,7 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
 
 module.exports = {
     isHttpUrl,
+    isExternalCharacterLink,
     safeModalValue,
     formatParticipantName,
     formatParticipantList,

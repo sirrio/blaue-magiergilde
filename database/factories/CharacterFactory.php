@@ -18,7 +18,7 @@ class CharacterFactory extends Factory
         return [
             'user_id' => User::factory(),
             'name' => $this->faker->name(),
-            'external_link' => $this->faker->url(),
+            'external_link' => 'https://www.dndbeyond.com/characters/'.$this->faker->numberBetween(1000, 99999999),
             'start_tier' => $this->faker->randomElement(['bt', 'lt', 'ht']),
             'version' => '2024',
             'avatar' => $this->faker->imageUrl(200, 200, 'people'),

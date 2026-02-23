@@ -111,6 +111,7 @@ const {
     formatParticipantList,
     getParticipantSearch,
     getStartTierSelection,
+    isExternalCharacterLink,
     isHttpUrl,
     safeModalValue,
     setParticipantSearch,
@@ -1211,8 +1212,8 @@ async function handle(interaction) {
             await showCreationError(interaction, state, ownerDiscordId, 'Name fehlt.');
             return true;
         }
-        if (!isHttpUrl(externalLink)) {
-            await showCreationError(interaction, state, ownerDiscordId, 'Der External Link muss eine http/https URL sein.');
+        if (!isExternalCharacterLink(externalLink)) {
+            await showCreationError(interaction, state, ownerDiscordId, 'Bitte nutze einen DnDBeyond-Charakterlink (https://www.dndbeyond.com/characters/...).');
             return true;
         }
 
@@ -1849,8 +1850,11 @@ async function handle(interaction) {
             await updateManageMessage(interaction, { content: 'Name fehlt.', flags: MessageFlags.Ephemeral });
             return true;
         }
-        if (!isHttpUrl(url)) {
-            await updateManageMessage(interaction, { content: 'Invalid URL (http/https only).', flags: MessageFlags.Ephemeral });
+        if (!isExternalCharacterLink(url)) {
+            await updateManageMessage(interaction, {
+                content: 'Please use a DnDBeyond character link (https://www.dndbeyond.com/characters/...).',
+                flags: MessageFlags.Ephemeral,
+            });
             return true;
         }
 
@@ -2196,7 +2200,7 @@ async function handle(interaction) {
 
             const urlInput = new TextInputBuilder()
                 .setCustomId('basicUrl')
-                .setLabel('External Link (URL)')
+                .setLabel('DnDBeyond Link (URL)')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setValue(safeModalValue(character.external_link));

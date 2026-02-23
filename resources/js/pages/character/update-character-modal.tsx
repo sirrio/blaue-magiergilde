@@ -100,13 +100,13 @@ const UpdateCharacterModal = ({ character, children }: { character: Character; c
                 </SelectOptions>
               </Select>
               <Input
-                placeholder="https://..."
+                placeholder="https://www.dndbeyond.com/characters/..."
                 errors={errors.external_link}
                 type="url"
                 value={data.external_link}
                 onChange={(e) => setData('external_link', e.target.value)}
               >
-                External Link
+                DnDBeyond Link
               </Input>
               <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
                 Avatar

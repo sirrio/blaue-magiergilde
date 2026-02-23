@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Rules\ExternalCharacterLink;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCharacterForUserRequest extends FormRequest
@@ -25,7 +26,7 @@ class UpdateCharacterForUserRequest extends FormRequest
             'name' => 'required|string',
             'class' => 'required|array|min:1',
             'class.*' => 'integer|exists:character_classes,id',
-            'external_link' => 'required|url',
+            'external_link' => ['required', 'url', new ExternalCharacterLink],
             'start_tier' => 'required|in:bt,lt,ht',
             'version' => 'required|string',
             'dm_bubbles' => 'required|integer|min:0|max:1024',
