@@ -90,6 +90,7 @@ const adminSections = [
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth, discordConnected, handbookChannels, activeChannelId, features } =
     usePage<PageProps>().props
+  const needsPasswordFallback = Boolean(auth.user?.needs_password_fallback)
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   const compendiumDesktopRef = useRef<HTMLDetailsElement>(null)
@@ -368,7 +369,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
         <div className="navbar-end flex-1 w-auto justify-end gap-2">
           <div className="dropdown dropdown-end">
-            <button tabIndex={0} aria-label="User menu" className="btn btn-ghost btn-circle avatar">
+            <button tabIndex={0} aria-label="User menu" className="btn btn-ghost btn-circle avatar relative overflow-visible">
               <div className="w-10 rounded-full">
                 {auth.user.avatar ? (
                   <img alt={auth.user.name} src={auth.user.avatar} />
@@ -378,6 +379,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </span>
                 )}
               </div>
+              {needsPasswordFallback ? (
+                <span className="badge badge-warning badge-xs absolute -right-0.5 -top-0.5" aria-label="Password fallback required">
+                  !
+                </span>
+              ) : null}
             </button>
             <ul tabIndex={0} role="menu" className="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
               <li className="flex items-center gap-3 px-4 py-2" role="none">
@@ -404,8 +410,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </li>
               {accountLinks.map((link) => (
                 <li key={link.route} role="none">
-                  <Link role="menuitem" method={link.method} href={route(link.route)}>
-                    {link.name}
+                  <Link role="menuitem" method={link.method} href={route(link.route)} className="flex items-center justify-between gap-2">
+                    <span>{link.name}</span>
+                    {needsPasswordFallback && link.route === 'profile.edit' ? (
+                      <span className="badge badge-warning badge-xs">!</span>
+                    ) : null}
                   </Link>
                 </li>
               ))}
