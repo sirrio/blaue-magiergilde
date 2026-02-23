@@ -1182,6 +1182,35 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
     ];
 }
 
+function buildCharacterRegisterConfirmRow({ characterId, ownerDiscordId }) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterRegisterConfirm_${characterId}_${ownerDiscordId}`)
+            .setLabel('Register with Magiergilde')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`characterRegisterCancel_${characterId}_${ownerDiscordId}`)
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
+    const name = String(character?.name || `Character ${character?.id || ''}`).trim() || `Character ${character?.id || ''}`;
+    const embed = new EmbedBuilder()
+        .setTitle('Register Character With Magiergilde')
+        .setColor(0xf59e0b)
+        .setDescription(
+            `This changes **${name}** from **draft** to **active (pending)** and registers it with the Magiergilde for review.\n\n`
+            + 'After Magiergilde review, you cannot switch approved or declined characters back by yourself.',
+        );
+
+    return {
+        embeds: [embed],
+        components: [buildCharacterRegisterConfirmRow({ characterId: character.id, ownerDiscordId })],
+    };
+}
+
 function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advSelect_${characterId}_${ownerDiscordId}`)
@@ -2012,6 +2041,8 @@ module.exports = {
     buildAdventureDeleteConfirmRow,
     buildDowntimeDeleteConfirmRow,
     buildCharacterCardRows,
+    buildCharacterRegisterConfirmRow,
+    buildCharacterRegisterConfirmView,
     buildAdventureListRows,
     buildDowntimeStepEmbed,
     buildDowntimeDurationRows,

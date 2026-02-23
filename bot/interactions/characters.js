@@ -73,6 +73,7 @@ const {
     buildParticipantOptions,
     buildCharacterCardPayload,
     buildCharacterCardRows,
+    buildCharacterRegisterConfirmView,
     buildCharacterClassesView,
     buildCharacterFactionView,
     buildCharacterManageView,
@@ -2086,20 +2087,8 @@ async function handle(interaction) {
                 return true;
             }
 
-            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus: 'pending' });
-            if (!result.ok) {
-                await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-
-            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
-            if (!refreshed) {
-                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-
             await interaction.update({
-                ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+                ...buildCharacterRegisterConfirmView({ character, ownerDiscordId }),
                 content: '',
             });
             return true;
@@ -2394,6 +2383,69 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, { content: 'Unknown action.', flags: MessageFlags.Ephemeral });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterRegister')) {
+        const [action, idRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(idRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (action === 'characterRegisterCancel') {
+            await interaction.update({
+                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action !== 'characterRegisterConfirm') {
+            return false;
+        }
+
+        if (!isCharacterStatusSwitchEnabled) {
+            await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const status = String(character.guild_status || '').trim().toLowerCase();
+        if (status !== 'draft') {
+            await interaction.update({
+                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus: 'pending' });
+        if (!result.ok) {
+            await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+            content: '',
+        });
         return true;
     }
 
