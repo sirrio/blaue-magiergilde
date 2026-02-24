@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Auction;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auction\StoreAuctionRequest;
 use App\Http\Requests\Auction\UpdateAuctionRequest;
 use App\Models\Auction;
 use App\Models\AuctionSetting;
@@ -88,20 +87,6 @@ class AuctionController extends Controller
                 'voice_channel_is_thread',
             ]),
         ]);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StoreAuctionRequest $request): RedirectResponse
-    {
-        Auction::query()->create([
-            'title' => null,
-            'status' => 'open',
-            'currency' => 'GP',
-        ]);
-
-        return redirect()->back();
     }
 
     /**
