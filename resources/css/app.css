@@ -75,6 +75,18 @@
     color: #a855f7;
   }
 
+  .text-rarity-legendary {
+    color: #f59e0b;
+  }
+
+  .text-rarity-artifact {
+    color: #ef4444;
+  }
+
+  .text-rarity-unknown-rarity {
+    color: #64748b;
+  }
+
   .text-tier-bt {
     color: #cd7f32;
   }

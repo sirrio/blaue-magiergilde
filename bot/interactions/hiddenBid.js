@@ -36,7 +36,10 @@ function truncateText(value, maxLength) {
 
 function formatRarityLabel(rarity) {
     const clean = String(rarity || 'common').trim().toLowerCase();
-    if (clean === 'very_rare') return 'Very rare';
+    if (clean === 'unknown_rarity') return 'Unknown rarity';
+    if (clean === 'artifact') return 'Artifact';
+    if (clean === 'legendary') return 'Legendary';
+    if (clean === 'very_rare') return 'Very Rare';
     if (clean === 'rare') return 'Rare';
     if (clean === 'uncommon') return 'Uncommon';
     return 'Common';

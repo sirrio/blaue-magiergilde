@@ -24,6 +24,12 @@ function formatPermissionList(perms) {
 
 function rarityDisplayName(rarity) {
     switch (rarity) {
+        case 'unknown_rarity':
+            return 'Unknown rarity';
+        case 'artifact':
+            return 'Artifact';
+        case 'legendary':
+            return 'Legendary';
         case 'very_rare':
             return 'Very Rare';
         case 'rare':
@@ -46,6 +52,8 @@ function getBidStep(row) {
     if (row.rarity === 'uncommon') baseStep = 50;
     if (row.rarity === 'rare') baseStep = 100;
     if (row.rarity === 'very_rare') baseStep = 500;
+    if (row.rarity === 'legendary') baseStep = 1000;
+    if (row.rarity === 'artifact') baseStep = 5000;
 
     if (row.type === 'consumable' || row.type === 'spellscroll') {
         baseStep = Math.floor(baseStep / 2);
@@ -450,7 +458,7 @@ async function postAuctionToChannel({ client, channelId, auctionId, operationId 
     const itemMessageIds = {};
 
     const createdAtUnix = Math.floor(new Date(auction.created_at).getTime() / 1000);
-    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
+    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
     const typeOrder = ['item', 'consumable', 'spellscroll'];
     const grouped = new Map();
 

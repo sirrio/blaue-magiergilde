@@ -16,6 +16,9 @@ const rarityColors: Record<string, string> = {
   uncommon: 'text-rarity-uncommon',
   rare: 'text-rarity-rare',
   very_rare: 'text-rarity-very-rare',
+  legendary: 'text-rarity-legendary',
+  artifact: 'text-rarity-artifact',
+  unknown_rarity: 'text-rarity-unknown-rarity',
 }
 
 const typeIcons: Record<string, ReactElement> = {
@@ -319,6 +322,9 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
                 <option value="uncommon">Uncommon</option>
                 <option value="rare">Rare</option>
                 <option value="very_rare">Very Rare</option>
+                <option value="legendary">Legendary</option>
+                <option value="artifact">Artifact</option>
+                <option value="unknown_rarity">Unknown rarity</option>
               </SelectOptions>
             </Select>
             <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
@@ -482,6 +488,9 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
               <option value="uncommon">Uncommon</option>
               <option value="rare">Rare</option>
               <option value="very_rare">Very Rare</option>
+              <option value="legendary">Legendary</option>
+              <option value="artifact">Artifact</option>
+              <option value="unknown_rarity">Unknown rarity</option>
             </SelectOptions>
           </Select>
           <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
@@ -903,6 +912,9 @@ export default function ItemRow({
                         <option value="uncommon">Uncommon</option>
                         <option value="rare">Rare</option>
                         <option value="very_rare">Very Rare</option>
+                        <option value="legendary">Legendary</option>
+                        <option value="artifact">Artifact</option>
+                        <option value="unknown_rarity">Unknown rarity</option>
                       </SelectOptions>
                     </Select>
                     <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>

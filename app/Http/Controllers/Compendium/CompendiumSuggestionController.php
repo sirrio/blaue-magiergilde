@@ -395,7 +395,7 @@ class CompendiumSuggestionController extends Controller
                 'name' => 'required|string',
                 'url' => 'nullable|url|max:2048',
                 'cost' => 'nullable|string',
-                'rarity' => 'required|in:common,uncommon,rare,very_rare',
+                'rarity' => 'required|in:common,uncommon,rare,very_rare,legendary,artifact,unknown_rarity',
                 'type' => 'required|in:item,consumable,spellscroll',
                 'source_id' => 'nullable|integer|exists:sources,id',
             ];

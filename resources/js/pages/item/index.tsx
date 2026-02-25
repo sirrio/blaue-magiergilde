@@ -165,6 +165,9 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
                 <option value="uncommon">Uncommon</option>
                 <option value="rare">Rare</option>
                 <option value="very_rare">Very Rare</option>
+                <option value="legendary">Legendary</option>
+                <option value="artifact">Artifact</option>
+                <option value="unknown_rarity">Unknown rarity</option>
               </SelectOptions>
             </Select>
             <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
@@ -313,6 +316,9 @@ export default function Index({
     { label: 'Uncommon', value: 'uncommon' },
     { label: 'Rare', value: 'rare' },
     { label: 'Very Rare', value: 'very_rare' },
+    { label: 'Legendary', value: 'legendary' },
+    { label: 'Artifact', value: 'artifact' },
+    { label: 'Unknown rarity', value: 'unknown_rarity' },
   ]
 
   const typeFilters: FilterOption[] = [

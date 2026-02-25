@@ -12,7 +12,7 @@ class ShopRollService
 {
     private function normalizeSelectionType(string $rarity, string $type): string
     {
-        if (in_array($rarity, ['very_rare', 'rare'], true) && in_array($type, ['consumable', 'spellscroll'], true)) {
+        if (in_array($rarity, ['rare', 'very_rare', 'legendary', 'artifact'], true) && in_array($type, ['consumable', 'spellscroll'], true)) {
             return 'consumable';
         }
 
@@ -117,7 +117,7 @@ class ShopRollService
             ->where('shop_enabled', true)
             ->where('rarity', $rarity);
 
-        if ($selectionType === 'consumable' && in_array($rarity, ['rare', 'very_rare'], true)) {
+        if ($selectionType === 'consumable' && in_array($rarity, ['rare', 'very_rare', 'legendary', 'artifact'], true)) {
             $query->whereIn('type', ['consumable', 'spellscroll']);
         } else {
             $query->where('type', $selectionType);

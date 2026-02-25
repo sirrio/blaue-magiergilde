@@ -20,6 +20,9 @@ const rarityLabels: Record<string, string> = {
   uncommon: 'Uncommon',
   rare: 'Rare',
   very_rare: 'Very Rare',
+  legendary: 'Legendary',
+  artifact: 'Artifact',
+  unknown_rarity: 'Unknown rarity',
 }
 
 const statusLabels: Record<string, string> = {
@@ -33,6 +36,9 @@ const rarityColors: Record<string, string> = {
   uncommon: 'text-rarity-uncommon',
   rare: 'text-rarity-rare',
   very_rare: 'text-rarity-very-rare',
+  legendary: 'text-rarity-legendary',
+  artifact: 'text-rarity-artifact',
+  unknown_rarity: 'text-rarity-unknown-rarity',
 }
 
 const typeIcons: Record<string, ReactElement> = {
@@ -41,7 +47,7 @@ const typeIcons: Record<string, ReactElement> = {
   consumable: <FlaskRound size={14} />,
 }
 
-const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'] as const
+const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'] as const
 const typeOrder: Record<Item['type'], number> = {
   item: 0,
   consumable: 1,
@@ -82,6 +88,8 @@ const getBidStep = (item: Item): number => {
   if (item.rarity === 'uncommon') baseStep = 50
   if (item.rarity === 'rare') baseStep = 100
   if (item.rarity === 'very_rare') baseStep = 500
+  if (item.rarity === 'legendary') baseStep = 1000
+  if (item.rarity === 'artifact') baseStep = 5000
 
   if (item.type === 'consumable' || item.type === 'spellscroll') {
     baseStep = Math.floor(baseStep / 2)
@@ -705,6 +713,9 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
                 <option value="uncommon">Uncommon</option>
                 <option value="rare">Rare</option>
                 <option value="very_rare">Very Rare</option>
+                <option value="legendary">Legendary</option>
+                <option value="artifact">Artifact</option>
+                <option value="unknown_rarity">Unknown rarity</option>
               </SelectOptions>
             </Select>
             <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>

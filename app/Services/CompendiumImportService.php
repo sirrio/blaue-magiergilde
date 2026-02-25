@@ -320,8 +320,8 @@ class CompendiumImportService
         if (! in_array($type, ['item', 'consumable', 'spellscroll'], true)) {
             $errors[] = 'type must be item|consumable|spellscroll';
         }
-        if (! in_array($rarity, ['common', 'uncommon', 'rare', 'very_rare'], true)) {
-            $errors[] = 'rarity must be common|uncommon|rare|very_rare';
+        if (! in_array($rarity, ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'], true)) {
+            $errors[] = 'rarity must be common|uncommon|rare|very_rare|legendary|artifact|unknown_rarity';
         }
         if ($url !== null && ! filter_var($url, FILTER_VALIDATE_URL)) {
             $errors[] = 'url must be a valid URL';

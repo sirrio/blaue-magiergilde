@@ -24,6 +24,8 @@ class AuctionBidController extends Controller
             'uncommon' => 50,
             'rare' => 100,
             'very_rare' => 500,
+            'legendary' => 1000,
+            'artifact' => 5000,
             default => 10,
         };
 

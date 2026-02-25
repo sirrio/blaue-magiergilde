@@ -302,7 +302,7 @@ export interface Item {
   url: string
   cost: string
   type: 'item' | 'consumable' | 'spellscroll'
-  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare'
+  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
   pick_count: number
   shop_enabled?: boolean
   guild_enabled?: boolean
