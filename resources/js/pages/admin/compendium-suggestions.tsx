@@ -20,7 +20,7 @@ interface SuggestionUser {
 interface CompendiumSuggestionRecord {
   id: number
   kind: SuggestionKind
-  target_id: number
+  target_id: number | null
   target_name?: string | null
   status: SuggestionStatus
   proposed_payload: Record<string, unknown>
@@ -245,6 +245,9 @@ export default function CompendiumSuggestionsPage({
               const changeEntries = Object.entries(suggestion.proposed_payload ?? {})
               const submittedAt = suggestion.created_at ? format(new Date(suggestion.created_at), "dd.MM.yyyy ' - ' HH:mm") : '-'
               const reviewedAt = suggestion.reviewed_at ? format(new Date(suggestion.reviewed_at), "dd.MM.yyyy ' - ' HH:mm") : null
+              const hasCurrentSnapshot = suggestion.current_snapshot && Object.keys(suggestion.current_snapshot).length > 0
+              const suggestionTargetLabel = suggestion.target_name
+                ?? (suggestion.target_id ? `Deleted #${suggestion.target_id}` : `New ${kindLabel[suggestion.kind]} suggestion`)
 
               return (
                 <ListRow key={suggestion.id}>
@@ -254,7 +257,7 @@ export default function CompendiumSuggestionsPage({
                         <span className={`badge ${statusClass[suggestion.status]}`}>{suggestion.status}</span>
                         <span className="badge badge-outline">{kindLabel[suggestion.kind]}</span>
                         <span className="text-sm font-semibold">
-                          #{suggestion.id} · {suggestion.target_name ?? `Deleted #${suggestion.target_id}`}
+                          #{suggestion.id} · {suggestionTargetLabel}
                         </span>
                       </div>
                       <div className="text-xs text-base-content/60">
@@ -273,9 +276,15 @@ export default function CompendiumSuggestionsPage({
                           {changeEntries.map(([field, value]) => (
                             <div key={field}>
                               <span className="font-medium">{fieldLabels[field] ?? field}:</span>{' '}
-                              <span className="text-base-content/70">{formatFieldValue(field, suggestion.current_snapshot?.[field], sourceLabels)}</span>{' '}
-                              <span className="text-base-content/50">→</span>{' '}
-                              <span>{formatFieldValue(field, value, sourceLabels)}</span>
+                              {hasCurrentSnapshot ? (
+                                <>
+                                  <span className="text-base-content/70">{formatFieldValue(field, suggestion.current_snapshot?.[field], sourceLabels)}</span>{' '}
+                                  <span className="text-base-content/50">→</span>{' '}
+                                  <span>{formatFieldValue(field, value, sourceLabels)}</span>
+                                </>
+                              ) : (
+                                <span>{formatFieldValue(field, value, sourceLabels)}</span>
+                              )}
                             </div>
                           ))}
                         </div>

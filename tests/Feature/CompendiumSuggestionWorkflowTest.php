@@ -75,6 +75,46 @@ test('authenticated user can submit an item compendium suggestion', function () 
         ]);
 });
 
+test('authenticated user can submit a new item compendium suggestion without target id', function () {
+    $user = User::factory()->create(['is_admin' => false]);
+    $source = Source::factory()->create([
+        'name' => "Dungeon Master's Guide",
+        'shortcode' => 'DMG',
+    ]);
+
+    $response = $this->actingAs($user)->post(route('compendium-suggestions.store'), [
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'changes' => [
+            'name' => 'Moon-Touched Sword',
+            'type' => 'item',
+            'rarity' => 'unknown_rarity',
+            'cost' => '150 GP',
+            'url' => 'https://example.test/items/moon-touched-sword',
+            'source_id' => $source->id,
+        ],
+        'notes' => 'Seen in session loot list.',
+        'source_url' => 'https://example.test/reference/moon-touched-sword',
+    ]);
+
+    $response->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $suggestion = CompendiumSuggestion::query()->latest('id')->first();
+
+    expect($suggestion)->not->toBeNull()
+        ->and($suggestion?->kind)->toBe(CompendiumSuggestion::KIND_ITEM)
+        ->and($suggestion?->target_id)->toBeNull()
+        ->and($suggestion?->current_snapshot)->toBeNull()
+        ->and($suggestion?->proposed_payload)->toMatchArray([
+            'name' => 'Moon-Touched Sword',
+            'type' => 'item',
+            'rarity' => 'unknown_rarity',
+            'cost' => '150 GP',
+            'url' => 'https://example.test/items/moon-touched-sword',
+            'source_id' => $source->id,
+        ]);
+});
+
 test('item suggestion requires at least one change or a note', function () {
     $user = User::factory()->create(['is_admin' => false]);
     $item = Item::factory()->create([
@@ -195,6 +235,47 @@ test('admin can approve pending spell suggestion and apply changes', function ()
 
     expect($spell->legacy_url)->toBe('https://example.test/fireball-legacy')
         ->and($spell->spell_level)->toBe(4)
+        ->and($suggestion->status)->toBe(CompendiumSuggestion::STATUS_APPROVED)
+        ->and($suggestion->reviewed_by)->toBe($admin->id);
+});
+
+test('admin can approve pending new item suggestion and create item', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $submitter = User::factory()->create(['is_admin' => false]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $suggestion = CompendiumSuggestion::query()->create([
+        'user_id' => $submitter->id,
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => null,
+        'status' => CompendiumSuggestion::STATUS_PENDING,
+        'proposed_payload' => [
+            'name' => 'Glamoured Studded Leather',
+            'url' => 'https://example.test/items/glamoured-studded-leather',
+            'cost' => '250 GP',
+            'rarity' => 'rare',
+            'type' => 'item',
+            'source_id' => $source->id,
+        ],
+        'current_snapshot' => null,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.compendium-suggestions.approve', $suggestion), [])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $suggestion->refresh();
+    $createdItem = Item::query()->find($suggestion->target_id);
+
+    expect($createdItem)->not->toBeNull()
+        ->and($createdItem?->name)->toBe('Glamoured Studded Leather')
+        ->and($createdItem?->rarity)->toBe('rare')
+        ->and($createdItem?->type)->toBe('item')
+        ->and($createdItem?->source_id)->toBe($source->id)
         ->and($suggestion->status)->toBe(CompendiumSuggestion::STATUS_APPROVED)
         ->and($suggestion->reviewed_by)->toBe($admin->id);
 });

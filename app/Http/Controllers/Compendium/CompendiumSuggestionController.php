@@ -45,28 +45,42 @@ class CompendiumSuggestionController extends Controller
     public function store(StoreCompendiumSuggestionRequest $request): RedirectResponse
     {
         $kind = (string) $request->string('kind');
-        $targetId = (int) $request->integer('target_id');
-        $target = $this->resolveTarget($kind, $targetId);
+        $targetId = $request->filled('target_id') ? (int) $request->integer('target_id') : null;
+        $target = $targetId !== null ? $this->resolveTarget($kind, $targetId) : null;
 
-        if (! $target) {
+        if ($targetId !== null && ! $target) {
             return redirect()->back()->withErrors([
                 'target_id' => 'The selected compendium entry was not found.',
             ]);
         }
 
-        $snapshot = $this->snapshotForTarget($kind, $target);
+        if ($targetId === null && $kind !== CompendiumSuggestion::KIND_ITEM) {
+            return redirect()->back()->withErrors([
+                'target_id' => 'The selected compendium entry was not found.',
+            ]);
+        }
+
+        $snapshot = $target ? $this->snapshotForTarget($kind, $target) : [];
         $normalizedChanges = $this->normalizeChanges($kind, (array) $request->input('changes', []));
-        $effectiveChanges = $this->effectiveChanges($snapshot, $normalizedChanges);
+        $effectiveChanges = $target
+            ? $this->effectiveChanges($snapshot, $normalizedChanges)
+            : $normalizedChanges;
 
         if ($effectiveChanges !== []) {
-            $candidate = array_replace($snapshot, $effectiveChanges);
+            $candidate = $target ? array_replace($snapshot, $effectiveChanges) : $effectiveChanges;
             $this->validateCandidate($kind, $candidate);
         }
 
         $notes = trim((string) $request->input('notes', ''));
-        if ($effectiveChanges === [] && $notes === '') {
+        if ($target && $effectiveChanges === [] && $notes === '') {
             return redirect()->back()->withErrors([
                 'changes' => 'Please provide at least one changed field or a note.',
+            ]);
+        }
+
+        if (! $target && $effectiveChanges === []) {
+            return redirect()->back()->withErrors([
+                'changes' => 'Please provide the required fields for a new item suggestion.',
             ]);
         }
 
@@ -76,7 +90,7 @@ class CompendiumSuggestionController extends Controller
             'target_id' => $targetId,
             'status' => CompendiumSuggestion::STATUS_PENDING,
             'proposed_payload' => $effectiveChanges,
-            'current_snapshot' => $snapshot,
+            'current_snapshot' => $snapshot === [] ? null : $snapshot,
             'notes' => $notes !== '' ? $notes : null,
             'source_url' => $this->normalizeNullableString($request->input('source_url')),
         ]);
@@ -131,9 +145,14 @@ class CompendiumSuggestionController extends Controller
 
         return Inertia::render('admin/compendium-suggestions', [
             'suggestions' => $suggestions->map(function (CompendiumSuggestion $suggestion) use ($itemNames, $spellNames): array {
-                $targetName = $suggestion->kind === CompendiumSuggestion::KIND_ITEM
-                    ? $itemNames->get($suggestion->target_id)
-                    : $spellNames->get($suggestion->target_id);
+                $targetName = null;
+                if ($suggestion->target_id === null && $suggestion->kind === CompendiumSuggestion::KIND_ITEM) {
+                    $targetName = 'New item suggestion';
+                } elseif ($suggestion->target_id !== null) {
+                    $targetName = $suggestion->kind === CompendiumSuggestion::KIND_ITEM
+                        ? $itemNames->get($suggestion->target_id)
+                        : $spellNames->get($suggestion->target_id);
+                }
 
                 return [
                     'id' => $suggestion->id,
@@ -194,18 +213,31 @@ class CompendiumSuggestionController extends Controller
             }
 
             if ($changes !== []) {
-                $target = $this->resolveTarget($compendiumSuggestion->kind, $compendiumSuggestion->target_id);
-                if (! $target) {
-                    throw ValidationException::withMessages([
-                        'suggestion' => 'The target entry no longer exists.',
-                    ]);
-                }
+                if ($compendiumSuggestion->target_id === null) {
+                    if ($compendiumSuggestion->kind !== CompendiumSuggestion::KIND_ITEM) {
+                        throw ValidationException::withMessages([
+                            'suggestion' => 'Creating new entries is only supported for item suggestions.',
+                        ]);
+                    }
 
-                $snapshot = $this->snapshotForTarget($compendiumSuggestion->kind, $target);
-                $candidate = array_replace($snapshot, $changes);
-                $this->validateCandidate($compendiumSuggestion->kind, $candidate);
-                $this->applyChanges($target, $changes);
-                $target->save();
+                    $this->validateCandidate($compendiumSuggestion->kind, $changes);
+                    $target = $this->createTarget($compendiumSuggestion->kind, $changes);
+                    $compendiumSuggestion->target_id = $target->id;
+                    $compendiumSuggestion->current_snapshot = $this->snapshotForTarget($compendiumSuggestion->kind, $target);
+                } else {
+                    $target = $this->resolveTarget($compendiumSuggestion->kind, (int) $compendiumSuggestion->target_id);
+                    if (! $target) {
+                        throw ValidationException::withMessages([
+                            'suggestion' => 'The target entry no longer exists.',
+                        ]);
+                    }
+
+                    $snapshot = $this->snapshotForTarget($compendiumSuggestion->kind, $target);
+                    $candidate = array_replace($snapshot, $changes);
+                    $this->validateCandidate($compendiumSuggestion->kind, $candidate);
+                    $this->applyChanges($target, $changes);
+                    $target->save();
+                }
             }
 
             $reviewNotes = trim((string) $request->input('review_notes', ''));
@@ -374,6 +406,30 @@ class CompendiumSuggestionController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function createTarget(string $kind, array $payload): Item|Spell
+    {
+        if ($kind === CompendiumSuggestion::KIND_ITEM) {
+            $item = new Item;
+            $item->forceFill($payload)->save();
+
+            return $item;
+        }
+
+        if ($kind === CompendiumSuggestion::KIND_SPELL) {
+            $spell = new Spell;
+            $spell->forceFill($payload)->save();
+
+            return $spell;
+        }
+
+        throw ValidationException::withMessages([
+            'kind' => 'Unsupported suggestion kind.',
+        ]);
+    }
+
+    /**
      * @param  array<string, mixed>  $candidate
      */
     private function validateCandidate(string $kind, array $candidate): void
@@ -411,8 +467,12 @@ class CompendiumSuggestionController extends Controller
         ];
     }
 
-    private function resolveTarget(string $kind, int $targetId): Item|Spell|null
+    private function resolveTarget(string $kind, ?int $targetId): Item|Spell|null
     {
+        if ($targetId === null) {
+            return null;
+        }
+
         if ($kind === CompendiumSuggestion::KIND_ITEM) {
             return Item::query()->find($targetId);
         }
@@ -433,6 +493,7 @@ class CompendiumSuggestionController extends Controller
         $itemIds = $suggestions
             ->where('kind', CompendiumSuggestion::KIND_ITEM)
             ->pluck('target_id')
+            ->filter(static fn ($id) => $id !== null)
             ->map(static fn ($id) => (int) $id)
             ->unique()
             ->values();
@@ -457,6 +518,7 @@ class CompendiumSuggestionController extends Controller
         $spellIds = $suggestions
             ->where('kind', CompendiumSuggestion::KIND_SPELL)
             ->pluck('target_id')
+            ->filter(static fn ($id) => $id !== null)
             ->map(static fn ($id) => (int) $id)
             ->unique()
             ->values();
