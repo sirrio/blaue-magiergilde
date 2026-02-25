@@ -12,6 +12,7 @@ const payload = {
     character_dm_bubbles: 0,
     character_dm_coins: 0,
     character_shop_spend: 0,
+    character_registration_note: 'Please review this with custom homebrew note.',
     character_avatar_url: 'https://example.test/avatars/character.png',
     user_name: 'User',
     user_discord_id: '123456789012345678',
@@ -34,5 +35,11 @@ assert.equal(dmField?.value, '0 bubbles · 0 coins');
 
 const userField = embedData.fields.find((field) => field.name === 'User');
 assert.ok(userField?.value.includes('<@123456789012345678>'));
+
+const registrationField = embedData.fields.find((field) => field.name === 'Registration info');
+assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');
+
+const buttonLabels = message.components[0].toJSON().components.map((component) => component.label);
+assert.deepEqual(buttonLabels.slice(0, 3), ['Approve', 'Needs changes', 'Decline']);
 
 console.log('character-approval-embed.test.js passed');

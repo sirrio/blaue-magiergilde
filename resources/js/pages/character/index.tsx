@@ -89,6 +89,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     return ['bt', 'lt', 'ht'].includes(calculateTier(char))
   }).length
   const draftCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'draft').length
+  const needsChangesCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'needs_changes').length
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -149,10 +150,12 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
               <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{activeCharacterCount}/8 Active</span>
             </h1>
             <p className="text-xs text-base-content/70 sm:text-sm">Manage all your characters easily below.</p>
-            {isStatusSwitchEnabled && draftCharacterCount > 0 ? (
+            {isStatusSwitchEnabled && (draftCharacterCount > 0 || needsChangesCharacterCount > 0) ? (
               <p className="mt-1 text-xs text-warning">
-                {draftCharacterCount} draft {draftCharacterCount === 1 ? 'character is' : 'characters are'} still private. Use
-                "Register with Magiergilde" on a card to start review.
+                {draftCharacterCount > 0 ? `${draftCharacterCount} draft ${draftCharacterCount === 1 ? 'character is' : 'characters are'} still private.` : ''}
+                {draftCharacterCount > 0 && needsChangesCharacterCount > 0 ? ' ' : ''}
+                {needsChangesCharacterCount > 0 ? `${needsChangesCharacterCount} ${needsChangesCharacterCount === 1 ? 'character needs' : 'characters need'} fixes and re-registration.` : ''}
+                {' '}Use "Register with Magiergilde" on a card to start review.
               </p>
             ) : null}
           </div>

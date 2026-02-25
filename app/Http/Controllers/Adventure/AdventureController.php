@@ -142,7 +142,7 @@ class AdventureController extends Controller
      */
     private function guildCharacterStatusesForAllies(): array
     {
-        $statuses = ['pending', 'approved'];
+        $statuses = ['pending', 'approved', 'needs_changes'];
 
         if (! (bool) Config::get('features.character_status_switch', true)) {
             $statuses[] = 'draft';

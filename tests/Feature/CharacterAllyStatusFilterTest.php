@@ -18,6 +18,7 @@ it('includes draft guild characters in ally candidates when status switching is 
     $draftCharacter = Character::factory()->create(['guild_status' => 'draft']);
     $pendingCharacter = Character::factory()->create(['guild_status' => 'pending']);
     $approvedCharacter = Character::factory()->create(['guild_status' => 'approved']);
+    $needsChangesCharacter = Character::factory()->create(['guild_status' => 'needs_changes']);
     $retiredCharacter = Character::factory()->create(['guild_status' => 'retired']);
 
     $this->actingAs($owner)
@@ -25,12 +26,13 @@ it('includes draft guild characters in ally candidates when status switching is 
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('character/show')
-            ->where('guildCharacters', function ($guildCharacters) use ($draftCharacter, $pendingCharacter, $approvedCharacter, $retiredCharacter): bool {
+            ->where('guildCharacters', function ($guildCharacters) use ($draftCharacter, $pendingCharacter, $approvedCharacter, $needsChangesCharacter, $retiredCharacter): bool {
                 $ids = collect($guildCharacters)->pluck('id');
 
                 return $ids->contains($draftCharacter->id)
                     && $ids->contains($pendingCharacter->id)
                     && $ids->contains($approvedCharacter->id)
+                    && $ids->contains($needsChangesCharacter->id)
                     && ! $ids->contains($retiredCharacter->id);
             }));
 });

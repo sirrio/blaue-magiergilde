@@ -221,7 +221,7 @@ class CharacterController extends Controller
      */
     private function guildCharacterStatusesForAllies(): array
     {
-        $statuses = ['pending', 'approved'];
+        $statuses = ['pending', 'approved', 'needs_changes'];
 
         if (! $this->isCharacterStatusSwitchEnabled()) {
             $statuses[] = 'draft';

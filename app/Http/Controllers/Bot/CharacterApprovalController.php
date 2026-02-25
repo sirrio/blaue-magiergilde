@@ -74,7 +74,7 @@ class CharacterApprovalController extends Controller
             ]);
         }
 
-        if (in_array($data['status'], ['approved', 'declined'], true)) {
+        if (in_array($data['status'], ['approved', 'declined', 'needs_changes'], true)) {
             $result = $notificationService->notifyStatusChange($character, $data['status']);
             if (! $result['ok']) {
                 Log::warning('Character approval DM failed.', [

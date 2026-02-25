@@ -44,7 +44,7 @@ const allowedFactions = new Set([
     'waffenmeister',
     'arkanisten',
 ]);
-const allowedGuildStatuses = new Set(['pending', 'draft', 'approved', 'declined', 'retired']);
+const allowedGuildStatuses = new Set(['pending', 'draft', 'approved', 'declined', 'needs_changes', 'retired']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 const adventureCreationSteps = ['duration', 'date', 'title', 'quest', 'notes', 'participants', 'confirm'];
 const downtimeCreationSteps = ['duration', 'date', 'type', 'notes', 'confirm'];
@@ -153,6 +153,7 @@ function formatGuildStatusLabel(value) {
     const status = normalizeGuildStatus(value);
     if (status === 'approved') return 'Approved';
     if (status === 'declined') return 'Declined';
+    if (status === 'needs_changes') return 'Needs changes';
     if (status === 'retired') return 'Retired';
     if (status === 'draft') return 'Draft';
     return 'Pending';
@@ -1161,9 +1162,10 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
 
 function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
     const primaryRow = new ActionRowBuilder();
-    const isDraft = String(guildStatus || '').trim().toLowerCase() === 'draft';
-    const canLogActivity = !isDraft || !isCharacterStatusSwitchEnabled;
-    if (isDraft) {
+    const normalizedStatus = String(guildStatus || '').trim().toLowerCase();
+    const canRegister = normalizedStatus === 'draft' || normalizedStatus === 'needs_changes';
+    const canLogActivity = !canRegister || !isCharacterStatusSwitchEnabled;
+    if (canRegister) {
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
@@ -1230,11 +1232,13 @@ function buildCharacterRegisterConfirmRow({ characterId, ownerDiscordId }) {
 
 function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
     const name = String(character?.name || `Character ${character?.id || ''}`).trim() || `Character ${character?.id || ''}`;
+    const currentStatus = String(character?.guild_status || '').trim().toLowerCase();
+    const fromStatus = currentStatus === 'needs_changes' ? 'needs changes' : 'draft';
     const embed = new EmbedBuilder()
         .setTitle('Register Character With Magiergilde')
         .setColor(0xf59e0b)
         .setDescription(
-            `This changes **${name}** from **draft** to **active (pending)** and registers it with the Magiergilde for review.\n\n`
+            `This changes **${name}** from **${fromStatus}** to **active (pending)** and registers it with the Magiergilde for review.\n\n`
             + 'After Magiergilde review, you cannot switch approved or declined characters back by yourself.',
         );
 
@@ -1242,6 +1246,24 @@ function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
         embeds: [embed],
         components: [buildCharacterRegisterConfirmRow({ characterId: character.id, ownerDiscordId })],
     };
+}
+
+function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialNote = '' }) {
+    const modal = new ModalBuilder()
+        .setCustomId(`characterRegisterNoteModal_${characterId}_${ownerDiscordId}`)
+        .setTitle('Registration info');
+
+    const noteInput = new TextInputBuilder()
+        .setCustomId('registrationNote')
+        .setLabel('Info for support/review team')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(2000)
+        .setValue(safeModalValue(initialNote, 2000));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(noteInput));
+
+    return modal;
 }
 
 function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
@@ -2077,6 +2099,7 @@ module.exports = {
     buildCharacterCardRows,
     buildCharacterRegisterConfirmRow,
     buildCharacterRegisterConfirmView,
+    buildCharacterRegisterNoteModal,
     buildAdventureListRows,
     buildDowntimeStepEmbed,
     buildDowntimeDurationRows,

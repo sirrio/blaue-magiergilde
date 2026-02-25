@@ -152,6 +152,7 @@ class CharacterApprovalNotificationService
             'character_version' => $character->version,
             'character_faction' => $character->faction,
             'character_notes' => $character->notes,
+            'character_registration_note' => $character->registration_note,
             'character_is_filler' => $character->is_filler,
             'character_dm_bubbles' => $character->dm_bubbles,
             'character_dm_coins' => $character->dm_coins,

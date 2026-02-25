@@ -40,6 +40,18 @@ labels = labelsFromPrimaryRow(rows);
 
 assert.equal(labels.includes('Set level'), false);
 
+buildCharacterCardRows = loadBuildCharacterCardRows('true');
+rows = buildCharacterCardRows({
+    characterId: 13,
+    ownerDiscordId: '123',
+    isFiller: false,
+    simplifiedTracking: false,
+    guildStatus: 'needs_changes',
+});
+labels = labelsFromPrimaryRow(rows);
+assert.equal(labels.includes('Register with Magiergilde'), true);
+assert.equal(labels.includes('Adventure'), false);
+
 buildCharacterCardRows = loadBuildCharacterCardRows('false');
 rows = buildCharacterCardRows({
     characterId: 12,

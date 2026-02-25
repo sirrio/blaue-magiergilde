@@ -48,3 +48,36 @@ it('accepts character approval actions from the discord bot', function () {
     $notificationService->shouldHaveReceived('syncAnnouncement')->once();
     $notificationService->shouldHaveReceived('notifyStatusChange')->once();
 });
+
+it('accepts needs changes status from the discord bot', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
+    $notificationService->shouldReceive('notifyStatusChange')->once()->andReturn(['ok' => true, 'status' => 200]);
+
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '2234567890',
+    ]);
+
+    $character = Character::factory()->create([
+        'guild_status' => 'pending',
+    ]);
+
+    $this->withHeader('X-Bot-Token', 'token')
+        ->post(route('bot.character-approvals.status'), [
+            'character_id' => $character->id,
+            'status' => 'needs_changes',
+            'actor_discord_id' => $admin->discord_id,
+        ])
+        ->assertOk()
+        ->assertJson(['status' => 'updated']);
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('needs_changes');
+
+    $notificationService->shouldHaveReceived('syncAnnouncement')->once();
+    $notificationService->shouldHaveReceived('notifyStatusChange')->once();
+});

@@ -70,13 +70,16 @@ it('posts a discord announcement when a newly created draft character is submitt
     $character = Character::query()->where('user_id', $owner->id)->latest('id')->firstOrFail();
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'New register details from owner.',
+        ])
         ->assertRedirect();
 
     Http::assertSent(function ($request) {
         return $request->url() === 'http://bot.test/character-approval/pending'
             && $request['channel_id'] === '9876543210'
-            && $request['character_name'] === 'New Character';
+            && $request['character_name'] === 'New Character'
+            && $request['character_registration_note'] === 'New register details from owner.';
     });
 });
 
@@ -102,13 +105,16 @@ it('posts a discord announcement when an existing draft character is submitted f
     $character->characterClasses()->sync([$characterClass->id]);
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Please review with updated notes.',
+        ])
         ->assertRedirect();
 
     Http::assertSent(function ($request) use ($character) {
         return $request->url() === 'http://bot.test/character-approval/pending'
             && $request['channel_id'] === '9876543210'
-            && $request['character_name'] === $character->name;
+            && $request['character_name'] === $character->name
+            && $request['character_registration_note'] === 'Please review with updated notes.';
     });
 });
 
@@ -134,7 +140,9 @@ it('does not send dashboard URLs as external link in approval announcements', fu
     ]);
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Check external link filtering.',
+        ])
         ->assertRedirect();
 
     Http::assertSent(function ($request) use ($character) {

@@ -47,12 +47,12 @@ const allowedFactions = new Set([
     'waffenmeister',
     'arkanisten',
 ]);
-const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'retired', 'draft']);
+const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'needs_changes', 'retired', 'draft']);
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
 function guildCharacterStatusesForAllies() {
-    const statuses = ['pending', 'approved'];
+    const statuses = ['pending', 'approved', 'needs_changes'];
     if (!isCharacterStatusSwitchEnabled) {
         statuses.push('draft');
     }
@@ -220,6 +220,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.bubble_shop_spend,
                 c.is_filler,
                 c.guild_status,
+                c.registration_note,
                 c.simplified_tracking,
                 c.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
@@ -286,6 +287,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.bubble_shop_spend,
                 c.is_filler,
                 c.guild_status,
+                c.registration_note,
                 c.simplified_tracking,
                 c.avatar_masked,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
@@ -523,9 +525,9 @@ async function createCharacterForDiscord(
         const [insertCharacter] = await connection.execute(
             `
             INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, created_at, updated_at)
             VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 safeName,
@@ -540,6 +542,7 @@ async function createCharacterForDiscord(
                 safeIsFiller ? 1 : 0,
                 userId,
                 safeGuildStatus,
+                null,
                 createdAt,
                 createdAt,
             ],
@@ -592,7 +595,7 @@ async function createCharacterForDiscord(
 async function updateCharacterForDiscord(
     discordUser,
     characterId,
-    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus, simplifiedTracking, avatarMasked },
+    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus, registrationNote, simplifiedTracking, avatarMasked },
 ) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
@@ -625,6 +628,9 @@ async function updateCharacterForDiscord(
         : typeof guildStatus !== 'undefined'
             ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
             : existing.guild_status;
+    const newRegistrationNote = typeof registrationNote === 'string'
+        ? registrationNote.trim()
+        : existing.registration_note;
     const newSimplifiedTracking = typeof simplifiedTracking !== 'undefined'
         ? normalizeBoolean(simplifiedTracking, Boolean(existing.simplified_tracking))
         : Boolean(existing.simplified_tracking);
@@ -638,7 +644,7 @@ async function updateCharacterForDiscord(
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, simplified_tracking = ?, avatar_masked = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
         [
@@ -654,6 +660,7 @@ async function updateCharacterForDiscord(
             newBubbleShopSpend,
             newIsFiller ? 1 : 0,
             newGuildStatus,
+            newRegistrationNote || null,
             newSimplifiedTracking ? 1 : 0,
             newAvatarMasked ? 1 : 0,
             updatedAt,

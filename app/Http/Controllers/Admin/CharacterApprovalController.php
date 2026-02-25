@@ -48,7 +48,7 @@ class CharacterApprovalController extends Controller
             });
         }
 
-        if (in_array($status, ['pending', 'approved', 'declined', 'retired', 'draft'], true)) {
+        if (in_array($status, ['pending', 'approved', 'declined', 'needs_changes', 'retired', 'draft'], true)) {
             $charactersQuery->where('guild_status', $status);
         }
 
@@ -78,6 +78,7 @@ class CharacterApprovalController extends Controller
                 'version',
                 'faction',
                 'guild_status',
+                'registration_note',
                 'notes',
                 'admin_notes',
                 'dm_bubbles',
@@ -103,7 +104,7 @@ class CharacterApprovalController extends Controller
         abort_unless($user && $user->is_admin, 403);
 
         $data = $request->validate([
-            'guild_status' => ['sometimes', 'required', 'in:pending,approved,declined'],
+            'guild_status' => ['sometimes', 'required', 'in:pending,approved,declined,needs_changes'],
             'admin_notes' => ['nullable', 'string'],
         ]);
         $statusChange = null;
@@ -162,7 +163,7 @@ class CharacterApprovalController extends Controller
                 ]);
             }
 
-            if (in_array($statusChange, ['approved', 'declined'], true)) {
+            if (in_array($statusChange, ['approved', 'declined', 'needs_changes'], true)) {
                 $result = $notificationService->notifyStatusChange($character, $statusChange);
                 if (! $result['ok']) {
                     Log::warning('Character approval DM failed.', [

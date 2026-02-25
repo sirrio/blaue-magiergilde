@@ -5,6 +5,7 @@ import { Card, CardAction, CardBody, CardContent, CardTitle } from '@/components
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
+import { TextArea } from '@/components/ui/text-area'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
@@ -29,7 +30,7 @@ import { PageProps } from '@/types'
 import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
+import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
 import React, { useState } from 'react'
 import { useImage } from 'react-image'
 
@@ -149,9 +150,12 @@ function SubmitForApprovalModal({
 }: {
   character: Character
   processing: boolean
-  onSubmit: (onSuccess: () => void) => void
+  onSubmit: (registrationNote: string, onSuccess: () => void) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [registrationNote, setRegistrationNote] = useState(character.registration_note ?? '')
+  const trimmedRegistrationNote = registrationNote.trim()
+  const fromLabel = (character.guild_status ?? 'draft') === 'needs_changes' ? 'needs changes' : 'draft'
 
   return (
     <Modal isOpen={isOpen} onClose={() => !processing && setIsOpen(false)}>
@@ -160,7 +164,10 @@ function SubmitForApprovalModal({
           size="sm"
           color="warning"
           className="w-full justify-center"
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            setRegistrationNote(character.registration_note ?? '')
+            setIsOpen(true)
+          }}
           disabled={processing}
           aria-label="Register with Magiergilde"
           title="Register with Magiergilde"
@@ -172,14 +179,21 @@ function SubmitForApprovalModal({
       <ModalTitle>Register Character With Magiergilde</ModalTitle>
       <ModalContent>
         <p className="text-sm text-base-content/80">
-          This changes <span className="font-semibold">{character.name}</span> from draft to active (pending) and registers it with
+          This changes <span className="font-semibold">{character.name}</span> from {fromLabel} to active (pending) and registers it with
           the Magiergilde for review.
         </p>
+        <TextArea
+          value={registrationNote}
+          onChange={(event) => setRegistrationNote(event.target.value)}
+          placeholder="Add relevant info for the support/review team..."
+        >
+          Registration info (required)
+        </TextArea>
         <p className="mt-2 text-xs text-base-content/60">
           After Magiergilde review, you cannot switch approved or declined characters back by yourself.
         </p>
       </ModalContent>
-      <ModalAction onClick={() => onSubmit(() => setIsOpen(false))} disabled={processing}>
+      <ModalAction onClick={() => onSubmit(trimmedRegistrationNote, () => setIsOpen(false))} disabled={processing || trimmedRegistrationNote.length === 0}>
         Register now
       </ModalAction>
     </Modal>
@@ -217,13 +231,16 @@ export function CharacterCard({
   const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
   const draftOnlyMode = !(features?.character_status_switch ?? true)
-  const canLogActivity = draftOnlyMode || guildStatus !== 'draft'
-  const requiresSubmissionBeforeDowntime = !draftOnlyMode && guildStatus === 'draft'
+  const requiresRegistration = guildStatus === 'draft' || guildStatus === 'needs_changes'
+  const canLogActivity = draftOnlyMode || !requiresRegistration
+  const requiresSubmissionBeforeDowntime = !draftOnlyMode && requiresRegistration
   const hasRoom = (character.room_count ?? 0) > 0
   const statusLabel = guildStatus === 'approved'
     ? 'Approved'
     : guildStatus === 'declined'
       ? 'Declined'
+      : guildStatus === 'needs_changes'
+        ? 'Needs changes'
       : guildStatus === 'retired'
         ? 'Retired'
         : guildStatus === 'draft'
@@ -233,6 +250,8 @@ export function CharacterCard({
     ? <CheckCircle2 size={14} />
     : guildStatus === 'declined'
       ? <XCircle size={14} />
+      : guildStatus === 'needs_changes'
+        ? <AlertTriangle size={14} />
       : guildStatus === 'retired'
         ? <Archive size={14} />
         : guildStatus === 'draft'
@@ -242,6 +261,8 @@ export function CharacterCard({
     ? 'text-success'
     : guildStatus === 'declined'
       ? 'text-error'
+      : guildStatus === 'needs_changes'
+        ? 'text-warning'
       : guildStatus === 'retired'
         ? 'text-base-content/50'
         : guildStatus === 'draft'
@@ -249,11 +270,13 @@ export function CharacterCard({
           : 'text-warning'
   const statusTooltip = guildStatus === 'draft'
     ? 'Draft only. This character is not registered with the Magiergilde yet.'
+    : guildStatus === 'needs_changes'
+      ? 'Changes requested by the Magiergilde. Update and register again for review.'
     : guildStatus === 'pending'
       ? 'Registered with the Magiergilde. Waiting for review.'
       : `Status: ${statusLabel}`
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
-  const canSubmitForApproval = isStatusSwitchEnabled && guildStatus === 'draft'
+  const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
@@ -279,7 +302,7 @@ export function CharacterCard({
   const adventuresCountWarningReason = 'Simple mode auto-level entries exist. Played adventures count is not reliable.'
   const factionLevelWarningReason = 'Simple mode auto-level entries exist. Faction level is not reliable.'
 
-  const submitForApproval = (onSuccess: () => void) => {
+  const submitForApproval = (registrationNote: string, onSuccess: () => void) => {
     if (isSubmittingForApproval || !canSubmitForApproval) {
       return
     }
@@ -287,7 +310,9 @@ export function CharacterCard({
     setIsSubmittingForApproval(true)
     router.post(
       route('characters.submit-approval', character.id),
-      {},
+      {
+        registration_note: registrationNote,
+      },
       {
         preserveScroll: true,
         preserveState: true,

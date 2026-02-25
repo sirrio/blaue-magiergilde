@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
+import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 interface FilterOption {
@@ -30,6 +30,7 @@ type AdminCharacter = Pick<
   | 'external_link'
   | 'user_id'
   | 'guild_status'
+  | 'registration_note'
   | 'user'
   | 'admin_notes'
   | 'admin_managed'
@@ -59,6 +60,7 @@ type CharacterGroup = {
 const getStatusLabel = (status?: string | null) => {
   if (status === 'approved') return 'Approved'
   if (status === 'declined') return 'Declined'
+  if (status === 'needs_changes') return 'Needs changes'
   if (status === 'retired') return 'Retired'
   if (status === 'draft') return 'Draft'
   return 'Pending'
@@ -186,6 +188,7 @@ const AdminCharacterModal = ({
     draft: 'Draft',
     approved: 'Approved',
     declined: 'Declined',
+    needs_changes: 'Needs changes',
     retired: 'Retired',
   }
   const initialFormData = {
@@ -479,6 +482,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     { label: 'Pending', value: 'pending' },
     { label: 'Draft', value: 'draft' },
     { label: 'Approved', value: 'approved' },
+    { label: 'Needs changes', value: 'needs_changes' },
     { label: 'Declined', value: 'declined' },
     { label: 'Retired', value: 'retired' },
   ]
@@ -570,6 +574,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     pending: 'Pending',
     draft: 'Draft',
     approved: 'Approved',
+    needs_changes: 'Needs changes',
     declined: 'Declined',
     retired: 'Retired',
   }
@@ -712,6 +717,7 @@ const tierTextClassMap: Record<string, string> = {
                     const currentLevel = calculateLevel(character)
                     const isAdminManaged = Boolean(character.admin_managed)
                     const characterNotes = character.notes?.trim()
+                    const registrationNote = character.registration_note?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
                     return (
                       <ListRow key={character.id} className={cn('grid-cols-1', isDraft && 'opacity-60')}>
@@ -735,6 +741,11 @@ const tierTextClassMap: Record<string, string> = {
                               {characterNotes ? (
                                 <span className="max-w-xs truncate text-xs text-base-content/60" title={characterNotes}>
                                   {characterNotes}
+                                </span>
+                              ) : null}
+                              {registrationNote ? (
+                                <span className="max-w-xs truncate text-xs text-base-content/60" title={registrationNote}>
+                                  Registration: {registrationNote}
                                 </span>
                               ) : null}
                             </div>
@@ -761,6 +772,7 @@ const tierTextClassMap: Record<string, string> = {
                                 'flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5',
                                 status === 'approved' && 'text-success',
                                 status === 'declined' && 'text-error',
+                                status === 'needs_changes' && 'text-warning',
                                 status === 'pending' && 'text-warning',
                                 status === 'draft' && 'text-base-content/60',
                                 status === 'retired' && 'text-base-content/50',
@@ -768,6 +780,7 @@ const tierTextClassMap: Record<string, string> = {
                             >
                               {status === 'approved' && <CheckCircle2 size={12} />}
                               {status === 'declined' && <XCircle size={12} />}
+                              {status === 'needs_changes' && <AlertTriangle size={12} />}
                               {status === 'pending' && <Clock size={12} />}
                               {status === 'draft' && <Pencil size={12} />}
                               {status === 'retired' && <Archive size={12} />}
@@ -815,6 +828,20 @@ const tierTextClassMap: Record<string, string> = {
                               }
                             >
                               <CheckCircle2 size={14} />
+                            </Button>
+                            <Button
+                              size="xs"
+                              modifier="square"
+                              variant="ghost"
+                              color="warning"
+                              disabled={status === 'needs_changes' || status === 'retired' || status === 'draft'}
+                              onClick={() =>
+                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
+                                  guild_status: 'needs_changes',
+                                })
+                              }
+                            >
+                              <AlertTriangle size={14} />
                             </Button>
                             <Button
                               size="xs"

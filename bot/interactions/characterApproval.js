@@ -14,6 +14,7 @@ function parseApprovalAction(customId) {
     if (!Number.isFinite(characterId) || characterId <= 0) return null;
 
     if (action === 'approve') return { status: 'approved', characterId };
+    if (action === 'needs-changes') return { status: 'needs_changes', characterId };
     if (action === 'decline') return { status: 'declined', characterId };
 
     return null;
@@ -78,7 +79,11 @@ async function handle(interaction) {
         return true;
     }
 
-    const verb = action.status === 'approved' ? 'Approved' : 'Declined';
+    const verb = action.status === 'approved'
+        ? 'Approved'
+        : action.status === 'needs_changes'
+            ? 'Marked as needs changes'
+            : 'Declined';
     await interaction.editReply({
         embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
     });
