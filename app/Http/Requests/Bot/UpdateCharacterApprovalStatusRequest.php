@@ -16,7 +16,7 @@ class UpdateCharacterApprovalStatusRequest extends FormRequest
     {
         return [
             'character_id' => ['required', 'integer', 'exists:characters,id'],
-            'status' => ['required', 'string', 'in:approved,declined,needs_changes'],
+            'status' => ['required', 'string', 'in:pending,approved,declined,needs_changes'],
             'actor_discord_id' => ['required', 'string', 'regex:/^[0-9]{5,}$/', 'max:32'],
             'review_note' => [
                 'nullable',

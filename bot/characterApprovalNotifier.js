@@ -141,13 +141,14 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         embed.setFooter({ text: `Character #${payload.character_id}` });
     }
 
-    const buttons = new ActionRowBuilder();
+    const actionButtons = new ActionRowBuilder();
     const isPending = statusRaw === 'pending';
+    const canSetPending = ['approved', 'declined', 'needs_changes'].includes(String(statusRaw).toLowerCase());
     const characterId = Number(payload?.character_id);
     const hasCharacterId = Number.isFinite(characterId) && characterId > 0;
     const characterIdValue = hasCharacterId ? String(characterId) : '0';
 
-    buttons.addComponents(
+    actionButtons.addComponents(
         new ButtonBuilder()
             .setCustomId(`character-approval:approve:${characterIdValue}`)
             .setLabel('Approve')
@@ -156,17 +157,24 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         new ButtonBuilder()
             .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
             .setLabel('Needs changes')
-            .setStyle(ButtonStyle.Secondary)
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:decline:${characterIdValue}`)
             .setLabel('Decline')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!isPending || !hasCharacterId),
+        new ButtonBuilder()
+            .setCustomId(`character-approval:set-pending:${characterIdValue}`)
+            .setLabel('Set pending')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!canSetPending || !hasCharacterId),
     );
 
+    const components = [actionButtons];
+    const linkButtons = new ActionRowBuilder();
     if (approvalUrl) {
-        buttons.addComponents(
+        linkButtons.addComponents(
             new ButtonBuilder()
                 .setLabel('Open approvals')
                 .setStyle(ButtonStyle.Link)
@@ -175,7 +183,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
 
     if (externalLink) {
-        buttons.addComponents(
+        linkButtons.addComponents(
             new ButtonBuilder()
                 .setLabel('Open external link')
                 .setStyle(ButtonStyle.Link)
@@ -183,9 +191,13 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         );
     }
 
+    if (linkButtons.components.length > 0) {
+        components.push(linkButtons);
+    }
+
     return {
         embeds: [embed],
-        components: [buttons],
+        components,
     };
 }
 

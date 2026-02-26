@@ -106,3 +106,58 @@ it('requires review note for needs changes status from the discord bot', functio
         ->assertUnprocessable()
         ->assertJsonValidationErrors('review_note');
 });
+
+it('allows setting a reviewed character back to pending from the discord bot', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
+    $notificationService->shouldReceive('notifyStatusChange')->never();
+
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '4234567890',
+    ]);
+
+    $character = Character::factory()->create([
+        'guild_status' => 'needs_changes',
+        'review_note' => 'Old review note.',
+    ]);
+
+    $this->withHeader('X-Bot-Token', 'token')
+        ->post(route('bot.character-approvals.status'), [
+            'character_id' => $character->id,
+            'status' => 'pending',
+            'actor_discord_id' => $admin->discord_id,
+        ])
+        ->assertOk()
+        ->assertJson(['status' => 'updated']);
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending')
+        ->and($character->review_note)->toBeNull();
+});
+
+it('requires pending status before approval decisions from the discord bot', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '5234567890',
+    ]);
+
+    $character = Character::factory()->create([
+        'guild_status' => 'needs_changes',
+    ]);
+
+    $this->withHeader('X-Bot-Token', 'token')
+        ->post(route('bot.character-approvals.status'), [
+            'character_id' => $character->id,
+            'status' => 'approved',
+            'actor_discord_id' => $admin->discord_id,
+        ])
+        ->assertConflict()
+        ->assertJsonPath('error', 'Only pending characters can be reviewed. Set status back to pending first.');
+});

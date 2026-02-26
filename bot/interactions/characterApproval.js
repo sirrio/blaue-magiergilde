@@ -1,5 +1,7 @@
 const {
     ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
     MessageFlags,
     ModalBuilder,
     TextInputBuilder,
@@ -7,7 +9,7 @@ const {
 } = require('discord.js');
 const { resolveApiBaseUrl } = require('../appUrls');
 const { withInsecureDispatcher } = require('../httpClient');
-const { buildErrorEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
+const { buildErrorEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 
 function parseApprovalAction(customId) {
     if (!customId || !customId.startsWith('character-approval:')) return null;
@@ -22,6 +24,7 @@ function parseApprovalAction(customId) {
     if (action === 'approve') return { status: 'approved', characterId };
     if (action === 'needs-changes') return { status: 'needs_changes', characterId };
     if (action === 'decline') return { status: 'declined', characterId };
+    if (action === 'set-pending') return { status: 'pending', characterId };
 
     return null;
 }
@@ -34,6 +37,36 @@ function parseApprovalModal(customId) {
 
     const status = String(parts[1] || '').trim().toLowerCase();
     if (!['needs_changes', 'declined'].includes(status)) return null;
+
+    const characterId = Number(parts[2]);
+    if (!Number.isFinite(characterId) || characterId <= 0) return null;
+
+    return { status, characterId };
+}
+
+function parseApprovalConfirm(customId) {
+    if (!customId || !customId.startsWith('character-approval-confirm:')) return null;
+
+    const parts = customId.split(':');
+    if (parts.length !== 3) return null;
+
+    const status = String(parts[1] || '').trim().toLowerCase();
+    if (!['approved', 'pending'].includes(status)) return null;
+
+    const characterId = Number(parts[2]);
+    if (!Number.isFinite(characterId) || characterId <= 0) return null;
+
+    return { status, characterId };
+}
+
+function parseApprovalCancel(customId) {
+    if (!customId || !customId.startsWith('character-approval-cancel:')) return null;
+
+    const parts = customId.split(':');
+    if (parts.length !== 3) return null;
+
+    const status = String(parts[1] || '').trim().toLowerCase();
+    if (!['approved', 'pending'].includes(status)) return null;
 
     const characterId = Number(parts[2]);
     if (!Number.isFinite(characterId) || characterId <= 0) return null;
@@ -100,20 +133,57 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
         ? 'Approved'
         : action.status === 'needs_changes'
             ? 'Marked as needs changes'
-            : 'Declined';
+            : action.status === 'declined'
+                ? 'Declined'
+                : 'Set back to pending';
     await interaction.editReply({
         embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
     });
     return true;
 }
 
+async function showConfirmation(interaction, action) {
+    const label = action.status === 'approved' ? 'approve' : 'set this character back to pending';
+    await interaction.reply({
+        embeds: [buildWarningEmbed('Confirm action', `Do you want to ${label}?`)],
+        components: [
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`character-approval-confirm:${action.status}:${action.characterId}`)
+                    .setLabel('Confirm')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`character-approval-cancel:${action.status}:${action.characterId}`)
+                    .setLabel('Cancel')
+                    .setStyle(ButtonStyle.Secondary),
+            ),
+        ],
+        flags: MessageFlags.Ephemeral,
+    });
+    return true;
+}
+
 async function handle(interaction) {
     if (interaction.isButton()) {
+        const confirmAction = parseApprovalConfirm(interaction.customId);
+        if (confirmAction) {
+            return sendStatusUpdate(interaction, confirmAction);
+        }
+
+        const cancelAction = parseApprovalCancel(interaction.customId);
+        if (cancelAction) {
+            await interaction.update({
+                embeds: [buildSuccessEmbed('Cancelled', 'No changes were made.')],
+                components: [],
+            });
+            return true;
+        }
+
         const action = parseApprovalAction(interaction.customId);
         if (!action) return false;
 
-        if (action.status === 'approved') {
-            return sendStatusUpdate(interaction, action);
+        if (action.status === 'approved' || action.status === 'pending') {
+            return showConfirmation(interaction, action);
         }
 
         const modal = new ModalBuilder()
