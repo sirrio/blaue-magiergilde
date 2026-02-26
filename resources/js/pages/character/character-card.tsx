@@ -154,7 +154,6 @@ function SubmitForApprovalModal({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [registrationNote, setRegistrationNote] = useState(character.registration_note ?? '')
-  const trimmedRegistrationNote = registrationNote.trim()
   const fromLabel = (character.guild_status ?? 'draft') === 'needs_changes' ? 'needs changes' : 'draft'
 
   return (
@@ -187,13 +186,13 @@ function SubmitForApprovalModal({
           onChange={(event) => setRegistrationNote(event.target.value)}
           placeholder="Add relevant info for the support/review team..."
         >
-          Registration info (required)
+          Registration info (optional)
         </TextArea>
         <p className="mt-2 text-xs text-base-content/60">
           After Magiergilde review, you cannot switch approved or declined characters back by yourself.
         </p>
       </ModalContent>
-      <ModalAction onClick={() => onSubmit(trimmedRegistrationNote, () => setIsOpen(false))} disabled={processing || trimmedRegistrationNote.length === 0}>
+      <ModalAction onClick={() => onSubmit(registrationNote.trim(), () => setIsOpen(false))} disabled={processing}>
         Register now
       </ModalAction>
     </Modal>
@@ -230,6 +229,7 @@ export function CharacterCard({
   const earnedBubbles = calculateBubble(character) + additionalBubbles
   const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
+  const reviewNote = character.review_note?.trim() ?? ''
   const draftOnlyMode = !(features?.character_status_switch ?? true)
   const requiresRegistration = guildStatus === 'draft' || guildStatus === 'needs_changes'
   const canLogActivity = draftOnlyMode || !requiresRegistration
@@ -270,8 +270,14 @@ export function CharacterCard({
           : 'text-warning'
   const statusTooltip = guildStatus === 'draft'
     ? 'Draft only. This character is not registered with the Magiergilde yet.'
+    : guildStatus === 'declined'
+      ? reviewNote
+        ? `Declined by the Magiergilde. Note: ${reviewNote}`
+        : 'Declined by the Magiergilde.'
     : guildStatus === 'needs_changes'
-      ? 'Changes requested by the Magiergilde. Update and register again for review.'
+      ? reviewNote
+        ? `Changes requested by the Magiergilde. Note: ${reviewNote}`
+        : 'Changes requested by the Magiergilde. Update and register again for review.'
     : guildStatus === 'pending'
       ? 'Registered with the Magiergilde. Waiting for review.'
       : `Status: ${statusLabel}`

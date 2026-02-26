@@ -85,6 +85,7 @@ class CharacterApprovalNotificationService
             'character_faction' => $payload['character_faction'] ?? null,
             'character_classes' => $payload['character_classes'] ?? [],
             'character_avatar_url' => $payload['character_avatar_url'] ?? null,
+            'character_review_note' => $payload['character_review_note'] ?? null,
             'external_link' => $payload['external_link'] ?? null,
         ]);
     }
@@ -153,6 +154,7 @@ class CharacterApprovalNotificationService
             'character_faction' => $character->faction,
             'character_notes' => $character->notes,
             'character_registration_note' => $character->registration_note,
+            'character_review_note' => $character->review_note,
             'character_is_filler' => $character->is_filler,
             'character_dm_bubbles' => $character->dm_bubbles,
             'character_dm_coins' => $character->dm_coins,

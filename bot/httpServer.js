@@ -294,6 +294,7 @@ function startHttpServer(client) {
             const characterClasses = Array.isArray(payload?.character_classes) ? payload.character_classes : [];
             const characterAvatarUrl = payload?.character_avatar_url ? String(payload.character_avatar_url).trim() : '';
             const externalLink = typeof payload?.external_link === 'string' ? payload.external_link.trim() : '';
+            const characterReviewNote = typeof payload?.character_review_note === 'string' ? payload.character_review_note.trim() : '';
 
             const result = await sendCharacterApprovalDm({
                 client,
@@ -307,6 +308,7 @@ function startHttpServer(client) {
                 characterFaction,
                 characterClasses,
                 characterAvatarUrl,
+                characterReviewNote,
                 externalLink,
             });
 

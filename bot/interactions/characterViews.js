@@ -1257,7 +1257,7 @@ function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialN
         .setCustomId('registrationNote')
         .setLabel('Info for support/review team')
         .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true)
+        .setRequired(false)
         .setMaxLength(2000)
         .setValue(safeModalValue(initialNote, 2000));
 

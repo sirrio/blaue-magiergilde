@@ -13,6 +13,7 @@ const payload = {
     character_dm_coins: 0,
     character_shop_spend: 0,
     character_registration_note: 'Please review this with custom homebrew note.',
+    character_review_note: 'Please provide a proper DnDBeyond link before approval.',
     character_avatar_url: 'https://example.test/avatars/character.png',
     user_name: 'User',
     user_discord_id: '123456789012345678',
@@ -38,6 +39,9 @@ assert.ok(userField?.value.includes('<@123456789012345678>'));
 
 const registrationField = embedData.fields.find((field) => field.name === 'Registration info');
 assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');
+
+const reviewField = embedData.fields.find((field) => field.name === 'Review note');
+assert.equal(reviewField?.value, 'Please provide a proper DnDBeyond link before approval.');
 
 const buttonLabels = message.components[0].toJSON().components.map((component) => component.label);
 assert.deepEqual(buttonLabels.slice(0, 3), ['Approve', 'Needs changes', 'Decline']);

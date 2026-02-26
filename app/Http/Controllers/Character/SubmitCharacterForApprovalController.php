@@ -27,7 +27,9 @@ class SubmitCharacterForApprovalController extends Controller
             return redirect()->back();
         }
 
-        $character->registration_note = trim($request->string('registration_note')->toString());
+        $registrationNote = trim((string) $request->input('registration_note', ''));
+        $character->registration_note = $registrationNote !== '' ? $registrationNote : null;
+        $character->review_note = null;
         $character->guild_status = 'pending';
         $character->save();
 

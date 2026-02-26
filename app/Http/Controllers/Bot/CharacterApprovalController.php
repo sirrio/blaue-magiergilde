@@ -51,6 +51,11 @@ class CharacterApprovalController extends Controller
 
         $previousStatus = $character->guild_status;
         $character->guild_status = $data['status'];
+        if (in_array($data['status'], ['declined', 'needs_changes'], true)) {
+            $character->review_note = trim((string) ($data['review_note'] ?? ''));
+        } else {
+            $character->review_note = null;
+        }
         $character->save();
 
         AdminAuditLog::query()->create([

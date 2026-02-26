@@ -255,6 +255,7 @@ it('allows owners to re-register characters in needs changes status', function (
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'needs_changes',
         'registration_note' => 'Old note',
+        'review_note' => 'Old requested changes',
     ]);
 
     $this->actingAs($owner)
@@ -265,10 +266,11 @@ it('allows owners to re-register characters in needs changes status', function (
 
     $character->refresh();
     expect($character->guild_status)->toBe('pending')
-        ->and($character->registration_note)->toBe('Updated info after requested fixes.');
+        ->and($character->registration_note)->toBe('Updated info after requested fixes.')
+        ->and($character->review_note)->toBeNull();
 });
 
-it('requires registration info when submitting a character for review', function () {
+it('allows empty registration info when submitting a character for review', function () {
     Config::set('features.character_status_switch', true);
 
     $owner = User::factory()->create();
@@ -280,10 +282,11 @@ it('requires registration info when submitting a character for review', function
         ->post(route('characters.submit-approval', $character), [
             'registration_note' => '',
         ])
-        ->assertSessionHasErrors('registration_note');
+        ->assertRedirect();
 
     $character->refresh();
-    expect($character->guild_status)->toBe('draft');
+    expect($character->guild_status)->toBe('pending')
+        ->and($character->registration_note)->toBeNull();
 });
 
 it('does not allow draft submission when character status switching is disabled', function () {

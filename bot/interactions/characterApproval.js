@@ -1,4 +1,10 @@
-const { MessageFlags } = require('discord.js');
+const {
+    ActionRowBuilder,
+    MessageFlags,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+} = require('discord.js');
 const { resolveApiBaseUrl } = require('../appUrls');
 const { withInsecureDispatcher } = require('../httpClient');
 const { buildErrorEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
@@ -20,12 +26,22 @@ function parseApprovalAction(customId) {
     return null;
 }
 
-async function handle(interaction) {
-    if (!interaction.isButton()) return false;
+function parseApprovalModal(customId) {
+    if (!customId || !customId.startsWith('character-approval-note:')) return null;
 
-    const action = parseApprovalAction(interaction.customId);
-    if (!action) return false;
+    const parts = customId.split(':');
+    if (parts.length !== 3) return null;
 
+    const status = String(parts[1] || '').trim().toLowerCase();
+    if (!['needs_changes', 'declined'].includes(status)) return null;
+
+    const characterId = Number(parts[2]);
+    if (!Number.isFinite(characterId) || characterId <= 0) return null;
+
+    return { status, characterId };
+}
+
+async function sendStatusUpdate(interaction, action, reviewNote = '') {
     const appUrl = resolveApiBaseUrl();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
 
@@ -52,6 +68,7 @@ async function handle(interaction) {
                 character_id: action.characterId,
                 status: action.status,
                 actor_discord_id: String(interaction.user.id),
+                review_note: reviewNote || undefined,
             }),
         }));
     } catch (error) {
@@ -88,6 +105,50 @@ async function handle(interaction) {
         embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
     });
     return true;
+}
+
+async function handle(interaction) {
+    if (interaction.isButton()) {
+        const action = parseApprovalAction(interaction.customId);
+        if (!action) return false;
+
+        if (action.status === 'approved') {
+            return sendStatusUpdate(interaction, action);
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId(`character-approval-note:${action.status}:${action.characterId}`)
+            .setTitle(action.status === 'declined' ? 'Decline character' : 'Request changes');
+
+        const reviewNoteInput = new TextInputBuilder()
+            .setCustomId('review_note')
+            .setLabel('Review note (required)')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(2000)
+            .setMinLength(1)
+            .setPlaceholder('Explain why this character was declined or what needs to be fixed.');
+
+        modal.addComponents(new ActionRowBuilder().addComponents(reviewNoteInput));
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (!interaction.isModalSubmit()) return false;
+
+    const action = parseApprovalModal(interaction.customId);
+    if (!action) return false;
+
+    const reviewNote = String(interaction.fields.getTextInputValue('review_note') || '').trim();
+    if (!reviewNote) {
+        await interaction.reply({
+            embeds: [buildErrorEmbed('Missing review note', 'Please provide a review note before submitting.')],
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
+    return sendStatusUpdate(interaction, action, reviewNote);
 }
 
 module.exports = {

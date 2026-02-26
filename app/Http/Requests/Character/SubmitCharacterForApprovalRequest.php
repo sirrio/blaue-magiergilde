@@ -22,7 +22,7 @@ class SubmitCharacterForApprovalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'registration_note' => ['required', 'string', 'max:2000'],
+            'registration_note' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

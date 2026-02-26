@@ -71,13 +71,38 @@ it('accepts needs changes status from the discord bot', function () {
             'character_id' => $character->id,
             'status' => 'needs_changes',
             'actor_discord_id' => $admin->discord_id,
+            'review_note' => 'Please update your external link and notes.',
         ])
         ->assertOk()
         ->assertJson(['status' => 'updated']);
 
     $character->refresh();
-    expect($character->guild_status)->toBe('needs_changes');
+    expect($character->guild_status)->toBe('needs_changes')
+        ->and($character->review_note)->toBe('Please update your external link and notes.');
 
     $notificationService->shouldHaveReceived('syncAnnouncement')->once();
     $notificationService->shouldHaveReceived('notifyStatusChange')->once();
+});
+
+it('requires review note for needs changes status from the discord bot', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '3234567890',
+    ]);
+
+    $character = Character::factory()->create([
+        'guild_status' => 'pending',
+    ]);
+
+    $this->withHeader('X-Bot-Token', 'token')
+        ->postJson(route('bot.character-approvals.status'), [
+            'character_id' => $character->id,
+            'status' => 'needs_changes',
+            'actor_discord_id' => $admin->discord_id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('review_note');
 });

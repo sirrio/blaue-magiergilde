@@ -344,6 +344,7 @@ export interface Character {
   deleted_at: string
   guild_status?: 'pending' | 'approved' | 'declined' | 'needs_changes' | 'retired' | 'draft'
   registration_note?: string | null
+  review_note?: string | null
   room_count?: number
   admin_notes?: string | null
   admin_managed?: boolean

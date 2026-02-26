@@ -34,6 +34,31 @@ it('sends a discord DM when a character is approved', function () {
     });
 });
 
+it('includes review note when notifying about needs changes', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/character-approval/notify' => Http::response(['status' => 'sent'], 200),
+    ]);
+
+    $admin = User::factory()->create(['is_admin' => true]);
+    $owner = User::factory()->create(['discord_id' => '1234567890']);
+    $character = Character::factory()->for($owner)->create(['guild_status' => 'pending']);
+
+    $this->actingAs($admin)->patch(route('admin.character-approvals.update', $character), [
+        'guild_status' => 'needs_changes',
+        'review_note' => 'Please fix class setup and missing details.',
+    ])->assertRedirect();
+
+    Http::assertSent(function ($request) {
+        return $request->url() === 'http://bot.test/character-approval/notify'
+            && $request['discord_user_id'] === '1234567890'
+            && $request['status'] === 'needs_changes'
+            && $request['character_review_note'] === 'Please fix class setup and missing details.';
+    });
+});
+
 it('posts a discord announcement when a newly created draft character is submitted', function () {
     Config::set('services.bot.http_url', 'http://bot.test');
     Config::set('services.bot.http_token', 'token');

@@ -93,6 +93,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     const shopSpend = Number.isFinite(numericShopSpend) ? numericShopSpend : null;
     const notes = trimField(payload?.character_notes || '');
     const registrationNote = trimField(payload?.character_registration_note || '');
+    const reviewNote = trimField(payload?.character_review_note || '');
     const externalLink = payload?.external_link || '';
     const approvalUrl = payload?.approval_url || '';
     const avatarUrl = options.avatarUrlOverride || payload?.character_avatar_url || '';
@@ -131,6 +132,9 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
     if (isMeaningful(registrationNote) && registrationNote !== '—') {
         embed.addFields({ name: 'Registration info', value: registrationNote, inline: false });
+    }
+    if (isMeaningful(reviewNote) && reviewNote !== '—') {
+        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
     }
 
     if (payload?.character_id) {
@@ -197,6 +201,7 @@ async function sendCharacterApprovalDm({
     characterFaction,
     characterClasses,
     characterAvatarUrl,
+    characterReviewNote,
     externalLink,
 }) {
     if (!discordUserId || !/^[0-9]{5,}$/.test(String(discordUserId))) {
@@ -217,6 +222,7 @@ async function sendCharacterApprovalDm({
     const rawFaction = characterFaction ? String(characterFaction).trim() : '';
     const faction = rawFaction.toLowerCase() === 'none' ? '' : rawFaction;
     const classes = formatClasses(characterClasses);
+    const reviewNote = trimField(characterReviewNote || '');
 
     let description = '';
     if (label.toLowerCase() === 'approved') {
@@ -248,6 +254,10 @@ async function sendCharacterApprovalDm({
 
     if (fields.length > 0) {
         embed.addFields(fields);
+    }
+
+    if (isMeaningful(reviewNote) && reviewNote !== '—' && (status === 'needs_changes' || status === 'declined')) {
+        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
     }
 
     let avatarAttachment = null;

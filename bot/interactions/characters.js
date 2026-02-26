@@ -2066,10 +2066,6 @@ async function handle(interaction) {
         }
 
         const registrationNote = String(interaction.fields.getTextInputValue('registrationNote') || '').trim();
-        if (!registrationNote) {
-            await updateManageMessage(interaction, { content: 'Please provide registration info.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
 
         const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, {
             guildStatus: 'pending',

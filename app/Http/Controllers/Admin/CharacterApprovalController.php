@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -79,6 +80,7 @@ class CharacterApprovalController extends Controller
                 'faction',
                 'guild_status',
                 'registration_note',
+                'review_note',
                 'notes',
                 'admin_notes',
                 'dm_bubbles',
@@ -106,10 +108,20 @@ class CharacterApprovalController extends Controller
         $data = $request->validate([
             'guild_status' => ['sometimes', 'required', 'in:pending,approved,declined,needs_changes'],
             'admin_notes' => ['nullable', 'string'],
+            'review_note' => [
+                'nullable',
+                'string',
+                'max:2000',
+                Rule::requiredIf(fn () => in_array((string) $request->input('guild_status'), ['declined', 'needs_changes'], true)),
+            ],
         ]);
         $statusChange = null;
 
         if (array_key_exists('guild_status', $data)) {
+            if ($character->guild_status === $data['guild_status']) {
+                return redirect()->back();
+            }
+
             if ($character->guild_status === 'retired') {
                 return redirect()->back()->withErrors([
                     'guild_status' => 'Retired characters cannot change status.',
@@ -120,8 +132,23 @@ class CharacterApprovalController extends Controller
                     'guild_status' => 'Draft characters must be submitted by their owner.',
                 ]);
             }
+
+            if (
+                in_array($data['guild_status'], ['approved', 'declined', 'needs_changes'], true)
+                && $character->guild_status !== 'pending'
+            ) {
+                return redirect()->back()->withErrors([
+                    'guild_status' => 'Only pending characters can be reviewed. Set status back to pending first.',
+                ]);
+            }
+
             $previousStatus = $character->guild_status;
             $character->guild_status = $data['guild_status'];
+            if (in_array($data['guild_status'], ['declined', 'needs_changes'], true)) {
+                $character->review_note = trim((string) ($data['review_note'] ?? ''));
+            } else {
+                $character->review_note = null;
+            }
             AdminAuditLog::query()->create([
                 'actor_user_id' => $user->id,
                 'action' => 'character.guild_status.updated',
