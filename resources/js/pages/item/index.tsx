@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import ItemRow from '@/pages/item/item-row'
-import { Item, Source } from '@/types'
+import { Item, MundaneItemVariant, Source } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
 import { LoaderCircle, MessageSquarePlus, Plus, Scale, ScrollText, Shield, Store } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
@@ -31,6 +31,63 @@ const spellSchoolLabels: Record<string, string> = {
 
 const spellLevels = Array.from({ length: 10 }, (_, i) => i)
 const spellSchools = Object.keys(spellSchoolLabels)
+
+const formatVariantCost = (costGp?: number | null): string => {
+  if (costGp == null) return 'variable'
+  return `${costGp} GP`
+}
+
+const VariantSelector = ({
+  variants,
+  selectedIds,
+  onToggle,
+}: {
+  variants: MundaneItemVariant[]
+  selectedIds: number[]
+  onToggle: (id: number) => void
+}) => {
+  const weaponVariants = variants.filter((variant) => variant.category === 'weapon')
+  const armorVariants = variants.filter((variant) => variant.category === 'armor')
+  const groups = [
+    { label: 'Weapons', entries: weaponVariants },
+    { label: 'Armor', entries: armorVariants },
+  ]
+
+  return (
+    <div className="space-y-2 rounded-box border border-base-200 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Variant Prices (Optional)</p>
+      <p className="text-xs text-base-content/70">
+        Select mundane base variants this item can apply to.
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {groups.map((group) => (
+          <div key={group.label} className="space-y-1">
+            <p className="text-xs font-semibold text-base-content/70">{group.label}</p>
+            <div className="max-h-36 space-y-1 overflow-y-auto pr-1">
+              {group.entries.map((variant) => {
+                const checked = selectedIds.includes(variant.id)
+                return (
+                  <label key={variant.id} className="flex items-center justify-between gap-2 rounded px-1 py-1 text-xs hover:bg-base-200/60">
+                    <span className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-xs"
+                        checked={checked}
+                        onChange={() => onToggle(variant.id)}
+                      />
+                      <span>{variant.name}</span>
+                    </span>
+                    <span className="text-base-content/60">{formatVariantCost(variant.cost_gp)}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -178,7 +235,7 @@ const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
   )
 }
 
-const StoreItemModal = ({ sources }: { sources: Source[] }) => {
+const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
@@ -187,6 +244,7 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
     rarity: 'common',
     type: 'item',
     source_id: '' as number | '',
+    mundane_variant_ids: [] as number[],
     shop_enabled: true,
     guild_enabled: true,
     default_spell_roll_enabled: false,
@@ -202,6 +260,7 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
     setData('shop_enabled', true)
     setData('guild_enabled', true)
     setData('source_id', '')
+    setData('mundane_variant_ids', [])
     setData('default_spell_roll_enabled', false)
     setData('default_spell_levels', [])
     setData('default_spell_schools', [])
@@ -247,6 +306,15 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
     if (!enabled) {
       setData('ruling_note', '')
     }
+  }
+
+  const toggleMundaneVariant = (variantId: number) => {
+    setData(
+      'mundane_variant_ids',
+      data.mundane_variant_ids.includes(variantId)
+        ? data.mundane_variant_ids.filter((id) => id !== variantId)
+        : [...data.mundane_variant_ids, variantId],
+    )
   }
 
   const handleSubmit = () => {
@@ -300,6 +368,11 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
                 ))}
               </SelectOptions>
             </Select>
+            <VariantSelector
+              variants={mundaneVariants}
+              selectedIds={data.mundane_variant_ids}
+              onToggle={toggleMundaneVariant}
+            />
           </div>
 
           <div className="space-y-3">
@@ -449,11 +522,13 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
 export default function Index({
   items,
   sources,
+  mundaneVariants,
   canManage = false,
   indexRoute = 'compendium.items.index',
 }: {
   items: Item[]
   sources: Source[]
+  mundaneVariants: MundaneItemVariant[]
   canManage?: boolean
   indexRoute?: string
 }) {
@@ -600,7 +675,7 @@ export default function Index({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {canManage ? <StoreItemModal sources={sources} /> : null}
+            {canManage ? <StoreItemModal sources={sources} mundaneVariants={mundaneVariants} /> : null}
             {!canManage ? <SuggestNewItemModal sources={sources} /> : null}
           </div>
         </section>
@@ -682,7 +757,17 @@ export default function Index({
           }
           data={['items']}
         >
-          <List>{items?.map((item) => <ItemRow key={item.id} item={item} sources={sources} canManage={canManage} />)}</List>
+          <List>
+            {items?.map((item) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                sources={sources}
+                canManage={canManage}
+                mundaneVariants={mundaneVariants}
+              />
+            ))}
+          </List>
         </Deferred>
       </div>
     </AppLayout>

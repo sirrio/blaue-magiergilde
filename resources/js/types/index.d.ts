@@ -253,6 +253,15 @@ export interface Source {
   shortcode: string
 }
 
+export interface MundaneItemVariant {
+  id: number
+  name: string
+  slug: string
+  category: 'weapon' | 'armor'
+  cost_gp?: number | null
+  is_placeholder?: boolean
+}
+
 export interface CompendiumImportRun {
   id: number
   entity_type: 'items' | 'spells'
@@ -301,6 +310,7 @@ export interface Item {
   name: string
   url: string
   cost: string
+  display_cost?: string | null
   type: 'item' | 'consumable' | 'spellscroll'
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
   pick_count: number
@@ -313,6 +323,8 @@ export interface Item {
   ruling_note?: string | null
   source_id?: number | null
   source?: Source | null
+  mundane_variant_ids?: number[]
+  mundane_variants?: MundaneItemVariant[]
 }
 
 export interface Spell {

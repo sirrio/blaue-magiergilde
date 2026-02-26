@@ -7,6 +7,7 @@ use App\Http\Requests\Auction\StoreAuctionItemRequest;
 use App\Models\Auction;
 use App\Models\AuctionItem;
 use App\Models\Item;
+use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,7 @@ class AuctionItemController extends Controller
 
         $item = Item::query()
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->find($request->item_id);
         $costValue = $this->parseCostValue($item?->cost);
         $repairMax = $costValue;
@@ -81,7 +83,7 @@ class AuctionItemController extends Controller
                 'item_id' => $request->item_id,
                 'item_name' => $item?->name,
                 'item_url' => $item?->url,
-                'item_cost' => $item?->cost,
+                'item_cost' => $item ? ItemCostResolver::resolveForItem($item) : null,
                 'item_rarity' => $item?->rarity,
                 'item_type' => $item?->type,
                 'snapshot_custom' => false,

@@ -6,6 +6,7 @@ use App\Models\Item;
 use App\Models\Shop;
 use App\Models\ShopItem;
 use App\Models\Spell;
+use App\Support\ItemCostResolver;
 use Illuminate\Support\Facades\DB;
 
 class ShopRollService
@@ -114,6 +115,7 @@ class ShopRollService
                 'default_spell_levels',
                 'default_spell_schools',
             ])
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->where('shop_enabled', true)
             ->where('rarity', $rarity);
 
@@ -128,7 +130,12 @@ class ShopRollService
             return null;
         }
 
-        $candidatePool = $candidates->map(static fn (Item $item) => $item->toArray())->all();
+        $candidatePool = $candidates->map(static function (Item $item): array {
+            $payload = $item->toArray();
+            $payload['display_cost'] = ItemCostResolver::resolveForItem($item);
+
+            return $payload;
+        })->all();
         if ($excludeItemId !== null) {
             $withoutCurrent = array_values(array_filter(
                 $candidatePool,
@@ -182,7 +189,7 @@ class ShopRollService
             $line->item_id = $newItemId;
             $line->item_name = $replacement['name'] ?? null;
             $line->item_url = $replacement['url'] ?? null;
-            $line->item_cost = $replacement['cost'] ?? null;
+            $line->item_cost = $replacement['display_cost'] ?? ($replacement['cost'] ?? null);
             $line->item_rarity = $replacement['rarity'] ?? null;
             $line->item_type = $replacement['type'] ?? null;
             $line->spell_id = $spellId;
@@ -242,7 +249,7 @@ class ShopRollService
                     'item_id' => $pickedItem['id'],
                     'item_name' => $pickedItem['name'] ?? null,
                     'item_url' => $pickedItem['url'] ?? null,
-                    'item_cost' => $pickedItem['cost'] ?? null,
+                    'item_cost' => $pickedItem['display_cost'] ?? ($pickedItem['cost'] ?? null),
                     'item_rarity' => $pickedItem['rarity'] ?? null,
                     'item_type' => $pickedItem['type'] ?? null,
                     'snapshot_custom' => false,

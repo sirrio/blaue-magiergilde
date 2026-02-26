@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Item\StoreItemRequest;
 use App\Http\Requests\Item\UpdateItemRequest;
 use App\Models\Item;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
+use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,7 +31,10 @@ class ItemController extends Controller
         $searchTerm = request('search');
 
         $itemQuery = Item::query();
-        $itemQuery->with('source:id,name,shortcode');
+        $itemQuery->with([
+            'source:id,name,shortcode',
+            'mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order',
+        ]);
 
         if (! empty($searchTerm)) {
             $itemQuery->where('name', 'LIKE', "%$searchTerm%");
@@ -95,7 +100,39 @@ class ItemController extends Controller
                 'ruling_note',
                 'source_id',
             ])
-            ->get();
+            ->get()
+            ->map(function (Item $item): array {
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'cost' => $item->cost,
+                    'display_cost' => ItemCostResolver::resolveForItem($item),
+                    'url' => $item->url,
+                    'rarity' => $item->rarity,
+                    'type' => $item->type,
+                    'pick_count' => $item->pick_count,
+                    'shop_enabled' => $item->shop_enabled,
+                    'guild_enabled' => $item->guild_enabled,
+                    'default_spell_roll_enabled' => $item->default_spell_roll_enabled,
+                    'default_spell_levels' => $item->default_spell_levels,
+                    'default_spell_schools' => $item->default_spell_schools,
+                    'ruling_changed' => $item->ruling_changed,
+                    'ruling_note' => $item->ruling_note,
+                    'source_id' => $item->source_id,
+                    'source' => $item->source,
+                    'mundane_variant_ids' => $item->mundaneVariants->pluck('id')->values(),
+                    'mundane_variants' => $item->mundaneVariants->map(static function (MundaneItemVariant $variant): array {
+                        return [
+                            'id' => $variant->id,
+                            'name' => $variant->name,
+                            'slug' => $variant->slug,
+                            'category' => $variant->category,
+                            'cost_gp' => $variant->cost_gp !== null ? (float) $variant->cost_gp : null,
+                            'is_placeholder' => $variant->is_placeholder,
+                        ];
+                    })->values(),
+                ];
+            });
 
         return Inertia::render('item/index', [
             'items' => Inertia::defer(fn () => $items),
@@ -103,6 +140,21 @@ class ItemController extends Controller
                 ->orderBy('shortcode')
                 ->orderBy('name')
                 ->get(['id', 'name', 'shortcode']),
+            'mundaneVariants' => MundaneItemVariant::query()
+                ->orderBy('category')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'category', 'cost_gp', 'is_placeholder'])
+                ->map(static function (MundaneItemVariant $variant): array {
+                    return [
+                        'id' => $variant->id,
+                        'name' => $variant->name,
+                        'slug' => $variant->slug,
+                        'category' => $variant->category,
+                        'cost_gp' => $variant->cost_gp !== null ? (float) $variant->cost_gp : null,
+                        'is_placeholder' => $variant->is_placeholder,
+                    ];
+                }),
             'canManage' => request()->routeIs('admin.items.index'),
             'indexRoute' => request()->routeIs('admin.items.index')
                 ? 'admin.items.index'
@@ -136,6 +188,10 @@ class ItemController extends Controller
         $this->applyRulingNote($item, $request);
         $this->applyDefaultSpellRoll($item, $request);
         $item->save();
+        $item->mundaneVariants()->sync(array_values(array_unique(array_filter(array_map(
+            static fn ($value) => (int) $value,
+            (array) $request->input('mundane_variant_ids', []),
+        ), static fn (int $id) => $id > 0))));
 
         return redirect()->back();
     }
@@ -172,6 +228,10 @@ class ItemController extends Controller
         $this->applyRulingNote($item, $request);
         $this->applyDefaultSpellRoll($item, $request);
         $item->save();
+        $item->mundaneVariants()->sync(array_values(array_unique(array_filter(array_map(
+            static fn ($value) => (int) $value,
+            (array) $request->input('mundane_variant_ids', []),
+        ), static fn (int $id) => $id > 0))));
 
         return redirect()->back();
     }

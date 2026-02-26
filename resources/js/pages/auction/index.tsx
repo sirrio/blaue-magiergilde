@@ -75,7 +75,7 @@ const getAuctionItemSnapshot = (auctionItem: AuctionItem): Item => {
     id: item.id ?? 0,
     name: auctionItem.item_name ?? item.name ?? 'Unknown item',
     url: auctionItem.item_url ?? item.url ?? '',
-    cost: auctionItem.item_cost ?? item.cost ?? '',
+    cost: auctionItem.item_cost ?? item.display_cost ?? item.cost ?? '',
     rarity: (auctionItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
     type: (auctionItem.item_type ?? item.type ?? 'item') as Item['type'],
     pick_count: item.pick_count ?? 0,
@@ -646,7 +646,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
   const { data, setData, patch, processing } = useForm({
     name: item.name ?? '',
     url: item.url ?? '',
-    cost: item.cost ?? '',
+    cost: item.display_cost ?? item.cost ?? '',
     notes: auctionItem.notes ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
@@ -660,14 +660,14 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     setData({
       name: item.name ?? '',
       url: item.url ?? '',
-      cost: item.cost ?? '',
+      cost: item.display_cost ?? item.cost ?? '',
       notes: auctionItem.notes ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
       repair_current: auctionItem.repair_current ?? '',
       repair_max: auctionItem.repair_max ?? '',
     })
-  }, [isOpen, auctionItem.notes, auctionItem.repair_current, auctionItem.repair_max, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, auctionItem.notes, auctionItem.repair_current, auctionItem.repair_max, item.cost, item.display_cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.auction-items.snapshot.update', { auctionItem: auctionItem.id }), {

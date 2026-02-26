@@ -6,7 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { Item, PageProps, ShopItem, Source, Spell } from '@/types'
+import { Item, MundaneItemVariant, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
 import { Copy, Dices, FlaskRound, MessageSquarePlus, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Send, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
@@ -144,6 +144,64 @@ const spellSchools = [
 
 type SpellSchool = (typeof spellSchools)[number]
 
+const formatVariantCost = (costGp?: number | null): string => {
+  if (costGp == null) return 'variable'
+  return `${costGp} GP`
+}
+
+const VariantSelector = ({
+  variants,
+  selectedIds,
+  onToggle,
+}: {
+  variants: MundaneItemVariant[]
+  selectedIds: number[]
+  onToggle: (id: number) => void
+}) => {
+  const grouped = [
+    {
+      label: 'Weapons',
+      entries: variants.filter((variant) => variant.category === 'weapon'),
+    },
+    {
+      label: 'Armor',
+      entries: variants.filter((variant) => variant.category === 'armor'),
+    },
+  ]
+
+  return (
+    <div className="space-y-2 rounded-box border border-base-200 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Variant Prices (Optional)</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {grouped.map((group) => (
+          <div key={group.label} className="space-y-1">
+            <p className="text-xs font-semibold text-base-content/70">{group.label}</p>
+            <div className="max-h-36 space-y-1 overflow-y-auto pr-1">
+              {group.entries.map((variant) => {
+                const checked = selectedIds.includes(variant.id)
+                return (
+                  <label key={variant.id} className="flex items-center justify-between gap-2 rounded px-1 py-1 text-xs hover:bg-base-200/60">
+                    <span className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-xs"
+                        checked={checked}
+                        onChange={() => onToggle(variant.id)}
+                      />
+                      <span>{variant.name}</span>
+                    </span>
+                    <span className="text-base-content/60">{formatVariantCost(variant.cost_gp)}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
   const { data, setData, post } = useForm({
     spell_levels: [] as number[],
@@ -256,10 +314,11 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
 }
 
 const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: Item }) => {
+  const baseCost = item.display_cost ?? item.cost ?? ''
   const { data, setData, patch, processing } = useForm({
     name: item.name ?? '',
     url: item.url ?? '',
-    cost: item.cost ?? '',
+    cost: baseCost,
     notes: shopItem.notes ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
@@ -271,12 +330,12 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
     setData({
       name: item.name ?? '',
       url: item.url ?? '',
-      cost: item.cost ?? '',
+      cost: baseCost,
       notes: shopItem.notes ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
     })
-  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData, shopItem.notes])
+  }, [baseCost, isOpen, item.name, item.rarity, item.type, item.url, setData, shopItem.notes])
 
   const handleSubmit = () => {
     patch(route('admin.shop-items.snapshot.update', { shopItem: shopItem.id }), {
@@ -531,12 +590,14 @@ export default function ItemRow({
   item,
   shopItem,
   sources = [],
+  mundaneVariants = [],
   canUpdatePostLine = false,
   canManage = true,
 }: {
   item: Item
   shopItem?: ShopItem
   sources?: Source[]
+  mundaneVariants?: MundaneItemVariant[]
   canUpdatePostLine?: boolean
   canManage?: boolean
 }) {
@@ -548,6 +609,7 @@ export default function ItemRow({
     type: item.type,
     rarity: item.rarity,
     source_id: item.source_id ?? '',
+    mundane_variant_ids: item.mundane_variant_ids ?? [],
     shop_enabled: item.shop_enabled ?? true,
     guild_enabled: item.guild_enabled ?? true,
     default_spell_roll_enabled: item.default_spell_roll_enabled ?? false,
@@ -619,7 +681,17 @@ export default function ItemRow({
     }
   }
 
+  const toggleMundaneVariant = (variantId: number) => {
+    setData(
+      'mundane_variant_ids',
+      data.mundane_variant_ids.includes(variantId)
+        ? data.mundane_variant_ids.filter((id) => id !== variantId)
+        : [...data.mundane_variant_ids, variantId],
+    )
+  }
+
   const spell = getShopSpellSnapshot(shopItem)
+  const resolvedCost = item.display_cost ?? item.cost
   const shopNotes = shopItem?.notes?.trim()
   const baseName = shopNotes ? `${item.name} - ${shopNotes}` : item.name
   const displayName = spell ? `${baseName} - ${spell.name}` : baseName
@@ -629,8 +701,8 @@ export default function ItemRow({
   const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
   const isCustomListing = Boolean(shopItem?.snapshot_custom)
   const discordLineText = spell
-    ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${item.cost}`
-    : `[${baseName}](<${item.url}>): ${item.cost}`
+    ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${resolvedCost ?? ''}`
+    : `[${baseName}](<${item.url}>): ${resolvedCost ?? ''}`
 
   const handleSnapshotRefresh = () => {
     if (!shopItem) return
@@ -748,6 +820,11 @@ export default function ItemRow({
               {item.source.shortcode}
             </span>
           ) : null}
+          {item.mundane_variants?.length ? (
+            <span className="ml-2 rounded-full border border-info/40 px-2 py-0.5 text-[9px] uppercase text-info">
+              {item.mundane_variants.length} variant{item.mundane_variants.length === 1 ? '' : 's'}
+            </span>
+          ) : null}
           {shopItem && isCustomListing ? (
             <span className="ml-2 rounded-full border border-warning/40 px-2 py-0.5 text-[9px] uppercase text-warning">
               Custom listing
@@ -758,7 +835,7 @@ export default function ItemRow({
           <span className="text-[11px] text-base-content/60">{autoRollSummary}</span>
         ) : null}
       </div>
-      <div className="max-w-20 font-mono text-xs">{item.cost ? item.cost : <span className="text-error">No cost available</span>}</div>
+      <div className="max-w-56 font-mono text-xs">{resolvedCost ? resolvedCost : <span className="text-error">No cost available</span>}</div>
       {!shopItem ? (
         <div className="flex items-center justify-center gap-2 text-xs">
           {isShopEnabled ? (
@@ -901,6 +978,11 @@ export default function ItemRow({
                         ))}
                       </SelectOptions>
                     </Select>
+                    <VariantSelector
+                      variants={mundaneVariants}
+                      selectedIds={data.mundane_variant_ids}
+                      onToggle={toggleMundaneVariant}
+                    />
                   </div>
 
                   <div className="space-y-3">

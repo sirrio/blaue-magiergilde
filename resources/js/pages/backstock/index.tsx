@@ -56,7 +56,7 @@ const getBackstockItemSnapshot = (entry: BackstockItem): Item => {
     id: item.id ?? 0,
     name: entry.item_name ?? item.name ?? 'Unknown item',
     url: entry.item_url ?? item.url ?? '',
-    cost: entry.item_cost ?? item.cost ?? '',
+    cost: entry.item_cost ?? item.display_cost ?? item.cost ?? '',
     rarity: (entry.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
     type: (entry.item_type ?? item.type ?? 'item') as Item['type'],
     pick_count: item.pick_count ?? 0,
@@ -109,7 +109,7 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
   const { data, setData, patch, processing } = useForm({
     name: item.name ?? '',
     url: item.url ?? '',
-    cost: item.cost ?? '',
+    cost: item.display_cost ?? item.cost ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
   })
@@ -120,11 +120,11 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
     setData({
       name: item.name ?? '',
       url: item.url ?? '',
-      cost: item.cost ?? '',
+      cost: item.display_cost ?? item.cost ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
     })
-  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, item.cost, item.display_cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.backstock-items.snapshot.update', { backstockItem: entry.id }), {

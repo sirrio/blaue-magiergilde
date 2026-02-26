@@ -39,6 +39,8 @@ class StoreItemRequest extends FormRequest
             'rarity' => 'required|string',
             'type' => 'required|string',
             'source_id' => 'nullable|integer|exists:sources,id',
+            'mundane_variant_ids' => 'nullable|array',
+            'mundane_variant_ids.*' => 'integer|exists:mundane_item_variants,id',
             'shop_enabled' => 'boolean',
             'guild_enabled' => 'boolean',
             'default_spell_roll_enabled' => 'boolean',

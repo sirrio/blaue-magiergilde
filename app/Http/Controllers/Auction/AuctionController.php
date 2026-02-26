@@ -8,6 +8,7 @@ use App\Models\Auction;
 use App\Models\AuctionSetting;
 use App\Models\BackstockItem;
 use App\Models\Item;
+use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -49,7 +50,9 @@ class AuctionController extends Controller
                         'sold_bid_id',
                     ])
                     ->orderBy('id'),
-                'auctionItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
+                'auctionItems.item' => fn ($query) => $query
+                    ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+                    ->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
                 'auctionItems.bids' => fn ($query) => $query
                     ->select(['id', 'auction_item_id', 'bidder_name', 'bidder_discord_id', 'amount', 'created_at'])
                     ->orderByDesc('amount')
@@ -60,12 +63,27 @@ class AuctionController extends Controller
             ])
             ->orderByDesc('created_at')
             ->select(['id', 'title', 'status', 'currency', 'created_at', 'posted_at'])
-            ->get();
+            ->get()
+            ->map(function (Auction $auction): Auction {
+                $auction->auctionItems->each(function ($auctionItem): void {
+                    if ($auctionItem->item) {
+                        $auctionItem->item->setAttribute('display_cost', ItemCostResolver::resolveForItem($auctionItem->item));
+                    }
+                });
+
+                return $auction;
+            });
 
         $items = Item::query()
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->orderBy('name')
             ->select(['id', 'name', 'rarity', 'type', 'cost', 'url'])
-            ->get();
+            ->get()
+            ->map(function (Item $item): Item {
+                $item->setAttribute('display_cost', ItemCostResolver::resolveForItem($item));
+
+                return $item;
+            });
 
         $auctionSettings = AuctionSetting::current();
 
