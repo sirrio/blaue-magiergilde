@@ -380,7 +380,7 @@ async function postBackstockToChannel({ client, channelId, operationId }) {
     const itemMessageIds = {};
 
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
-    const typeOrder = ['item', 'consumable', 'spellscroll'];
+    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
     const grouped = new Map();
 
     for (const row of items) {

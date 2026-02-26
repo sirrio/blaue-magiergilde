@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auction;
 
 use App\Models\Item;
+use App\Support\ItemPricing;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -17,21 +18,6 @@ class StoreAuctionItemRequest extends FormRequest
         $user = Auth::user();
 
         return $user->is_admin;
-    }
-
-    private function parseCostValue(?string $cost): ?int
-    {
-        if ($cost === null) {
-            return null;
-        }
-
-        $digits = preg_replace('/[^0-9]/', '', $cost);
-
-        if ($digits === '') {
-            return null;
-        }
-
-        return (int) $digits;
     }
 
     /**
@@ -59,12 +45,12 @@ class StoreAuctionItemRequest extends FormRequest
                         return;
                     }
 
-                    $item = Item::query()->select('cost')->find($itemId);
+                    $item = Item::query()->select(['rarity', 'type'])->find($itemId);
                     if (! $item) {
                         return;
                     }
 
-                    $costValue = $this->parseCostValue($item->cost);
+                    $costValue = ItemPricing::baseCostGp($item->rarity, $item->type);
                     if ($costValue === null) {
                         return;
                     }

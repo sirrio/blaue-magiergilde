@@ -30,7 +30,7 @@ class UpdateAuctionItemSnapshotRequest extends FormRequest
             'cost' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:255',
             'rarity' => 'required|in:common,uncommon,rare,very_rare,legendary,artifact,unknown_rarity',
-            'type' => 'required|in:item,consumable,spellscroll',
+            'type' => 'required|in:weapon,armor,item,consumable,spellscroll',
             'repair_current' => [
                 'nullable',
                 'integer',

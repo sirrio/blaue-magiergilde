@@ -459,7 +459,7 @@ async function postAuctionToChannel({ client, channelId, auctionId, operationId 
 
     const createdAtUnix = Math.floor(new Date(auction.created_at).getTime() / 1000);
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
-    const typeOrder = ['item', 'consumable', 'spellscroll'];
+    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
     const grouped = new Map();
 
     for (const row of items) {

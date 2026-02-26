@@ -14,6 +14,8 @@ assert.equal(getBidStepForItem({ rarity: 'artifact', type: 'item' }), 5000);
 assert.equal(getBidStepForItem({ rarity: 'rare', type: 'consumable' }), 50);
 assert.equal(getBidStepForItem({ rarity: 'very_rare', type: 'spellscroll' }), 250);
 assert.equal(getBidStepForItem({ rarity: 'legendary', type: 'spellscroll' }), 500);
+assert.equal(getBidStepForItem({ rarity: 'rare', type: 'weapon' }), 100);
+assert.equal(getBidStepForItem({ rarity: 'rare', type: 'armor' }), 100);
 assert.equal(getBidStepForItem({ rarity: 'unknown_rarity', type: 'item' }), 10);
 
 assert.equal(getStartingBidFromRepair({ repairCurrent: 0, step: 50 }), 0);

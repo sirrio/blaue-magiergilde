@@ -95,7 +95,6 @@ const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
   const { data, setData, reset } = useForm({
     name: '',
     url: '',
-    cost: '',
     rarity: 'common' as Item['rarity'],
     type: 'item' as Item['type'],
     source_id: '' as number | '',
@@ -127,7 +126,6 @@ const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
       type: data.type,
       rarity: data.rarity,
       url: normalizeText(data.url ?? ''),
-      cost: normalizeText(data.cost ?? ''),
       source_id: data.source_id === '' ? null : Number(data.source_id),
     }
 
@@ -151,7 +149,6 @@ const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
           || formErrors.source_url
           || formErrors.name
           || formErrors.url
-          || formErrors.cost
           || formErrors.rarity
           || formErrors.type
           || formErrors.source_id
@@ -186,9 +183,6 @@ const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
           <Input value={data.url} onChange={(e) => setData('url', e.target.value)}>
             URL
           </Input>
-          <Input value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-            Cost
-          </Input>
           <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
             <SelectLabel>Rarity</SelectLabel>
             <SelectOptions>
@@ -204,9 +198,11 @@ const SuggestNewItemModal = ({ sources }: { sources: Source[] }) => {
           <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
             <SelectLabel>Type</SelectLabel>
             <SelectOptions>
+              <option value="weapon">Weapon</option>
+              <option value="armor">Armor</option>
               <option value="item">Item</option>
-              <option value="spellscroll">Spell Scroll</option>
               <option value="consumable">Consumable</option>
+              <option value="spellscroll">Spell Scroll</option>
             </SelectOptions>
           </Select>
           <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
@@ -240,7 +236,6 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
     url: '',
-    cost: '',
     rarity: 'common',
     type: 'item',
     source_id: '' as number | '',
@@ -350,9 +345,6 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
             <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
               URL
             </Input>
-            <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-              Cost
-            </Input>
             <Select
               errors={errors.source_id}
               value={data.source_id}
@@ -392,9 +384,11 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
             <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
               <SelectLabel>Type</SelectLabel>
               <SelectOptions>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
                 <option value="item">Item</option>
-                <option value="spellscroll">Spell Scroll</option>
                 <option value="consumable">Consumable</option>
+                <option value="spellscroll">Spell Scroll</option>
               </SelectOptions>
             </Select>
           </div>
@@ -543,6 +537,8 @@ export default function Index({
   ]
 
   const typeFilters: FilterOption[] = [
+    { label: 'Weapon', value: 'weapon' },
+    { label: 'Armor', value: 'armor' },
     { label: 'Item', value: 'item' },
     { label: 'Consumable', value: 'consumable' },
     { label: 'Spell Scroll', value: 'spellscroll' },

@@ -309,9 +309,9 @@ export interface Item {
   id: number
   name: string
   url: string
-  cost: string
+  cost: string | null
   display_cost?: string | null
-  type: 'item' | 'consumable' | 'spellscroll'
+  type: 'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
   pick_count: number
   shop_enabled?: boolean

@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { BackstockItem, BackstockSettings, BotOperation, DiscordBackupChannel, Item } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { FlaskRound, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash } from 'lucide-react'
+import { FlaskRound, Package, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Shield, Sword, Trash } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useState, JSX } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -34,13 +34,15 @@ const rarityColors: Record<string, string> = {
 }
 
 const typeIcons: Record<string, JSX.Element> = {
-  item: <Sword className="h-4 w-4" />,
-  spellscroll: <ScrollText className="h-4 w-4" />,
+  weapon: <Sword className="h-4 w-4" />,
+  armor: <Shield className="h-4 w-4" />,
+  item: <Package className="h-4 w-4" />,
   consumable: <FlaskRound className="h-4 w-4" />,
+  spellscroll: <ScrollText className="h-4 w-4" />,
 }
 
 const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity']
-const typeOrder = ['item', 'consumable', 'spellscroll']
+const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll']
 
 const getRarityTextColor = (rarity: string): string => {
   return rarityColors[rarity] || ''
@@ -175,9 +177,11 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
         <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
           <SelectLabel>Type</SelectLabel>
           <SelectOptions>
+            <option value="weapon">Weapon</option>
+            <option value="armor">Armor</option>
             <option value="item">Item</option>
-            <option value="spellscroll">Spell Scroll</option>
             <option value="consumable">Consumable</option>
+            <option value="spellscroll">Spell Scroll</option>
           </SelectOptions>
         </Select>
       </ModalContent>

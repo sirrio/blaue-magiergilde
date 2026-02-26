@@ -9,6 +9,7 @@ use App\Models\Item;
 use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Support\ItemCostResolver;
+use App\Support\ItemPricing;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -178,7 +179,7 @@ class ItemController extends Controller
         $item = new Item;
 
         $item->name = $request->name;
-        $item->cost = $request->cost;
+        $item->cost = ItemPricing::storageCost($request->rarity, $request->type);
         $item->url = $request->url;
         $item->rarity = $request->rarity;
         $item->type = $request->type;
@@ -218,7 +219,7 @@ class ItemController extends Controller
     public function update(UpdateItemRequest $request, Item $item): RedirectResponse
     {
         $item->name = $request->name;
-        $item->cost = $request->cost;
+        $item->cost = ItemPricing::storageCost($request->rarity, $request->type);
         $item->url = $request->url;
         $item->rarity = $request->rarity;
         $item->type = $request->type;

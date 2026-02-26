@@ -112,3 +112,82 @@ test('admin can assign mundane variants and item index returns display cost', fu
     expect($itemPayload['display_cost'])->toContain('Longsword')
         ->toContain('Dagger');
 });
+
+test('item cost is derived from rarity and type on admin update', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'name' => 'Derived Cost Item',
+        'type' => 'item',
+        'rarity' => 'common',
+        'cost' => '999999 GP',
+    ]);
+
+    $response = $this->actingAs($admin)->put(route('admin.items.update', $item), [
+        'id' => $item->id,
+        'name' => $item->name,
+        'url' => $item->url,
+        'cost' => '123456 GP',
+        'rarity' => 'rare',
+        'type' => 'consumable',
+        'source_id' => null,
+        'shop_enabled' => true,
+        'guild_enabled' => true,
+        'default_spell_roll_enabled' => false,
+        'ruling_changed' => false,
+    ]);
+
+    $response->assertRedirect()->assertSessionHasNoErrors();
+
+    $item->refresh();
+    expect($item->cost)->toBe('2500 GP');
+});
+
+test('weapon and armor item types use full base rarity cost', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $weapon = Item::factory()->create([
+        'name' => 'Weapon Cost Item',
+        'type' => 'item',
+        'rarity' => 'common',
+        'cost' => '1 GP',
+    ]);
+    $armor = Item::factory()->create([
+        'name' => 'Armor Cost Item',
+        'type' => 'item',
+        'rarity' => 'common',
+        'cost' => '1 GP',
+    ]);
+
+    $this->actingAs($admin)->put(route('admin.items.update', $weapon), [
+        'id' => $weapon->id,
+        'name' => $weapon->name,
+        'url' => $weapon->url,
+        'cost' => '999 GP',
+        'rarity' => 'rare',
+        'type' => 'weapon',
+        'source_id' => null,
+        'shop_enabled' => true,
+        'guild_enabled' => true,
+        'default_spell_roll_enabled' => false,
+        'ruling_changed' => false,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $this->actingAs($admin)->put(route('admin.items.update', $armor), [
+        'id' => $armor->id,
+        'name' => $armor->name,
+        'url' => $armor->url,
+        'cost' => '999 GP',
+        'rarity' => 'very_rare',
+        'type' => 'armor',
+        'source_id' => null,
+        'shop_enabled' => true,
+        'guild_enabled' => true,
+        'default_spell_roll_enabled' => false,
+        'ruling_changed' => false,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $weapon->refresh();
+    $armor->refresh();
+
+    expect($weapon->cost)->toBe('5000 GP')
+        ->and($armor->cost)->toBe('20000 GP');
+});

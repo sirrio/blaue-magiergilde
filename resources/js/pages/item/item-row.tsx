@@ -8,7 +8,7 @@ import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { Item, MundaneItemVariant, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { Copy, Dices, FlaskRound, MessageSquarePlus, Minus, Pencil, Plus, RotateCcw, ScrollText, Scale, Send, Shield, Store, Sword, Trash } from 'lucide-react'
+import { Copy, Dices, FlaskRound, MessageSquarePlus, Minus, Package, Pencil, Plus, RotateCcw, ScrollText, Scale, Send, Shield, Store, Sword, Trash } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
 
 const rarityColors: Record<string, string> = {
@@ -22,9 +22,11 @@ const rarityColors: Record<string, string> = {
 }
 
 const typeIcons: Record<string, ReactElement> = {
-  item: <Sword />,
-  spellscroll: <ScrollText />,
+  weapon: <Sword />,
+  armor: <Shield />,
+  item: <Package />,
   consumable: <FlaskRound />,
+  spellscroll: <ScrollText />,
 }
 
 const getRarityTextColor = (rarity: string): string => {
@@ -389,9 +391,11 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
             <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
               <SelectLabel>Type</SelectLabel>
               <SelectOptions>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
                 <option value="item">Item</option>
-                <option value="spellscroll">Spell Scroll</option>
                 <option value="consumable">Consumable</option>
+                <option value="spellscroll">Spell Scroll</option>
               </SelectOptions>
             </Select>
           </div>
@@ -416,7 +420,6 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
   const { data, setData, reset } = useForm({
     name: item.name ?? '',
     url: item.url ?? '',
-    cost: item.cost ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
     source_id: item.source_id ?? '',
@@ -429,7 +432,6 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
     reset()
     setData('name', item.name ?? '')
     setData('url', item.url ?? '')
-    setData('cost', item.cost ?? '')
     setData('rarity', item.rarity ?? 'common')
     setData('type', item.type ?? 'item')
     setData('source_id', item.source_id ?? '')
@@ -454,12 +456,6 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
     const currentUrl = normalizeText(item.url ?? '')
     if (normalizedUrl !== currentUrl) {
       changes.url = normalizedUrl
-    }
-
-    const normalizedCost = normalizeText(data.cost ?? '')
-    const currentCost = normalizeText(item.cost ?? '')
-    if (normalizedCost !== currentCost) {
-      changes.cost = normalizedCost
     }
 
     if ((data.rarity ?? 'common') !== (item.rarity ?? 'common')) {
@@ -503,7 +499,6 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
           || formErrors.source_url
           || formErrors.name
           || formErrors.url
-          || formErrors.cost
           || formErrors.rarity
           || formErrors.type
           || formErrors.source_id
@@ -537,9 +532,6 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
           <Input value={data.url} onChange={(e) => setData('url', e.target.value)}>
             URL
           </Input>
-          <Input value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-            Cost
-          </Input>
           <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
             <SelectLabel>Rarity</SelectLabel>
             <SelectOptions>
@@ -555,9 +547,11 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
           <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
             <SelectLabel>Type</SelectLabel>
             <SelectOptions>
+              <option value="weapon">Weapon</option>
+              <option value="armor">Armor</option>
               <option value="item">Item</option>
-              <option value="spellscroll">Spell Scroll</option>
               <option value="consumable">Consumable</option>
+              <option value="spellscroll">Spell Scroll</option>
             </SelectOptions>
           </Select>
           <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
@@ -605,7 +599,6 @@ export default function ItemRow({
     id: item.id,
     name: item.name,
     url: item.url,
-    cost: item.cost,
     type: item.type,
     rarity: item.rarity,
     source_id: item.source_id ?? '',
@@ -960,9 +953,6 @@ export default function ItemRow({
                     <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
                       URL
                     </Input>
-                    <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-                      Cost
-                    </Input>
                     <Select
                       errors={errors.source_id}
                       value={data.source_id}
@@ -1002,9 +992,11 @@ export default function ItemRow({
                     <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
                       <SelectLabel>Type</SelectLabel>
                       <SelectOptions>
+                        <option value="weapon">Weapon</option>
+                        <option value="armor">Armor</option>
                         <option value="item">Item</option>
-                        <option value="spellscroll">Spell Scroll</option>
                         <option value="consumable">Consumable</option>
+                        <option value="spellscroll">Spell Scroll</option>
                       </SelectOptions>
                     </Select>
                   </div>

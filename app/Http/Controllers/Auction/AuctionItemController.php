@@ -8,6 +8,7 @@ use App\Models\Auction;
 use App\Models\AuctionItem;
 use App\Models\Item;
 use App\Support\ItemCostResolver;
+use App\Support\ItemPricing;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,21 +16,6 @@ use Illuminate\Validation\ValidationException;
 
 class AuctionItemController extends Controller
 {
-    private function parseCostValue(?string $cost): ?int
-    {
-        if ($cost === null) {
-            return null;
-        }
-
-        $digits = preg_replace('/[^0-9]/', '', $cost);
-
-        if ($digits === '') {
-            return null;
-        }
-
-        return (int) $digits;
-    }
-
     /**
      * Store a newly created resource in storage.
      */
@@ -54,7 +40,7 @@ class AuctionItemController extends Controller
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
             ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->find($request->item_id);
-        $costValue = $this->parseCostValue($item?->cost);
+        $costValue = $item ? ItemPricing::baseCostGp($item->rarity, $item->type) : null;
         $repairMax = $costValue;
 
         if ($repairCurrent === null) {

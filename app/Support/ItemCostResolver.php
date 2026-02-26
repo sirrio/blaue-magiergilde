@@ -14,52 +14,31 @@ class ItemCostResolver
             ? $item->mundaneVariants
             : $item->mundaneVariants()->get();
 
-        return self::resolve((string) ($item->cost ?? ''), $variants);
+        return self::resolve(
+            rarity: $item->rarity,
+            type: $item->type,
+            variants: $variants,
+        );
     }
 
     /**
      * @param  iterable<int, MundaneItemVariant>  $variants
      */
-    public static function resolve(?string $baseCost, iterable $variants): ?string
+    public static function resolve(?string $rarity, ?string $type, iterable $variants): ?string
     {
-        $normalizedBaseCost = trim((string) $baseCost);
+        $baseCost = ItemPricing::displayBaseCost($rarity, $type);
         $variantCollection = collect($variants)->filter(static fn ($variant) => $variant instanceof MundaneItemVariant)->values();
 
         if ($variantCollection->isEmpty()) {
-            return $normalizedBaseCost === '' ? null : $normalizedBaseCost;
-        }
-
-        if (self::isLegacyPlaceholderString($normalizedBaseCost, $variantCollection)) {
-            return $normalizedBaseCost;
+            return $baseCost;
         }
 
         $variantLabel = self::formatVariantLabel($variantCollection);
         if ($variantLabel === '') {
-            return $normalizedBaseCost === '' ? null : $normalizedBaseCost;
+            return $baseCost;
         }
 
-        if ($normalizedBaseCost === '') {
-            return $variantLabel;
-        }
-
-        return $normalizedBaseCost.' + '.$variantLabel;
-    }
-
-    private static function isLegacyPlaceholderString(string $baseCost, Collection $variants): bool
-    {
-        if ($baseCost === '') {
-            return false;
-        }
-
-        $containsWeaponPlaceholder = str_contains(mb_strtolower($baseCost), 'waffenpreis');
-        $containsArmorPlaceholder = str_contains(mb_strtolower($baseCost), 'rüstungspreis')
-            || str_contains(mb_strtolower($baseCost), 'ruestungspreis');
-
-        if (! $containsWeaponPlaceholder && ! $containsArmorPlaceholder) {
-            return false;
-        }
-
-        return $variants->every(static fn (MundaneItemVariant $variant) => $variant->is_placeholder);
+        return $baseCost.' + '.$variantLabel;
     }
 
     private static function formatVariantLabel(Collection $variants): string

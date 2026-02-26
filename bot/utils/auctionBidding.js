@@ -8,7 +8,7 @@ function normalizeItemRarity(value) {
 
 function normalizeItemType(value) {
     const type = String(value || '').trim().toLowerCase();
-    if (type === 'consumable' || type === 'spellscroll') {
+    if (type === 'weapon' || type === 'armor' || type === 'item' || type === 'consumable' || type === 'spellscroll') {
         return type;
     }
     return 'item';

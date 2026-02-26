@@ -35,9 +35,8 @@ class StoreItemRequest extends FormRequest
         return [
             'name' => 'required|string',
             'url' => 'url',
-            'cost' => 'string',
             'rarity' => 'required|string',
-            'type' => 'required|string',
+            'type' => 'required|in:weapon,armor,item,consumable,spellscroll',
             'source_id' => 'nullable|integer|exists:sources,id',
             'mundane_variant_ids' => 'nullable|array',
             'mundane_variant_ids.*' => 'integer|exists:mundane_item_variants,id',

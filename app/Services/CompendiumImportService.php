@@ -317,8 +317,8 @@ class CompendiumImportService
         if ($name === '') {
             $errors[] = 'name is required';
         }
-        if (! in_array($type, ['item', 'consumable', 'spellscroll'], true)) {
-            $errors[] = 'type must be item|consumable|spellscroll';
+        if (! in_array($type, ['weapon', 'armor', 'item', 'consumable', 'spellscroll'], true)) {
+            $errors[] = 'type must be weapon|armor|item|consumable|spellscroll';
         }
         if (! in_array($rarity, ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'], true)) {
             $errors[] = 'rarity must be common|uncommon|rare|very_rare|legendary|artifact|unknown_rarity';

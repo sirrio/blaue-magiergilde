@@ -452,7 +452,7 @@ class CompendiumSuggestionController extends Controller
                 'url' => 'nullable|url|max:2048',
                 'cost' => 'nullable|string',
                 'rarity' => 'required|in:common,uncommon,rare,very_rare,legendary,artifact,unknown_rarity',
-                'type' => 'required|in:item,consumable,spellscroll',
+                'type' => 'required|in:weapon,armor,item,consumable,spellscroll',
                 'source_id' => 'nullable|integer|exists:sources,id',
             ];
         }

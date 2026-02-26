@@ -382,6 +382,7 @@ async function sendOneLine(destination, line) {
 function countPlannedShopLines(grouped, rarityOrder) {
     // Top header line.
     let total = 1;
+    const itemLikeTypes = ['weapon', 'armor', 'item'];
 
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
@@ -389,7 +390,9 @@ function countPlannedShopLines(grouped, rarityOrder) {
 
         // Rarity section header.
         total += 1;
-        total += (byType.get('item') || []).length;
+        for (const type of itemLikeTypes) {
+            total += (byType.get(type) || []).length;
+        }
 
         if (rarity === 'common' || rarity === 'uncommon') {
             // Consumable header.
@@ -436,7 +439,8 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     const itemMessageIds = {};
 
     const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
-    const typeOrder = ['item', 'consumable', 'spellscroll'];
+    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
+    const itemLikeTypes = ['weapon', 'armor', 'item'];
     const grouped = new Map();
 
     for (const row of items) {
@@ -530,10 +534,12 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
             : `## ***:crossed_swords: ${rarityLabel} Magic Items:***`;
         const sectionId = await sendTrackedLine(title, `${rarityLabel} section`);
         if (sectionId) headerMessageIds.push(sectionId);
-        for (const row of byType.get('item') ?? []) {
-             
-            const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
-            if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+        for (const type of itemLikeTypes) {
+            for (const row of byType.get(type) ?? []) {
+                 
+                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
+                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+            }
         }
 
         if (rarity === 'common' || rarity === 'uncommon') {
