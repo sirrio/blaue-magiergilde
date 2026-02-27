@@ -149,7 +149,7 @@ test('template download returns csv content for items', function () {
 
     $response->assertOk();
     $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
-    expect($response->streamedContent())->toContain('name,type,rarity,cost,url,source_shortcode');
+    expect($response->streamedContent())->toContain('name,type,rarity,cost,extra_cost_note,url,source_shortcode');
 });
 
 test('non admin cannot preview compendium import', function () {

@@ -88,6 +88,7 @@ class ItemController extends Controller
                 'id',
                 'name',
                 'cost',
+                'extra_cost_note',
                 'url',
                 'rarity',
                 'type',
@@ -107,6 +108,7 @@ class ItemController extends Controller
                     'id' => $item->id,
                     'name' => $item->name,
                     'cost' => $item->cost,
+                    'extra_cost_note' => $item->extra_cost_note,
                     'display_cost' => ItemCostResolver::resolveForItem($item),
                     'url' => $item->url,
                     'rarity' => $item->rarity,
@@ -180,6 +182,7 @@ class ItemController extends Controller
 
         $item->name = $request->name;
         $item->cost = ItemPricing::storageCost($request->rarity, $request->type);
+        $item->extra_cost_note = $this->resolveExtraCostNote($request, (string) $request->type);
         $item->url = $request->url;
         $item->rarity = $request->rarity;
         $item->type = $request->type;
@@ -189,10 +192,7 @@ class ItemController extends Controller
         $this->applyRulingNote($item, $request);
         $this->applyDefaultSpellRoll($item, $request);
         $item->save();
-        $item->mundaneVariants()->sync(array_values(array_unique(array_filter(array_map(
-            static fn ($value) => (int) $value,
-            (array) $request->input('mundane_variant_ids', []),
-        ), static fn (int $id) => $id > 0))));
+        $item->mundaneVariants()->sync($this->normalizeMundaneVariantIds($request, (string) $request->type));
 
         return redirect()->back();
     }
@@ -220,6 +220,7 @@ class ItemController extends Controller
     {
         $item->name = $request->name;
         $item->cost = ItemPricing::storageCost($request->rarity, $request->type);
+        $item->extra_cost_note = $this->resolveExtraCostNote($request, (string) $request->type);
         $item->url = $request->url;
         $item->rarity = $request->rarity;
         $item->type = $request->type;
@@ -229,10 +230,7 @@ class ItemController extends Controller
         $this->applyRulingNote($item, $request);
         $this->applyDefaultSpellRoll($item, $request);
         $item->save();
-        $item->mundaneVariants()->sync(array_values(array_unique(array_filter(array_map(
-            static fn ($value) => (int) $value,
-            (array) $request->input('mundane_variant_ids', []),
-        ), static fn (int $id) => $id > 0))));
+        $item->mundaneVariants()->sync($this->normalizeMundaneVariantIds($request, (string) $request->type));
 
         return redirect()->back();
     }
@@ -275,5 +273,60 @@ class ItemController extends Controller
 
         $item->ruling_changed = $hasRulingChange;
         $item->ruling_note = $note !== '' ? $note : null;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function normalizeMundaneVariantIds(Request $request, string $type): array
+    {
+        if (! in_array($type, ['weapon', 'armor'], true)) {
+            return [];
+        }
+
+        $requestedIds = array_values(array_unique(array_filter(array_map(
+            static fn ($value) => is_numeric($value) ? (int) $value : null,
+            (array) $request->input('mundane_variant_ids', [])
+        ), static fn ($id) => $id !== null && $id > 0)));
+
+        if ($requestedIds === []) {
+            return [];
+        }
+
+        $selectedVariants = MundaneItemVariant::query()
+            ->where('category', $type)
+            ->whereIn('id', $requestedIds)
+            ->get(['id', 'is_placeholder']);
+
+        $placeholderId = $selectedVariants
+            ->first(static fn (MundaneItemVariant $variant): bool => $variant->is_placeholder)
+            ?->id;
+
+        if ($placeholderId !== null) {
+            return [(int) $placeholderId];
+        }
+
+        return $selectedVariants
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    private function resolveExtraCostNote(Request $request, string $type): ?string
+    {
+        if (in_array($type, ['weapon', 'armor'], true)) {
+            return null;
+        }
+
+        $note = trim((string) $request->input('extra_cost_note', ''));
+        if ($note === '') {
+            return null;
+        }
+
+        $note = preg_replace('/^\+\s*/u', '', $note) ?? $note;
+        $note = trim($note);
+
+        return $note !== '' ? $note : null;
     }
 }

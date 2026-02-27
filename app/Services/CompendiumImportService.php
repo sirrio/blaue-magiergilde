@@ -21,8 +21,8 @@ class CompendiumImportService
     {
         if ($entityType === 'items') {
             return implode("\n", [
-                'name,type,rarity,cost,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
-                'Potion of Healing,consumable,common,50 GP,https://example.test/items/potion-healing,PHB,true,true,false,',
+                'name,type,rarity,cost,extra_cost_note,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+                'Potion of Healing,consumable,common,50 GP,Component cost,https://example.test/items/potion-healing,PHB,true,true,false,',
             ])."\n";
         }
 
@@ -310,6 +310,7 @@ class CompendiumImportService
         $type = strtolower(trim((string) ($row['type'] ?? '')));
         $rarity = strtolower(trim((string) ($row['rarity'] ?? '')));
         $cost = $this->nullableString($row['cost'] ?? null);
+        $extraCostNote = $this->nullableString($row['extra_cost_note'] ?? $row['extra_cost'] ?? null);
         $url = $this->nullableString($row['url'] ?? null);
         $sourceShortcode = strtoupper(trim((string) ($row['source_shortcode'] ?? $row['source'] ?? $row['source_code'] ?? '')));
         $sourceId = null;
@@ -333,6 +334,16 @@ class CompendiumImportService
             }
         }
 
+        if (in_array($type, ['weapon', 'armor'], true)) {
+            $extraCostNote = null;
+        } elseif ($extraCostNote !== null) {
+            $extraCostNote = preg_replace('/^\+\s*/u', '', $extraCostNote) ?? $extraCostNote;
+            $extraCostNote = trim($extraCostNote);
+            if ($extraCostNote === '') {
+                $extraCostNote = null;
+            }
+        }
+
         $guildEnabled = $this->parseBoolean($row['guild_enabled'] ?? null, true, 'guild_enabled', $errors);
         $shopEnabled = $this->parseBoolean($row['shop_enabled'] ?? null, true, 'shop_enabled', $errors);
         $rulingChanged = $this->parseBoolean($row['ruling_changed'] ?? null, false, 'ruling_changed', $errors);
@@ -350,6 +361,7 @@ class CompendiumImportService
             'type' => $type,
             'rarity' => $rarity,
             'cost' => $cost,
+            'extra_cost_note' => $extraCostNote,
             'url' => $url,
             'source_id' => $sourceId,
             'guild_enabled' => $guildEnabled,
@@ -454,6 +466,7 @@ class CompendiumImportService
         $comparableFields = [
             'rarity' => $payload['rarity'],
             'cost' => $payload['cost'],
+            'extra_cost_note' => $payload['extra_cost_note'],
             'url' => $payload['url'],
             'guild_enabled' => (bool) $payload['guild_enabled'],
             'shop_enabled' => (bool) $payload['shop_enabled'],

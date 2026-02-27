@@ -18,27 +18,32 @@ class ItemCostResolver
             rarity: $item->rarity,
             type: $item->type,
             variants: $variants,
+            extraCostNote: $item->extra_cost_note,
         );
     }
 
     /**
      * @param  iterable<int, MundaneItemVariant>  $variants
      */
-    public static function resolve(?string $rarity, ?string $type, iterable $variants): ?string
+    public static function resolve(?string $rarity, ?string $type, iterable $variants, ?string $extraCostNote = null): ?string
     {
         $baseCost = ItemPricing::displayBaseCost($rarity, $type);
         $variantCollection = collect($variants)->filter(static fn ($variant) => $variant instanceof MundaneItemVariant)->values();
+        $parts = [$baseCost];
 
-        if ($variantCollection->isEmpty()) {
-            return $baseCost;
+        if (! $variantCollection->isEmpty()) {
+            $variantLabel = self::formatVariantLabel($variantCollection);
+            if ($variantLabel !== '') {
+                $parts[] = $variantLabel;
+            }
         }
 
-        $variantLabel = self::formatVariantLabel($variantCollection);
-        if ($variantLabel === '') {
-            return $baseCost;
+        $normalizedExtraCostNote = self::normalizeExtraCostNote($extraCostNote);
+        if ($normalizedExtraCostNote !== null) {
+            $parts[] = $normalizedExtraCostNote;
         }
 
-        return $baseCost.' + '.$variantLabel;
+        return implode(' + ', $parts);
     }
 
     private static function formatVariantLabel(Collection $variants): string
@@ -46,15 +51,22 @@ class ItemCostResolver
         if ($variants->count() === 1) {
             /** @var MundaneItemVariant $single */
             $single = $variants->first();
+            $prefix = self::variantSourcePrefix($single->category);
 
-            return self::formatSingleVariant($single);
+            return $prefix.': '.self::formatSingleVariant($single);
         }
 
         $grouped = $variants
             ->sortBy('sort_order')
             ->groupBy('category')
             ->map(function (Collection $entries, string $category): string {
-                $prefix = $category === 'armor' ? 'Armor' : 'Weapon';
+                $prefix = self::variantSourcePrefix($category);
+                if ($entries->count() > 1) {
+                    $summary = $entries->count().' options';
+
+                    return $prefix.': '.$summary;
+                }
+
                 $formattedEntries = $entries
                     ->map(static fn (MundaneItemVariant $variant): string => self::formatSingleVariant($variant))
                     ->implode(', ');
@@ -81,5 +93,23 @@ class ItemCostResolver
         $formatted = number_format($value, 2, '.', '');
 
         return rtrim(rtrim($formatted, '0'), '.');
+    }
+
+    private static function variantSourcePrefix(string $category): string
+    {
+        return $category === 'armor' ? 'Armor base' : 'Weapon base';
+    }
+
+    private static function normalizeExtraCostNote(?string $value): ?string
+    {
+        $text = trim((string) ($value ?? ''));
+        if ($text === '') {
+            return null;
+        }
+
+        $text = preg_replace('/^\+\s*/u', '', $text) ?? $text;
+        $text = trim($text);
+
+        return $text !== '' ? $text : null;
     }
 }

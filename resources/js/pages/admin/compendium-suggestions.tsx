@@ -44,6 +44,7 @@ const fieldLabels: Record<string, string> = {
   name: 'Name',
   url: 'URL',
   legacy_url: 'Legacy URL',
+  extra_cost_note: 'Extra cost note',
   rarity: 'Rarity',
   type: 'Type',
   source_id: 'Source',

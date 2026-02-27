@@ -310,6 +310,7 @@ export interface Item {
   name: string
   url: string
   cost: string | null
+  extra_cost_note?: string | null
   display_cost?: string | null
   type: 'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'

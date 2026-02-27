@@ -28,6 +28,7 @@ class CompendiumSuggestionController extends Controller
             'name',
             'url',
             'cost',
+            'extra_cost_note',
             'rarity',
             'type',
             'source_id',
@@ -337,7 +338,7 @@ class CompendiumSuggestionController extends Controller
                 continue;
             }
 
-            if (in_array($field, ['url', 'legacy_url', 'cost'], true)) {
+            if (in_array($field, ['url', 'legacy_url', 'cost', 'extra_cost_note'], true)) {
                 $normalized[$field] = $this->normalizeNullableString($value);
 
                 continue;
@@ -379,6 +380,7 @@ class CompendiumSuggestionController extends Controller
                 'name' => (string) $target->name,
                 'url' => $target->url,
                 'cost' => $target->cost,
+                'extra_cost_note' => $target->extra_cost_note,
                 'rarity' => (string) $target->rarity,
                 'type' => (string) $target->type,
                 'source_id' => $target->source_id === null ? null : (int) $target->source_id,
@@ -451,6 +453,7 @@ class CompendiumSuggestionController extends Controller
                 'name' => 'required|string',
                 'url' => 'nullable|url|max:2048',
                 'cost' => 'nullable|string',
+                'extra_cost_note' => 'nullable|string|max:255',
                 'rarity' => 'required|in:common,uncommon,rare,very_rare,legendary,artifact,unknown_rarity',
                 'type' => 'required|in:weapon,armor,item,consumable,spellscroll',
                 'source_id' => 'nullable|integer|exists:sources,id',
