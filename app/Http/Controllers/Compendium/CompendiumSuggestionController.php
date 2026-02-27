@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\ReviewCompendiumSuggestionRequest;
 use App\Http\Requests\Compendium\StoreCompendiumSuggestionRequest;
 use App\Models\CompendiumSuggestion;
 use App\Models\Item;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Models\Spell;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator as ValidationValidator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,6 +34,7 @@ class CompendiumSuggestionController extends Controller
             'rarity',
             'type',
             'source_id',
+            'mundane_variant_ids',
         ],
         CompendiumSuggestion::KIND_SPELL => [
             'name',
@@ -143,6 +146,20 @@ class CompendiumSuggestionController extends Controller
             ->orderBy('name')
             ->pluck('name', 'id')
             ->map(static fn ($name): string => (string) $name);
+        $variantLabels = MundaneItemVariant::query()
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'category', 'is_placeholder'])
+            ->mapWithKeys(static function (MundaneItemVariant $variant): array {
+                $label = $variant->is_placeholder
+                    ? $variant->name
+                    : sprintf('%s (%s)', $variant->name, $variant->category);
+
+                return [
+                    (string) $variant->id => $label,
+                ];
+            });
 
         return Inertia::render('admin/compendium-suggestions', [
             'suggestions' => $suggestions->map(function (CompendiumSuggestion $suggestion) use ($itemNames, $spellNames): array {
@@ -189,6 +206,7 @@ class CompendiumSuggestionController extends Controller
                 CompendiumSuggestion::STATUS_REJECTED => CompendiumSuggestion::query()->where('status', CompendiumSuggestion::STATUS_REJECTED)->count(),
             ],
             'sourceLabels' => $sourceLabels,
+            'variantLabels' => $variantLabels,
         ]);
     }
 
@@ -223,6 +241,9 @@ class CompendiumSuggestionController extends Controller
 
                     $this->validateCandidate($compendiumSuggestion->kind, $changes);
                     $target = $this->createTarget($compendiumSuggestion->kind, $changes);
+                    if ($target instanceof Item && array_key_exists('mundane_variant_ids', $changes)) {
+                        $target->mundaneVariants()->sync($this->normalizeMundaneVariantIds($changes['mundane_variant_ids']));
+                    }
                     $compendiumSuggestion->target_id = $target->id;
                     $compendiumSuggestion->current_snapshot = $this->snapshotForTarget($compendiumSuggestion->kind, $target);
                 } else {
@@ -326,6 +347,12 @@ class CompendiumSuggestionController extends Controller
                 continue;
             }
 
+            if ($field === 'mundane_variant_ids') {
+                $normalized[$field] = $this->normalizeMundaneVariantIds($value);
+
+                continue;
+            }
+
             if ($field === 'spell_level') {
                 $normalized[$field] = is_numeric($value) ? (int) $value : $value;
 
@@ -384,6 +411,12 @@ class CompendiumSuggestionController extends Controller
                 'rarity' => (string) $target->rarity,
                 'type' => (string) $target->type,
                 'source_id' => $target->source_id === null ? null : (int) $target->source_id,
+                'mundane_variant_ids' => $target->mundaneVariants()
+                    ->pluck('mundane_item_variants.id')
+                    ->map(static fn ($id): int => (int) $id)
+                    ->sort()
+                    ->values()
+                    ->all(),
             ];
         }
 
@@ -402,8 +435,18 @@ class CompendiumSuggestionController extends Controller
      */
     private function applyChanges(Item|Spell $target, array $changes): void
     {
+        $mundaneVariantIds = null;
+        if ($target instanceof Item && array_key_exists('mundane_variant_ids', $changes)) {
+            $mundaneVariantIds = $this->normalizeMundaneVariantIds($changes['mundane_variant_ids']);
+            unset($changes['mundane_variant_ids']);
+        }
+
         foreach ($changes as $field => $value) {
             $target->{$field} = $value;
+        }
+
+        if ($target instanceof Item && $mundaneVariantIds !== null) {
+            $target->mundaneVariants()->sync($mundaneVariantIds);
         }
     }
 
@@ -413,6 +456,10 @@ class CompendiumSuggestionController extends Controller
     private function createTarget(string $kind, array $payload): Item|Spell
     {
         if ($kind === CompendiumSuggestion::KIND_ITEM) {
+            if (array_key_exists('mundane_variant_ids', $payload)) {
+                unset($payload['mundane_variant_ids']);
+            }
+
             $item = new Item;
             $item->forceFill($payload)->save();
 
@@ -437,6 +484,11 @@ class CompendiumSuggestionController extends Controller
     private function validateCandidate(string $kind, array $candidate): void
     {
         $validator = Validator::make($candidate, $this->validationRulesForKind($kind));
+        if ($kind === CompendiumSuggestion::KIND_ITEM) {
+            $validator->after(function (ValidationValidator $validator) use ($candidate): void {
+                $this->validateItemCandidateMundaneVariants($validator, $candidate);
+            });
+        }
 
         if ($validator->fails()) {
             throw ValidationException::withMessages($validator->errors()->toArray());
@@ -457,6 +509,8 @@ class CompendiumSuggestionController extends Controller
                 'rarity' => 'required|in:common,uncommon,rare,very_rare,legendary,artifact,unknown_rarity',
                 'type' => 'required|in:weapon,armor,item,consumable,spellscroll',
                 'source_id' => 'nullable|integer|exists:sources,id',
+                'mundane_variant_ids' => 'nullable|array',
+                'mundane_variant_ids.*' => 'integer|exists:mundane_item_variants,id',
             ];
         }
 
@@ -554,6 +608,68 @@ class CompendiumSuggestionController extends Controller
         }
 
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function normalizeMundaneVariantIds(mixed $value): array
+    {
+        return collect((array) $value)
+            ->map(static fn ($entry) => is_numeric($entry) ? (int) $entry : null)
+            ->filter(static fn ($entry) => $entry !== null && $entry > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $candidate
+     */
+    private function validateItemCandidateMundaneVariants(ValidationValidator $validator, array $candidate): void
+    {
+        $type = (string) ($candidate['type'] ?? '');
+        $extraCostNote = trim((string) ($candidate['extra_cost_note'] ?? ''));
+        $variantIds = $this->normalizeMundaneVariantIds($candidate['mundane_variant_ids'] ?? []);
+
+        if (in_array($type, ['weapon', 'armor'], true)) {
+            if ($extraCostNote !== '') {
+                $validator->errors()->add('extra_cost_note', 'Extra cost note is only allowed for item, consumable, or spell scroll.');
+            }
+
+            if ($variantIds === []) {
+                return;
+            }
+
+            $selectedVariants = MundaneItemVariant::query()
+                ->whereIn('id', $variantIds)
+                ->get(['id', 'category', 'is_placeholder']);
+
+            $invalidCount = $selectedVariants
+                ->where('category', '!=', $type)
+                ->count();
+
+            if ($invalidCount > 0) {
+                $validator->errors()->add('mundane_variant_ids', "Only {$type} variants can be attached to {$type} items.");
+            }
+
+            $hasAnyOption = $selectedVariants->contains(static fn (MundaneItemVariant $variant): bool => $variant->is_placeholder);
+            if ($hasAnyOption && count($variantIds) > 1) {
+                $label = ucfirst($type);
+                $validator->errors()->add('mundane_variant_ids', "The Any {$label} option cannot be combined with specific {$type} variants.");
+            }
+
+            return;
+        }
+
+        if (! in_array($type, ['item', 'consumable', 'spellscroll'], true)) {
+            return;
+        }
+
+        if ($variantIds !== []) {
+            $validator->errors()->add('mundane_variant_ids', 'Mundane variants are only allowed for weapon or armor items.');
+        }
     }
 
     private function valuesEquivalent(mixed $left, mixed $right): bool

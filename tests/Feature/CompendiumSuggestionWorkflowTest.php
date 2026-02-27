@@ -2,6 +2,7 @@
 
 use App\Models\CompendiumSuggestion;
 use App\Models\Item;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Models\Spell;
 use App\Models\User;
@@ -73,6 +74,84 @@ test('authenticated user can submit an item compendium suggestion', function () 
             'cost' => '100 GP',
             'rarity' => 'uncommon',
         ]);
+});
+
+test('authenticated user can submit an item compendium suggestion with mundane variants', function () {
+    $user = User::factory()->create(['is_admin' => false]);
+    $item = Item::factory()->create([
+        'name' => 'Sword of Testing',
+        'url' => 'https://example.test/sword-of-testing',
+        'cost' => '100 GP',
+        'rarity' => 'common',
+        'type' => 'weapon',
+        'source_id' => null,
+    ]);
+
+    $club = MundaneItemVariant::factory()->create([
+        'name' => 'Club',
+        'slug' => 'club-suggestion-submit',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
+    $dagger = MundaneItemVariant::factory()->create([
+        'name' => 'Dagger',
+        'slug' => 'dagger-suggestion-submit',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
+    $expectedVariantIds = collect([$dagger->id, $club->id])
+        ->sort()
+        ->values()
+        ->all();
+
+    $response = $this->actingAs($user)->post(route('compendium-suggestions.store'), [
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => $item->id,
+        'changes' => [
+            'mundane_variant_ids' => [$dagger->id, $club->id, $club->id],
+        ],
+        'notes' => 'Attach specific weapon variants.',
+    ]);
+
+    $response->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $suggestion = CompendiumSuggestion::query()->latest('id')->first();
+
+    expect($suggestion)->not->toBeNull()
+        ->and($suggestion?->kind)->toBe(CompendiumSuggestion::KIND_ITEM)
+        ->and($suggestion?->target_id)->toBe($item->id)
+        ->and($suggestion?->proposed_payload)->toMatchArray([
+            'mundane_variant_ids' => $expectedVariantIds,
+        ]);
+});
+
+test('item compendium suggestion rejects mundane variants on non weapon or armor types', function () {
+    $user = User::factory()->create(['is_admin' => false]);
+    $item = Item::factory()->create([
+        'name' => 'Potion of Testing',
+        'url' => 'https://example.test/potion-of-testing',
+        'cost' => '50 GP',
+        'rarity' => 'common',
+        'type' => 'consumable',
+    ]);
+    $variant = MundaneItemVariant::factory()->create([
+        'name' => 'Longsword',
+        'slug' => 'longsword-validation',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
+
+    $response = $this->actingAs($user)->post(route('compendium-suggestions.store'), [
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => $item->id,
+        'changes' => [
+            'mundane_variant_ids' => [$variant->id],
+        ],
+    ]);
+
+    $response->assertRedirect()
+        ->assertSessionHasErrors(['mundane_variant_ids']);
 });
 
 test('authenticated user can submit a new item compendium suggestion without target id', function () {
@@ -194,6 +273,65 @@ test('admin can approve pending item suggestion and apply changes', function () 
         ->and($suggestion->reviewed_at)->not->toBeNull();
 });
 
+test('admin can approve pending item suggestion and sync mundane variants', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $submitter = User::factory()->create(['is_admin' => false]);
+    $item = Item::factory()->create([
+        'name' => 'Sword of Testing',
+        'url' => 'https://example.test/sword-of-testing',
+        'cost' => '100 GP',
+        'rarity' => 'common',
+        'type' => 'weapon',
+    ]);
+
+    $longsword = MundaneItemVariant::factory()->create([
+        'name' => 'Longsword',
+        'slug' => 'longsword-suggestion-approve',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
+    $warhammer = MundaneItemVariant::factory()->create([
+        'name' => 'Warhammer',
+        'slug' => 'warhammer-suggestion-approve',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
+    $item->mundaneVariants()->sync([$longsword->id]);
+
+    $suggestion = CompendiumSuggestion::query()->create([
+        'user_id' => $submitter->id,
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => $item->id,
+        'status' => CompendiumSuggestion::STATUS_PENDING,
+        'proposed_payload' => [
+            'mundane_variant_ids' => [$warhammer->id],
+        ],
+        'current_snapshot' => [
+            'name' => $item->name,
+            'url' => $item->url,
+            'cost' => $item->cost,
+            'extra_cost_note' => $item->extra_cost_note,
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'source_id' => $item->source_id,
+            'mundane_variant_ids' => [$longsword->id],
+        ],
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.compendium-suggestions.approve', $suggestion), [])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $item->refresh();
+    $suggestion->refresh();
+
+    $syncedVariantIds = $item->mundaneVariants()->pluck('mundane_item_variants.id')->map(static fn ($id): int => (int) $id)->all();
+
+    expect($syncedVariantIds)->toBe([$warhammer->id])
+        ->and($suggestion->status)->toBe(CompendiumSuggestion::STATUS_APPROVED);
+});
+
 test('admin can approve pending spell suggestion and apply changes', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $submitter = User::factory()->create(['is_admin' => false]);
@@ -278,6 +416,46 @@ test('admin can approve pending new item suggestion and create item', function (
         ->and($createdItem?->source_id)->toBe($source->id)
         ->and($suggestion->status)->toBe(CompendiumSuggestion::STATUS_APPROVED)
         ->and($suggestion->reviewed_by)->toBe($admin->id);
+});
+
+test('admin can approve pending new item suggestion and sync mundane variants', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $submitter = User::factory()->create(['is_admin' => false]);
+    $mace = MundaneItemVariant::factory()->create([
+        'name' => 'Mace',
+        'slug' => 'mace-suggestion-create',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
+
+    $suggestion = CompendiumSuggestion::query()->create([
+        'user_id' => $submitter->id,
+        'kind' => CompendiumSuggestion::KIND_ITEM,
+        'target_id' => null,
+        'status' => CompendiumSuggestion::STATUS_PENDING,
+        'proposed_payload' => [
+            'name' => 'Rune Mace',
+            'url' => 'https://example.test/items/rune-mace',
+            'cost' => '1000 GP',
+            'rarity' => 'uncommon',
+            'type' => 'weapon',
+            'mundane_variant_ids' => [$mace->id],
+        ],
+        'current_snapshot' => null,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.compendium-suggestions.approve', $suggestion), [])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $suggestion->refresh();
+    $createdItem = Item::query()->find($suggestion->target_id);
+
+    expect($createdItem)->not->toBeNull()
+        ->and($createdItem?->type)->toBe('weapon')
+        ->and($createdItem?->mundaneVariants()->pluck('mundane_item_variants.id')->map(static fn ($id): int => (int) $id)->all())->toBe([$mace->id])
+        ->and($suggestion->status)->toBe(CompendiumSuggestion::STATUS_APPROVED);
 });
 
 test('admin can approve suggestion with legacy nested changes payload', function () {
@@ -436,6 +614,12 @@ test('admin suggestions index includes source labels for display', function () {
         'name' => "Player's Handbook",
         'shortcode' => 'PHB',
     ]);
+    $variant = MundaneItemVariant::factory()->create([
+        'name' => 'Longsword',
+        'slug' => 'longsword-suggestion-index',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
 
     $response = $this->actingAs($admin)
         ->get(route('admin.compendium-suggestions.index'))
@@ -443,7 +627,10 @@ test('admin suggestions index includes source labels for display', function () {
 
     $props = $response->viewData('page')['props'] ?? [];
     $sourceLabels = $props['sourceLabels'] ?? [];
+    $variantLabels = $props['variantLabels'] ?? [];
 
     expect($sourceLabels)->toBeArray();
     expect($sourceLabels[(string) $source->id] ?? null)->toBe("Player's Handbook");
+    expect($variantLabels)->toBeArray();
+    expect($variantLabels[(string) $variant->id] ?? null)->toBe('Longsword (weapon)');
 });

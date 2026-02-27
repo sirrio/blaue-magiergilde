@@ -48,6 +48,7 @@ const fieldLabels: Record<string, string> = {
   rarity: 'Rarity',
   type: 'Type',
   source_id: 'Source',
+  mundane_variant_ids: 'Mundane variants',
   spell_school: 'School',
   spell_level: 'Level',
 }
@@ -63,6 +64,7 @@ const formatFieldValue = (
   field: string,
   value: unknown,
   sourceLabels: Record<string, string>,
+  variantLabels: Record<string, string>,
 ): string => {
   if (field === 'source_id') {
     if (value === null || value === undefined || value === '') {
@@ -71,6 +73,19 @@ const formatFieldValue = (
 
     const sourceKey = String(value)
     return sourceLabels[sourceKey] ?? sourceKey
+  }
+
+  if (field === 'mundane_variant_ids') {
+    if (!Array.isArray(value) || value.length === 0) {
+      return 'none'
+    }
+
+    return value
+      .map((entry) => {
+        const key = String(entry)
+        return variantLabels[key] ?? `#${key}`
+      })
+      .join(', ')
   }
 
   return formatValue(value)
@@ -144,11 +159,13 @@ export default function CompendiumSuggestionsPage({
   filters,
   counts,
   sourceLabels = {},
+  variantLabels = {},
 }: {
   suggestions: CompendiumSuggestionRecord[]
   filters: SuggestionFilters
   counts: Record<string, number>
   sourceLabels?: Record<string, string>
+  variantLabels?: Record<string, string>
 }) {
   const currentParams = route().params as Record<string, string | number | undefined>
   const [search, setSearch] = useState(String(filters.search ?? ''))
@@ -278,12 +295,12 @@ export default function CompendiumSuggestionsPage({
                               <span className="font-medium">{fieldLabels[field] ?? field}:</span>{' '}
                               {hasCurrentSnapshot ? (
                                 <>
-                                  <span className="text-base-content/70">{formatFieldValue(field, suggestion.current_snapshot?.[field], sourceLabels)}</span>{' '}
+                                  <span className="text-base-content/70">{formatFieldValue(field, suggestion.current_snapshot?.[field], sourceLabels, variantLabels)}</span>{' '}
                                   <span className="text-base-content/50">→</span>{' '}
-                                  <span>{formatFieldValue(field, value, sourceLabels)}</span>
+                                  <span>{formatFieldValue(field, value, sourceLabels, variantLabels)}</span>
                                 </>
                               ) : (
-                                <span>{formatFieldValue(field, value, sourceLabels)}</span>
+                                <span>{formatFieldValue(field, value, sourceLabels, variantLabels)}</span>
                               )}
                             </div>
                           ))}

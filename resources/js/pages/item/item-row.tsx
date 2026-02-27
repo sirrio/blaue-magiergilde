@@ -449,7 +449,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
   )
 }
 
-const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source[] }) => {
+const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item; sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { data, setData, reset } = useForm({
@@ -457,6 +457,7 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
     url: item.url ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
+    mundane_variant_ids: item.mundane_variant_ids ?? [],
     extra_cost_note: item.extra_cost_note ?? '',
     source_id: item.source_id ?? '',
     source_url: '',
@@ -470,6 +471,7 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
     setData('url', item.url ?? '')
     setData('rarity', item.rarity ?? 'common')
     setData('type', item.type ?? 'item')
+    setData('mundane_variant_ids', item.mundane_variant_ids ?? [])
     setData('extra_cost_note', item.extra_cost_note ?? '')
     setData('source_id', item.source_id ?? '')
     setData('source_url', '')
@@ -481,8 +483,41 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
     return trimmed === '' ? null : trimmed
   }
 
+  const normalizeVariantIds = (type: Item['type'], ids: number[]) => {
+    const filtered = filterVariantIdsByType(type, ids, mundaneVariants)
+    return [...filtered].sort((a, b) => a - b)
+  }
+
+  const toggleMundaneVariant = (variantId: number) => {
+    const isSelected = data.mundane_variant_ids.includes(variantId)
+    if (isSelected) {
+      setData('mundane_variant_ids', data.mundane_variant_ids.filter((id) => id !== variantId))
+      return
+    }
+
+    const targetVariant = mundaneVariants.find((variant) => variant.id === variantId)
+    if (!targetVariant) {
+      setData('mundane_variant_ids', [...data.mundane_variant_ids, variantId])
+      return
+    }
+
+    if (targetVariant.is_placeholder) {
+      setData('mundane_variant_ids', [variantId])
+      return
+    }
+
+    const selectedPlaceholder = mundaneVariants.find(
+      (variant) => data.mundane_variant_ids.includes(variant.id) && variant.is_placeholder,
+    )
+    const nextIds = selectedPlaceholder
+      ? data.mundane_variant_ids.filter((id) => id !== selectedPlaceholder.id)
+      : data.mundane_variant_ids
+
+    setData('mundane_variant_ids', [...nextIds, variantId])
+  }
+
   const handleSubmit = () => {
-    const changes: Record<string, string | number | null> = {}
+    const changes: Record<string, string | number | null | number[]> = {}
 
     const normalizedName = (data.name ?? '').trim()
     if (normalizedName !== (item.name ?? '').trim()) {
@@ -501,6 +536,12 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
 
     if ((data.type ?? 'item') !== (item.type ?? 'item')) {
       changes.type = data.type
+    }
+
+    const normalizedVariantIds = normalizeVariantIds(data.type as Item['type'], data.mundane_variant_ids)
+    const currentVariantIds = normalizeVariantIds(item.type as Item['type'], item.mundane_variant_ids ?? [])
+    if (JSON.stringify(normalizedVariantIds) !== JSON.stringify(currentVariantIds)) {
+      changes.mundane_variant_ids = normalizedVariantIds
     }
 
     const normalizedExtraCost = normalizeText(data.extra_cost_note ?? '')
@@ -546,6 +587,8 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
           || formErrors.type
           || formErrors.extra_cost_note
           || formErrors.source_id
+          || formErrors.mundane_variant_ids
+          || formErrors['mundane_variant_ids.0']
 
         if (message) {
           toast.show(String(message), 'error')
@@ -593,6 +636,8 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
             onChange={(e) => {
               const nextType = e.target.value as Item['type']
               setData('type', nextType)
+              const nextVariantIds = filterVariantIdsByType(nextType, data.mundane_variant_ids, mundaneVariants)
+              setData('mundane_variant_ids', nextVariantIds)
               if (nextType === 'weapon' || nextType === 'armor') {
                 setData('extra_cost_note', '')
               }
@@ -605,8 +650,14 @@ const SuggestItemUpdateModal = ({ item, sources }: { item: Item; sources: Source
               <option value="item">Item</option>
               <option value="consumable">Consumable</option>
               <option value="spellscroll">Spell Scroll</option>
-            </SelectOptions>
-          </Select>
+              </SelectOptions>
+            </Select>
+          <VariantSelector
+            variants={mundaneVariants}
+            selectedIds={data.mundane_variant_ids}
+            onToggle={toggleMundaneVariant}
+            itemType={data.type as Item['type']}
+          />
           {data.type === 'item' || data.type === 'consumable' || data.type === 'spellscroll' ? (
             <Input value={data.extra_cost_note} onChange={(e) => setData('extra_cost_note', e.target.value)}>
               Extra cost note (optional)
@@ -1223,7 +1274,7 @@ export default function ItemRow({
         {!shopItem && !canManage ? (
           <>
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
-            <SuggestItemUpdateModal item={item} sources={sources} />
+            <SuggestItemUpdateModal item={item} sources={sources} mundaneVariants={mundaneVariants} />
           </>
         ) : null}
       </div>
