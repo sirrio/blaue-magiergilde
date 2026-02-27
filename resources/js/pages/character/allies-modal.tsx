@@ -3,6 +3,7 @@ import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
+import { toast } from '@/components/ui/toast'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
@@ -576,6 +577,20 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     () => allies.map((ally) => ally.linked_character_id).filter(Boolean) as number[],
     [allies],
   )
+  useEffect(() => {
+    setAllies(character.allies)
+  }, [character.allies])
+
+  const showFirstError = (errors: Record<string, string>) => {
+    const firstError = Object.values(errors)[0]
+    if (firstError) {
+      toast.show(firstError, 'error')
+      return
+    }
+
+    toast.show('Ally could not be saved.', 'error')
+  }
+
   const handleSave = (ally: Ally) => {
     const { linked_character: linkedCharacter, avatar, ...rest } = ally
     void linkedCharacter
@@ -590,14 +605,26 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     }
 
     if (ally.id === 0) {
-      router.post(route('allies.store'), payload, { preserveScroll: true })
-      const newAlly = { ...ally, id: Date.now() + Math.floor(Math.random() * 1000) }
-      setAllies((current) => [...current, newAlly])
+      router.post(route('allies.store'), payload, {
+        preserveScroll: true,
+        onSuccess: () => {
+          setEditingId(null)
+        },
+        onError: (errors) => {
+          showFirstError(errors as Record<string, string>)
+        },
+      })
     } else {
-      router.post(route('allies.update', ally.id), payload, { preserveScroll: true })
-      setAllies((current) => current.map((entry) => (entry.id === ally.id ? ally : entry)))
+      router.post(route('allies.update', ally.id), payload, {
+        preserveScroll: true,
+        onSuccess: () => {
+          setEditingId(null)
+        },
+        onError: (errors) => {
+          showFirstError(errors as Record<string, string>)
+        },
+      })
     }
-    setEditingId(null)
   }
   const handleCancel = () => {
     setEditingId(null)
@@ -605,9 +632,15 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   const handleRemove = (ally: Ally) => {
     const label = getAllyDisplayName(ally)
     if (window.confirm(`Are you sure you want to remove ${label}?`)) {
-      router.delete(route('allies.destroy', ally.id), { preserveScroll: true })
-      setAllies((current) => current.filter((entry) => entry.id !== ally.id))
-      setEditingId(null)
+      router.delete(route('allies.destroy', ally.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+          setEditingId(null)
+        },
+        onError: () => {
+          toast.show('Ally could not be removed.', 'error')
+        },
+      })
     }
   }
 
