@@ -160,6 +160,19 @@ class CompendiumSuggestionController extends Controller
                     (string) $variant->id => $label,
                 ];
             });
+        $variantMeta = MundaneItemVariant::query()
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'category', 'is_placeholder'])
+            ->mapWithKeys(static fn (MundaneItemVariant $variant): array => [
+                (string) $variant->id => [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'category' => $variant->category,
+                    'is_placeholder' => $variant->is_placeholder,
+                ],
+            ]);
 
         return Inertia::render('admin/compendium-suggestions', [
             'suggestions' => $suggestions->map(function (CompendiumSuggestion $suggestion) use ($itemNames, $spellNames): array {
@@ -207,6 +220,7 @@ class CompendiumSuggestionController extends Controller
             ],
             'sourceLabels' => $sourceLabels,
             'variantLabels' => $variantLabels,
+            'variantMeta' => $variantMeta,
         ]);
     }
 

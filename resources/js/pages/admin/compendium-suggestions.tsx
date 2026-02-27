@@ -6,7 +6,7 @@ import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
 import { router, useForm } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { Check, Search, X } from 'lucide-react'
+import { ArrowRight, Check, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 type SuggestionKind = 'item' | 'spell'
@@ -38,6 +38,13 @@ interface SuggestionFilters {
   status?: string
   kind?: string
   search?: string
+}
+
+interface VariantMetaRecord {
+  id: number
+  name: string
+  category: string
+  is_placeholder: boolean
 }
 
 const fieldLabels: Record<string, string> = {
@@ -89,6 +96,125 @@ const formatFieldValue = (
   }
 
   return formatValue(value)
+}
+
+const categorizeVariantIds = (
+  value: unknown,
+  variantMeta: Record<string, VariantMetaRecord>,
+): Record<string, VariantMetaRecord[]> => {
+  const ids = Array.isArray(value) ? value : []
+  const grouped: Record<string, VariantMetaRecord[]> = {}
+
+  ids.forEach((entry) => {
+    const key = String(entry)
+    const meta = variantMeta[key]
+    if (!meta) {
+      return
+    }
+
+    const bucket = meta.is_placeholder ? 'any' : meta.category || 'other'
+    grouped[bucket] = [...(grouped[bucket] ?? []), meta]
+  })
+
+  return grouped
+}
+
+const VariantChips = ({
+  value,
+  variantMeta,
+}: {
+  value: unknown
+  variantMeta: Record<string, VariantMetaRecord>
+}) => {
+  const grouped = categorizeVariantIds(value, variantMeta)
+  const sections = [
+    { key: 'any', label: 'Any' },
+    { key: 'weapon', label: 'Weapon' },
+    { key: 'armor', label: 'Armor' },
+    { key: 'other', label: 'Other' },
+  ].filter((section) => (grouped[section.key] ?? []).length > 0)
+
+  if (sections.length === 0) {
+    return <span className="text-base-content/60">none</span>
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {sections.map((section) => (
+        <div key={section.key} className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-base-content/50">{section.label}</span>
+          {(grouped[section.key] ?? []).map((variant) => (
+            <span
+              key={`${section.key}-${variant.id}`}
+              className="rounded-full border border-base-300 bg-base-100 px-2 py-1 text-[11px] leading-none"
+            >
+              {variant.name}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const DiffValue = ({
+  field,
+  value,
+  sourceLabels,
+  variantLabels,
+  variantMeta,
+}: {
+  field: string
+  value: unknown
+  sourceLabels: Record<string, string>
+  variantLabels: Record<string, string>
+  variantMeta: Record<string, VariantMetaRecord>
+}) => {
+  if (field === 'mundane_variant_ids') {
+    return <VariantChips value={value} variantMeta={variantMeta} />
+  }
+
+  if (field === 'source_id') {
+    const text = formatFieldValue(field, value, sourceLabels, variantLabels)
+    return <span className="rounded-full border border-base-300 bg-base-100 px-2 py-1 text-[11px] leading-none">{text}</span>
+  }
+
+  return <span>{formatFieldValue(field, value, sourceLabels, variantLabels)}</span>
+}
+
+const VariantDiffSummary = ({
+  currentValue,
+  nextValue,
+  variantMeta,
+}: {
+  currentValue: unknown
+  nextValue: unknown
+  variantMeta: Record<string, VariantMetaRecord>
+}) => {
+  const currentIds = new Set((Array.isArray(currentValue) ? currentValue : []).map((entry) => Number(entry)))
+  const nextIds = new Set((Array.isArray(nextValue) ? nextValue : []).map((entry) => Number(entry)))
+
+  const added = [...nextIds].filter((id) => !currentIds.has(id))
+  const removed = [...currentIds].filter((id) => !nextIds.has(id))
+
+  if (added.length === 0 && removed.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 text-[11px]">
+      {added.length > 0 ? (
+        <span className="rounded-full border border-success/30 bg-success/10 px-2 py-1 text-success">
+          Added: {added.map((id) => variantMeta[String(id)]?.name ?? `#${id}`).join(', ')}
+        </span>
+      ) : null}
+      {removed.length > 0 ? (
+        <span className="rounded-full border border-error/30 bg-error/10 px-2 py-1 text-error">
+          Removed: {removed.map((id) => variantMeta[String(id)]?.name ?? `#${id}`).join(', ')}
+        </span>
+      ) : null}
+    </div>
+  )
 }
 
 const statusClass: Record<SuggestionStatus, string> = {
@@ -160,12 +286,14 @@ export default function CompendiumSuggestionsPage({
   counts,
   sourceLabels = {},
   variantLabels = {},
+  variantMeta = {},
 }: {
   suggestions: CompendiumSuggestionRecord[]
   filters: SuggestionFilters
   counts: Record<string, number>
   sourceLabels?: Record<string, string>
   variantLabels?: Record<string, string>
+  variantMeta?: Record<string, VariantMetaRecord>
 }) {
   const currentParams = route().params as Record<string, string | number | undefined>
   const [search, setSearch] = useState(String(filters.search ?? ''))
@@ -291,16 +419,77 @@ export default function CompendiumSuggestionsPage({
                         <p className="mb-2 text-xs font-semibold uppercase text-base-content/60">Suggested changes</p>
                         <div className="space-y-1 text-xs">
                           {changeEntries.map(([field, value]) => (
-                            <div key={field}>
-                              <span className="font-medium">{fieldLabels[field] ?? field}:</span>{' '}
+                            <div key={field} className="space-y-1.5 rounded-lg border border-base-200/80 bg-base-100/70 p-2">
+                              <span className="font-medium">{fieldLabels[field] ?? field}</span>
                               {hasCurrentSnapshot ? (
-                                <>
-                                  <span className="text-base-content/70">{formatFieldValue(field, suggestion.current_snapshot?.[field], sourceLabels, variantLabels)}</span>{' '}
-                                  <span className="text-base-content/50">→</span>{' '}
-                                  <span>{formatFieldValue(field, value, sourceLabels, variantLabels)}</span>
-                                </>
+                                field === 'mundane_variant_ids' ? (
+                                  <>
+                                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-start">
+                                      <div className="space-y-1 rounded-lg border border-base-200 bg-base-100 p-2">
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Current</p>
+                                        <DiffValue
+                                          field={field}
+                                          value={suggestion.current_snapshot?.[field]}
+                                          sourceLabels={sourceLabels}
+                                          variantLabels={variantLabels}
+                                          variantMeta={variantMeta}
+                                        />
+                                      </div>
+                                      <div className="hidden items-center justify-center text-base-content/40 md:flex">
+                                        <ArrowRight size={14} />
+                                      </div>
+                                      <div className="space-y-1 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Suggested</p>
+                                        <DiffValue
+                                          field={field}
+                                          value={value}
+                                          sourceLabels={sourceLabels}
+                                          variantLabels={variantLabels}
+                                          variantMeta={variantMeta}
+                                        />
+                                      </div>
+                                    </div>
+                                    <VariantDiffSummary
+                                      currentValue={suggestion.current_snapshot?.[field]}
+                                      nextValue={value}
+                                      variantMeta={variantMeta}
+                                    />
+                                  </>
+                                ) : (
+                                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
+                                    <div className="rounded-lg border border-base-200 bg-base-100 p-2 text-base-content/70">
+                                      <DiffValue
+                                        field={field}
+                                        value={suggestion.current_snapshot?.[field]}
+                                        sourceLabels={sourceLabels}
+                                        variantLabels={variantLabels}
+                                        variantMeta={variantMeta}
+                                      />
+                                    </div>
+                                    <div className="hidden items-center justify-center text-base-content/40 md:flex">
+                                      <ArrowRight size={14} />
+                                    </div>
+                                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-2">
+                                      <DiffValue
+                                        field={field}
+                                        value={value}
+                                        sourceLabels={sourceLabels}
+                                        variantLabels={variantLabels}
+                                        variantMeta={variantMeta}
+                                      />
+                                    </div>
+                                  </div>
+                                )
                               ) : (
-                                <span>{formatFieldValue(field, value, sourceLabels, variantLabels)}</span>
+                                <div className="rounded-lg border border-primary/20 bg-primary/5 p-2">
+                                  <DiffValue
+                                    field={field}
+                                    value={value}
+                                    sourceLabels={sourceLabels}
+                                    variantLabels={variantLabels}
+                                    variantMeta={variantMeta}
+                                  />
+                                </div>
                               )}
                             </div>
                           ))}

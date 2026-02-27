@@ -628,9 +628,17 @@ test('admin suggestions index includes source labels for display', function () {
     $props = $response->viewData('page')['props'] ?? [];
     $sourceLabels = $props['sourceLabels'] ?? [];
     $variantLabels = $props['variantLabels'] ?? [];
+    $variantMeta = $props['variantMeta'] ?? [];
 
     expect($sourceLabels)->toBeArray();
     expect($sourceLabels[(string) $source->id] ?? null)->toBe("Player's Handbook");
     expect($variantLabels)->toBeArray();
     expect($variantLabels[(string) $variant->id] ?? null)->toBe('Longsword (weapon)');
+    expect($variantMeta)->toBeArray();
+    expect($variantMeta[(string) $variant->id] ?? [])->toMatchArray([
+        'id' => $variant->id,
+        'name' => 'Longsword',
+        'category' => 'weapon',
+        'is_placeholder' => false,
+    ]);
 });

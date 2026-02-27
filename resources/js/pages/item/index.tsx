@@ -49,17 +49,23 @@ const VariantSelector = ({
   selectedIds,
   onToggle,
   itemType,
+  helperText,
+  error,
 }: {
   variants: MundaneItemVariant[]
   selectedIds: number[]
   onToggle: (id: number) => void
   itemType: Item['type']
+  helperText?: React.ReactNode
+  error?: string | null
 }) => {
   const requiredCategory = variantCategoryByType[itemType]
   if (requiredCategory === null) {
     return (
-      <div className="rounded-box border border-base-200 p-3 text-xs text-base-content/70">
-        Mundane variants are only used for weapon and armor types.
+      <div className={cn('rounded-box border p-3 text-xs', error ? 'border-error/40 bg-error/5 text-error' : 'border-base-200 text-base-content/70')}>
+        <p>Mundane variants are only used for weapon and armor types.</p>
+        {helperText ? <div className="mt-1">{helperText}</div> : null}
+        {error ? <div className="mt-1 font-medium">{error}</div> : null}
       </div>
     )
   }
@@ -77,6 +83,8 @@ const VariantSelector = ({
         Select mundane base variants this {itemType} can apply to.
       </p>
       <p className="text-xs text-base-content/60">The "Any" option is exclusive and cannot be combined with specific variants.</p>
+      {helperText ? <p className="text-xs text-base-content/60">{helperText}</p> : null}
+      {error ? <p className="text-xs font-medium text-error">{error}</p> : null}
       <div className="max-h-36 space-y-1 overflow-y-auto pr-1">
         {entries.map((variant) => {
           const checked = selectedIds.includes(variant.id)
@@ -128,9 +136,50 @@ const filterVariantIdsByType = (
   return variantIds.filter((id) => allowed.has(id))
 }
 
+const buildSuggestionItemValidationState = (
+  type: Item['type'],
+  variantIds: number[],
+  variants: MundaneItemVariant[],
+  extraCostNote: string,
+) => {
+  const requiredCategory = variantCategoryByType[type]
+  const selectedVariants = variants.filter((variant) => variantIds.includes(variant.id))
+  const hasPlaceholder = selectedVariants.some((variant) => Boolean(variant.is_placeholder))
+  const specificCount = selectedVariants.filter((variant) => !variant.is_placeholder).length
+  const invalidVariantSelection = requiredCategory === null && selectedVariants.length > 0
+
+  const variantHint = requiredCategory === null
+    ? 'Variants are not used for item, consumable, or spell scroll suggestions.'
+    : hasPlaceholder
+      ? `"Any ${requiredCategory}" is selected and excludes specific variants.`
+      : specificCount > 0
+        ? `${specificCount} specific ${requiredCategory} variant${specificCount === 1 ? '' : 's'} selected.`
+        : `You can attach optional ${requiredCategory} variants or leave this empty.`
+
+  const variantError = invalidVariantSelection
+    ? 'Selected variants do not fit this type and will be removed on submit.'
+    : null
+
+  const trimmedExtraCostNote = extraCostNote.trim()
+  const extraCostHint = requiredCategory === null
+    ? 'Use extra cost note only when the item adds an extra cost, like material components or embedded valuables.'
+    : 'Weapon and armor suggestions use mundane variants instead of an extra cost note.'
+  const extraCostError = requiredCategory !== null && trimmedExtraCostNote !== ''
+    ? 'Extra cost note is not used for weapon or armor suggestions.'
+    : null
+
+  return {
+    variantHint,
+    variantError,
+    extraCostHint,
+    extraCostError,
+  }
+}
+
 const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({})
   const { data, setData, reset } = useForm({
     name: '',
     url: '',
@@ -146,11 +195,19 @@ const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; 
   useEffect(() => {
     if (!isOpen) return
     reset()
+    setSubmitErrors({})
     setData('rarity', 'common')
     setData('type', 'item')
     setData('mundane_variant_ids', [])
     setData('extra_cost_note', '')
   }, [isOpen, reset, setData])
+
+  const validationState = buildSuggestionItemValidationState(
+    data.type as Item['type'],
+    data.mundane_variant_ids,
+    mundaneVariants,
+    data.extra_cost_note,
+  )
 
   const normalizeText = (value: string) => {
     const trimmed = value.trim()
@@ -219,9 +276,11 @@ const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; 
       preserveScroll: true,
       onSuccess: () => {
         setIsOpen(false)
+        setSubmitErrors({})
         toast.show('Suggestion submitted. Thank you!', 'info')
       },
       onError: (formErrors) => {
+        setSubmitErrors(Object.fromEntries(Object.entries(formErrors).map(([key, value]) => [key, String(value)])))
         const message = formErrors.changes
           || formErrors.target_id
           || formErrors.kind
@@ -303,11 +362,17 @@ const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; 
             selectedIds={data.mundane_variant_ids}
             onToggle={toggleMundaneVariant}
             itemType={data.type as Item['type']}
+            helperText={validationState.variantHint}
+            error={submitErrors.mundane_variant_ids ?? submitErrors['mundane_variant_ids.0'] ?? validationState.variantError}
           />
           {data.type === 'item' || data.type === 'consumable' || data.type === 'spellscroll' ? (
-            <Input value={data.extra_cost_note} onChange={(e) => setData('extra_cost_note', e.target.value)}>
-              Extra cost note (optional)
-            </Input>
+            <div className="space-y-1">
+              <Input value={data.extra_cost_note} onChange={(e) => setData('extra_cost_note', e.target.value)}>
+                Extra cost note (optional)
+              </Input>
+              <p className="text-xs text-base-content/60">{validationState.extraCostHint}</p>
+              {submitErrors.extra_cost_note ? <p className="text-xs font-medium text-error">{submitErrors.extra_cost_note}</p> : null}
+            </div>
           ) : null}
           <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
             <SelectLabel>Source</SelectLabel>
@@ -446,6 +511,13 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
     }
   }
 
+  const validationState = buildSuggestionItemValidationState(
+    data.type as Item['type'],
+    data.mundane_variant_ids,
+    mundaneVariants,
+    data.extra_cost_note,
+  )
+
   const handleSubmit = () => {
     if (data.default_spell_roll_enabled && data.default_spell_levels.length === 0) {
       toast.show('Select at least one default spell level.', 'error')
@@ -499,15 +571,20 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
               selectedIds={data.mundane_variant_ids}
               onToggle={toggleMundaneVariant}
               itemType={data.type as Item['type']}
+              helperText={validationState.variantHint}
+              error={errors.mundane_variant_ids ?? errors['mundane_variant_ids.0'] ?? validationState.variantError}
             />
             {data.type === 'item' || data.type === 'consumable' || data.type === 'spellscroll' ? (
-              <Input
-                errors={errors.extra_cost_note}
-                value={data.extra_cost_note}
-                onChange={(e) => setData('extra_cost_note', e.target.value)}
-              >
-                Extra cost note (optional)
-              </Input>
+              <div className="space-y-1">
+                <Input
+                  errors={errors.extra_cost_note}
+                  value={data.extra_cost_note}
+                  onChange={(e) => setData('extra_cost_note', e.target.value)}
+                >
+                  Extra cost note (optional)
+                </Input>
+                <p className="text-xs text-base-content/60">{validationState.extraCostHint}</p>
+              </div>
             ) : null}
           </div>
 
