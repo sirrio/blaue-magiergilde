@@ -215,8 +215,14 @@ class ShopRollService
     public function roll(): Shop
     {
         $items = Item::query()
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->where('shop_enabled', true)
             ->get()
+            ->map(function (Item $item): Item {
+                $item->setAttribute('display_cost', ItemCostResolver::resolveForItem($item));
+
+                return $item;
+            })
             ->groupBy(['rarity', function ($item) {
                 return $this->normalizeSelectionType($item->rarity, $item->type);
             }]);
