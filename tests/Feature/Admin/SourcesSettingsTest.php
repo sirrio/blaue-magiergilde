@@ -18,7 +18,9 @@ test('admin can create and update sources from settings', function () {
         ])
         ->assertRedirect();
 
-    $source = Source::query()->first();
+    $source = Source::query()
+        ->where('shortcode', 'PHB')
+        ->first();
 
     expect($source)->not->toBeNull()
         ->and($source?->shortcode)->toBe('PHB')
