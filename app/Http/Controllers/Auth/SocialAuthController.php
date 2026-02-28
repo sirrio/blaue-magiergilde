@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Laravel\Socialite\Facades\Socialite;
+use Throwable;
 
 class SocialAuthController extends Controller
 {
@@ -23,13 +25,29 @@ class SocialAuthController extends Controller
     /**
      * Verarbeitet den Callback von Discord.
      */
-    public function handleProviderCallback(): RedirectResponse
+    public function handleProviderCallback(Request $request): RedirectResponse
     {
-        $discordUser = Socialite::driver('discord')->user();
+        $isLinkingDiscord = Auth::check();
+
+        if ($request->filled('error')) {
+            return $this->redirectForFailedCallback($isLinkingDiscord, $this->discordErrorMessage($request));
+        }
+
+        try {
+            $discordUser = Socialite::driver('discord')->user();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $this->redirectForFailedCallback(
+                $isLinkingDiscord,
+                'Discord authentication failed. Please try again. If the problem persists, contact an administrator.',
+            );
+        }
+
         $discordId = $discordUser->getId();
         $discordProfile = $this->resolveDiscordProfile($discordUser);
 
-        if (Auth::check()) {
+        if ($isLinkingDiscord) {
             /** @var User $user */
             $user = Auth::user();
 
@@ -122,5 +140,29 @@ class SocialAuthController extends Controller
         }
 
         return redirect()->route('characters.index');
+    }
+
+    private function redirectForFailedCallback(bool $isLinkingDiscord, string $message): RedirectResponse
+    {
+        if ($isLinkingDiscord) {
+            return redirect()
+                ->route('profile.edit')
+                ->with('error', $message);
+        }
+
+        return redirect()
+            ->route('login')
+            ->with('error', $message);
+    }
+
+    private function discordErrorMessage(Request $request): string
+    {
+        $error = trim((string) $request->query('error', ''));
+
+        if ($error === 'access_denied') {
+            return 'Discord authentication was cancelled.';
+        }
+
+        return 'Discord authentication failed. Please try again.';
     }
 }
