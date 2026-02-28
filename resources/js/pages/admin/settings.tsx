@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
-import { TextArea } from '@/components/ui/text-area'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import {
@@ -12,7 +11,6 @@ import {
   DiscordBackupChannel,
   DiscordBackupStats,
   DiscordBackupStatus,
-  DiscordBotOwnersStatus,
   DiscordBotSettings,
   PageProps,
   Source,
@@ -44,8 +42,7 @@ export default function Settings({
   const selectionForm = useForm({
     guilds: [] as { guild_id: string; channel_ids: string[] }[],
   })
-  const ownerIdsForm = useForm({
-    owner_ids: (discordBotSettings.owner_ids ?? []).join(', '),
+  const botSettingsForm = useForm({
     character_approval_channel_id: discordBotSettings.character_approval_channel_id ?? '',
     character_approval_channel_name: discordBotSettings.character_approval_channel_name ?? '',
     character_approval_channel_guild_id: discordBotSettings.character_approval_channel_guild_id ?? '',
@@ -68,9 +65,6 @@ export default function Settings({
   const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
-  const [ownerStatus, setOwnerStatus] = useState<DiscordBotOwnersStatus | null>(null)
-  const [ownerStatusLoading, setOwnerStatusLoading] = useState(false)
-  const [ownerStatusError, setOwnerStatusError] = useState<string | null>(null)
   const [editingSource, setEditingSource] = useState<Source | null>(null)
   const [importEntityType, setImportEntityType] = useState<'items' | 'spells'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -183,29 +177,6 @@ export default function Settings({
       }
     }
   }, [backupStatus?.running, fetchBackupStatus])
-
-  const fetchOwnerStatus = useCallback(async () => {
-    setOwnerStatusLoading(true)
-    setOwnerStatusError(null)
-    try {
-      const response = await fetch(route('admin.settings.bot.owners.status'), {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setOwnerStatus(null)
-        setOwnerStatusError(String(payload?.error ?? 'Owner status could not be loaded.'))
-        return
-      }
-      setOwnerStatus(payload as DiscordBotOwnersStatus)
-    } catch {
-      setOwnerStatus(null)
-      setOwnerStatusError('Owner status could not be loaded.')
-    } finally {
-      setOwnerStatusLoading(false)
-    }
-  }, [])
 
   const selectedChannelDetails = useMemo(
     () => discordBackup.selected_channels_details ?? {},
@@ -445,22 +416,17 @@ export default function Settings({
   }, [mergedChannelGroups, selectedByGuild])
   const hasBackupSelection = selectedChannelsFlat.length > 0
 
-  const handleOwnerIdsSave = () => {
-    ownerIdsForm.patch(route('admin.settings.bot.owners.update'), {
+  const handleBotSettingsSave = () => {
+    botSettingsForm.patch(route('admin.settings.bot.update'), {
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Bot settings saved.', 'info')
-        void fetchOwnerStatus()
       },
       onError: () => {
         toast.show('Bot settings could not be saved.', 'error')
       },
     })
   }
-
-  useEffect(() => {
-    void fetchOwnerStatus()
-  }, [fetchOwnerStatus])
 
   useEffect(() => {
     if (!editingSource) return
@@ -603,41 +569,34 @@ export default function Settings({
     }
   }, [importPreview])
 
-  const ownerCacheLabel = ownerStatusLoading
-    ? 'Loading...'
-    : ownerStatus?.updated_at
-      ? new Date(ownerStatus.updated_at).toLocaleString()
-      : 'Not yet cached'
-  const ownerEntries = ownerStatus?.owners ?? []
-  const ownerIdsFallback = ownerStatus?.owner_ids ?? discordBotSettings.owner_ids ?? []
   const sourceById = useMemo(() => {
     return Object.fromEntries(sources.map((source) => [source.id, `${source.shortcode} - ${source.name}`]))
   }, [sources])
 
   const approvalChannelLabel = useMemo(() => {
-    if (ownerIdsForm.data.character_approval_channel_name) {
-      return ownerIdsForm.data.character_approval_channel_name
+    if (botSettingsForm.data.character_approval_channel_name) {
+      return botSettingsForm.data.character_approval_channel_name
     }
-    if (ownerIdsForm.data.character_approval_channel_id) {
-      return ownerIdsForm.data.character_approval_channel_id
+    if (botSettingsForm.data.character_approval_channel_id) {
+      return botSettingsForm.data.character_approval_channel_id
     }
     return 'Not configured'
   }, [
-    ownerIdsForm.data.character_approval_channel_id,
-    ownerIdsForm.data.character_approval_channel_name,
+    botSettingsForm.data.character_approval_channel_id,
+    botSettingsForm.data.character_approval_channel_name,
   ])
 
   const supportTicketChannelLabel = useMemo(() => {
-    if (ownerIdsForm.data.support_ticket_channel_name) {
-      return ownerIdsForm.data.support_ticket_channel_name
+    if (botSettingsForm.data.support_ticket_channel_name) {
+      return botSettingsForm.data.support_ticket_channel_name
     }
-    if (ownerIdsForm.data.support_ticket_channel_id) {
-      return ownerIdsForm.data.support_ticket_channel_id
+    if (botSettingsForm.data.support_ticket_channel_id) {
+      return botSettingsForm.data.support_ticket_channel_id
     }
     return 'Not configured'
   }, [
-    ownerIdsForm.data.support_ticket_channel_id,
-    ownerIdsForm.data.support_ticket_channel_name,
+    botSettingsForm.data.support_ticket_channel_id,
+    botSettingsForm.data.support_ticket_channel_name,
   ])
 
   type BotChannelSelection =
@@ -648,34 +607,34 @@ export default function Settings({
   const handleApprovalChannelSelect = useCallback(
     (selection: BotChannelSelection) => {
       if (!selection || Array.isArray(selection)) return
-      ownerIdsForm.setData('character_approval_channel_id', selection.id)
-      ownerIdsForm.setData('character_approval_channel_name', selection.name)
-      ownerIdsForm.setData('character_approval_channel_guild_id', selection.guild_id)
+      botSettingsForm.setData('character_approval_channel_id', selection.id)
+      botSettingsForm.setData('character_approval_channel_name', selection.name)
+      botSettingsForm.setData('character_approval_channel_guild_id', selection.guild_id)
     },
-    [ownerIdsForm],
+    [botSettingsForm],
   )
 
   const handleApprovalChannelClear = useCallback(() => {
-    ownerIdsForm.setData('character_approval_channel_id', '')
-    ownerIdsForm.setData('character_approval_channel_name', '')
-    ownerIdsForm.setData('character_approval_channel_guild_id', '')
-  }, [ownerIdsForm])
+    botSettingsForm.setData('character_approval_channel_id', '')
+    botSettingsForm.setData('character_approval_channel_name', '')
+    botSettingsForm.setData('character_approval_channel_guild_id', '')
+  }, [botSettingsForm])
 
   const handleSupportTicketChannelSelect = useCallback(
     (selection: BotChannelSelection) => {
       if (!selection || Array.isArray(selection)) return
-      ownerIdsForm.setData('support_ticket_channel_id', selection.id)
-      ownerIdsForm.setData('support_ticket_channel_name', selection.name)
-      ownerIdsForm.setData('support_ticket_channel_guild_id', selection.guild_id)
+      botSettingsForm.setData('support_ticket_channel_id', selection.id)
+      botSettingsForm.setData('support_ticket_channel_name', selection.name)
+      botSettingsForm.setData('support_ticket_channel_guild_id', selection.guild_id)
     },
-    [ownerIdsForm],
+    [botSettingsForm],
   )
 
   const handleSupportTicketChannelClear = useCallback(() => {
-    ownerIdsForm.setData('support_ticket_channel_id', '')
-    ownerIdsForm.setData('support_ticket_channel_name', '')
-    ownerIdsForm.setData('support_ticket_channel_guild_id', '')
-  }, [ownerIdsForm])
+    botSettingsForm.setData('support_ticket_channel_id', '')
+    botSettingsForm.setData('support_ticket_channel_name', '')
+    botSettingsForm.setData('support_ticket_channel_guild_id', '')
+  }, [botSettingsForm])
 
   return (
     <AppLayout>
@@ -1072,7 +1031,7 @@ export default function Settings({
               >
                 Select channel
               </DiscordChannelPickerModal>
-              {ownerIdsForm.data.character_approval_channel_id ? (
+              {botSettingsForm.data.character_approval_channel_id ? (
                 <Button size="sm" variant="ghost" onClick={handleApprovalChannelClear}>
                   Clear
                 </Button>
@@ -1083,8 +1042,8 @@ export default function Settings({
             <span>
               Current: <span className="font-semibold text-base-content">{approvalChannelLabel}</span>
             </span>
-            {ownerIdsForm.errors.character_approval_channel_id ? (
-              <span className="text-error">{ownerIdsForm.errors.character_approval_channel_id}</span>
+            {botSettingsForm.errors.character_approval_channel_id ? (
+              <span className="text-error">{botSettingsForm.errors.character_approval_channel_id}</span>
             ) : null}
           </div>
           <div className="mt-4 border-t border-base-200 pt-4">
@@ -1107,7 +1066,7 @@ export default function Settings({
                 >
                   Select channel
                 </DiscordChannelPickerModal>
-                {ownerIdsForm.data.support_ticket_channel_id ? (
+                {botSettingsForm.data.support_ticket_channel_id ? (
                   <Button size="sm" variant="ghost" onClick={handleSupportTicketChannelClear}>
                     Clear
                   </Button>
@@ -1118,73 +1077,15 @@ export default function Settings({
               <span>
                 Current: <span className="font-semibold text-base-content">{supportTicketChannelLabel}</span>
               </span>
-              {ownerIdsForm.errors.support_ticket_channel_id ? (
-                <span className="text-error">{ownerIdsForm.errors.support_ticket_channel_id}</span>
+              {botSettingsForm.errors.support_ticket_channel_id ? (
+                <span className="text-error">{botSettingsForm.errors.support_ticket_channel_id}</span>
               ) : null}
             </div>
           </div>
           <div className="mt-3 flex justify-end">
-            <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>
+            <Button size="sm" variant="outline" onClick={handleBotSettingsSave} disabled={botSettingsForm.processing}>
               Save bot settings
             </Button>
-          </div>
-        </div>
-        <div className="rounded-box bg-base-100 shadow-md p-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold">Bot access</h2>
-              <p className="text-xs text-base-content/60">
-                Add Discord user IDs allowed to use owner-only bot commands.
-              </p>
-            </div>
-            <div className="text-xs text-base-content/60">Bot cache: {ownerCacheLabel}</div>
-          </div>
-          <div className="mt-3 space-y-3">
-            <TextArea
-              value={ownerIdsForm.data.owner_ids}
-              onChange={(event) => ownerIdsForm.setData('owner_ids', event.target.value)}
-              placeholder="137565166001848320, 1087006381212700682"
-              errors={ownerIdsForm.errors.owner_ids}
-            >
-              Owner IDs (comma separated)
-            </TextArea>
-            {ownerStatusError ? (
-              <p className="text-xs text-error">{ownerStatusError}</p>
-            ) : ownerEntries.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {ownerEntries.map((owner) => (
-                  <div
-                    key={owner.id}
-                    className="flex items-center gap-2 rounded-full border border-base-200 px-2 py-1 text-xs"
-                  >
-                    {owner.avatar_url ? (
-                      <img
-                        src={owner.avatar_url}
-                        alt=""
-                        className="h-6 w-6 rounded-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="h-6 w-6 rounded-full bg-base-200" />
-                    )}
-                    <span className="max-w-[160px] truncate">
-                      {owner.display_name || owner.name || owner.id}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : ownerIdsFallback.length > 0 ? (
-              <p className="text-xs text-base-content/60">
-                Cached IDs: {ownerIdsFallback.join(', ')}
-              </p>
-            ) : (
-              <p className="text-xs text-base-content/60">No owners cached yet.</p>
-            )}
-            <div className="flex justify-end">
-              <Button size="sm" variant="outline" onClick={handleOwnerIdsSave} disabled={ownerIdsForm.processing}>
-                Save bot settings
-              </Button>
-            </div>
           </div>
         </div>
       </div>

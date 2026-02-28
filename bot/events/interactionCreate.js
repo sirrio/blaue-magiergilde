@@ -1,6 +1,5 @@
 const { Events } = require('discord.js');
 
-const { isOwner } = require('../commandConfig');
 const appJoin = require('../interactions/appJoin');
 const characterApproval = require('../interactions/characterApproval');
 const characters = require('../interactions/characters');
@@ -24,20 +23,6 @@ module.exports = {
 
             const command = interaction.client.commands.get(interaction.commandName);
             if (!command) return;
-
-            if (command.ownerOnly && !isOwner(interaction.user.id)) {
-                if (!interaction.deferred && !interaction.replied) {
-                    await interaction.deferReply({ flags: 64 });
-                }
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({
-                        content: '',
-                        embeds: [buildErrorEmbed('Access denied', 'You are not allowed to use this command.')],
-                        components: [],
-                    });
-                }
-                return;
-            }
 
             await command.execute(interaction);
         } catch (error) {

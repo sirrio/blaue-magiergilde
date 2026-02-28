@@ -48,44 +48,15 @@ class ItemCostResolver
 
     private static function formatVariantLabel(Collection $variants): string
     {
-        if ($variants->count() === 1) {
-            /** @var MundaneItemVariant $single */
-            $single = $variants->first();
-            $prefix = self::variantSourcePrefix($single->category);
+        /** @var MundaneItemVariant $first */
+        $first = $variants->sortBy('sort_order')->first();
+        $prefix = self::variantSourcePrefix($first->category);
 
-            return $prefix.': '.self::formatSingleVariant($single);
+        if ($variants->count() !== 1 || $first->is_placeholder || $first->cost_gp === null) {
+            return $prefix;
         }
 
-        $grouped = $variants
-            ->sortBy('sort_order')
-            ->groupBy('category')
-            ->map(function (Collection $entries, string $category): string {
-                $prefix = self::variantSourcePrefix($category);
-                if ($entries->count() > 1) {
-                    $summary = $entries->count().' options';
-
-                    return $prefix.': '.$summary;
-                }
-
-                $formattedEntries = $entries
-                    ->map(static fn (MundaneItemVariant $variant): string => self::formatSingleVariant($variant))
-                    ->implode(', ');
-
-                return $prefix.': '.$formattedEntries;
-            })
-            ->values()
-            ->implode(' | ');
-
-        return $grouped;
-    }
-
-    private static function formatSingleVariant(MundaneItemVariant $variant): string
-    {
-        if ($variant->cost_gp === null) {
-            return $variant->name;
-        }
-
-        return $variant->name.' ('.self::formatGp((float) $variant->cost_gp).' GP)';
+        return $prefix.' ('.self::formatGp((float) $first->cost_gp).' GP)';
     }
 
     private static function formatGp(float $value): string
@@ -97,7 +68,7 @@ class ItemCostResolver
 
     private static function variantSourcePrefix(string $category): string
     {
-        return $category === 'armor' ? 'Armor base' : 'Weapon base';
+        return $category === 'armor' ? 'Armor cost' : 'Weapon cost';
     }
 
     private static function normalizeExtraCostNote(?string $value): ?string

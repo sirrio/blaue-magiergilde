@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\User;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Psr7\Request as PsrRequest;
+use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
@@ -76,4 +79,21 @@ test('discord callback does not clear password for existing linked users', funct
     expect($freshUser)->not->toBeNull()
         ->and($freshUser?->password)->not->toBeNull()
         ->and(Hash::check('OriginalSecret123!', (string) $freshUser?->password))->toBeTrue();
+});
+
+test('discord callback redirects to login with error when token exchange fails', function () {
+    Socialite::shouldReceive('driver->user')
+        ->once()
+        ->andThrow(new ClientException(
+            'Client error: `POST https://discord.com/api/oauth2/token` resulted in a `400 Bad Request` response.',
+            new PsrRequest('POST', 'https://discord.com/api/oauth2/token'),
+            new PsrResponse(400, [], '{"message":"400: Bad Request","code":0}')
+        ));
+
+    $response = $this->get(route('discord.callback'));
+
+    $response->assertRedirect(route('login', absolute: false))
+        ->assertSessionHas('error', 'Discord authentication failed. Please try again. If the problem persists, contact an administrator.');
+
+    $this->assertGuest();
 });

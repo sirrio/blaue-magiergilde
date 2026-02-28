@@ -34,11 +34,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('/admin/settings/discord/backup/channels', [DiscordBackupSettingsController::class, 'update'])
         ->name('admin.settings.backup.channels.update');
 
-    Route::patch('/admin/settings/discord/bot/owners', [DiscordBotSettingsController::class, 'update'])
-        ->name('admin.settings.bot.owners.update');
-
-    Route::get('/admin/settings/discord/bot/owners/status', [DiscordBotSettingsController::class, 'status'])
-        ->name('admin.settings.bot.owners.status');
+    Route::patch('/admin/settings/discord/bot', [DiscordBotSettingsController::class, 'update'])
+        ->name('admin.settings.bot.update');
 
     Route::post('/admin/settings/sources', [SourceController::class, 'store'])
         ->name('admin.settings.sources.store');

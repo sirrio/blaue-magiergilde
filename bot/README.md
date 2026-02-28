@@ -63,7 +63,6 @@ Set these in the root `.env`:
 - `DISCORD_CLIENT_ID` - Discord application ID (also used for OAuth in the app)
 - `DISCORD_GUILD_IDS` - comma-separated list (for guild commands, visible immediately)
 - `DISCORD_COMMAND_PREFIX` - for example `mg`
-- `DISCORD_OWNER_IDS` - fallback list of Discord user IDs (owner-only commands). The app can override this list.
 - `DISCORD_SUPPORT_STAFF_ROLE_IDS` - optional comma-separated role IDs allowed to relay/close tickets in threads. Empty means everyone with thread access.
 - `BOT_APP_URL` - internal base URL for bot → app API calls (for example `http://127.0.0.1:8000` or a private hostname).
 - `BOT_PUBLIC_APP_URL` - optional public base URL for links/avatars in Discord (for example `https://blaue-magiergilde.de`). Overrides `APP_URL` for links only.

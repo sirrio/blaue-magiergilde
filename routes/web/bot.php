@@ -3,7 +3,6 @@
 use App\Http\Controllers\Bot\CharacterApprovalController;
 use App\Http\Controllers\Bot\CharacterAvatarController;
 use App\Http\Controllers\Bot\DiscordBackupController;
-use App\Http\Controllers\Bot\DiscordBotSettingsController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
 
@@ -30,7 +29,4 @@ Route::prefix('bot')
 
         Route::post('character-approvals/sync', [CharacterApprovalController::class, 'sync'])
             ->name('bot.character-approvals.sync');
-
-        Route::get('discord-owners', [DiscordBotSettingsController::class, 'ownerIds'])
-            ->name('bot.discord-owners');
     });

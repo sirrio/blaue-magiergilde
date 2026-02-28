@@ -119,7 +119,42 @@ test('admin can assign weapon mundane variants and item index returns display co
 
     expect($itemPayload['display_cost'] ?? null)->toBeString()
         ->and($itemPayload['display_cost'])->toContain('100 GP');
-    expect($itemPayload['display_cost'])->toContain('Weapon base: 2 options');
+    expect($itemPayload['display_cost'])->toContain('Weapon cost');
+});
+
+test('single specific mundane variant shows only the selected base cost amount', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $item = Item::factory()->create([
+        'name' => 'Specific Armor',
+        'cost' => '100 GP',
+        'type' => 'armor',
+        'rarity' => 'common',
+    ]);
+
+    $paddedArmorId = (int) DB::table('mundane_item_variants')
+        ->where('slug', 'padded-armor')
+        ->value('id');
+
+    $response = $this->actingAs($admin)->put(route('admin.items.update', $item), [
+        'id' => $item->id,
+        'name' => $item->name,
+        'url' => $item->url,
+        'cost' => $item->cost,
+        'rarity' => $item->rarity,
+        'type' => 'armor',
+        'source_id' => null,
+        'mundane_variant_ids' => [$paddedArmorId],
+        'shop_enabled' => true,
+        'guild_enabled' => true,
+        'default_spell_roll_enabled' => false,
+        'ruling_changed' => false,
+    ]);
+
+    $response->assertRedirect()->assertSessionHasNoErrors();
+
+    $resolvedCost = \App\Support\ItemCostResolver::resolveForItem($item->fresh());
+
+    expect($resolvedCost)->toBe('100 GP + Armor cost (5 GP)');
 });
 
 test('weapon any variant is exclusive and cannot be mixed with specific variants', function () {

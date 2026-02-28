@@ -34,5 +34,5 @@ test('rolling a new shop draft stores resolved display cost in item snapshot', f
         ->first();
 
     expect($snapshot)->not->toBeNull()
-        ->and($snapshot?->item_cost)->toContain('Weapon base: 2 options');
+        ->and($snapshot?->item_cost)->toContain('Weapon cost');
 });
