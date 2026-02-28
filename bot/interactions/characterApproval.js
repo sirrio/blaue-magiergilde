@@ -7,7 +7,7 @@ const {
     TextInputBuilder,
     TextInputStyle,
 } = require('discord.js');
-const { resolveApiBaseUrl } = require('../appUrls');
+const { resolveApiBaseUrls } = require('../appUrls');
 const { withInsecureDispatcher } = require('../httpClient');
 const { buildErrorEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 
@@ -75,12 +75,12 @@ function parseApprovalCancel(customId) {
 }
 
 async function sendStatusUpdate(interaction, action, reviewNote = '') {
-    const appUrl = resolveApiBaseUrl();
+    const appUrls = resolveApiBaseUrls();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
 
-    if (!appUrl || !token) {
+    if (appUrls.length === 0 || !token) {
         await interaction.reply({
-            embeds: [buildErrorEmbed('Bot HTTP not configured', 'Set BOT_APP_URL and BOT_HTTP_TOKEN.')],
+            embeds: [buildErrorEmbed('Bot HTTP not configured', 'Set BOT_APP_URL or BOT_PUBLIC_APP_URL and BOT_HTTP_TOKEN.')],
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -88,27 +88,36 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/status`;
-    let response;
-    try {
-        response = await fetch(endpoint, withInsecureDispatcher(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Bot-Token': token,
-            },
-            body: JSON.stringify({
-                character_id: action.characterId,
-                status: action.status,
-                actor_discord_id: String(interaction.user.id),
-                review_note: reviewNote || undefined,
-            }),
-        }));
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[bot] Character approval request failed.', { endpoint, error: message });
+    let response = null;
+    let lastEndpoint = '';
+    for (const appUrl of appUrls) {
+        const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/status`;
+        lastEndpoint = endpoint;
+
+        try {
+            response = await fetch(endpoint, withInsecureDispatcher(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Bot-Token': token,
+                },
+                body: JSON.stringify({
+                    character_id: action.characterId,
+                    status: action.status,
+                    actor_discord_id: String(interaction.user.id),
+                    review_note: reviewNote || undefined,
+                }),
+            }));
+            break;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[bot] Character approval request failed.', { endpoint, error: message });
+        }
+    }
+
+    if (!response) {
         await interaction.editReply({
-            embeds: [buildErrorEmbed('App request failed', `Failed to reach the app (${endpoint}).`)],
+            embeds: [buildErrorEmbed('App request failed', `Failed to reach the app (${lastEndpoint}).`)],
         });
         return true;
     }
