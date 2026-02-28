@@ -565,6 +565,17 @@ class CompendiumImportService
      */
     private function findMatchingItem(array $payload): ?Item
     {
+        $url = is_string($payload['url'] ?? null) ? trim((string) $payload['url']) : '';
+        if ($url !== '') {
+            $urlMatches = Item::query()
+                ->where('url', $url)
+                ->get();
+
+            if ($urlMatches->count() === 1) {
+                return $urlMatches->first();
+            }
+        }
+
         $exact = Item::query()
             ->where('name', $payload['name'])
             ->where('type', $payload['type'])
