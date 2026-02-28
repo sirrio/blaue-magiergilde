@@ -19,7 +19,6 @@ const token = (process.env.DISCORD_BOT_TOKEN || '').trim();
 const clientId = (process.env.DISCORD_CLIENT_ID || '').trim();
 const guildIds = parseList(process.env.DISCORD_GUILD_IDS);
 const commandPrefix = String(process.env.DISCORD_COMMAND_PREFIX || 'mg').trim();
-const ownerIds = parseList(process.env.DISCORD_OWNER_IDS);
 const supportStaffRoleIds = parseList(process.env.DISCORD_SUPPORT_STAFF_ROLE_IDS);
 
 module.exports = {
@@ -27,6 +26,5 @@ module.exports = {
     clientId,
     guildIds,
     commandPrefix,
-    ownerIds,
     supportStaffRoleIds,
 };

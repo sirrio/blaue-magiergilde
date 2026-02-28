@@ -220,7 +220,6 @@ export interface DiscordBackupStatus {
 }
 
 export interface DiscordBotSettings {
-  owner_ids: string[]
   character_approval_channel_id?: string | null
   character_approval_channel_name?: string | null
   character_approval_channel_guild_id?: string | null
@@ -232,19 +231,6 @@ export interface DiscordBotSettings {
   games_channel_guild_id?: string | null
   games_scan_years?: number | null
   games_scan_interval_minutes?: number | null
-}
-
-export interface DiscordBotOwner {
-  id: string
-  name?: string
-  display_name?: string | null
-  avatar_url?: string | null
-}
-
-export interface DiscordBotOwnersStatus {
-  owner_ids: string[]
-  updated_at?: string | null
-  owners?: DiscordBotOwner[]
 }
 
 export interface Source {

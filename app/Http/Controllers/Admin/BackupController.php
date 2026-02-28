@@ -61,7 +61,6 @@ class BackupController extends Controller
                 })(),
             ],
             'discordBotSettings' => [
-                'owner_ids' => $botSettings->owner_ids ?? [],
                 'character_approval_channel_id' => $botSettings->character_approval_channel_id,
                 'character_approval_channel_name' => $botSettings->character_approval_channel_name,
                 'character_approval_channel_guild_id' => $botSettings->character_approval_channel_guild_id,

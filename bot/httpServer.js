@@ -6,7 +6,6 @@ const { postBackstockToChannel, updateBackstockItemPost } = require('./backstock
 const { postShopToChannel, updateShopPost, updateShopItemPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 const { runGameAnnouncementSync } = require('./discordGameSync');
-const { ownerIdsList, ownerIdsUpdatedAt } = require('./ownerIdsStore');
 const { guildIds: configuredGuildIds } = require('./config');
 const {
     postCharacterApprovalAnnouncement,
@@ -117,7 +116,6 @@ function startHttpServer(client) {
         const isDiscordThreads = path === '/discord-threads';
         const isDiscordBackupChannel = path === '/discord-backup/channel';
         const isDiscordBackupStatus = path === '/discord-backup/status';
-        const isDiscordOwnersStatus = path === '/discord-owners/status';
         const isDiscordMemberLookup = path === '/discord-member-lookup';
         const isCharacterApprovalNotify = path === '/character-approval/notify';
         const isCharacterApprovalPending = path === '/character-approval/pending';
@@ -157,15 +155,12 @@ function startHttpServer(client) {
             isAuctionItemSold ||
             isGamesSync;
 
-        if (
-            (req.method !== 'POST' && !(req.method === 'GET' && isDiscordOwnersStatus)) ||
-            (!allowedPost && !(req.method === 'GET' && isDiscordOwnersStatus))
-        ) {
+        if (req.method !== 'POST' || !allowedPost) {
             respondJson(res, 404, { error: 'Not found.' });
             return;
         }
 
-        if (!isDiscordBackupStatus && !isDiscordOwnersStatus) {
+        if (!isDiscordBackupStatus) {
             const limitStatus = getRateLimitStatus(req);
             if (limitStatus.limited) {
                 logReject(req, 'rate limited');
@@ -203,31 +198,6 @@ function startHttpServer(client) {
 
         if (isDiscordBackupStatus) {
             respondJson(res, 200, { status: getBackupStatus() });
-            return;
-        }
-
-        if (isDiscordOwnersStatus) {
-            const ownerIds = ownerIdsList();
-            const owners = [];
-            for (const id of ownerIds) {
-                try {
-                    const user = await client.users.fetch(id);
-                    owners.push({
-                        id: String(id),
-                        name: user.username,
-                        display_name: user.globalName || null,
-                        avatar_url: user.displayAvatarURL({ size: 96 }),
-                    });
-                } catch {
-                    owners.push({ id: String(id) });
-                }
-            }
-
-            respondJson(res, 200, {
-                owner_ids: ownerIds,
-                updated_at: ownerIdsUpdatedAt() ? ownerIdsUpdatedAt().toISOString() : null,
-                owners,
-            });
             return;
         }
 
