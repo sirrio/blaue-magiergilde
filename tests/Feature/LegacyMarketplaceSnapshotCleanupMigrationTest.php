@@ -62,6 +62,8 @@ test('cleanup migration normalizes legacy snapshot markers and removes invalid v
     /** @var \Illuminate\Database\Migrations\Migration $migration */
     $migration = require database_path('migrations/2026_02_27_021528_cleanup_legacy_marketplace_snapshot_cost_markers.php');
     $migration->up();
+    $labelMigration = require database_path('migrations/2026_02_28_221228_normalize_marketplace_snapshot_variant_cost_labels.php');
+    $labelMigration->up();
 
     $shopSnapshot->refresh();
     $auctionSnapshot->refresh();
@@ -70,6 +72,6 @@ test('cleanup migration normalizes legacy snapshot markers and removes invalid v
     expect(DB::table('item_mundane_variant')->where('item_id', $consumable->id)->count())->toBe(0);
 
     expect($shopSnapshot->item_cost)->toBe('500 GP + Component cost');
-    expect($auctionSnapshot->item_cost)->toBe('1000 GP + Weapon base: Any weapon');
-    expect($backstockSnapshot->item_cost)->toBe('1000 GP + Armor base: Any armor');
+    expect($auctionSnapshot->item_cost)->toBe('1000 GP + Weapon cost');
+    expect($backstockSnapshot->item_cost)->toBe('1000 GP + Armor cost');
 });
