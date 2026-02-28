@@ -5,6 +5,7 @@ namespace App\Http\Requests\Compendium;
 use App\Models\CompendiumSuggestion;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class StoreCompendiumSuggestionRequest extends FormRequest
 {
@@ -28,7 +29,12 @@ class StoreCompendiumSuggestionRequest extends FormRequest
                 CompendiumSuggestion::KIND_ITEM,
                 CompendiumSuggestion::KIND_SPELL,
             ]),
-            'target_id' => 'required|integer|min:1',
+            'target_id' => [
+                Rule::requiredIf(fn (): bool => (string) $this->input('kind') === CompendiumSuggestion::KIND_SPELL),
+                'nullable',
+                'integer',
+                'min:1',
+            ],
             'source_url' => 'nullable|url|max:2048',
             'notes' => 'nullable|string|max:2000',
             'changes' => 'nullable|array',

@@ -24,6 +24,12 @@ function formatPermissionList(perms) {
 
 function rarityDisplayName(rarity) {
     switch (rarity) {
+        case 'unknown_rarity':
+            return 'Unknown rarity';
+        case 'artifact':
+            return 'Artifact';
+        case 'legendary':
+            return 'Legendary';
         case 'very_rare':
             return 'Very Rare';
         case 'rare':
@@ -44,6 +50,8 @@ function tierRequirementForRarity(rarity) {
         case 'rare':
             return 'Ab High Tier';
         case 'very_rare':
+        case 'legendary':
+        case 'artifact':
             return 'Ab Epic Tier';
         default:
             return '';
@@ -374,6 +382,7 @@ async function sendOneLine(destination, line) {
 function countPlannedShopLines(grouped, rarityOrder) {
     // Top header line.
     let total = 1;
+    const itemLikeTypes = ['weapon', 'armor', 'item'];
 
     for (const rarity of rarityOrder) {
         const byType = grouped.get(rarity);
@@ -381,7 +390,9 @@ function countPlannedShopLines(grouped, rarityOrder) {
 
         // Rarity section header.
         total += 1;
-        total += (byType.get('item') || []).length;
+        for (const type of itemLikeTypes) {
+            total += (byType.get(type) || []).length;
+        }
 
         if (rarity === 'common' || rarity === 'uncommon') {
             // Consumable header.
@@ -427,8 +438,9 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     const headerMessageIds = [];
     const itemMessageIds = {};
 
-    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
-    const typeOrder = ['item', 'consumable', 'spellscroll'];
+    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
+    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
+    const itemLikeTypes = ['weapon', 'armor', 'item'];
     const grouped = new Map();
 
     for (const row of items) {
@@ -517,15 +529,17 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
             if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
 
-        const sectionId = await sendTrackedLine(
-            `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`,
-            `${rarityLabel} section`,
-        );
+        const title = tierText
+            ? `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`
+            : `## ***:crossed_swords: ${rarityLabel} Magic Items:***`;
+        const sectionId = await sendTrackedLine(title, `${rarityLabel} section`);
         if (sectionId) headerMessageIds.push(sectionId);
-        for (const row of byType.get('item') ?? []) {
-             
-            const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
-            if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+        for (const type of itemLikeTypes) {
+            for (const row of byType.get(type) ?? []) {
+                 
+                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
+                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
+            }
         }
 
         if (rarity === 'common' || rarity === 'uncommon') {

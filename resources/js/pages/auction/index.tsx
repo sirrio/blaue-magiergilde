@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, AuctionVoiceCandidate, BotOperation, DiscordBackupChannel, Item, PageProps } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { CheckCircle2, ChevronsRight, EyeOff, FlaskRound, History, Mic, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronsRight, EyeOff, FlaskRound, History, Mic, Package, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Shield, Sword, Trash, XCircle } from 'lucide-react'
 import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -20,6 +20,9 @@ const rarityLabels: Record<string, string> = {
   uncommon: 'Uncommon',
   rare: 'Rare',
   very_rare: 'Very Rare',
+  legendary: 'Legendary',
+  artifact: 'Artifact',
+  unknown_rarity: 'Unknown rarity',
 }
 
 const statusLabels: Record<string, string> = {
@@ -33,19 +36,26 @@ const rarityColors: Record<string, string> = {
   uncommon: 'text-rarity-uncommon',
   rare: 'text-rarity-rare',
   very_rare: 'text-rarity-very-rare',
+  legendary: 'text-rarity-legendary',
+  artifact: 'text-rarity-artifact',
+  unknown_rarity: 'text-rarity-unknown-rarity',
 }
 
 const typeIcons: Record<string, ReactElement> = {
-  item: <Sword size={14} />,
-  spellscroll: <ScrollText size={14} />,
+  weapon: <Sword size={14} />,
+  armor: <Shield size={14} />,
+  item: <Package size={14} />,
   consumable: <FlaskRound size={14} />,
+  spellscroll: <ScrollText size={14} />,
 }
 
-const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'] as const
+const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'] as const
 const typeOrder: Record<Item['type'], number> = {
-  item: 0,
-  consumable: 1,
-  spellscroll: 2,
+  weapon: 0,
+  armor: 1,
+  item: 2,
+  consumable: 3,
+  spellscroll: 4,
 }
 const isLocalDev = import.meta.env.DEV
 const mockVoiceCandidates: AuctionVoiceCandidate[] = [
@@ -69,7 +79,7 @@ const getAuctionItemSnapshot = (auctionItem: AuctionItem): Item => {
     id: item.id ?? 0,
     name: auctionItem.item_name ?? item.name ?? 'Unknown item',
     url: auctionItem.item_url ?? item.url ?? '',
-    cost: auctionItem.item_cost ?? item.cost ?? '',
+    cost: auctionItem.item_cost ?? item.display_cost ?? item.cost ?? '',
     rarity: (auctionItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
     type: (auctionItem.item_type ?? item.type ?? 'item') as Item['type'],
     pick_count: item.pick_count ?? 0,
@@ -82,6 +92,8 @@ const getBidStep = (item: Item): number => {
   if (item.rarity === 'uncommon') baseStep = 50
   if (item.rarity === 'rare') baseStep = 100
   if (item.rarity === 'very_rare') baseStep = 500
+  if (item.rarity === 'legendary') baseStep = 1000
+  if (item.rarity === 'artifact') baseStep = 5000
 
   if (item.type === 'consumable' || item.type === 'spellscroll') {
     baseStep = Math.floor(baseStep / 2)
@@ -638,7 +650,7 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
   const { data, setData, patch, processing } = useForm({
     name: item.name ?? '',
     url: item.url ?? '',
-    cost: item.cost ?? '',
+    cost: item.display_cost ?? item.cost ?? '',
     notes: auctionItem.notes ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
@@ -652,14 +664,14 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
     setData({
       name: item.name ?? '',
       url: item.url ?? '',
-      cost: item.cost ?? '',
+      cost: item.display_cost ?? item.cost ?? '',
       notes: auctionItem.notes ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
       repair_current: auctionItem.repair_current ?? '',
       repair_max: auctionItem.repair_max ?? '',
     })
-  }, [isOpen, auctionItem.notes, auctionItem.repair_current, auctionItem.repair_max, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, auctionItem.notes, auctionItem.repair_current, auctionItem.repair_max, item.cost, item.display_cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.auction-items.snapshot.update', { auctionItem: auctionItem.id }), {
@@ -705,16 +717,21 @@ const AuctionItemSnapshotModal = ({ auctionItem, item }: { auctionItem: AuctionI
                 <option value="uncommon">Uncommon</option>
                 <option value="rare">Rare</option>
                 <option value="very_rare">Very Rare</option>
+                <option value="legendary">Legendary</option>
+                <option value="artifact">Artifact</option>
+                <option value="unknown_rarity">Unknown rarity</option>
               </SelectOptions>
             </Select>
-            <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
-              <SelectLabel>Type</SelectLabel>
-              <SelectOptions>
-                <option value="item">Item</option>
-                <option value="spellscroll">Spell Scroll</option>
-                <option value="consumable">Consumable</option>
-              </SelectOptions>
-            </Select>
+              <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+                <SelectLabel>Type</SelectLabel>
+                <SelectOptions>
+                  <option value="weapon">Weapon</option>
+                  <option value="armor">Armor</option>
+                  <option value="item">Item</option>
+                  <option value="consumable">Consumable</option>
+                  <option value="spellscroll">Spell Scroll</option>
+                </SelectOptions>
+              </Select>
           </div>
 
           <div className="space-y-3">

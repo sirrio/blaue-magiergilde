@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Ally;
 
+use App\Models\Character;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,7 +18,20 @@ class StoreAllyRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $userId = $this->user()?->getAuthIdentifier();
+        if (! $userId) {
+            return false;
+        }
+
+        $characterId = $this->integer('character_id');
+        if ($characterId <= 0) {
+            return true;
+        }
+
+        return Character::query()
+            ->whereKey($characterId)
+            ->where('user_id', $userId)
+            ->exists();
     }
 
     /**
@@ -28,6 +42,7 @@ class StoreAllyRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'character_id' => 'required|integer|exists:characters,id',
             'name' => 'required|string|max:255',
             'rating' => 'required|integer|min:1|max:5',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',

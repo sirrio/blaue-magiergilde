@@ -52,3 +52,48 @@ it('includes simplified tracking flag for character approvals', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->where('characters.0.simplified_tracking', true));
 });
+
+it('requires review note when marking a character as needs changes', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $character = Character::factory()->create(['guild_status' => 'pending']);
+
+    $this->actingAs($admin)
+        ->patch('/admin/character-approvals/characters/'.$character->id, [
+            'guild_status' => 'needs_changes',
+        ])
+        ->assertSessionHasErrors('review_note');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending')
+        ->and($character->review_note)->toBeNull();
+});
+
+it('stores review note when marking a character as declined', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $character = Character::factory()->create(['guild_status' => 'pending']);
+
+    $this->actingAs($admin)
+        ->patch('/admin/character-approvals/characters/'.$character->id, [
+            'guild_status' => 'declined',
+            'review_note' => 'Missing required details for approval.',
+        ])
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('declined')
+        ->and($character->review_note)->toBe('Missing required details for approval.');
+});
+
+it('requires pending status before applying review decisions', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $character = Character::factory()->create(['guild_status' => 'needs_changes']);
+
+    $this->actingAs($admin)
+        ->patch('/admin/character-approvals/characters/'.$character->id, [
+            'guild_status' => 'approved',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('needs_changes');
+});

@@ -24,6 +24,12 @@ function formatPermissionList(perms) {
 
 function rarityDisplayName(rarity) {
     switch (rarity) {
+        case 'unknown_rarity':
+            return 'Unknown rarity';
+        case 'artifact':
+            return 'Artifact';
+        case 'legendary':
+            return 'Legendary';
         case 'very_rare':
             return 'Very Rare';
         case 'rare':
@@ -44,6 +50,8 @@ function tierRequirementForRarity(rarity) {
         case 'rare':
             return 'Ab High Tier';
         case 'very_rare':
+        case 'legendary':
+        case 'artifact':
             return 'Ab Epic Tier';
         default:
             return '';
@@ -371,8 +379,8 @@ async function postBackstockToChannel({ client, channelId, operationId }) {
     const messageIds = [];
     const itemMessageIds = {};
 
-    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare'];
-    const typeOrder = ['item', 'consumable', 'spellscroll'];
+    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
+    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
     const grouped = new Map();
 
     for (const row of items) {

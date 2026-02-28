@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BackstockItem;
 use App\Models\BackstockSetting;
 use App\Models\Item;
+use App\Support\ItemCostResolver;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -15,7 +16,9 @@ class BackstockController extends Controller
     {
         $backstockItems = BackstockItem::query()
             ->with([
-                'item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type']),
+                'item' => fn ($query) => $query
+                    ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+                    ->select(['id', 'name', 'url', 'cost', 'rarity', 'type']),
             ])
             ->orderBy('id')
             ->get([
@@ -29,12 +32,25 @@ class BackstockController extends Controller
                 'snapshot_custom',
                 'notes',
                 'created_at',
-            ]);
+            ])
+            ->map(function (BackstockItem $backstockItem): BackstockItem {
+                if ($backstockItem->item) {
+                    $backstockItem->item->setAttribute('display_cost', ItemCostResolver::resolveForItem($backstockItem->item));
+                }
+
+                return $backstockItem;
+            });
 
         $items = Item::query()
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->orderBy('name')
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
-            ->get();
+            ->get()
+            ->map(function (Item $item): Item {
+                $item->setAttribute('display_cost', ItemCostResolver::resolveForItem($item));
+
+                return $item;
+            });
 
         $settings = BackstockSetting::current();
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ShopItem;
 use App\Models\Spell;
+use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 
@@ -15,6 +16,7 @@ class RefreshShopItemSnapshotController extends Controller
     {
         $item = Item::query()
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
             ->find($shopItem->item_id);
 
         if (! $item) {
@@ -25,7 +27,7 @@ class RefreshShopItemSnapshotController extends Controller
 
         $shopItem->item_name = $item->name;
         $shopItem->item_url = $item->url;
-        $shopItem->item_cost = $item->cost;
+        $shopItem->item_cost = ItemCostResolver::resolveForItem($item);
         $shopItem->item_rarity = $item->rarity;
         $shopItem->item_type = $item->type;
 

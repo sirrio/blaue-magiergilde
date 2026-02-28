@@ -140,6 +140,57 @@ test('item import updates existing unsourced rows instead of creating duplicates
         ->url->toBe('https://example.test/potion-new');
 });
 
+test('item import matches existing unsourced rows by unique url before falling back to name and type', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Xanathar's Guide to Everything",
+        'shortcode' => 'XGE',
+    ]);
+
+    Item::factory()->create([
+        'name' => 'Master Sword',
+        'type' => 'item',
+        'rarity' => 'rare',
+        'cost' => '5000 GP',
+        'url' => 'https://example.test/items/master-sword-a',
+        'source_id' => null,
+    ]);
+
+    $target = Item::factory()->create([
+        'name' => 'Master Sword',
+        'type' => 'item',
+        'rarity' => 'rare',
+        'cost' => '5000 GP',
+        'url' => 'https://example.test/items/master-sword-b',
+        'source_id' => null,
+    ]);
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Master Sword,item,rare,5500 GP,https://example.test/items/master-sword-b,XGE,true,true,false,',
+    ]);
+
+    $preview = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $preview->assertOk();
+    expect((int) $preview->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $preview->json('summary.new_rows'))->toBe(0);
+
+    $apply = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $preview->json('preview_token'),
+    ]);
+
+    $apply->assertOk();
+
+    expect(Item::query()->count())->toBe(2);
+    expect($target->fresh())
+        ->source_id->toBe($source->id)
+        ->cost->toBe('5500 GP');
+});
+
 test('template download returns csv content for items', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
@@ -149,7 +200,7 @@ test('template download returns csv content for items', function () {
 
     $response->assertOk();
     $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
-    expect($response->streamedContent())->toContain('name,type,rarity,cost,url,source_shortcode');
+    expect($response->streamedContent())->toContain('name,type,rarity,cost,extra_cost_note,url,source_shortcode');
 });
 
 test('non admin cannot preview compendium import', function () {

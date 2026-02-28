@@ -1,6 +1,6 @@
 function normalizeItemRarity(value) {
     const rarity = String(value || '').trim().toLowerCase();
-    if (rarity === 'uncommon' || rarity === 'rare' || rarity === 'very_rare') {
+    if (rarity === 'uncommon' || rarity === 'rare' || rarity === 'very_rare' || rarity === 'legendary' || rarity === 'artifact' || rarity === 'unknown_rarity') {
         return rarity;
     }
     return 'common';
@@ -8,7 +8,7 @@ function normalizeItemRarity(value) {
 
 function normalizeItemType(value) {
     const type = String(value || '').trim().toLowerCase();
-    if (type === 'consumable' || type === 'spellscroll') {
+    if (type === 'weapon' || type === 'armor' || type === 'item' || type === 'consumable' || type === 'spellscroll') {
         return type;
     }
     return 'item';
@@ -22,6 +22,8 @@ function getBidStepForItem({ rarity, type }) {
     if (normalizedRarity === 'uncommon') baseStep = 50;
     if (normalizedRarity === 'rare') baseStep = 100;
     if (normalizedRarity === 'very_rare') baseStep = 500;
+    if (normalizedRarity === 'legendary') baseStep = 1000;
+    if (normalizedRarity === 'artifact') baseStep = 5000;
 
     if (normalizedType === 'consumable' || normalizedType === 'spellscroll') {
         baseStep = Math.floor(baseStep / 2);

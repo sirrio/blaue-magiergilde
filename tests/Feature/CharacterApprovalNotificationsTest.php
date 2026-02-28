@@ -34,6 +34,31 @@ it('sends a discord DM when a character is approved', function () {
     });
 });
 
+it('includes review note when notifying about needs changes', function () {
+    Config::set('services.bot.http_url', 'http://bot.test');
+    Config::set('services.bot.http_token', 'token');
+
+    Http::fake([
+        'http://bot.test/character-approval/notify' => Http::response(['status' => 'sent'], 200),
+    ]);
+
+    $admin = User::factory()->create(['is_admin' => true]);
+    $owner = User::factory()->create(['discord_id' => '1234567890']);
+    $character = Character::factory()->for($owner)->create(['guild_status' => 'pending']);
+
+    $this->actingAs($admin)->patch(route('admin.character-approvals.update', $character), [
+        'guild_status' => 'needs_changes',
+        'review_note' => 'Please fix class setup and missing details.',
+    ])->assertRedirect();
+
+    Http::assertSent(function ($request) {
+        return $request->url() === 'http://bot.test/character-approval/notify'
+            && $request['discord_user_id'] === '1234567890'
+            && $request['status'] === 'needs_changes'
+            && $request['character_review_note'] === 'Please fix class setup and missing details.';
+    });
+});
+
 it('posts a discord announcement when a newly created draft character is submitted', function () {
     Config::set('services.bot.http_url', 'http://bot.test');
     Config::set('services.bot.http_token', 'token');
@@ -70,13 +95,16 @@ it('posts a discord announcement when a newly created draft character is submitt
     $character = Character::query()->where('user_id', $owner->id)->latest('id')->firstOrFail();
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'New register details from owner.',
+        ])
         ->assertRedirect();
 
     Http::assertSent(function ($request) {
         return $request->url() === 'http://bot.test/character-approval/pending'
             && $request['channel_id'] === '9876543210'
-            && $request['character_name'] === 'New Character';
+            && $request['character_name'] === 'New Character'
+            && $request['character_registration_note'] === 'New register details from owner.';
     });
 });
 
@@ -102,13 +130,16 @@ it('posts a discord announcement when an existing draft character is submitted f
     $character->characterClasses()->sync([$characterClass->id]);
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Please review with updated notes.',
+        ])
         ->assertRedirect();
 
     Http::assertSent(function ($request) use ($character) {
         return $request->url() === 'http://bot.test/character-approval/pending'
             && $request['channel_id'] === '9876543210'
-            && $request['character_name'] === $character->name;
+            && $request['character_name'] === $character->name
+            && $request['character_registration_note'] === 'Please review with updated notes.';
     });
 });
 
@@ -134,7 +165,9 @@ it('does not send dashboard URLs as external link in approval announcements', fu
     ]);
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Check external link filtering.',
+        ])
         ->assertRedirect();
 
     Http::assertSent(function ($request) use ($character) {

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -30,5 +31,12 @@ class Item extends Model
     public function source(): BelongsTo
     {
         return $this->belongsTo(Source::class);
+    }
+
+    public function mundaneVariants(): BelongsToMany
+    {
+        return $this->belongsToMany(MundaneItemVariant::class, 'item_mundane_variant')
+            ->orderBy('sort_order')
+            ->orderBy('name');
     }
 }

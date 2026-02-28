@@ -8,9 +8,9 @@ import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import ItemRow from '@/pages/item/item-row'
-import { Item, Source } from '@/types'
+import { Item, MundaneItemVariant, Source } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
-import { LoaderCircle, Plus, Scale, ScrollText, Shield, Store } from 'lucide-react'
+import { LoaderCircle, MessageSquarePlus, Plus, Scale, ScrollText, Shield, Store } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
 interface FilterOption {
@@ -31,16 +31,385 @@ const spellSchoolLabels: Record<string, string> = {
 
 const spellLevels = Array.from({ length: 10 }, (_, i) => i)
 const spellSchools = Object.keys(spellSchoolLabels)
+const variantCategoryByType: Record<Item['type'], 'weapon' | 'armor' | null> = {
+  weapon: 'weapon',
+  armor: 'armor',
+  item: null,
+  consumable: null,
+  spellscroll: null,
+}
 
-const StoreItemModal = ({ sources }: { sources: Source[] }) => {
+const formatVariantCost = (costGp?: number | null): string => {
+  if (costGp == null) return 'variable'
+  return `${costGp} GP`
+}
+
+const VariantSelector = ({
+  variants,
+  selectedIds,
+  onToggle,
+  itemType,
+  helperText,
+  error,
+}: {
+  variants: MundaneItemVariant[]
+  selectedIds: number[]
+  onToggle: (id: number) => void
+  itemType: Item['type']
+  helperText?: React.ReactNode
+  error?: string | null
+}) => {
+  const requiredCategory = variantCategoryByType[itemType]
+  if (requiredCategory === null) {
+    return (
+      <div className={cn('rounded-box border p-3 text-xs', error ? 'border-error/40 bg-error/5 text-error' : 'border-base-200 text-base-content/70')}>
+        <p>Mundane variants are only used for weapon and armor types.</p>
+        {helperText ? <div className="mt-1">{helperText}</div> : null}
+        {error ? <div className="mt-1 font-medium">{error}</div> : null}
+      </div>
+    )
+  }
+
+  const entries = variants.filter((variant) => variant.category === requiredCategory)
+  const heading = requiredCategory === 'weapon' ? 'Weapon variants' : 'Armor variants'
+  const selectedEntries = entries.filter((variant) => selectedIds.includes(variant.id))
+  const hasSelectedPlaceholder = selectedEntries.some((variant) => Boolean(variant.is_placeholder))
+  const hasSelectedSpecific = selectedEntries.some((variant) => !variant.is_placeholder)
+
+  return (
+    <div className="space-y-2 rounded-box border border-base-200 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{heading} (Optional)</p>
+      <p className="text-xs text-base-content/70">
+        Select mundane base variants this {itemType} can apply to.
+      </p>
+      <p className="text-xs text-base-content/60">The "Any" option is exclusive and cannot be combined with specific variants.</p>
+      {helperText ? <p className="text-xs text-base-content/60">{helperText}</p> : null}
+      {error ? <p className="text-xs font-medium text-error">{error}</p> : null}
+      <div className="max-h-36 space-y-1 overflow-y-auto pr-1">
+        {entries.map((variant) => {
+          const checked = selectedIds.includes(variant.id)
+          const disabled = (hasSelectedPlaceholder && !checked && !variant.is_placeholder)
+            || (hasSelectedSpecific && !checked && variant.is_placeholder)
+          return (
+            <label
+              key={variant.id}
+              className={cn(
+                'flex items-center justify-between gap-2 rounded px-1 py-1 text-xs',
+                disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-base-200/60',
+              )}
+            >
+              <span className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => onToggle(variant.id)}
+                />
+                <span>{variant.name}</span>
+              </span>
+              <span className="text-base-content/60">{formatVariantCost(variant.cost_gp)}</span>
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const filterVariantIdsByType = (
+  type: Item['type'],
+  variantIds: number[],
+  variants: MundaneItemVariant[],
+): number[] => {
+  const requiredCategory = variantCategoryByType[type]
+  if (requiredCategory === null) {
+    return []
+  }
+
+  const allowed = new Set(
+    variants
+      .filter((variant) => variant.category === requiredCategory)
+      .map((variant) => variant.id),
+  )
+
+  return variantIds.filter((id) => allowed.has(id))
+}
+
+const buildSuggestionItemValidationState = (
+  type: Item['type'],
+  variantIds: number[],
+  variants: MundaneItemVariant[],
+  extraCostNote: string,
+) => {
+  const requiredCategory = variantCategoryByType[type]
+  const selectedVariants = variants.filter((variant) => variantIds.includes(variant.id))
+  const hasPlaceholder = selectedVariants.some((variant) => Boolean(variant.is_placeholder))
+  const specificCount = selectedVariants.filter((variant) => !variant.is_placeholder).length
+  const invalidVariantSelection = requiredCategory === null && selectedVariants.length > 0
+
+  const variantHint = requiredCategory === null
+    ? 'Variants are not used for item, consumable, or spell scroll suggestions.'
+    : hasPlaceholder
+      ? `"Any ${requiredCategory}" is selected and excludes specific variants.`
+      : specificCount > 0
+        ? `${specificCount} specific ${requiredCategory} variant${specificCount === 1 ? '' : 's'} selected.`
+        : `You can attach optional ${requiredCategory} variants or leave this empty.`
+
+  const variantError = invalidVariantSelection
+    ? 'Selected variants do not fit this type and will be removed on submit.'
+    : null
+
+  const trimmedExtraCostNote = extraCostNote.trim()
+  const extraCostHint = requiredCategory === null
+    ? 'Use extra cost note only when the item adds an extra cost, like material components or embedded valuables.'
+    : 'Weapon and armor suggestions use mundane variants instead of an extra cost note.'
+  const extraCostError = requiredCategory !== null && trimmedExtraCostNote !== ''
+    ? 'Extra cost note is not used for weapon or armor suggestions.'
+    : null
+
+  return {
+    variantHint,
+    variantError,
+    extraCostHint,
+    extraCostError,
+  }
+}
+
+const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({})
+  const { data, setData, reset } = useForm({
+    name: '',
+    url: '',
+    rarity: 'common' as Item['rarity'],
+    type: 'item' as Item['type'],
+    mundane_variant_ids: [] as number[],
+    extra_cost_note: '',
+    source_id: '' as number | '',
+    source_url: '',
+    notes: '',
+  })
+
+  useEffect(() => {
+    if (!isOpen) return
+    reset()
+    setSubmitErrors({})
+    setData('rarity', 'common')
+    setData('type', 'item')
+    setData('mundane_variant_ids', [])
+    setData('extra_cost_note', '')
+  }, [isOpen, reset, setData])
+
+  const validationState = buildSuggestionItemValidationState(
+    data.type as Item['type'],
+    data.mundane_variant_ids,
+    mundaneVariants,
+    data.extra_cost_note,
+  )
+
+  const normalizeText = (value: string) => {
+    const trimmed = value.trim()
+    return trimmed === '' ? null : trimmed
+  }
+
+  const toggleMundaneVariant = (variantId: number) => {
+    const isSelected = data.mundane_variant_ids.includes(variantId)
+    if (isSelected) {
+      setData('mundane_variant_ids', data.mundane_variant_ids.filter((id) => id !== variantId))
+      return
+    }
+
+    const targetVariant = mundaneVariants.find((variant) => variant.id === variantId)
+    if (!targetVariant) {
+      setData('mundane_variant_ids', [...data.mundane_variant_ids, variantId])
+      return
+    }
+
+    if (targetVariant.is_placeholder) {
+      setData('mundane_variant_ids', [variantId])
+      return
+    }
+
+    const selectedPlaceholder = mundaneVariants.find(
+      (variant) => data.mundane_variant_ids.includes(variant.id) && variant.is_placeholder,
+    )
+    const nextIds = selectedPlaceholder
+      ? data.mundane_variant_ids.filter((id) => id !== selectedPlaceholder.id)
+      : data.mundane_variant_ids
+
+    setData('mundane_variant_ids', [...nextIds, variantId])
+  }
+
+  const handleSubmit = () => {
+    const normalizedName = (data.name ?? '').trim()
+    if (normalizedName === '') {
+      toast.show('Name is required.', 'error')
+      return
+    }
+
+    const normalizedVariantIds = filterVariantIdsByType(data.type, data.mundane_variant_ids, mundaneVariants)
+
+    const changes: Record<string, string | number | null> = {
+      name: normalizedName,
+      type: data.type,
+      rarity: data.rarity,
+      url: normalizeText(data.url ?? ''),
+      extra_cost_note: data.type === 'weapon' || data.type === 'armor'
+        ? null
+        : normalizeText(data.extra_cost_note ?? ''),
+      source_id: data.source_id === '' ? null : Number(data.source_id),
+    }
+
+    if (data.type === 'weapon' || data.type === 'armor' || normalizedVariantIds.length > 0) {
+      Object.assign(changes, { mundane_variant_ids: normalizedVariantIds })
+    }
+
+    setIsSubmitting(true)
+    router.post(route('compendium-suggestions.store'), {
+      kind: 'item',
+      changes,
+      source_url: normalizeText(data.source_url ?? ''),
+      notes: normalizeText(data.notes ?? ''),
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setIsOpen(false)
+        setSubmitErrors({})
+        toast.show('Suggestion submitted. Thank you!', 'info')
+      },
+      onError: (formErrors) => {
+        setSubmitErrors(Object.fromEntries(Object.entries(formErrors).map(([key, value]) => [key, String(value)])))
+        const message = formErrors.changes
+          || formErrors.target_id
+          || formErrors.kind
+          || formErrors.notes
+          || formErrors.source_url
+          || formErrors.name
+          || formErrors.url
+          || formErrors.rarity
+          || formErrors.type
+          || formErrors.source_id
+          || formErrors.mundane_variant_ids
+          || formErrors['mundane_variant_ids.0']
+
+        if (message) {
+          toast.show(String(message), 'error')
+        }
+      },
+      onFinish: () => {
+        setIsSubmitting(false)
+      },
+    })
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+      <ModalTrigger>
+        <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} className="gap-2">
+          <MessageSquarePlus size={14} />
+          Suggest new item
+        </Button>
+      </ModalTrigger>
+      <ModalTitle>Suggest new item</ModalTitle>
+      <ModalContent>
+        <div className="space-y-3">
+          <p className="text-xs text-base-content/70">
+            Propose a new compendium item. The admin team reviews and approves it.
+          </p>
+          <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
+            Name
+          </Input>
+          <Input value={data.url} onChange={(e) => setData('url', e.target.value)}>
+            URL
+          </Input>
+          <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
+            <SelectLabel>Rarity</SelectLabel>
+            <SelectOptions>
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+              <option value="very_rare">Very Rare</option>
+              <option value="legendary">Legendary</option>
+              <option value="artifact">Artifact</option>
+              <option value="unknown_rarity">Unknown rarity</option>
+            </SelectOptions>
+          </Select>
+          <Select
+            value={data.type}
+            onChange={(e) => {
+              const nextType = e.target.value as Item['type']
+              setData('type', nextType)
+              const nextVariantIds = filterVariantIdsByType(nextType, data.mundane_variant_ids, mundaneVariants)
+              setData('mundane_variant_ids', nextVariantIds)
+              if (nextType === 'weapon' || nextType === 'armor') {
+                setData('extra_cost_note', '')
+              }
+            }}
+          >
+            <SelectLabel>Type</SelectLabel>
+            <SelectOptions>
+              <option value="weapon">Weapon</option>
+              <option value="armor">Armor</option>
+              <option value="item">Item</option>
+              <option value="consumable">Consumable</option>
+              <option value="spellscroll">Spell Scroll</option>
+              </SelectOptions>
+            </Select>
+          <VariantSelector
+            variants={mundaneVariants}
+            selectedIds={data.mundane_variant_ids}
+            onToggle={toggleMundaneVariant}
+            itemType={data.type as Item['type']}
+            helperText={validationState.variantHint}
+            error={submitErrors.mundane_variant_ids ?? submitErrors['mundane_variant_ids.0'] ?? validationState.variantError}
+          />
+          {data.type === 'item' || data.type === 'consumable' || data.type === 'spellscroll' ? (
+            <div className="space-y-1">
+              <Input value={data.extra_cost_note} onChange={(e) => setData('extra_cost_note', e.target.value)}>
+                Extra cost note (optional)
+              </Input>
+              <p className="text-xs text-base-content/60">{validationState.extraCostHint}</p>
+              {submitErrors.extra_cost_note ? <p className="text-xs font-medium text-error">{submitErrors.extra_cost_note}</p> : null}
+            </div>
+          ) : null}
+          <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
+            <SelectLabel>Source</SelectLabel>
+            <SelectOptions>
+              <option value="">No source</option>
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.shortcode} - {source.name}
+                </option>
+              ))}
+            </SelectOptions>
+          </Select>
+          <Input value={data.source_url} onChange={(e) => setData('source_url', e.target.value)}>
+            Reference URL (optional)
+          </Input>
+          <TextArea value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
+            Note for reviewers (optional)
+          </TextArea>
+        </div>
+      </ModalContent>
+      <ModalAction onClick={handleSubmit} disabled={isSubmitting}>
+        Submit
+      </ModalAction>
+    </Modal>
+  )
+}
+
+const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
     url: '',
-    cost: '',
     rarity: 'common',
     type: 'item',
+    extra_cost_note: '',
     source_id: '' as number | '',
+    mundane_variant_ids: [] as number[],
     shop_enabled: true,
     guild_enabled: true,
     default_spell_roll_enabled: false,
@@ -56,6 +425,8 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
     setData('shop_enabled', true)
     setData('guild_enabled', true)
     setData('source_id', '')
+    setData('mundane_variant_ids', [])
+    setData('extra_cost_note', '')
     setData('default_spell_roll_enabled', false)
     setData('default_spell_levels', [])
     setData('default_spell_schools', [])
@@ -103,6 +474,50 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
     }
   }
 
+  const toggleMundaneVariant = (variantId: number) => {
+    const isSelected = data.mundane_variant_ids.includes(variantId)
+    if (isSelected) {
+      setData('mundane_variant_ids', data.mundane_variant_ids.filter((id) => id !== variantId))
+      return
+    }
+
+    const targetVariant = mundaneVariants.find((variant) => variant.id === variantId)
+    if (!targetVariant) {
+      setData('mundane_variant_ids', [...data.mundane_variant_ids, variantId])
+      return
+    }
+
+    if (targetVariant.is_placeholder) {
+      setData('mundane_variant_ids', [variantId])
+      return
+    }
+
+    const selectedPlaceholder = mundaneVariants.find(
+      (variant) => data.mundane_variant_ids.includes(variant.id) && variant.is_placeholder,
+    )
+    const nextIds = selectedPlaceholder
+      ? data.mundane_variant_ids.filter((id) => id !== selectedPlaceholder.id)
+      : data.mundane_variant_ids
+
+    setData('mundane_variant_ids', [...nextIds, variantId])
+  }
+
+  const handleTypeChange = (nextType: Item['type']) => {
+    setData('type', nextType)
+    const nextVariantIds = filterVariantIdsByType(nextType, data.mundane_variant_ids, mundaneVariants)
+    setData('mundane_variant_ids', nextVariantIds)
+    if (nextType === 'weapon' || nextType === 'armor') {
+      setData('extra_cost_note', '')
+    }
+  }
+
+  const validationState = buildSuggestionItemValidationState(
+    data.type as Item['type'],
+    data.mundane_variant_ids,
+    mundaneVariants,
+    data.extra_cost_note,
+  )
+
   const handleSubmit = () => {
     if (data.default_spell_roll_enabled && data.default_spell_levels.length === 0) {
       toast.show('Select at least one default spell level.', 'error')
@@ -136,9 +551,6 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
             <Input errors={errors.url} placeholder="https://..." type="url" value={data.url} onChange={(e) => setData('url', e.target.value)}>
               URL
             </Input>
-            <Input errors={errors.cost} placeholder="1000 GP" value={data.cost} onChange={(e) => setData('cost', e.target.value)}>
-              Cost
-            </Input>
             <Select
               errors={errors.source_id}
               value={data.source_id}
@@ -154,6 +566,26 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
                 ))}
               </SelectOptions>
             </Select>
+            <VariantSelector
+              variants={mundaneVariants}
+              selectedIds={data.mundane_variant_ids}
+              onToggle={toggleMundaneVariant}
+              itemType={data.type as Item['type']}
+              helperText={validationState.variantHint}
+              error={errors.mundane_variant_ids ?? errors['mundane_variant_ids.0'] ?? validationState.variantError}
+            />
+            {data.type === 'item' || data.type === 'consumable' || data.type === 'spellscroll' ? (
+              <div className="space-y-1">
+                <Input
+                  errors={errors.extra_cost_note}
+                  value={data.extra_cost_note}
+                  onChange={(e) => setData('extra_cost_note', e.target.value)}
+                >
+                  Extra cost note (optional)
+                </Input>
+                <p className="text-xs text-base-content/60">{validationState.extraCostHint}</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-3">
@@ -165,14 +597,19 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
                 <option value="uncommon">Uncommon</option>
                 <option value="rare">Rare</option>
                 <option value="very_rare">Very Rare</option>
+                <option value="legendary">Legendary</option>
+                <option value="artifact">Artifact</option>
+                <option value="unknown_rarity">Unknown rarity</option>
               </SelectOptions>
             </Select>
-            <Select errors={errors.type} value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
+            <Select errors={errors.type} value={data.type} onChange={(e) => handleTypeChange(e.target.value as Item['type'])}>
               <SelectLabel>Type</SelectLabel>
               <SelectOptions>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
                 <option value="item">Item</option>
-                <option value="spellscroll">Spell Scroll</option>
                 <option value="consumable">Consumable</option>
+                <option value="spellscroll">Spell Scroll</option>
               </SelectOptions>
             </Select>
           </div>
@@ -300,11 +737,13 @@ const StoreItemModal = ({ sources }: { sources: Source[] }) => {
 export default function Index({
   items,
   sources,
+  mundaneVariants,
   canManage = false,
   indexRoute = 'compendium.items.index',
 }: {
   items: Item[]
   sources: Source[]
+  mundaneVariants: MundaneItemVariant[]
   canManage?: boolean
   indexRoute?: string
 }) {
@@ -313,9 +752,14 @@ export default function Index({
     { label: 'Uncommon', value: 'uncommon' },
     { label: 'Rare', value: 'rare' },
     { label: 'Very Rare', value: 'very_rare' },
+    { label: 'Legendary', value: 'legendary' },
+    { label: 'Artifact', value: 'artifact' },
+    { label: 'Unknown rarity', value: 'unknown_rarity' },
   ]
 
   const typeFilters: FilterOption[] = [
+    { label: 'Weapon', value: 'weapon' },
+    { label: 'Armor', value: 'armor' },
     { label: 'Item', value: 'item' },
     { label: 'Consumable', value: 'consumable' },
     { label: 'Spell Scroll', value: 'spellscroll' },
@@ -448,7 +892,8 @@ export default function Index({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {canManage ? <StoreItemModal sources={sources} /> : null}
+            {canManage ? <StoreItemModal sources={sources} mundaneVariants={mundaneVariants} /> : null}
+            {!canManage ? <SuggestNewItemModal sources={sources} mundaneVariants={mundaneVariants} /> : null}
           </div>
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
@@ -529,7 +974,17 @@ export default function Index({
           }
           data={['items']}
         >
-          <List>{items?.map((item) => <ItemRow key={item.id} item={item} sources={sources} canManage={canManage} />)}</List>
+          <List>
+            {items?.map((item) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                sources={sources}
+                canManage={canManage}
+                mundaneVariants={mundaneVariants}
+              />
+            ))}
+          </List>
         </Deferred>
       </div>
     </AppLayout>

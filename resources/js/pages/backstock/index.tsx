@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { BackstockItem, BackstockSettings, BotOperation, DiscordBackupChannel, Item } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { FlaskRound, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Sword, Trash } from 'lucide-react'
+import { FlaskRound, Package, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Shield, Sword, Trash } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useState, JSX } from 'react'
 
 const rarityLabels: Record<string, string> = {
@@ -18,6 +18,9 @@ const rarityLabels: Record<string, string> = {
   uncommon: 'Uncommon',
   rare: 'Rare',
   very_rare: 'Very Rare',
+  legendary: 'Legendary',
+  artifact: 'Artifact',
+  unknown_rarity: 'Unknown rarity',
 }
 
 const rarityColors: Record<string, string> = {
@@ -25,16 +28,21 @@ const rarityColors: Record<string, string> = {
   uncommon: 'text-rarity-uncommon',
   rare: 'text-rarity-rare',
   very_rare: 'text-rarity-very-rare',
+  legendary: 'text-rarity-legendary',
+  artifact: 'text-rarity-artifact',
+  unknown_rarity: 'text-rarity-unknown-rarity',
 }
 
 const typeIcons: Record<string, JSX.Element> = {
-  item: <Sword className="h-4 w-4" />,
-  spellscroll: <ScrollText className="h-4 w-4" />,
+  weapon: <Sword className="h-4 w-4" />,
+  armor: <Shield className="h-4 w-4" />,
+  item: <Package className="h-4 w-4" />,
   consumable: <FlaskRound className="h-4 w-4" />,
+  spellscroll: <ScrollText className="h-4 w-4" />,
 }
 
-const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare']
-const typeOrder = ['item', 'consumable', 'spellscroll']
+const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity']
+const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll']
 
 const getRarityTextColor = (rarity: string): string => {
   return rarityColors[rarity] || ''
@@ -50,7 +58,7 @@ const getBackstockItemSnapshot = (entry: BackstockItem): Item => {
     id: item.id ?? 0,
     name: entry.item_name ?? item.name ?? 'Unknown item',
     url: entry.item_url ?? item.url ?? '',
-    cost: entry.item_cost ?? item.cost ?? '',
+    cost: entry.item_cost ?? item.display_cost ?? item.cost ?? '',
     rarity: (entry.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
     type: (entry.item_type ?? item.type ?? 'item') as Item['type'],
     pick_count: item.pick_count ?? 0,
@@ -103,7 +111,7 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
   const { data, setData, patch, processing } = useForm({
     name: item.name ?? '',
     url: item.url ?? '',
-    cost: item.cost ?? '',
+    cost: item.display_cost ?? item.cost ?? '',
     rarity: item.rarity ?? 'common',
     type: item.type ?? 'item',
   })
@@ -114,11 +122,11 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
     setData({
       name: item.name ?? '',
       url: item.url ?? '',
-      cost: item.cost ?? '',
+      cost: item.display_cost ?? item.cost ?? '',
       rarity: item.rarity ?? 'common',
       type: item.type ?? 'item',
     })
-  }, [isOpen, item.cost, item.name, item.rarity, item.type, item.url, setData])
+  }, [isOpen, item.cost, item.display_cost, item.name, item.rarity, item.type, item.url, setData])
 
   const handleSubmit = () => {
     patch(route('admin.backstock-items.snapshot.update', { backstockItem: entry.id }), {
@@ -161,14 +169,19 @@ const BackstockItemSnapshotModal = ({ entry, item }: { entry: BackstockItem; ite
             <option value="uncommon">Uncommon</option>
             <option value="rare">Rare</option>
             <option value="very_rare">Very Rare</option>
+            <option value="legendary">Legendary</option>
+            <option value="artifact">Artifact</option>
+            <option value="unknown_rarity">Unknown rarity</option>
           </SelectOptions>
         </Select>
         <Select value={data.type} onChange={(e) => setData('type', e.target.value as Item['type'])}>
           <SelectLabel>Type</SelectLabel>
           <SelectOptions>
+            <option value="weapon">Weapon</option>
+            <option value="armor">Armor</option>
             <option value="item">Item</option>
-            <option value="spellscroll">Spell Scroll</option>
             <option value="consumable">Consumable</option>
+            <option value="spellscroll">Spell Scroll</option>
           </SelectOptions>
         </Select>
       </ModalContent>

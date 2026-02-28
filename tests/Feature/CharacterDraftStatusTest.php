@@ -238,11 +238,55 @@ it('allows owners to register draft characters with Magiergilde for review', fun
     ]);
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Character concept and review notes.',
+        ])
         ->assertRedirect();
 
     $character->refresh();
-    expect($character->guild_status)->toBe('pending');
+    expect($character->guild_status)->toBe('pending')
+        ->and($character->registration_note)->toBe('Character concept and review notes.');
+});
+
+it('allows owners to re-register characters in needs changes status', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'needs_changes',
+        'registration_note' => 'Old note',
+        'review_note' => 'Old requested changes',
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Updated info after requested fixes.',
+        ])
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending')
+        ->and($character->registration_note)->toBe('Updated info after requested fixes.')
+        ->and($character->review_note)->toBeNull();
+});
+
+it('allows empty registration info when submitting a character for review', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => '',
+        ])
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending')
+        ->and($character->registration_note)->toBeNull();
 });
 
 it('does not allow draft submission when character status switching is disabled', function () {
@@ -254,7 +298,9 @@ it('does not allow draft submission when character status switching is disabled'
     ]);
 
     $this->actingAs($owner)
-        ->post(route('characters.submit-approval', $character))
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Attempt while feature disabled.',
+        ])
         ->assertSessionHasErrors('guild_status');
 
     $character->refresh();

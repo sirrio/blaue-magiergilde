@@ -15,7 +15,7 @@ it('rerolls a single shop line in place', function () {
     $oldItem = Item::factory()->create([
         'name' => 'Old Shop Item',
         'url' => 'https://example.test/old-item',
-        'cost' => '120 GP',
+        'cost' => '100 GP',
         'rarity' => 'common',
         'type' => 'item',
         'shop_enabled' => false,
@@ -26,7 +26,7 @@ it('rerolls a single shop line in place', function () {
     $newItem = Item::factory()->create([
         'name' => 'New Shop Item',
         'url' => 'https://example.test/new-item',
-        'cost' => '250 GP',
+        'cost' => '100 GP',
         'rarity' => 'common',
         'type' => 'item',
         'shop_enabled' => true,

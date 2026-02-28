@@ -7,6 +7,7 @@ use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Shop;
 use App\Services\ShopLifecycleService;
+use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,12 +23,23 @@ class ShopController extends Controller
 
         $shops = Shop::query()
             ->with([
-                'shopItems.item' => fn ($query) => $query->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
+                'shopItems.item' => fn ($query) => $query
+                    ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+                    ->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
                 'shopItems.spell' => fn ($query) => $query->select(['id', 'name', 'url', 'legacy_url', 'spell_level']),
             ])
             ->orderByDesc('created_at')
             ->select(['shops.id', 'created_at'])
-            ->get();
+            ->get()
+            ->map(function (Shop $shop): Shop {
+                $shop->shopItems->each(function ($shopItem): void {
+                    if ($shopItem->item) {
+                        $shopItem->item->setAttribute('display_cost', ItemCostResolver::resolveForItem($shopItem->item));
+                    }
+                });
+
+                return $shop;
+            });
 
         return Inertia::render('shop/index', [
             'shops' => $shops,

@@ -73,6 +73,7 @@ const {
     buildParticipantOptions,
     buildCharacterCardPayload,
     buildCharacterCardRows,
+    buildCharacterRegisterNoteModal,
     buildCharacterRegisterConfirmView,
     buildCharacterClassesView,
     buildCharacterFactionView,
@@ -2032,6 +2033,62 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterRegisterNoteModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (!isCharacterStatusSwitchEnabled) {
+            await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const status = String(character.guild_status || '').trim().toLowerCase();
+        if (status !== 'draft' && status !== 'needs_changes') {
+            await updateManageMessage(interaction, {
+                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                flags: MessageFlags.Ephemeral,
+            });
+            return true;
+        }
+
+        const registrationNote = String(interaction.fields.getTextInputValue('registrationNote') || '').trim();
+
+        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, {
+            guildStatus: 'pending',
+            registrationNote,
+        });
+        if (!result.ok) {
+            await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) {
+            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await updateManageMessage(interaction, {
+            ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('characterCard_')) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -2083,7 +2140,7 @@ async function handle(interaction) {
             }
 
             const status = String(character.guild_status || '').trim().toLowerCase();
-            if (status !== 'draft') {
+            if (status !== 'draft' && status !== 'needs_changes') {
                 await interaction.update({
                     ...buildCharacterCardPayload({ character, ownerDiscordId }),
                     content: '',
@@ -2426,7 +2483,7 @@ async function handle(interaction) {
         }
 
         const status = String(character.guild_status || '').trim().toLowerCase();
-        if (status !== 'draft') {
+        if (status !== 'draft' && status !== 'needs_changes') {
             await interaction.update({
                 ...buildCharacterCardPayload({ character, ownerDiscordId }),
                 content: '',
@@ -2434,22 +2491,11 @@ async function handle(interaction) {
             return true;
         }
 
-        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { guildStatus: 'pending' });
-        if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
-        if (!refreshed) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
-        await interaction.update({
-            ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
-            content: '',
-        });
+        await interaction.showModal(buildCharacterRegisterNoteModal({
+            characterId,
+            ownerDiscordId,
+            initialNote: String(character.registration_note || '').trim(),
+        }));
         return true;
     }
 

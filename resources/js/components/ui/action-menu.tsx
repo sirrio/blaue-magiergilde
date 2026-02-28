@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { EllipsisVertical } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
 import React from 'react'
 
 type ActionMenuItem =
@@ -20,13 +20,23 @@ type ActionMenuItem =
       disabled?: boolean
       icon?: React.ReactNode
     }
+  | {
+      type: 'label'
+      label: string
+    }
+  | {
+      type: 'divider'
+      id?: string
+    }
 
 export const ActionMenu = ({
   items,
   align = 'end',
+  disabled = false,
 }: {
   items: ActionMenuItem[]
   align?: 'start' | 'end'
+  disabled?: boolean
 }) => {
   if (items.length === 0) return null
 
@@ -39,14 +49,53 @@ export const ActionMenu = ({
 
   return (
     <details className={cn('dropdown', align === 'end' ? 'dropdown-end' : 'dropdown-start')}>
-      <summary className="btn btn-sm btn-outline btn-square" aria-label="More actions">
-        <EllipsisVertical size={16} />
+      <summary
+        className={cn('btn btn-sm btn-outline btn-square', disabled && 'btn-disabled opacity-60')}
+        aria-label="More actions"
+        aria-disabled={disabled}
+        onClick={(event) => {
+          if (disabled) {
+            event.preventDefault()
+            return
+          }
+
+          const currentDetails = event.currentTarget.closest('details.dropdown')
+          if (!currentDetails) {
+            return
+          }
+
+          const openMenus = Array.from(document.querySelectorAll('details.dropdown[open]'))
+          openMenus.forEach((menu) => {
+            if (menu !== currentDetails) {
+              menu.removeAttribute('open')
+            }
+          })
+        }}
+        onKeyDown={(event) => {
+          if (disabled && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault()
+          }
+        }}
+      >
+        <SlidersHorizontal size={16} />
       </summary>
-      <ul className="menu dropdown-content z-[1] mt-2 w-56 rounded-box border border-base-200 bg-base-100 p-1 shadow">
-        {items.map((item) => {
+      <ul className={cn('menu dropdown-content z-[1] mt-2 w-56 rounded-box border border-base-200 bg-base-100 p-1 shadow', disabled && 'hidden')}>
+        {items.map((item, index) => {
+          if (item.type === 'label') {
+            return (
+              <li key={`label-${item.label}-${index}`} className="menu-title px-3 py-1 text-[10px] uppercase tracking-wide text-base-content/50">
+                {item.label}
+              </li>
+            )
+          }
+
+          if (item.type === 'divider') {
+            return <li key={`divider-${item.id ?? index}`} className="my-1 border-t border-base-200" />
+          }
+
           if (item.type === 'toggle') {
             return (
-              <li key={item.label}>
+              <li key={`toggle-${item.label}`}>
                 <div className={cn('flex items-center justify-between gap-3 px-3 py-2', item.disabled && 'opacity-60')}>
                   <span className="flex items-center gap-2 text-sm">
                     {item.icon}
@@ -69,12 +118,16 @@ export const ActionMenu = ({
           }
 
           return (
-            <li key={item.label}>
+            <li key={`action-${item.label}`}>
               <button
                 type="button"
-                className={cn(item.tone === 'error' && 'text-error', item.active && 'menu-active')}
+                className={cn(
+                  item.tone === 'error' && !item.disabled && 'text-error',
+                  item.active && !item.disabled && 'menu-active',
+                  item.disabled && 'opacity-50 cursor-not-allowed'
+                )}
                 disabled={item.disabled}
-                aria-current={item.active ? 'true' : undefined}
+                aria-current={item.active && !item.disabled ? 'true' : undefined}
                 onClick={(event) => {
                   if (item.disabled) return
                   item.onSelect()

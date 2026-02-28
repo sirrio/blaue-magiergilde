@@ -22,4 +22,11 @@ assert.deepEqual(labels, ['Register with Magiergilde', 'Cancel']);
 assert.equal(row.components[0].custom_id, 'characterRegisterConfirm_42_1234567890');
 assert.equal(row.components[1].custom_id, 'characterRegisterCancel_42_1234567890');
 
+const needsChangesView = buildCharacterRegisterConfirmView({
+    character: { id: 43, name: 'Fix Me', guild_status: 'needs_changes' },
+    ownerDiscordId: '1234567890',
+});
+const needsChangesEmbed = needsChangesView.embeds[0].toJSON();
+assert.equal(needsChangesEmbed.description.includes('from **needs changes** to **active (pending)**'), true);
+
 console.log('character-register-confirm-view.test.js passed');

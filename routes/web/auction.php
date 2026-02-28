@@ -21,7 +21,6 @@ Route::middleware(['auth', 'admin'])
     ->group(function () {
         Route::resource('auctions', AuctionController::class)->only([
             'index',
-            'store',
             'update',
         ]);
 

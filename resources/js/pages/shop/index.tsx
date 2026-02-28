@@ -72,11 +72,11 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const getShopItemSnapshot = (shopItem: ShopItem): Item => {
     const item = shopItem.item ?? ({} as Item)
     return {
-      id: item.id ?? 0,
-      name: shopItem.item_name ?? item.name ?? 'Unknown item',
-      url: shopItem.item_url ?? item.url ?? '',
-      cost: shopItem.item_cost ?? item.cost ?? '',
-      rarity: (shopItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
+    id: item.id ?? 0,
+    name: shopItem.item_name ?? item.name ?? 'Unknown item',
+    url: shopItem.item_url ?? item.url ?? '',
+    cost: shopItem.item_cost ?? item.display_cost ?? item.cost ?? '',
+    rarity: (shopItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
       type: (shopItem.item_type ?? item.type ?? 'item') as Item['type'],
       pick_count: item.pick_count ?? 0,
     }

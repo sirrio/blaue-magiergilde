@@ -1,4 +1,5 @@
 import LogoTier from '@/components/logo-tier'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FileInput } from '@/components/ui/file-input'
@@ -14,8 +15,8 @@ import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
-import React, { useMemo, useState } from 'react'
+import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 interface FilterOption {
   label: string
@@ -30,6 +31,8 @@ type AdminCharacter = Pick<
   | 'external_link'
   | 'user_id'
   | 'guild_status'
+  | 'registration_note'
+  | 'review_note'
   | 'user'
   | 'admin_notes'
   | 'admin_managed'
@@ -59,16 +62,44 @@ type CharacterGroup = {
 const getStatusLabel = (status?: string | null) => {
   if (status === 'approved') return 'Approved'
   if (status === 'declined') return 'Declined'
+  if (status === 'needs_changes') return 'Needs changes'
   if (status === 'retired') return 'Retired'
   if (status === 'draft') return 'Draft'
   return 'Pending'
 }
 
-const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
-  const [isOpen, setIsOpen] = useState(false)
+const AdminNoteModal = ({
+  character,
+  isOpen: controlledIsOpen,
+  onOpenChange,
+  children,
+}: React.PropsWithChildren<{
+  character: AdminCharacter
+  isOpen?: boolean
+  onOpenChange?: (next: boolean) => void
+}>) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
   const { data, setData, patch, processing } = useForm({
     admin_notes: character.admin_notes ?? '',
   })
+  const isOpen = controlledIsOpen ?? internalIsOpen
+  const setIsOpen = (next: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(next)
+      return
+    }
+
+    setInternalIsOpen(next)
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    setData('admin_notes', character.admin_notes ?? '')
+  }, [character.admin_notes, isOpen, setData])
+
   const hasAdminNote = Boolean(character.admin_notes?.trim())
 
   const handleSubmit = () => {
@@ -82,20 +113,19 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-      <ModalTrigger>
-        <Button
-          size="xs"
-          variant="ghost"
-          modifier="square"
-          onClick={() => {
-            setData('admin_notes', character.admin_notes ?? '')
-            setIsOpen(true)
-          }}
-          className={cn(hasAdminNote ? 'text-warning' : 'text-base-content/40')}
-        >
-          <StickyNote size={14} />
-        </Button>
-      </ModalTrigger>
+      {children ? (
+        <ModalTrigger>
+          <span
+            onClick={() => {
+              setData('admin_notes', character.admin_notes ?? '')
+              setIsOpen(true)
+            }}
+            className={cn(hasAdminNote ? 'text-warning' : 'text-base-content/40')}
+          >
+            {children}
+          </span>
+        </ModalTrigger>
+      ) : null}
       <ModalTitle>Admin Note</ModalTitle>
       <ModalContent>
         <TextArea
@@ -110,6 +140,159 @@ const AdminNoteModal = ({ character }: { character: AdminCharacter }) => {
         Save
       </ModalAction>
     </Modal>
+  )
+}
+
+const CharacterActionsMenu = ({
+  character,
+  userId,
+  userName,
+}: {
+  character: AdminCharacter
+  userId: number
+  userName: string
+}) => {
+  const currentStatus = character.guild_status ?? 'pending'
+  const isPending = currentStatus === 'pending'
+  const isDraft = currentStatus === 'draft'
+  const isRetired = currentStatus === 'retired'
+  const canReview = isPending
+  const canOverrideToPending = !isPending && !isRetired && !isDraft
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  const [targetStatus, setTargetStatus] = useState<'pending' | 'approved' | 'needs_changes' | 'declined' | null>(null)
+  const [reviewNote, setReviewNote] = useState(character.review_note ?? '')
+  const [isQuickLevelOpen, setIsQuickLevelOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+
+  const openStatusModal = (status: 'pending' | 'approved' | 'needs_changes' | 'declined') => {
+    setTargetStatus(status)
+    setReviewNote(character.review_note ?? '')
+    setIsStatusModalOpen(true)
+  }
+
+  const closeStatusModal = () => {
+    setIsStatusModalOpen(false)
+    setTargetStatus(null)
+  }
+
+  const submitStatusUpdate = () => {
+    if (!targetStatus) {
+      return
+    }
+
+    router.patch(route('admin.character-approvals.update', { character: character.id }), {
+      guild_status: targetStatus,
+      review_note: targetStatus === 'needs_changes' || targetStatus === 'declined' ? reviewNote.trim() : undefined,
+    }, {
+      preserveScroll: true,
+      preserveState: true,
+      onSuccess: () => {
+        closeStatusModal()
+      },
+    })
+  }
+
+  const needsReviewNote = targetStatus === 'needs_changes' || targetStatus === 'declined'
+  const modalTitle = targetStatus === 'approved'
+    ? 'Approve character'
+    : targetStatus === 'pending'
+      ? 'Set back to pending'
+      : targetStatus === 'needs_changes'
+        ? 'Request changes'
+        : 'Decline character'
+  const modalAction = targetStatus === 'approved'
+    ? 'Approve'
+    : targetStatus === 'pending'
+      ? 'Set to pending'
+      : targetStatus === 'needs_changes'
+        ? 'Request changes'
+        : 'Decline character'
+
+  const modalDescription = targetStatus === 'approved'
+    ? 'Confirm setting this character to approved.'
+    : targetStatus === 'pending'
+      ? 'Confirm moving this character back to pending review.'
+      : targetStatus === 'needs_changes'
+        ? 'Provide a review note with required fixes.'
+        : 'Provide a review note explaining why this character is declined.'
+
+  return (
+    <>
+      <AdminQuickLevelModal character={character} isOpen={isQuickLevelOpen} onOpenChange={setIsQuickLevelOpen} />
+      <AdminCharacterModal userId={userId} userName={userName} character={character} isOpen={isEditOpen} onOpenChange={setIsEditOpen} />
+      <ActionMenu
+        disabled={isDraft}
+        items={[
+          { type: 'label', label: 'Character actions' },
+          {
+            label: 'Set level',
+            icon: <Gauge size={14} />,
+            onSelect: () => setIsQuickLevelOpen(true),
+          },
+          {
+            label: 'Edit character',
+            icon: <Pencil size={14} />,
+            onSelect: () => setIsEditOpen(true),
+          },
+          { type: 'divider', id: 'character-actions' },
+          { type: 'label', label: 'Review decisions' },
+          {
+            label: 'Approve',
+            icon: <CheckCircle2 size={14} />,
+            disabled: !canReview,
+            active: currentStatus === 'approved',
+            onSelect: () => openStatusModal('approved'),
+          },
+          {
+            label: 'Needs changes',
+            icon: <AlertTriangle size={14} />,
+            disabled: !canReview,
+            active: currentStatus === 'needs_changes',
+            onSelect: () => openStatusModal('needs_changes'),
+          },
+          {
+            label: 'Decline',
+            icon: <XCircle size={14} />,
+            tone: 'error',
+            disabled: !canReview,
+            active: currentStatus === 'declined',
+            onSelect: () => openStatusModal('declined'),
+          },
+          { type: 'divider', id: 'status-actions' },
+          { type: 'label', label: 'Override' },
+          {
+            label: 'Set back to pending',
+            icon: <Clock size={14} />,
+            disabled: !canOverrideToPending,
+            active: currentStatus === 'pending',
+            onSelect: () => openStatusModal('pending'),
+          },
+        ]}
+      />
+      <Modal isOpen={isStatusModalOpen} onClose={closeStatusModal}>
+        <ModalTitle>{modalTitle}</ModalTitle>
+        <ModalContent>
+          {needsReviewNote ? (
+            <TextArea
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+              placeholder="Describe what needs to be fixed..."
+            >
+              Review note (required)
+            </TextArea>
+          ) : (
+            <p className="text-sm text-base-content/80">{modalDescription}</p>
+          )}
+        </ModalContent>
+        <ModalAction
+          onClick={submitStatusUpdate}
+          disabled={needsReviewNote && reviewNote.trim() === ''}
+          variant={targetStatus === 'declined' ? 'error' : targetStatus === 'approved' ? 'success' : ''}
+        >
+          {modalAction}
+        </ModalAction>
+      </Modal>
+    </>
   )
 }
 
@@ -170,11 +353,15 @@ const AdminCharacterModal = ({
   userId,
   userName,
   character,
+  isOpen: controlledIsOpen,
+  onOpenChange,
   children,
 }: React.PropsWithChildren<{
   userId: number
   userName: string
   character?: AdminCharacter
+  isOpen?: boolean
+  onOpenChange?: (next: boolean) => void
 }>) => {
   const { classes, factions, versions, tiers, errors } = usePage<PageProps>().props
   const startTierOptions = Object.entries(tiers).filter(([key]) => key !== 'et')
@@ -186,6 +373,7 @@ const AdminCharacterModal = ({
     draft: 'Draft',
     approved: 'Approved',
     declined: 'Declined',
+    needs_changes: 'Needs changes',
     retired: 'Retired',
   }
   const initialFormData = {
@@ -205,13 +393,31 @@ const AdminCharacterModal = ({
   }
   const { data, setData, post, patch, processing, reset, clearErrors } = useForm(initialFormData)
   const [activeTab, setActiveTab] = useState<'basics' | 'details'>('basics')
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const isOpen = controlledIsOpen ?? internalIsOpen
+  const setIsOpen = (next: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(next)
+      return
+    }
+
+    setInternalIsOpen(next)
+  }
 
   const handleOpen = () => {
     reset()
     clearErrors()
     setIsOpen(true)
   }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    reset()
+    clearErrors()
+  }, [clearErrors, isOpen, reset])
 
   const handleClose = () => {
     setIsOpen(false)
@@ -238,9 +444,11 @@ const AdminCharacterModal = ({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose}>
-      <ModalTrigger>
-        <span onClick={handleOpen}>{children}</span>
-      </ModalTrigger>
+      {children ? (
+        <ModalTrigger>
+          <span onClick={handleOpen}>{children}</span>
+        </ModalTrigger>
+      ) : null}
       <ModalTitle>{isEdit ? 'Edit character' : 'Add character'}</ModalTitle>
       <ModalContent>
         <form>
@@ -395,16 +603,43 @@ const AdminCharacterModal = ({
   )
 }
 
-const AdminQuickLevelModal = ({ character }: { character: AdminCharacter }) => {
+const AdminQuickLevelModal = ({
+  character,
+  isOpen: controlledIsOpen,
+  onOpenChange,
+  children,
+}: React.PropsWithChildren<{
+  character: AdminCharacter
+  isOpen?: boolean
+  onOpenChange?: (next: boolean) => void
+}>) => {
   const { errors } = usePage<PageProps>().props
   const { data, setData, post, processing, reset, clearErrors } = useForm({ level: 1 })
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const isOpen = controlledIsOpen ?? internalIsOpen
+  const setIsOpen = (next: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(next)
+      return
+    }
+
+    setInternalIsOpen(next)
+  }
 
   const handleOpen = () => {
     reset()
     clearErrors()
     setIsOpen(true)
   }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    reset()
+    clearErrors()
+  }, [clearErrors, isOpen, reset])
 
   const handleClose = () => {
     setIsOpen(false)
@@ -423,11 +658,11 @@ const AdminQuickLevelModal = ({ character }: { character: AdminCharacter }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose}>
-      <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={handleOpen}>
-          <Gauge size={14} />
-        </Button>
-      </ModalTrigger>
+      {children ? (
+        <ModalTrigger>
+          <span onClick={handleOpen}>{children}</span>
+        </ModalTrigger>
+      ) : null}
       <ModalTitle>Set level</ModalTitle>
       <ModalContent>
         <Input
@@ -479,6 +714,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     { label: 'Pending', value: 'pending' },
     { label: 'Draft', value: 'draft' },
     { label: 'Approved', value: 'approved' },
+    { label: 'Needs changes', value: 'needs_changes' },
     { label: 'Declined', value: 'declined' },
     { label: 'Retired', value: 'retired' },
   ]
@@ -570,6 +806,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     pending: 'Pending',
     draft: 'Draft',
     approved: 'Approved',
+    needs_changes: 'Needs changes',
     declined: 'Declined',
     retired: 'Retired',
   }
@@ -712,6 +949,8 @@ const tierTextClassMap: Record<string, string> = {
                     const currentLevel = calculateLevel(character)
                     const isAdminManaged = Boolean(character.admin_managed)
                     const characterNotes = character.notes?.trim()
+                    const registrationNote = character.registration_note?.trim()
+                    const reviewNote = character.review_note?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
                     return (
                       <ListRow key={character.id} className={cn('grid-cols-1', isDraft && 'opacity-60')}>
@@ -735,6 +974,16 @@ const tierTextClassMap: Record<string, string> = {
                               {characterNotes ? (
                                 <span className="max-w-xs truncate text-xs text-base-content/60" title={characterNotes}>
                                   {characterNotes}
+                                </span>
+                              ) : null}
+                              {registrationNote ? (
+                                <span className="max-w-xs truncate text-xs text-base-content/60" title={registrationNote}>
+                                  Registration: {registrationNote}
+                                </span>
+                              ) : null}
+                              {reviewNote ? (
+                                <span className="max-w-xs truncate text-xs text-base-content/70" title={reviewNote}>
+                                  Review: {reviewNote}
                                 </span>
                               ) : null}
                             </div>
@@ -761,6 +1010,7 @@ const tierTextClassMap: Record<string, string> = {
                                 'flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5',
                                 status === 'approved' && 'text-success',
                                 status === 'declined' && 'text-error',
+                                status === 'needs_changes' && 'text-warning',
                                 status === 'pending' && 'text-warning',
                                 status === 'draft' && 'text-base-content/60',
                                 status === 'retired' && 'text-base-content/50',
@@ -768,6 +1018,7 @@ const tierTextClassMap: Record<string, string> = {
                             >
                               {status === 'approved' && <CheckCircle2 size={12} />}
                               {status === 'declined' && <XCircle size={12} />}
+                              {status === 'needs_changes' && <AlertTriangle size={12} />}
                               {status === 'pending' && <Clock size={12} />}
                               {status === 'draft' && <Pencil size={12} />}
                               {status === 'retired' && <Archive size={12} />}
@@ -779,57 +1030,23 @@ const tierTextClassMap: Record<string, string> = {
                                 <span>Admin</span>
                               </span>
                             ) : null}
+                            <AdminNoteModal character={character}>
+                              <span
+                                className={cn(
+                                  'flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]',
+                                  character.admin_notes?.trim()
+                                    ? 'border-warning/40 bg-warning/10 text-warning'
+                                    : 'border-base-200 bg-base-100/90 text-base-content/60',
+                                )}
+                                title={character.admin_notes?.trim() ? 'Edit admin note' : 'Add admin note'}
+                              >
+                                <StickyNote size={12} />
+                                <span>{character.admin_notes?.trim() ? 'Admin note' : 'Add note'}</span>
+                              </span>
+                            </AdminNoteModal>
                           </div>
-                          <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-base-200/60 pt-3 md:w-auto md:border-t-0 md:border-l-2 md:border-base-300/70 md:pt-0 md:pl-4">
-                            <AdminQuickLevelModal character={character} />
-                            <AdminCharacterModal userId={Number(group.key)} userName={group.label} character={character}>
-                              <Button size="xs" variant="ghost" modifier="square">
-                                <Pencil size={14} />
-                              </Button>
-                            </AdminCharacterModal>
-                            <AdminNoteModal character={character} />
-                            <Button
-                              size="xs"
-                              modifier="square"
-                              variant="ghost"
-                              color="warning"
-                              disabled={status === 'pending' || status === 'retired' || status === 'draft'}
-                              onClick={() =>
-                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
-                                  guild_status: 'pending',
-                                })
-                              }
-                            >
-                              <Clock size={14} />
-                            </Button>
-                            <Button
-                              size="xs"
-                              modifier="square"
-                              variant="ghost"
-                              color="success"
-                              disabled={status === 'approved' || status === 'retired' || status === 'draft'}
-                              onClick={() =>
-                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
-                                  guild_status: 'approved',
-                                })
-                              }
-                            >
-                              <CheckCircle2 size={14} />
-                            </Button>
-                            <Button
-                              size="xs"
-                              modifier="square"
-                              variant="ghost"
-                              color="error"
-                              disabled={status === 'declined' || status === 'retired' || status === 'draft'}
-                              onClick={() =>
-                                router.patch(route('admin.character-approvals.update', { character: character.id }), {
-                                  guild_status: 'declined',
-                                })
-                              }
-                            >
-                              <XCircle size={14} />
-                            </Button>
+                          <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-base-200/60 pt-3 md:w-auto md:border-t-0 md:pt-0">
+                            <CharacterActionsMenu character={character} userId={Number(group.key)} userName={group.label} />
                           </div>
                         </div>
                       </ListRow>

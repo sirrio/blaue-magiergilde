@@ -253,6 +253,15 @@ export interface Source {
   shortcode: string
 }
 
+export interface MundaneItemVariant {
+  id: number
+  name: string
+  slug: string
+  category: 'weapon' | 'armor'
+  cost_gp?: number | null
+  is_placeholder?: boolean
+}
+
 export interface CompendiumImportRun {
   id: number
   entity_type: 'items' | 'spells'
@@ -300,9 +309,11 @@ export interface Item {
   id: number
   name: string
   url: string
-  cost: string
-  type: 'item' | 'consumable' | 'spellscroll'
-  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare'
+  cost: string | null
+  extra_cost_note?: string | null
+  display_cost?: string | null
+  type: 'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'
+  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
   pick_count: number
   shop_enabled?: boolean
   guild_enabled?: boolean
@@ -313,6 +324,8 @@ export interface Item {
   ruling_note?: string | null
   source_id?: number | null
   source?: Source | null
+  mundane_variant_ids?: number[]
+  mundane_variants?: MundaneItemVariant[]
 }
 
 export interface Spell {
@@ -342,7 +355,9 @@ export interface Character {
   downtimes: Downtime[]
   allies: Ally[]
   deleted_at: string
-  guild_status?: 'pending' | 'approved' | 'declined' | 'retired' | 'draft'
+  guild_status?: 'pending' | 'approved' | 'declined' | 'needs_changes' | 'retired' | 'draft'
+  registration_note?: string | null
+  review_note?: string | null
   room_count?: number
   admin_notes?: string | null
   admin_managed?: boolean

@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Ally;
 
+use App\Models\Ally;
+use App\Models\Character;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,7 +14,20 @@ class UpdateAllyRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $userId = $this->user()?->getAuthIdentifier();
+        if (! $userId) {
+            return false;
+        }
+
+        $ally = $this->route('ally');
+        if (! $ally instanceof Ally) {
+            return false;
+        }
+
+        return Character::query()
+            ->whereKey($ally->character_id)
+            ->where('user_id', $userId)
+            ->exists();
     }
 
     /**

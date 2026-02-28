@@ -21,8 +21,8 @@ class CompendiumImportService
     {
         if ($entityType === 'items') {
             return implode("\n", [
-                'name,type,rarity,cost,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
-                'Potion of Healing,consumable,common,50 GP,https://example.test/items/potion-healing,PHB,true,true,false,',
+                'name,type,rarity,cost,extra_cost_note,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+                'Potion of Healing,consumable,common,50 GP,Component cost,https://example.test/items/potion-healing,PHB,true,true,false,',
             ])."\n";
         }
 
@@ -310,6 +310,7 @@ class CompendiumImportService
         $type = strtolower(trim((string) ($row['type'] ?? '')));
         $rarity = strtolower(trim((string) ($row['rarity'] ?? '')));
         $cost = $this->nullableString($row['cost'] ?? null);
+        $extraCostNote = $this->nullableString($row['extra_cost_note'] ?? $row['extra_cost'] ?? null);
         $url = $this->nullableString($row['url'] ?? null);
         $sourceShortcode = strtoupper(trim((string) ($row['source_shortcode'] ?? $row['source'] ?? $row['source_code'] ?? '')));
         $sourceId = null;
@@ -317,11 +318,11 @@ class CompendiumImportService
         if ($name === '') {
             $errors[] = 'name is required';
         }
-        if (! in_array($type, ['item', 'consumable', 'spellscroll'], true)) {
-            $errors[] = 'type must be item|consumable|spellscroll';
+        if (! in_array($type, ['weapon', 'armor', 'item', 'consumable', 'spellscroll'], true)) {
+            $errors[] = 'type must be weapon|armor|item|consumable|spellscroll';
         }
-        if (! in_array($rarity, ['common', 'uncommon', 'rare', 'very_rare'], true)) {
-            $errors[] = 'rarity must be common|uncommon|rare|very_rare';
+        if (! in_array($rarity, ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'], true)) {
+            $errors[] = 'rarity must be common|uncommon|rare|very_rare|legendary|artifact|unknown_rarity';
         }
         if ($url !== null && ! filter_var($url, FILTER_VALIDATE_URL)) {
             $errors[] = 'url must be a valid URL';
@@ -330,6 +331,16 @@ class CompendiumImportService
             $sourceId = $sourceMap[$sourceShortcode] ?? null;
             if ($sourceId === null) {
                 $errors[] = "unknown source shortcode '{$sourceShortcode}'";
+            }
+        }
+
+        if (in_array($type, ['weapon', 'armor'], true)) {
+            $extraCostNote = null;
+        } elseif ($extraCostNote !== null) {
+            $extraCostNote = preg_replace('/^\+\s*/u', '', $extraCostNote) ?? $extraCostNote;
+            $extraCostNote = trim($extraCostNote);
+            if ($extraCostNote === '') {
+                $extraCostNote = null;
             }
         }
 
@@ -350,6 +361,7 @@ class CompendiumImportService
             'type' => $type,
             'rarity' => $rarity,
             'cost' => $cost,
+            'extra_cost_note' => $extraCostNote,
             'url' => $url,
             'source_id' => $sourceId,
             'guild_enabled' => $guildEnabled,
@@ -454,6 +466,7 @@ class CompendiumImportService
         $comparableFields = [
             'rarity' => $payload['rarity'],
             'cost' => $payload['cost'],
+            'extra_cost_note' => $payload['extra_cost_note'],
             'url' => $payload['url'],
             'guild_enabled' => (bool) $payload['guild_enabled'],
             'shop_enabled' => (bool) $payload['shop_enabled'],
@@ -552,6 +565,17 @@ class CompendiumImportService
      */
     private function findMatchingItem(array $payload): ?Item
     {
+        $url = is_string($payload['url'] ?? null) ? trim((string) $payload['url']) : '';
+        if ($url !== '') {
+            $urlMatches = Item::query()
+                ->where('url', $url)
+                ->get();
+
+            if ($urlMatches->count() === 1) {
+                return $urlMatches->first();
+            }
+        }
+
         $exact = Item::query()
             ->where('name', $payload['name'])
             ->where('type', $payload['type'])

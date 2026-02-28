@@ -30,6 +30,7 @@ const STATUS_STYLES = {
     pending: { label: 'Pending', color: 0xf59e0b },
     approved: { label: 'Approved', color: 0x22c55e },
     declined: { label: 'Declined', color: 0xef4444 },
+    needs_changes: { label: 'Needs changes', color: 0xf97316 },
     retired: { label: 'Retired', color: 0x9ca3af },
     draft: { label: 'Draft', color: 0x64748b },
 };
@@ -91,6 +92,8 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     const numericShopSpend = Number(rawShopSpend);
     const shopSpend = Number.isFinite(numericShopSpend) ? numericShopSpend : null;
     const notes = trimField(payload?.character_notes || '');
+    const registrationNote = trimField(payload?.character_registration_note || '');
+    const reviewNote = trimField(payload?.character_review_note || '');
     const externalLink = payload?.external_link || '';
     const approvalUrl = payload?.approval_url || '';
     const avatarUrl = options.avatarUrlOverride || payload?.character_avatar_url || '';
@@ -127,32 +130,51 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     if (isMeaningful(notes) && notes !== '—') {
         embed.addFields({ name: 'Notes', value: notes, inline: false });
     }
+    if (isMeaningful(registrationNote) && registrationNote !== '—') {
+        embed.addFields({ name: 'Registration info', value: registrationNote, inline: false });
+    }
+    if (isMeaningful(reviewNote) && reviewNote !== '—') {
+        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
+    }
 
     if (payload?.character_id) {
         embed.setFooter({ text: `Character #${payload.character_id}` });
     }
 
-    const buttons = new ActionRowBuilder();
+    const actionButtons = new ActionRowBuilder();
     const isPending = statusRaw === 'pending';
+    const canSetPending = ['approved', 'declined', 'needs_changes'].includes(String(statusRaw).toLowerCase());
     const characterId = Number(payload?.character_id);
     const hasCharacterId = Number.isFinite(characterId) && characterId > 0;
     const characterIdValue = hasCharacterId ? String(characterId) : '0';
 
-    buttons.addComponents(
+    actionButtons.addComponents(
         new ButtonBuilder()
             .setCustomId(`character-approval:approve:${characterIdValue}`)
             .setLabel('Approve')
             .setStyle(ButtonStyle.Success)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
+            .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
+            .setLabel('Needs changes')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!isPending || !hasCharacterId),
+        new ButtonBuilder()
             .setCustomId(`character-approval:decline:${characterIdValue}`)
             .setLabel('Decline')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!isPending || !hasCharacterId),
+        new ButtonBuilder()
+            .setCustomId(`character-approval:set-pending:${characterIdValue}`)
+            .setLabel('Set pending')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!canSetPending || !hasCharacterId),
     );
 
+    const components = [actionButtons];
+    const linkButtons = new ActionRowBuilder();
     if (approvalUrl) {
-        buttons.addComponents(
+        linkButtons.addComponents(
             new ButtonBuilder()
                 .setLabel('Open approvals')
                 .setStyle(ButtonStyle.Link)
@@ -161,7 +183,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
 
     if (externalLink) {
-        buttons.addComponents(
+        linkButtons.addComponents(
             new ButtonBuilder()
                 .setLabel('Open external link')
                 .setStyle(ButtonStyle.Link)
@@ -169,9 +191,13 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         );
     }
 
+    if (linkButtons.components.length > 0) {
+        components.push(linkButtons);
+    }
+
     return {
         embeds: [embed],
-        components: [buttons],
+        components,
     };
 }
 
@@ -187,6 +213,7 @@ async function sendCharacterApprovalDm({
     characterFaction,
     characterClasses,
     characterAvatarUrl,
+    characterReviewNote,
     externalLink,
 }) {
     if (!discordUserId || !/^[0-9]{5,}$/.test(String(discordUserId))) {
@@ -207,10 +234,13 @@ async function sendCharacterApprovalDm({
     const rawFaction = characterFaction ? String(characterFaction).trim() : '';
     const faction = rawFaction.toLowerCase() === 'none' ? '' : rawFaction;
     const classes = formatClasses(characterClasses);
+    const reviewNote = trimField(characterReviewNote || '');
 
     let description = '';
     if (label.toLowerCase() === 'approved') {
         description = 'Your character is now approved and ready to play.';
+    } else if (label.toLowerCase() === 'needs changes') {
+        description = 'Your character needs changes. Please update it and register again for review.';
     } else if (label.toLowerCase() === 'declined') {
         description = 'Your character was declined. Please review the details and update if needed.';
     } else {
@@ -236,6 +266,10 @@ async function sendCharacterApprovalDm({
 
     if (fields.length > 0) {
         embed.addFields(fields);
+    }
+
+    if (isMeaningful(reviewNote) && reviewNote !== '—' && (status === 'needs_changes' || status === 'declined')) {
+        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
     }
 
     let avatarAttachment = null;

@@ -3,35 +3,33 @@
 namespace App\Http\Controllers\Character;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Character\SubmitCharacterForApprovalRequest;
 use App\Models\Character;
 use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
 class SubmitCharacterForApprovalController extends Controller
 {
     public function __invoke(
-        Request $request,
+        SubmitCharacterForApprovalRequest $request,
         Character $character,
         CharacterApprovalNotificationService $notificationService,
     ): RedirectResponse {
-        $userId = $request->user()?->getAuthIdentifier();
-        if (! $userId || $character->user_id !== $userId) {
-            abort(403);
-        }
-
         if (! (bool) Config::get('features.character_status_switch', true)) {
             return redirect()->back()->withErrors([
                 'guild_status' => 'Character submission is currently disabled.',
             ]);
         }
 
-        if ($character->guild_status !== 'draft') {
+        if (! in_array($character->guild_status, ['draft', 'needs_changes'], true)) {
             return redirect()->back();
         }
 
+        $registrationNote = trim((string) $request->input('registration_note', ''));
+        $character->registration_note = $registrationNote !== '' ? $registrationNote : null;
+        $character->review_note = null;
         $character->guild_status = 'pending';
         $character->save();
 
