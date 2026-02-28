@@ -9,7 +9,9 @@ const {
 } = require('discord.js');
 const { resolveApiBaseUrls } = require('../appUrls');
 const { withInsecureDispatcher } = require('../httpClient');
-const { buildErrorEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
+const { buildErrorEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
+
+const APPROVAL_STATUS_LABELS = new Set(['pending', 'approved', 'declined', 'needs changes', 'needs_changes', 'retired', 'draft']);
 
 function parseApprovalAction(customId) {
     if (!customId || !customId.startsWith('character-approval:')) return null;
@@ -48,7 +50,7 @@ function parseApprovalConfirm(customId) {
     if (!customId || !customId.startsWith('character-approval-confirm:')) return null;
 
     const parts = customId.split(':');
-    if (parts.length !== 3) return null;
+    if (parts.length !== 4) return null;
 
     const status = String(parts[1] || '').trim().toLowerCase();
     if (!['approved', 'pending'].includes(status)) return null;
@@ -56,14 +58,17 @@ function parseApprovalConfirm(customId) {
     const characterId = Number(parts[2]);
     if (!Number.isFinite(characterId) || characterId <= 0) return null;
 
-    return { status, characterId };
+    const sourceStatus = normalizeApprovalStatus(parts[3]);
+    if (!sourceStatus) return null;
+
+    return { status, characterId, sourceStatus };
 }
 
 function parseApprovalCancel(customId) {
     if (!customId || !customId.startsWith('character-approval-cancel:')) return null;
 
     const parts = customId.split(':');
-    if (parts.length !== 3) return null;
+    if (parts.length !== 4) return null;
 
     const status = String(parts[1] || '').trim().toLowerCase();
     if (!['approved', 'pending'].includes(status)) return null;
@@ -71,12 +76,100 @@ function parseApprovalCancel(customId) {
     const characterId = Number(parts[2]);
     if (!Number.isFinite(characterId) || characterId <= 0) return null;
 
-    return { status, characterId };
+    const sourceStatus = normalizeApprovalStatus(parts[3]);
+    if (!sourceStatus) return null;
+
+    return { status, characterId, sourceStatus };
+}
+
+function normalizeApprovalStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+    if (!normalized || !APPROVAL_STATUS_LABELS.has(normalized.replace(/_/g, ' ')) && !APPROVAL_STATUS_LABELS.has(normalized)) {
+        return null;
+    }
+
+    return normalized === 'needs changes' ? 'needs_changes' : normalized;
+}
+
+function getMessageApprovalStatus(message) {
+    const title = String(message?.embeds?.[0]?.title || '').trim();
+    if (!title) {
+        return null;
+    }
+
+    const [rawStatus] = title.split('·', 1);
+    return normalizeApprovalStatus(rawStatus);
+}
+
+function buildApprovalActionRow(status, characterId) {
+    const normalizedStatus = normalizeApprovalStatus(status) || 'pending';
+    const isPending = normalizedStatus === 'pending';
+    const canSetPending = ['approved', 'declined', 'needs_changes'].includes(normalizedStatus);
+    const hasCharacterId = Number.isFinite(characterId) && characterId > 0;
+    const characterIdValue = hasCharacterId ? String(characterId) : '0';
+
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`character-approval:approve:${characterIdValue}`)
+            .setLabel('Approve')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(!isPending || !hasCharacterId),
+        new ButtonBuilder()
+            .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
+            .setLabel('Needs changes')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!isPending || !hasCharacterId),
+        new ButtonBuilder()
+            .setCustomId(`character-approval:decline:${characterIdValue}`)
+            .setLabel('Decline')
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(!isPending || !hasCharacterId),
+        new ButtonBuilder()
+            .setCustomId(`character-approval:set-pending:${characterIdValue}`)
+            .setLabel('Set pending')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!canSetPending || !hasCharacterId),
+    );
+}
+
+function preserveSecondaryRows(message) {
+    return (message?.components ?? [])
+        .slice(1)
+        .map((row) => row.toJSON());
+}
+
+function buildInlineConfirmRow(action, sourceStatus) {
+    const characterIdValue = String(action.characterId);
+    const source = normalizeApprovalStatus(sourceStatus) || 'pending';
+    const confirmLabel = action.status === 'approved' ? 'Confirm approve' : 'Confirm set pending';
+
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`character-approval-confirm:${action.status}:${characterIdValue}:${source}`)
+            .setLabel(confirmLabel)
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`character-approval-cancel:${action.status}:${characterIdValue}:${source}`)
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Secondary),
+    );
+}
+
+async function restoreApprovalMessage(interaction, status, characterId) {
+    const components = [
+        buildApprovalActionRow(status, characterId).toJSON(),
+        ...preserveSecondaryRows(interaction.message),
+    ];
+
+    await interaction.message.edit({
+        components,
+    });
 }
 
 async function sendStatusUpdate(interaction, action, reviewNote = '') {
     const appUrls = resolveApiBaseUrls();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    const usesInlineConfirm = interaction.isButton();
 
     if (appUrls.length === 0 || !token) {
         await interaction.reply({
@@ -86,7 +179,11 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
         return true;
     }
 
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    if (usesInlineConfirm) {
+        await interaction.deferUpdate();
+    } else {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
 
     let response = null;
     let lastEndpoint = '';
@@ -116,9 +213,14 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
     }
 
     if (!response) {
-        await interaction.editReply({
+        const payload = {
             embeds: [buildErrorEmbed('App request failed', `Failed to reach the app (${lastEndpoint}).`)],
-        });
+        };
+        if (usesInlineConfirm) {
+            await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
+        } else {
+            await interaction.editReply(payload);
+        }
         return true;
     }
 
@@ -132,9 +234,19 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
         }
 
         const message = detail ? `Request failed: ${detail}` : 'Request failed.';
-        await interaction.editReply({
+        const payload = {
             embeds: [buildErrorEmbed('Approval update failed', message)],
-        });
+        };
+        if (usesInlineConfirm) {
+            await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
+        } else {
+            await interaction.editReply(payload);
+        }
+        return true;
+    }
+
+    if (usesInlineConfirm && interaction.message?.editable) {
+        await restoreApprovalMessage(interaction, action.status, action.characterId);
         return true;
     }
 
@@ -148,26 +260,18 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
     await interaction.editReply({
         embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
     });
+
     return true;
 }
 
 async function showConfirmation(interaction, action) {
-    const label = action.status === 'approved' ? 'approve' : 'set this character back to pending';
-    await interaction.reply({
-        embeds: [buildWarningEmbed('Confirm action', `Do you want to ${label}?`)],
+    const sourceStatus = getMessageApprovalStatus(interaction.message) || (action.status === 'approved' ? 'pending' : 'approved');
+
+    await interaction.update({
         components: [
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`character-approval-confirm:${action.status}:${action.characterId}`)
-                    .setLabel('Confirm')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`character-approval-cancel:${action.status}:${action.characterId}`)
-                    .setLabel('Cancel')
-                    .setStyle(ButtonStyle.Secondary),
-            ),
+            buildInlineConfirmRow(action, sourceStatus).toJSON(),
+            ...preserveSecondaryRows(interaction.message),
         ],
-        flags: MessageFlags.Ephemeral,
     });
     return true;
 }
@@ -182,8 +286,10 @@ async function handle(interaction) {
         const cancelAction = parseApprovalCancel(interaction.customId);
         if (cancelAction) {
             await interaction.update({
-                embeds: [buildSuccessEmbed('Cancelled', 'No changes were made.')],
-                components: [],
+                components: [
+                    buildApprovalActionRow(cancelAction.sourceStatus, cancelAction.characterId).toJSON(),
+                    ...preserveSecondaryRows(interaction.message),
+                ],
             });
             return true;
         }
