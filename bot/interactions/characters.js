@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const { Agent } = require('undici');
 const { updateCreationReply } = require('./interactionReplies');
-const { resolveApiBaseUrl } = require('../appUrls');
+const { resolveApiBaseUrls } = require('../appUrls');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
@@ -553,10 +553,6 @@ async function updateCreationMessage(state, payload) {
     return false;
 }
 
-function resolveAppUrl() {
-    return resolveApiBaseUrl();
-}
-
 const insecureAgent = new Agent({
     connect: {
         rejectUnauthorized: false,
@@ -630,127 +626,133 @@ function validateAvatarAttachment(attachment) {
 }
 
 async function storeCharacterAvatar(characterId, avatarUrl) {
-    const appUrl = resolveAppUrl();
+    const appUrls = resolveApiBaseUrls();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
     if (!characterId || !avatarUrl) {
         console.warn('[bot] Avatar upload skipped: missing character id or avatar url.');
         return { ok: false, reason: 'missing_input' };
     }
-    if (!appUrl || !token) {
-        console.warn('[bot] Avatar upload skipped: BOT_APP_URL or BOT_HTTP_TOKEN missing.');
+    if (appUrls.length === 0 || !token) {
+        console.warn('[bot] Avatar upload skipped: BOT_APP_URL/BOT_PUBLIC_APP_URL or BOT_HTTP_TOKEN missing.');
         return { ok: false, reason: 'config_missing' };
     }
 
-    try {
-        const endpoint = `${appUrl}/bot/character-avatars`;
-        enableInsecureTlsIfNeeded(endpoint);
-        const requestOptions = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Bot-Token': token,
-            },
-            body: JSON.stringify({
-                character_id: characterId,
-                avatar_url: avatarUrl,
-            }),
-            dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
-            redirect: 'manual',
-        };
+    for (const appUrl of appUrls) {
+        try {
+            const endpoint = `${appUrl}/bot/character-avatars`;
+            enableInsecureTlsIfNeeded(endpoint);
+            const requestOptions = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Bot-Token': token,
+                },
+                body: JSON.stringify({
+                    character_id: characterId,
+                    avatar_url: avatarUrl,
+                }),
+                dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
+                redirect: 'manual',
+            };
 
-        let response = await fetch(endpoint, requestOptions);
-        if ([301, 302, 307, 308].includes(response.status)) {
-            const location = response.headers.get('location');
-            if (location) {
-                const redirected = new URL(location, endpoint).toString();
-                enableInsecureTlsIfNeeded(redirected);
-                response = await fetch(redirected, {
-                    ...requestOptions,
-                    dispatcher: shouldAllowInsecure(redirected) ? insecureAgent : requestOptions.dispatcher,
-                });
-            }
-        }
-
-        const contentType = String(response.headers.get('content-type') || '');
-
-        if (!response.ok) {
-            const text = await response.text().catch(() => '');
-            const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
-            console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentType} body=${preview}`);
-            if (response.status === 413) {
-                return { ok: false, reason: 'avatar_too_large', status: response.status };
-            }
-            if (contentType.includes('application/json')) {
-                try {
-                    const payload = JSON.parse(text);
-                    if (payload?.error) {
-                        return { ok: false, reason: payload.error, status: response.status };
-                    }
-                } catch {
-                    // ignore JSON parse error
+            let response = await fetch(endpoint, requestOptions);
+            if ([301, 302, 307, 308].includes(response.status)) {
+                const location = response.headers.get('location');
+                if (location) {
+                    const redirected = new URL(location, endpoint).toString();
+                    enableInsecureTlsIfNeeded(redirected);
+                    response = await fetch(redirected, {
+                        ...requestOptions,
+                        dispatcher: shouldAllowInsecure(redirected) ? insecureAgent : requestOptions.dispatcher,
+                    });
                 }
             }
-            return { ok: false, reason: 'upload_failed', status: response.status };
-        }
 
-        if (!contentType.includes('application/json')) {
-            const text = await response.text().catch(() => '');
-            const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
-            console.warn(`[bot] Avatar upload unexpected response. content-type=${contentType} body=${preview}`);
-            return { ok: false, reason: 'upload_failed' };
-        }
+            const contentType = String(response.headers.get('content-type') || '');
 
-        const payload = await response.json().catch(() => null);
-        if (payload?.avatar_path) {
-            return { ok: true, avatarPath: payload.avatar_path };
-        }
-        return { ok: true };
-    } catch (error) {
-        const code = error?.cause?.code || error?.code;
-        if (code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
-            console.warn('[bot] Avatar upload TLS error. Endpoint:', `${appUrl}/bot/character-avatars`);
-        }
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+                console.warn(`[bot] Avatar upload failed (${response.status}). content-type=${contentType} body=${preview}`);
+                if (response.status === 413) {
+                    return { ok: false, reason: 'avatar_too_large', status: response.status };
+                }
+                if (contentType.includes('application/json')) {
+                    try {
+                        const payload = JSON.parse(text);
+                        if (payload?.error) {
+                            return { ok: false, reason: payload.error, status: response.status };
+                        }
+                    } catch {
+                        // ignore JSON parse error
+                    }
+                }
+                return { ok: false, reason: 'upload_failed', status: response.status };
+            }
 
-        console.warn('[bot] Avatar upload error.', error);
-        return { ok: false, reason: 'upload_failed' };
+            if (!contentType.includes('application/json')) {
+                const text = await response.text().catch(() => '');
+                const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+                console.warn(`[bot] Avatar upload unexpected response. content-type=${contentType} body=${preview}`);
+                return { ok: false, reason: 'upload_failed' };
+            }
+
+            const payload = await response.json().catch(() => null);
+            if (payload?.avatar_path) {
+                return { ok: true, avatarPath: payload.avatar_path };
+            }
+            return { ok: true };
+        } catch (error) {
+            const code = error?.cause?.code || error?.code;
+            if (code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+                console.warn('[bot] Avatar upload TLS error. Endpoint:', `${appUrl}/bot/character-avatars`);
+            }
+
+            console.warn('[bot] Avatar upload error.', error);
+        }
     }
+
+    return { ok: false, reason: 'upload_failed' };
 }
 
 async function syncCharacterApprovalAnnouncement(characterId) {
-    const appUrl = resolveAppUrl();
+    const appUrls = resolveApiBaseUrls();
     const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
-    if (!appUrl || !token) {
-        console.warn('[bot] Character approval sync skipped: BOT_APP_URL or BOT_HTTP_TOKEN missing.');
+    if (appUrls.length === 0 || !token) {
+        console.warn('[bot] Character approval sync skipped: BOT_APP_URL/BOT_PUBLIC_APP_URL or BOT_HTTP_TOKEN missing.');
         return { ok: false, reason: 'config_missing' };
     }
 
-    const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/sync`;
-    enableInsecureTlsIfNeeded(endpoint);
+    for (const appUrl of appUrls) {
+        const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/sync`;
+        enableInsecureTlsIfNeeded(endpoint);
 
-    try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Bot-Token': token,
-            },
-            body: JSON.stringify({ character_id: characterId }),
-            dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
-        });
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Bot-Token': token,
+                },
+                body: JSON.stringify({ character_id: characterId }),
+                dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
+            });
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => '');
-            const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
-            console.warn(`[bot] Character approval sync failed (${response.status}). ${preview}`);
-            return { ok: false, status: response.status };
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                const preview = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+                console.warn(`[bot] Character approval sync failed (${response.status}). ${preview}`);
+                return { ok: false, status: response.status };
+            }
+
+            return { ok: true };
+        } catch (error) {
+            console.warn('[bot] Character approval sync error.', error);
         }
-
-        return { ok: true };
-    } catch (error) {
-        console.warn('[bot] Character approval sync error.', error);
-        return { ok: false, reason: 'sync_failed' };
     }
+
+    return { ok: false, reason: 'sync_failed' };
 }
 
 async function updateCharacterForDiscordAndSync(discordUser, characterId, payload) {
