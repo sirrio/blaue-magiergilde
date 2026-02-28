@@ -140,6 +140,51 @@ test('item import updates existing unsourced rows instead of creating duplicates
         ->url->toBe('https://example.test/potion-new');
 });
 
+test('item import treats a source-only assignment as an update and applies it', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Xanathar's Guide to Everything",
+        'shortcode' => 'XGE',
+    ]);
+
+    $existing = Item::factory()->create([
+        'name' => 'Clockwork Amulet',
+        'type' => 'item',
+        'rarity' => 'common',
+        'cost' => '100 GP',
+        'url' => 'https://www.dndbeyond.com/magic-items/27042-clockwork-amulet',
+        'source_id' => null,
+        'guild_enabled' => true,
+        'shop_enabled' => true,
+        'ruling_changed' => false,
+        'ruling_note' => null,
+    ]);
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Clockwork Amulet,item,common,100 GP,,https://www.dndbeyond.com/magic-items/27042-clockwork-amulet,XGE,true,true,false,',
+    ]);
+
+    $preview = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $preview->assertOk();
+    expect((int) $preview->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $preview->json('summary.unchanged_rows'))->toBe(0)
+        ->and($preview->json('row_samples.0.changes.source_id.from'))->toBeNull()
+        ->and($preview->json('row_samples.0.changes.source_id.to'))->toBe($source->id);
+
+    $apply = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $preview->json('preview_token'),
+    ]);
+
+    $apply->assertOk();
+    expect((int) $apply->json('summary.updated_rows'))->toBe(1)
+        ->and($existing->fresh()?->source_id)->toBe($source->id);
+});
+
 test('item import matches existing unsourced rows by unique url before falling back to name and type', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $source = Source::factory()->create([

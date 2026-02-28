@@ -468,6 +468,7 @@ class CompendiumImportService
             'cost' => $payload['cost'],
             'extra_cost_note' => $payload['extra_cost_note'],
             'url' => $payload['url'],
+            'source_id' => $payload['source_id'],
             'guild_enabled' => (bool) $payload['guild_enabled'],
             'shop_enabled' => (bool) $payload['shop_enabled'],
             'ruling_changed' => (bool) $payload['ruling_changed'],
@@ -506,6 +507,7 @@ class CompendiumImportService
         $comparableFields = [
             'url' => $payload['url'],
             'legacy_url' => $payload['legacy_url'],
+            'source_id' => $payload['source_id'],
             'guild_enabled' => (bool) $payload['guild_enabled'],
             'ruling_changed' => (bool) $payload['ruling_changed'],
             'ruling_note' => $payload['ruling_note'],
