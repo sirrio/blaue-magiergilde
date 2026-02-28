@@ -168,10 +168,15 @@ async function getLinkedUserIdForDiscord(discordUser) {
     const name = pickDiscordDisplayName(discordUser);
     const avatar = pickDiscordAvatarUrl(discordUser);
 
-    const [existing] = await db.execute('SELECT id FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
+    const [existing] = await db.execute('SELECT id, deleted_at FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
     if (existing.length > 0) {
         const userId = existing[0].id;
-        await db.execute('UPDATE users SET name = ?, avatar = ?, updated_at = ? WHERE id = ?', [name, avatar, nowSql(), userId]);
+        const deletedAt = existing[0].deleted_at;
+        if (deletedAt) {
+            await db.execute('UPDATE users SET deleted_at = NULL, name = ?, avatar = ?, updated_at = ? WHERE id = ?', [name, avatar, nowSql(), userId]);
+        } else {
+            await db.execute('UPDATE users SET name = ?, avatar = ?, updated_at = ? WHERE id = ?', [name, avatar, nowSql(), userId]);
+        }
         return userId;
     }
 
@@ -187,12 +192,23 @@ async function createUserForDiscord(discordUser) {
     if (existingUserId) return { created: false, userId: existingUserId };
 
     const createdAt = nowSql();
-    const [result] = await db.execute(
-        'INSERT INTO users (discord_id, name, avatar, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [discordId, name, avatar, createdAt, createdAt],
-    );
+    try {
+        const [result] = await db.execute(
+            'INSERT INTO users (discord_id, name, avatar, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            [discordId, name, avatar, createdAt, createdAt],
+        );
 
-    return { created: true, userId: result.insertId };
+        return { created: true, userId: result.insertId };
+    } catch (error) {
+        if (error?.code === 'ER_DUP_ENTRY' || error?.errno === 1062) {
+            const linkedUserId = await getLinkedUserIdForDiscord(discordUser);
+            if (linkedUserId) {
+                return { created: false, userId: linkedUserId };
+            }
+        }
+
+        throw error;
+    }
 }
 
 async function getDefaultCharacterClassId(connection) {

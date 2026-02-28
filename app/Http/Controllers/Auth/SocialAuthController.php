@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Laravel\Socialite\Facades\Socialite;
@@ -52,6 +53,7 @@ class SocialAuthController extends Controller
             $user = Auth::user();
 
             $discordAlreadyLinked = User::query()
+                ->withTrashed()
                 ->where('discord_id', $discordId)
                 ->whereKeyNot($user->getKey())
                 ->exists();
@@ -74,10 +76,15 @@ class SocialAuthController extends Controller
         }
 
         $user = User::query()
+            ->withTrashed()
             ->where('discord_id', $discordId)
             ->first();
 
         if ($user) {
+            if ($user->trashed()) {
+                $user->restore();
+            }
+
             $user->avatar = $discordUser->getAvatar();
             $user->discord_username = $discordProfile['username'];
             $user->discord_display_name = $discordProfile['display_name'];
@@ -90,14 +97,39 @@ class SocialAuthController extends Controller
                 ?? 'Discord User'
             ));
 
-            $user = User::query()->create([
+            $createdAt = Carbon::now();
+
+            User::query()->insertOrIgnore([
                 'discord_id' => $discordId,
                 'discord_username' => $discordProfile['username'],
                 'discord_display_name' => $discordProfile['display_name'],
                 'name' => $fallbackName !== '' ? $fallbackName : 'Discord User',
                 'avatar' => $discordUser->getAvatar(),
                 'password' => null,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
             ]);
+
+            $user = User::query()
+                ->withTrashed()
+                ->where('discord_id', $discordId)
+                ->first();
+
+            if (! $user) {
+                return $this->redirectForFailedCallback(
+                    false,
+                    'Discord authentication failed. Please try again. If the problem persists, contact an administrator.',
+                );
+            }
+
+            if ($user->trashed()) {
+                $user->restore();
+            }
+
+            $user->avatar = $discordUser->getAvatar();
+            $user->discord_username = $discordProfile['username'];
+            $user->discord_display_name = $discordProfile['display_name'];
+            $user->save();
         }
 
         Auth::login($user, true);
