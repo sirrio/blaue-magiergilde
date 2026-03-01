@@ -1,5 +1,5 @@
 import { reportFrontendError } from '@/lib/frontend-error-reporting'
-import { AlertTriangle, RefreshCcw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, RefreshCcw, RotateCcw } from 'lucide-react'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface FrontendErrorBoundaryProps {
@@ -31,6 +31,23 @@ export class FrontendErrorBoundary extends Component<FrontendErrorBoundaryProps,
     })
   }
 
+  private retryView = (): void => {
+    this.setState({ hasError: false })
+  }
+
+  private goBack = (): void => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (window.history.length > 1) {
+      window.history.back()
+      return
+    }
+
+    window.location.assign('/')
+  }
+
   public override render(): ReactNode {
     if (!this.state.hasError) {
       return this.props.children
@@ -45,19 +62,40 @@ export class FrontendErrorBoundary extends Component<FrontendErrorBoundaryProps,
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <h1 className="text-xl font-semibold text-base-content">Something went wrong</h1>
+                <h1 className="text-xl font-semibold text-base-content">This view ran into a problem</h1>
                 <p className="text-sm text-base-content/70">
-                  The error was reported automatically. Reload the page and try again.
+                  The error was reported automatically. Try reopening the view first. If it still fails, reload the page.
+                </p>
+                <p className="text-xs text-base-content/50">
+                  Saved server data was not changed by this fallback screen.
                 </p>
               </div>
-              <button
-                className="btn btn-error btn-sm"
-                onClick={() => window.location.reload()}
-                type="button"
-              >
-                <RefreshCcw className="h-4 w-4" />
-                Reload page
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={this.retryView}
+                  type="button"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Try view again
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={this.goBack}
+                  type="button"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Go back
+                </button>
+                <button
+                  className="btn btn-error btn-sm"
+                  onClick={() => window.location.reload()}
+                  type="button"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  Reload page
+                </button>
+              </div>
             </div>
           </div>
         </div>

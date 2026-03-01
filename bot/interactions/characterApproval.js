@@ -13,6 +13,34 @@ const { buildErrorEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
 
 const APPROVAL_STATUS_LABELS = new Set(['pending', 'approved', 'declined', 'needs changes', 'needs_changes', 'retired', 'draft']);
 
+function isTimeoutMessage(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+
+    return normalized.includes('timed out')
+        || normalized.includes('curl error 28')
+        || normalized.includes('did not respond in time');
+}
+
+function buildReachabilityDetail(endpoint, lastErrorMessage) {
+    if (isTimeoutMessage(lastErrorMessage)) {
+        return `Failed to reach the app (${endpoint}). The website did not respond in time. Wait a moment and try again.`;
+    }
+
+    return `Failed to reach the app (${endpoint}). The website may be restarting or unreachable. Wait a moment and try again.`;
+}
+
+function buildRequestFailureDetail(detail) {
+    if (!detail) {
+        return 'Request failed. Wait a moment and try again.';
+    }
+
+    if (isTimeoutMessage(detail)) {
+        return `${detail} Wait a moment and try again.`;
+    }
+
+    return `Request failed: ${detail}`;
+}
+
 function parseApprovalAction(customId) {
     if (!customId || !customId.startsWith('character-approval:')) return null;
 
@@ -187,6 +215,7 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
 
     let response = null;
     let lastEndpoint = '';
+    let lastErrorMessage = '';
     for (const appUrl of appUrls) {
         const endpoint = `${appUrl.replace(/\/$/, '')}/bot/character-approvals/status`;
         lastEndpoint = endpoint;
@@ -208,13 +237,14 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
             break;
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
+            lastErrorMessage = message;
             console.error('[bot] Character approval request failed.', { endpoint, error: message });
         }
     }
 
     if (!response) {
         const payload = {
-            embeds: [buildErrorEmbed('App request failed', `Failed to reach the app (${lastEndpoint}).`)],
+            embeds: [buildErrorEmbed('App request failed', buildReachabilityDetail(lastEndpoint, lastErrorMessage))],
         };
         if (usesInlineConfirm) {
             await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
@@ -233,7 +263,7 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
             detail = '';
         }
 
-        const message = detail ? `Request failed: ${detail}` : 'Request failed.';
+        const message = buildRequestFailureDetail(detail);
         const payload = {
             embeds: [buildErrorEmbed('Approval update failed', message)],
         };
