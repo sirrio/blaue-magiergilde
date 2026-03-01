@@ -60,7 +60,7 @@ async function testCancelRestoresOriginalActions() {
     const confirmRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('character-approval-confirm:pending:12:approved')
-            .setLabel('Confirm set pending')
+            .setLabel('Confirm move back to review')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId('character-approval-cancel:pending:12:approved')
@@ -90,7 +90,7 @@ async function testCancelRestoresOriginalActions() {
     assert.equal(updatePayload.components.length, 2);
 
     const labels = updatePayload.components[0].components.map((component) => component.label);
-    assert.deepEqual(labels, ['Approve', 'Needs changes', 'Decline', 'Set pending']);
+    assert.deepEqual(labels, ['Approve', 'Request changes', 'Decline', 'Move back to review']);
     assert.equal(updatePayload.components[0].components[3].disabled, false);
 }
 

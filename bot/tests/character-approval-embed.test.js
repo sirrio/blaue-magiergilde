@@ -44,7 +44,7 @@ const reviewField = embedData.fields.find((field) => field.name === 'Review note
 assert.equal(reviewField?.value, 'Please provide a proper DnDBeyond link before approval.');
 
 const buttonLabels = message.components[0].toJSON().components.map((component) => component.label);
-assert.deepEqual(buttonLabels, ['Approve', 'Needs changes', 'Decline', 'Set pending']);
+assert.deepEqual(buttonLabels, ['Approve', 'Request changes', 'Decline', 'Move back to review']);
 assert.equal(message.components[0].toJSON().components[3].disabled, true);
 
 const approvedMessage = buildCharacterApprovalMessage({

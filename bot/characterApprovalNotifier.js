@@ -157,7 +157,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
-            .setLabel('Needs changes')
+            .setLabel('Request changes')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
@@ -167,7 +167,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Set pending')
+            .setLabel('Move back to review')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );

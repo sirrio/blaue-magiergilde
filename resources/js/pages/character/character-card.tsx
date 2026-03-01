@@ -207,6 +207,46 @@ function SubmitForApprovalModal({
   )
 }
 
+function getCharacterStatusBadgeClass(guildStatus: string): string {
+  if (guildStatus === 'approved') {
+    return 'badge-success badge-soft'
+  }
+
+  if (guildStatus === 'declined') {
+    return 'badge-error badge-soft'
+  }
+
+  if (guildStatus === 'needs_changes' || guildStatus === 'pending') {
+    return 'badge-warning badge-soft'
+  }
+
+  if (guildStatus === 'retired') {
+    return 'badge-neutral badge-soft'
+  }
+
+  return 'badge-ghost'
+}
+
+function getCharacterStatusHint(guildStatus: string): string {
+  if (guildStatus === 'draft') {
+    return 'Private draft. Register it with Magiergilde when it is ready for review.'
+  }
+
+  if (guildStatus === 'pending') {
+    return 'Submitted for review. Waiting for Magiergilde.'
+  }
+
+  if (guildStatus === 'needs_changes') {
+    return 'Changes requested. Update the character and register it again.'
+  }
+
+  if (guildStatus === 'declined') {
+    return 'Review declined. Check the review note before trying again.'
+  }
+
+  return ''
+}
+
 export function CharacterCard({
   character,
   guildCharacters = [],
@@ -277,7 +317,7 @@ export function CharacterCard({
           ? 'text-base-content/60'
           : 'text-warning'
   const statusTooltip = guildStatus === 'draft'
-    ? 'Draft only. This character is not registered with the Magiergilde yet.'
+    ? 'Private draft. This character is not registered with the Magiergilde yet.'
     : guildStatus === 'declined'
       ? reviewNote
         ? `Declined by the Magiergilde. Note: ${reviewNote}`
@@ -287,8 +327,10 @@ export function CharacterCard({
         ? `Changes requested by the Magiergilde. Note: ${reviewNote}`
         : 'Changes requested by the Magiergilde. Update and register again for review.'
     : guildStatus === 'pending'
-      ? 'Registered with the Magiergilde. Waiting for review.'
+      ? 'Submitted to the Magiergilde. Waiting for review.'
       : `Status: ${statusLabel}`
+  const statusHint = getCharacterStatusHint(guildStatus)
+  const statusBadgeClass = getCharacterStatusBadgeClass(guildStatus)
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
@@ -398,6 +440,7 @@ export function CharacterCard({
               {statusIcon}
             </span>
             <span className="truncate">{character.name}</span>
+            <span className={cn('badge badge-xs shrink-0', statusBadgeClass)}>{statusLabel}</span>
             {hasRoom ? (
               <span className="text-primary/70" title="Room assigned">
                 <MapPin size={14} />
@@ -411,6 +454,7 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
             </div>
+            {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}

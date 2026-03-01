@@ -47,14 +47,14 @@ class CharacterApprovalController extends Controller
 
         $isReviewDecision = in_array($data['status'], ['approved', 'declined', 'needs_changes'], true);
         if ($isReviewDecision && $character->guild_status !== 'pending') {
-            return response()->json(['error' => 'Only pending characters can be reviewed. Set status back to pending first.'], 409);
+            return response()->json(['error' => 'Only characters in pending review can be reviewed. Move the character back to review first.'], 409);
         }
 
         if (
             $data['status'] === 'pending'
             && ! in_array($character->guild_status, ['approved', 'declined', 'needs_changes'], true)
         ) {
-            return response()->json(['error' => 'Only reviewed characters can be set back to pending.'], 409);
+            return response()->json(['error' => 'Only reviewed characters can be moved back into review.'], 409);
         }
 
         $previousStatus = $character->guild_status;

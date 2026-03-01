@@ -159,5 +159,5 @@ it('requires pending status before approval decisions from the discord bot', fun
             'actor_discord_id' => $admin->discord_id,
         ])
         ->assertConflict()
-        ->assertJsonPath('error', 'Only pending characters can be reviewed. Set status back to pending first.');
+        ->assertJsonPath('error', 'Only characters in pending review can be reviewed. Move the character back to review first.');
 });
