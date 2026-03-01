@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\DiscordBackupController;
 use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use App\Http\Controllers\Admin\GameSettingsController;
+use App\Http\Controllers\Admin\LegacyCharacterApprovalImportController;
 use App\Http\Controllers\Admin\SourceController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +55,12 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     Route::post('/admin/settings/compendium/apply', [CompendiumImportController::class, 'apply'])
         ->name('admin.settings.compendium.apply');
+
+    Route::post('/admin/settings/legacy-character-approvals/preview', [LegacyCharacterApprovalImportController::class, 'preview'])
+        ->name('admin.settings.legacy-character-approvals.preview');
+
+    Route::post('/admin/settings/legacy-character-approvals/apply', [LegacyCharacterApprovalImportController::class, 'apply'])
+        ->name('admin.settings.legacy-character-approvals.apply');
 
     Route::get('/admin/games', [GameSettingsController::class, 'index'])->name('admin.games');
     Route::patch('/admin/games', [DiscordBotSettingsController::class, 'update'])->name('admin.games.update');
