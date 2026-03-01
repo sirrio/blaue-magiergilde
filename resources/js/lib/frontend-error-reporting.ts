@@ -81,16 +81,6 @@ export function installFrontendErrorReporting(): void {
   })
 }
 
-interface InertiaErrorEvent {
-  detail?: {
-    response?: {
-      status?: number
-      config?: { url?: string }
-    }
-    exception?: Error
-  }
-}
-
 export function installInertiaErrorReporting(): void {
   router.on('invalid', (event) => {
     const status = Number(event.detail?.response?.status ?? 0)

@@ -1,11 +1,14 @@
 import { expect, test } from '@playwright/test'
 
 const baseUrl = process.env.E2E_BASE_URL ?? 'https://blaue-magiergilde.test'
+const configuredBaseUrl = process.env.E2E_BASE_URL
 
 test.describe('Frontend monitoring smoke', () => {
   test.use({
     ignoreHTTPSErrors: true,
   })
+
+  test.skip(!configuredBaseUrl, 'Set E2E_BASE_URL to run frontend monitoring smoke tests against a live app.');
 
   test('reports uncaught browser errors to the monitoring endpoint', async ({ page }) => {
     const payloads: Array<Record<string, unknown>> = []
