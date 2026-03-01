@@ -1129,8 +1129,9 @@ export default function Index({
   const cooldownIntervalRef = useRef<number | null>(null)
   const isSyncingRef = useRef(false)
   const voiceChannelIdRef = useRef<string | null>(auctionSettings?.voice_channel_id ?? null)
-  const { auth } = usePage<PageProps>().props
+  const { auth, botChannelOverride } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
+  const hasBotChannelOverride = Boolean(botChannelOverride?.active && botChannelOverride?.channel_id)
 
   useEffect(() => {
     setSelectedAuction((prev) => {
@@ -1554,6 +1555,11 @@ export default function Index({
                           <p className="text-sm font-semibold">
                             {voiceChannelLabel}
                           </p>
+                          {hasBotChannelOverride ? (
+                            <p className="text-xs text-warning">
+                              Local override active: live voice sync uses {botChannelOverride?.channel_id}.
+                            </p>
+                          ) : null}
                           <DiscordChannelPickerModal
                             title="Select voice channel"
                             description="Choose the voice channel used for live candidates."
@@ -1577,6 +1583,11 @@ export default function Index({
                   </Modal>
                 ) : null}
               </div>
+              {hasBotChannelOverride ? (
+                <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  Local channel override active. Bot channel actions use Discord channel <span className="font-semibold">{botChannelOverride?.channel_id}</span> instead of the configured channel ids while developing locally.
+                </div>
+              ) : null}
               <BotOperationProgress
                 operation={activeOperation}
                 onOperationChange={setActiveOperation}

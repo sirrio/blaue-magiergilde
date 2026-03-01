@@ -68,7 +68,7 @@ export default function Settings({
     last_imported_at?: string | null
   }
 }) {
-  const { errors: pageErrors } = usePage<PageProps>().props
+  const { errors: pageErrors, botChannelOverride } = usePage<PageProps>().props
   const backupForm = useForm({})
   const deleteForm = useForm({})
   const selectionForm = useForm({
@@ -1248,6 +1248,11 @@ export default function Settings({
               ) : null}
             </div>
           </div>
+          {botChannelOverride?.active && botChannelOverride.channel_id ? (
+            <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              Local channel override active. The bot uses Discord channel <span className="font-semibold">{botChannelOverride.channel_id}</span> for character approvals and support tickets instead of the saved channel settings while developing locally.
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
             <span>
               Current: <span className="font-semibold text-base-content">{approvalChannelLabel}</span>

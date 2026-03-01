@@ -28,6 +28,7 @@ return [
         'http_token' => env('BOT_HTTP_TOKEN'),
         'http_timeout' => env('BOT_HTTP_TIMEOUT', 120),
         'guild_ids' => env('DISCORD_GUILD_IDS'),
+        'channel_override_id' => env('DISCORD_CHANNEL_OVERRIDE_ID'),
     ],
 
 ];

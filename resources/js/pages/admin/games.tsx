@@ -3,8 +3,8 @@ import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
 import LogoTier from '@/components/logo-tier'
-import { DiscordBotSettings } from '@/types'
-import { Head, useForm } from '@inertiajs/react'
+import { DiscordBotSettings, PageProps } from '@/types'
+import { Head, useForm, usePage } from '@inertiajs/react'
 import { CalendarDays } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { cn } from '@/lib/utils'
@@ -47,6 +47,7 @@ type GamesSettingsProps = {
 }
 
 export default function GamesSettings({ discordBotSettings, stats }: GamesSettingsProps) {
+  const { botChannelOverride } = usePage<PageProps>().props
   const form = useForm({
     games_channel_id: discordBotSettings.games_channel_id ?? '',
     games_channel_name: discordBotSettings.games_channel_name ?? '',
@@ -127,6 +128,11 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
             <div className="text-sm">
               Current: <span className="font-semibold text-base-content">{channelLabel}</span>
             </div>
+            {botChannelOverride?.active && botChannelOverride.channel_id ? (
+              <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                Local channel override active. The bot scans Discord channel <span className="font-semibold">{botChannelOverride.channel_id}</span> instead of the saved games channel while developing locally.
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap items-end gap-3">
               <label className="flex flex-col gap-1 text-sm">
