@@ -30,6 +30,7 @@ class EnsurePrivacyPolicyAccepted
         if ($hasAcceptedCurrentPolicy || $request->routeIs([
             'privacy-consent.show',
             'privacy-consent.store',
+            'monitoring.frontend-errors.store',
             'logout',
             'datenschutz',
             'impressum',

@@ -10,6 +10,7 @@ export interface PageProps {
   versions: string[]
   factions: object
   features: { games_calendar: boolean; rooms: boolean; character_status_switch: boolean }
+  botChannelOverride?: { active: boolean; channel_id?: string | null }
   discordConnected: boolean
   handbookChannels?: { id: string; name: string }[]
   activeChannelId?: string | null

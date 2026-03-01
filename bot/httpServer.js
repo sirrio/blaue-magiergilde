@@ -7,6 +7,7 @@ const { postShopToChannel, updateShopPost, updateShopItemPost } = require('./sho
 const { getSnapshot } = require('./voiceStateCache');
 const { runGameAnnouncementSync } = require('./discordGameSync');
 const { guildIds: configuredGuildIds } = require('./config');
+const { resolveChannelId } = require('./channelOverride');
 const {
     postCharacterApprovalAnnouncement,
     sendCharacterApprovalDm,
@@ -97,6 +98,10 @@ function getRateLimitStatus(req) {
 
     rateLimit.set(key, now);
     return { limited: false, retryAfterMs: 0 };
+}
+
+function readChannelId(payload) {
+    return resolveChannelId(payload?.channel_id);
 }
 
 function startHttpServer(client) {
@@ -293,7 +298,7 @@ function startHttpServer(client) {
         }
 
         if (isCharacterApprovalPending) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
 
             const result = await postCharacterApprovalAnnouncement({
                 client,
@@ -316,7 +321,7 @@ function startHttpServer(client) {
         }
 
         if (isCharacterApprovalUpdate) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const messageId = String(payload?.message_id || '').trim();
 
             const result = await updateCharacterApprovalAnnouncement({
@@ -337,7 +342,7 @@ function startHttpServer(client) {
         }
 
         if (isCharacterApprovalDelete) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const messageId = String(payload?.message_id || '').trim();
 
             const result = await deleteCharacterApprovalAnnouncement({
@@ -376,7 +381,7 @@ function startHttpServer(client) {
         }
 
         if (isDiscordThreads) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
                 logReject(req, 'invalid channel_id');
                 respondJson(res, 422, { error: 'Invalid channel_id.' });
@@ -434,7 +439,7 @@ function startHttpServer(client) {
 
         if (isDiscordBackupChannel) {
             const appUrl = String(payload?.app_url || '').trim();
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const guildId = String(payload?.guild_id || '').trim();
             const guildSelections = Array.isArray(payload?.guilds) ? payload.guilds : null;
             const allowlistByGuild = new Map();
@@ -484,7 +489,7 @@ function startHttpServer(client) {
         }
 
         if (isShopPost) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const shopId = Number(payload?.shop_id || 0);
             const operationId = Number(payload?.operation_id || 0);
             const threadName = typeof payload?.thread_name === 'string' ? payload.thread_name.trim() : '';
@@ -606,7 +611,7 @@ function startHttpServer(client) {
         }
 
         if (isBackstockPost) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const operationId = Number(payload?.operation_id || 0);
 
             if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
@@ -680,7 +685,7 @@ function startHttpServer(client) {
         }
 
         if (isAuctionPost) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const auctionId = Number(payload?.auction_id || 0);
             const operationId = Number(payload?.operation_id || 0);
 
@@ -762,7 +767,7 @@ function startHttpServer(client) {
         }
 
         if (isAuctionVoiceBid) {
-            const channelId = String(payload?.channel_id || '').trim();
+            const channelId = readChannelId(payload);
             const auctionItemId = Number(payload?.auction_item_id || 0);
             const bidderDiscordId = payload?.bidder_discord_id ? String(payload.bidder_discord_id).trim() : '';
             const bidderName = typeof payload?.bidder_name === 'string' ? payload.bidder_name.trim() : '';
@@ -924,7 +929,7 @@ function startHttpServer(client) {
             }
         }
 
-        const channelId = String(payload?.channel_id || '').trim();
+        const channelId = readChannelId(payload);
         if (!channelId || !/^[0-9]{5,}$/.test(channelId)) {
             logReject(req, 'invalid channel_id');
             respondJson(res, 422, { error: 'Invalid channel_id.' });

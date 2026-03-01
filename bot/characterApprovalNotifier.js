@@ -1,5 +1,6 @@
 const { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { withInsecureDispatcher, shouldAllowInsecure } = require('./httpClient');
+const { resolveChannelId } = require('./channelOverride');
 
 function resolveAvatarExtension(contentType, fallback) {
     if (!contentType) return fallback;
@@ -326,6 +327,8 @@ async function sendCharacterApprovalDm({
 }
 
 async function postCharacterApprovalAnnouncement({ client, channelId, payload }) {
+    channelId = resolveChannelId(channelId);
+
     if (!channelId || !/^[0-9]{5,}$/.test(String(channelId))) {
         return { ok: false, status: 422, error: 'Invalid channel_id.' };
     }
@@ -367,6 +370,8 @@ async function postCharacterApprovalAnnouncement({ client, channelId, payload })
 }
 
 async function updateCharacterApprovalAnnouncement({ client, channelId, messageId, payload }) {
+    channelId = resolveChannelId(channelId);
+
     if (!channelId || !/^[0-9]{5,}$/.test(String(channelId))) {
         return { ok: false, status: 422, error: 'Invalid channel_id.' };
     }
@@ -416,6 +421,8 @@ async function updateCharacterApprovalAnnouncement({ client, channelId, messageI
 }
 
 async function deleteCharacterApprovalAnnouncement({ client, channelId, messageId }) {
+    channelId = resolveChannelId(channelId);
+
     if (!channelId || !/^[0-9]{5,}$/.test(String(channelId))) {
         return { ok: false, status: 422, error: 'Invalid channel_id.' };
     }

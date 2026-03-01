@@ -76,6 +76,10 @@ class HandleInertiaRequests extends Middleware
                     : null,
             ],
             'features' => config('features'),
+            'botChannelOverride' => [
+                'active' => filled(config('services.bot.channel_override_id')),
+                'channel_id' => config('services.bot.channel_override_id'),
+            ],
             'discordConnected' => (bool) $user?->discord_id,
             'appearance' => $request->cookie('appearance', 'system'),
             'ziggy' => fn (): array => [

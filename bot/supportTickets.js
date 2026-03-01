@@ -1,5 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { supportStaffRoleIds } = require('./config');
+const { getChannelOverrideId } = require('./channelOverride');
 
 const CLOSE_COMMANDS = new Set(['close', '/close', '!close', 'ticket close', '!ticket close']);
 const CLAIM_COMMANDS = new Set(['claim', '/claim', '!claim', 'ticket claim', '!ticket claim']);
@@ -377,6 +378,11 @@ async function deleteCommandMessage(message) {
 }
 
 async function loadSupportTicketChannelId() {
+    const overrideChannelId = getChannelOverrideId();
+    if (overrideChannelId) {
+        return overrideChannelId;
+    }
+
     const now = Date.now();
     if (now - settingsLoadedAt < SETTINGS_CACHE_TTL_MS) {
         return cachedSupportTicketChannelId;
