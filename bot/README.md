@@ -64,6 +64,7 @@ Set these in the root `.env`:
 - `DISCORD_GUILD_IDS` - comma-separated list (for guild commands, visible immediately)
 - `DISCORD_COMMAND_PREFIX` - for example `mg`
 - `DISCORD_SUPPORT_STAFF_ROLE_IDS` - optional comma-separated role IDs allowed to relay/close tickets in threads. Empty means everyone with thread access.
+- `DISCORD_CHANNEL_OVERRIDE_ID` - optional local/testing override. If set, the bot uses this single Discord channel for game scans, support tickets, character approvals, and app-triggered post/update actions instead of the configured channel ids.
 - `BOT_APP_URL` - internal base URL for bot → app API calls (for example `http://127.0.0.1:8000` or a private hostname).
 - `BOT_PUBLIC_APP_URL` - optional public base URL for links/avatars in Discord (for example `https://blaue-magiergilde.de`). Overrides `APP_URL` for links only.
 

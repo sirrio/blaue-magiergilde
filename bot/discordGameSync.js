@@ -1,6 +1,7 @@
 const db = require('./db');
 const { scanGameAnnouncements } = require('./discordGameScanner');
 const { getGamesScanSinceDate } = require('./gameScanWindow');
+const { resolveChannelId } = require('./channelOverride');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -19,7 +20,7 @@ async function fetchGameSyncSettings() {
             'SELECT games_channel_id, games_scan_years, games_scan_interval_minutes FROM discord_bot_settings ORDER BY id LIMIT 1',
         );
         const row = rows?.[0] ?? {};
-        const channelId = String(row.games_channel_id || '').trim();
+        const channelId = resolveChannelId(row.games_channel_id);
         const rawYears = Number(row.games_scan_years);
         const scanYears = Number.isFinite(rawYears) && rawYears > 0 ? rawYears : 10;
         const rawMinutes = Number(row.games_scan_interval_minutes);
