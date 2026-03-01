@@ -132,7 +132,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         embed.addFields({ name: 'Notes', value: notes, inline: false });
     }
     if (isMeaningful(registrationNote) && registrationNote !== '—') {
-        embed.addFields({ name: 'Registration info', value: registrationNote, inline: false });
+        embed.addFields({ name: 'Registration notes', value: registrationNote, inline: false });
     }
     if (isMeaningful(reviewNote) && reviewNote !== '—') {
         embed.addFields({ name: 'Review note', value: reviewNote, inline: false });

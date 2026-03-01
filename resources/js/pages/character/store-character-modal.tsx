@@ -103,7 +103,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               <p className="text-xs text-base-content/60">
                 {!isCharacterStatusSwitchEnabled
                   ? 'Character submission is currently disabled. New characters stay draft.'
-                  : 'New characters start as draft. Use "Register with Magiergilde" on the character card to start review.'}
+                  : 'New characters start as draft. Use "Register with Magiergilde" on the character card when they are ready for review. Add rare languages, filler-character notes, and other review-relevant info in the registration notes.'}
               </p>
               <Input
                 placeholder="https://www.dndbeyond.com/characters/..."

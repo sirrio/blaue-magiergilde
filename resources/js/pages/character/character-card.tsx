@@ -181,22 +181,27 @@ function SubmitForApprovalModal({
           This changes <span className="font-semibold">{character.name}</span> from {fromLabel} to active (pending) and registers it with
           the Magiergilde for review.
         </p>
+        <p className="text-xs text-base-content/60">
+          The review team checks whether the character can be used in the Magiergilde and may request changes if something is missing or needs
+          clarification.
+        </p>
         <TextArea
           value={registrationNote}
           onChange={(event) => setRegistrationNote(event.target.value)}
-          placeholder="Add relevant review info, for example rare language choices, filler-character notes, or anything the Magiergilde should know..."
+          placeholder="Add review-relevant info, for example rare language choices, filler-character notes, or anything the Magiergilde should know..."
         >
-          Registration info / special notes (optional)
+          Registration notes (optional)
         </TextArea>
         <p className="text-xs text-base-content/60">
-          Use this for anything the review team should know when checking the character, for example rare language choices or if this is a filler character.
+          Use this for anything the review team should know when checking the character, for example rare language choices, filler characters,
+          or special rulings.
         </p>
         <p className="mt-2 text-xs text-base-content/60">
           After Magiergilde review, you cannot switch approved or declined characters back by yourself.
         </p>
       </ModalContent>
       <ModalAction onClick={() => onSubmit(registrationNote.trim(), () => setIsOpen(false))} disabled={processing}>
-        Register now
+        Register character
       </ModalAction>
     </Modal>
   )

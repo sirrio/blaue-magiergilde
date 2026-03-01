@@ -1239,6 +1239,7 @@ function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
         .setColor(0xf59e0b)
         .setDescription(
             `This changes **${name}** from **${fromStatus}** to **active (pending)** and registers it with the Magiergilde for review.\n\n`
+            + 'The review team checks whether the character can be used in the Magiergilde and may request changes if something is missing or needs clarification.\n\n'
             + 'After Magiergilde review, you cannot switch approved or declined characters back by yourself.',
         );
 
@@ -1251,14 +1252,15 @@ function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
 function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialNote = '' }) {
     const modal = new ModalBuilder()
         .setCustomId(`characterRegisterNoteModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Registration info');
+        .setTitle('Registration notes');
 
     const noteInput = new TextInputBuilder()
         .setCustomId('registrationNote')
-        .setLabel('Info for support/review team')
+        .setLabel('Review-relevant notes (optional)')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setMaxLength(2000)
+        .setPlaceholder('Rare languages, filler character, special rulings, ...')
         .setValue(safeModalValue(initialNote, 2000));
 
     modal.addComponents(new ActionRowBuilder().addComponents(noteInput));

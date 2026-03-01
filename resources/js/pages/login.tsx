@@ -53,14 +53,22 @@ export default function Login() {
                 className={cn('gap-2 text-sm sm:text-base', buttonOutlineDiscord)}
               >
                 <DiscordIcon width={20} />
-                Mit Discord fortfahren
+                Mit Discord anmelden
               </Button>
+              <div className="rounded-lg border border-sky-400/20 bg-sky-400/8 p-3 text-xs text-sky-100/90">
+                <p className="font-semibold text-sky-100">Discord already connected?</p>
+                <p className="mt-1">Use this if your app account is already linked to Discord.</p>
+                <p className="mt-1 text-sky-100/75">
+                  If you already use the website but Discord is not linked yet, log in below once and connect Discord in your profile.
+                </p>
+              </div>
 
               <div className="divider my-0 opacity-60">oder</div>
 
               <form onSubmit={submit} className="space-y-3 sm:space-y-4">
                 <Input
                   type="email"
+                  autoComplete="username"
                   value={data.email}
                   onChange={(e) => setData('email', e.target.value)}
                   errors={errors.email}
@@ -70,6 +78,7 @@ export default function Login() {
                 </Input>
                 <Input
                   type="password"
+                  autoComplete="current-password"
                   value={data.password}
                   onChange={(e) => setData('password', e.target.value)}
                   errors={errors.password}
@@ -92,7 +101,7 @@ export default function Login() {
                 <p className="text-center text-sm text-white/80">
                   Kein Account?{' '}
                   <Link href={route('register')} className="underline underline-offset-4 text-white/80 transition-colors hover:text-white">
-                    Registrieren
+                    Neuen Account erstellen
                   </Link>
                 </p>
                 <Button as={Link as ElementType} href={route('home')} variant="outline" className={cn('btn-sm', buttonOutlineWhite)}>

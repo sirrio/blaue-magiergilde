@@ -12,6 +12,10 @@ assert.equal(
     true,
 );
 assert.equal(
+    embed.description.includes('The review team checks whether the character can be used in the Magiergilde'),
+    true,
+);
+assert.equal(
     embed.description.includes('After Magiergilde review, you cannot switch approved or declined characters back by yourself.'),
     true,
 );

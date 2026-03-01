@@ -146,7 +146,8 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                 {draftCharacterCount > 0 ? `${draftCharacterCount} draft ${draftCharacterCount === 1 ? 'character is' : 'characters are'} still private.` : ''}
                 {draftCharacterCount > 0 && needsChangesCharacterCount > 0 ? ' ' : ''}
                 {needsChangesCharacterCount > 0 ? `${needsChangesCharacterCount} ${needsChangesCharacterCount === 1 ? 'character needs' : 'characters need'} fixes and re-registration.` : ''}
-                {' '}Use "Register with Magiergilde" on a card to start review. Add review-relevant info like rare languages or filler-character notes in the registration notes.
+                {' '}Use "Register with Magiergilde" on a card when a character is ready for review. Add rare languages, filler-character notes,
+                and other review-relevant info in the registration notes.
               </p>
             ) : null}
           </div>

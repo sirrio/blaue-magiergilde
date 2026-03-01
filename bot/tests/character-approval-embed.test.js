@@ -37,7 +37,7 @@ assert.equal(dmField?.value, '0 bubbles · 0 coins');
 const userField = embedData.fields.find((field) => field.name === 'User');
 assert.ok(userField?.value.includes('<@123456789012345678>'));
 
-const registrationField = embedData.fields.find((field) => field.name === 'Registration info');
+const registrationField = embedData.fields.find((field) => field.name === 'Registration notes');
 assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');
 
 const reviewField = embedData.fields.find((field) => field.name === 'Review note');
