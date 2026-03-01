@@ -1,6 +1,4 @@
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateClassString } from '@/helper/calculateClassString'
@@ -12,7 +10,7 @@ import { Character, PageProps } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
-import { Archive, BookUser, Copy, Plus, RefreshCw } from 'lucide-react'
+import { Archive, BookUser, Copy, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
@@ -90,13 +88,6 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   }).length
   const draftCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'draft').length
   const needsChangesCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'needs_changes').length
-
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-
-  const test = () => {
-    return router.post(route('auth.sync'), { email, password }, { preserveState: 'errors' })
-  }
 
   const updateTrackingMode = (characterId: number, value: boolean) => {
     if (updatingTrackingIds.includes(characterId)) return
@@ -182,7 +173,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
           <div className="py-10 text-center">
             <BookUser size={64} className="text-base-content mx-auto mb-4" />
             <h2 className="text-base-content text-lg font-semibold">No characters yet</h2>
-            <p className="text-base-content/70 text-sm">Start by creating or syncing your characters.</p>
+            <p className="text-base-content/70 text-sm">Start by creating your first character.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <StoreCharacterModal>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -190,33 +181,6 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                   <span>Create Character</span>
                 </Button>
               </StoreCharacterModal>
-              <Modal>
-                <ModalTrigger>
-                  <Button variant={'outline'} className="flex items-center gap-2">
-                    <RefreshCw size={16} />
-                    <span>Sync Characters</span>
-                  </Button>
-                </ModalTrigger>
-                <ModalTitle>Sync characters</ModalTitle>
-                <ModalContent>
-                  <Input type="email" placeholder="Enter your email" className="w-full" value={email} onChange={(e) => setEmail(e.target.value)}>
-                    Email
-                  </Input>
-                  <Input
-                    type="password"
-                    placeholder="Enter your password"
-                    className="w-full"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  >
-                    Password
-                  </Input>
-                </ModalContent>
-                <ModalAction onClick={() => test()}>Sync now</ModalAction>
-              </Modal>
-              <Button as="a" href={route('characters.deleted')} variant="outline" modifier="square">
-                <Archive size={16} />
-              </Button>
             </div>
           </div>
         ) : (

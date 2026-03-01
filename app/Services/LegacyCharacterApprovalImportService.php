@@ -19,11 +19,13 @@ class LegacyCharacterApprovalImportService
      */
     public function preview(UploadedFile $file): array
     {
-        [$headers, $rows, $headerLine] = $this->readCsvRows($file);
+        [$headers, $rows, $headerLine, $detectedHeaders] = $this->readCsvRows($file);
         $requiredHeaders = ['neuer_discordname', 'spieler', 'zimmer', 'bt', 'lt', 'ht', 'et'];
         $missingHeaders = array_values(array_diff($requiredHeaders, $headers));
 
         if ($missingHeaders !== []) {
+            $detectedHeadersText = $detectedHeaders === [] ? 'none' : implode(', ', $detectedHeaders);
+
             return [
                 'summary' => [
                     'total_rows' => 0,
@@ -35,7 +37,7 @@ class LegacyCharacterApprovalImportService
                 'row_samples' => [],
                 'error_samples' => [[
                     'line' => $headerLine ?? 1,
-                    'message' => 'Missing required headers: '.implode(', ', $missingHeaders),
+                    'message' => 'Missing required headers: '.implode(', ', $missingHeaders).". Detected headers: {$detectedHeadersText}",
                 ]],
                 'import_rows' => [],
             ];
@@ -185,26 +187,27 @@ class LegacyCharacterApprovalImportService
     }
 
     /**
-     * @return array{0: array<int, string>, 1: array<int, array{line:int,row:array<string,string>}>, 2:int|null}
+     * @return array{0: array<int, string>, 1: array<int, array{line:int,row:array<string,string>}>, 2:int|null, 3: array<int, string>}
      */
     private function readCsvRows(UploadedFile $file): array
     {
         $path = $file->getRealPath();
         if (! is_string($path) || $path === '') {
-            return [[], [], null];
+            return [[], [], null, []];
         }
 
         $delimiter = $this->detectDelimiter($path);
 
         $handle = fopen($path, 'rb');
         if ($handle === false) {
-            return [[], [], null];
+            return [[], [], null, []];
         }
 
         $requiredHeaders = ['neuer_discordname', 'spieler', 'zimmer', 'bt', 'lt', 'ht', 'et'];
         $headers = [];
         $rows = [];
         $headerLine = null;
+        $detectedHeaders = [];
         $line = 0;
 
         while (($row = fgetcsv($handle, 0, $delimiter, '"', '')) !== false) {
@@ -217,6 +220,9 @@ class LegacyCharacterApprovalImportService
 
             if ($headers === []) {
                 $candidateHeaders = array_values(array_map(fn ($value) => $this->normalizeHeader($value), $normalizedValues));
+                if ($candidateHeaders !== [] && $detectedHeaders === []) {
+                    $detectedHeaders = $candidateHeaders;
+                }
                 if (count(array_intersect($requiredHeaders, $candidateHeaders)) === count($requiredHeaders)) {
                     $headers = $candidateHeaders;
                     $headerLine = $line;
@@ -246,7 +252,7 @@ class LegacyCharacterApprovalImportService
 
         fclose($handle);
 
-        return [$headers, $rows, $headerLine];
+        return [$headers, $rows, $headerLine, $detectedHeaders];
     }
 
     private function detectDelimiter(string $path): string

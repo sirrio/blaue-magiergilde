@@ -119,6 +119,24 @@ test('legacy import preview accepts semicolon separated files', function () {
         ->and($preview->json('row_samples.0.payload.character_name'))->toBe('Liza');
 });
 
+test('preview includes detected headers when required legacy headers are missing', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $csv = implode("\n", [
+        'foo,bar,baz',
+        'a,b,c',
+    ]);
+
+    $preview = $this->actingAs($admin)->post(route('admin.settings.legacy-character-approvals.preview'), [
+        'file' => UploadedFile::fake()->createWithContent('legacy.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $preview->assertOk();
+    expect($preview->json('error_samples.0.message'))
+        ->toContain('Missing required headers')
+        ->toContain('Detected headers: foo, bar, baz');
+});
+
 test('non admin cannot preview legacy character approval import', function () {
     $user = User::factory()->create(['is_admin' => false]);
 
