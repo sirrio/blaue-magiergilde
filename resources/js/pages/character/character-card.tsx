@@ -184,10 +184,13 @@ function SubmitForApprovalModal({
         <TextArea
           value={registrationNote}
           onChange={(event) => setRegistrationNote(event.target.value)}
-          placeholder="Add relevant info for the support/review team..."
+          placeholder="Add relevant review info, for example rare language choices, filler-character notes, or anything the Magiergilde should know..."
         >
-          Registration info (optional)
+          Registration info / special notes (optional)
         </TextArea>
+        <p className="text-xs text-base-content/60">
+          Use this for anything the review team should know when checking the character, for example rare language choices or if this is a filler character.
+        </p>
         <p className="mt-2 text-xs text-base-content/60">
           After Magiergilde review, you cannot switch approved or declined characters back by yourself.
         </p>
