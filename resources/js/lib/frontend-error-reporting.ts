@@ -82,6 +82,14 @@ export function installFrontendErrorReporting(): void {
 }
 
 export function installInertiaErrorReporting(): void {
+  router.on('navigate', (event) => {
+    setCurrentPageComponent(event.detail.page.component)
+  })
+
+  router.on('success', (event) => {
+    setCurrentPageComponent(event.detail.page.component)
+  })
+
   router.on('invalid', (event) => {
     const status = Number(event.detail?.response?.status ?? 0)
     if (status < 500) {

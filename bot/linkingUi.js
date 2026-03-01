@@ -29,15 +29,23 @@ function notLinkedContent() {
 }
 
 function buildNotLinkedButtons(discordUserId) {
+    const baseUrl = resolvePublicBaseUrl();
+    const profileUrl = baseUrl ? `${baseUrl}/settings/profile` : null;
+
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`appJoinStart_${discordUserId}`)
             .setLabel('Create account')
             .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`appLinkInfo_${discordUserId}`)
-            .setLabel('I already have an account')
-            .setStyle(ButtonStyle.Secondary),
+        profileUrl
+            ? new ButtonBuilder()
+                .setLabel('I already have an account')
+                .setStyle(ButtonStyle.Link)
+                .setURL(profileUrl)
+            : new ButtonBuilder()
+                .setCustomId(`appLinkInfo_${discordUserId}`)
+                .setLabel('I already have an account')
+                .setStyle(ButtonStyle.Secondary),
     );
 }
 

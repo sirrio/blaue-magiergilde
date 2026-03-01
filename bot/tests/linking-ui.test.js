@@ -9,7 +9,7 @@ process.env.APP_URL = 'https://blaue-magiergilde.de';
 delete require.cache[require.resolve('../appUrls')];
 delete require.cache[require.resolve('../linkingUi')];
 
-const { legalLinksLine, notLinkedContent } = require('../linkingUi');
+const { legalLinksLine, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 
 const legalLine = legalLinksLine();
 assert.equal(legalLine.includes('Rechtliches'), true);
@@ -20,6 +20,15 @@ const content = notLinkedContent();
 assert.equal(content.includes('Rechtliches'), true);
 assert.equal(content.toLowerCase().includes('datenschutz'), true);
 assert.equal(content.toLowerCase().includes('impressum'), true);
+
+const buttons = buildNotLinkedButtons('123');
+const components = buttons.components.map((component) => component.toJSON());
+
+assert.equal(components[0].label, 'Create account');
+assert.equal(components[0].custom_id, 'appJoinStart_123');
+assert.equal(components[1].label, 'I already have an account');
+assert.equal(components[1].style, 5);
+assert.equal(components[1].url, 'https://blaue-magiergilde.de/settings/profile');
 
 if (previousPublicUrl === undefined) {
     delete process.env.BOT_PUBLIC_APP_URL;
