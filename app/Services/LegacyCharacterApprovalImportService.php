@@ -189,7 +189,14 @@ class LegacyCharacterApprovalImportService
      */
     private function readCsvRows(UploadedFile $file): array
     {
-        $handle = fopen($file->getRealPath(), 'rb');
+        $path = $file->getRealPath();
+        if (! is_string($path) || $path === '') {
+            return [[], [], null];
+        }
+
+        $delimiter = $this->detectDelimiter($path);
+
+        $handle = fopen($path, 'rb');
         if ($handle === false) {
             return [[], [], null];
         }
@@ -200,7 +207,7 @@ class LegacyCharacterApprovalImportService
         $headerLine = null;
         $line = 0;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, 0, $delimiter, '"', '')) !== false) {
             $line++;
             if (! is_array($row)) {
                 continue;
@@ -240,6 +247,44 @@ class LegacyCharacterApprovalImportService
         fclose($handle);
 
         return [$headers, $rows, $headerLine];
+    }
+
+    private function detectDelimiter(string $path): string
+    {
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return ',';
+        }
+
+        $delimiterScores = [
+            ',' => 0,
+            ';' => 0,
+            "\t" => 0,
+        ];
+
+        while (($line = fgets($handle)) !== false) {
+            $trimmed = trim($line);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            foreach (array_keys($delimiterScores) as $delimiter) {
+                $parsed = str_getcsv($trimmed, $delimiter, '"', '');
+                $normalizedHeaders = array_values(array_map(fn (string $value) => $this->normalizeHeader($value), $parsed));
+                $delimiterScores[$delimiter] = count(array_intersect(
+                    ['neuer_discordname', 'spieler', 'zimmer', 'bt', 'lt', 'ht', 'et'],
+                    $normalizedHeaders,
+                ));
+            }
+
+            break;
+        }
+
+        fclose($handle);
+
+        arsort($delimiterScores);
+
+        return (string) array_key_first($delimiterScores);
     }
 
     private function normalizeHeader(string $header): string

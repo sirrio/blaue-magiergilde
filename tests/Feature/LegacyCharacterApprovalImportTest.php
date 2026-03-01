@@ -101,6 +101,24 @@ test('preview rejects duplicate dnd beyond ids in legacy import file', function 
         ->and($preview->json('error_samples.0.message'))->toContain('Duplicate D&D Beyond character id');
 });
 
+test('legacy import preview accepts semicolon separated files', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $csv = implode("\n", [
+        'neuer Discordname;Spieler;Zimmer;BT;LT;HT;ET',
+        'sirrio;David;1.13;"Liza: https://www.dndbeyond.com/characters/132337081";;;;',
+    ]);
+
+    $preview = $this->actingAs($admin)->post(route('admin.settings.legacy-character-approvals.preview'), [
+        'file' => UploadedFile::fake()->createWithContent('legacy.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $preview->assertOk();
+    expect((int) $preview->json('summary.total_rows'))->toBe(1)
+        ->and((int) $preview->json('summary.invalid_rows'))->toBe(0)
+        ->and($preview->json('row_samples.0.payload.character_name'))->toBe('Liza');
+});
+
 test('non admin cannot preview legacy character approval import', function () {
     $user = User::factory()->create(['is_admin' => false]);
 
