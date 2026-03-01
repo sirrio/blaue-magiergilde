@@ -1018,10 +1018,15 @@ export default function Settings({
                 Template
               </Button>
               <Button size="sm" variant="outline" onClick={() => void handlePreviewImport()} disabled={importBusy}>
-                {importBusy ? 'Previewing...' : 'Preview'}
+                {importBusy ? 'Previewing...' : 'Preview compendium'}
               </Button>
             </div>
           </div>
+          {importFile ? (
+            <p className="mt-2 text-xs text-base-content/60">
+              Selected file: <span className="font-semibold text-base-content">{importFile.name}</span>
+            </p>
+          ) : null}
           {importPreview ? (
             <div className="mt-4 space-y-3 rounded-lg border border-base-200 p-3">
               <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1158,10 +1163,15 @@ export default function Settings({
             </label>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => void handlePreviewLegacyImport()} disabled={legacyImportBusy}>
-                {legacyImportBusy ? 'Previewing...' : 'Preview'}
+                {legacyImportBusy ? 'Previewing...' : 'Preview legacy CSV'}
               </Button>
             </div>
           </div>
+          {legacyImportFile ? (
+            <p className="mt-2 text-xs text-base-content/60">
+              Selected file: <span className="font-semibold text-base-content">{legacyImportFile.name}</span>
+            </p>
+          ) : null}
           {legacyImportPreview ? (
             <div className="mt-4 space-y-3 rounded-lg border border-base-200 p-3">
               <div className="flex flex-wrap items-center gap-2 text-xs">
