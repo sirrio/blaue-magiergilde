@@ -9,6 +9,7 @@ use App\Models\DiscordBotSetting;
 use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
+use App\Models\LegacyCharacterApproval;
 use App\Models\Source;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -90,6 +91,10 @@ class BackupController extends Controller
                     'error_samples',
                     'applied_at',
                 ]),
+            'legacyCharacterApprovalStats' => [
+                'total_rows' => LegacyCharacterApproval::query()->count(),
+                'last_imported_at' => LegacyCharacterApproval::query()->max('updated_at'),
+            ],
         ]);
     }
 }

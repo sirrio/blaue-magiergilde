@@ -48,7 +48,22 @@ type AdminCharacter = Pick<
   | 'character_classes'
   | 'avatar'
   | 'simplified_tracking'
->
+> & {
+  dndbeyond_character_id?: number | null
+  has_legacy_approval?: boolean
+  legacy_approval_match?: {
+    id: number
+    discord_name?: string | null
+    player_name?: string | null
+    room?: string | null
+    tier: string
+    character_name: string
+    external_link: string
+    dndbeyond_character_id: number
+    source_row?: number | null
+    source_column?: string | null
+  } | null
+}
 
 type CharacterGroup = {
   key: string
@@ -731,6 +746,10 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     { label: 'Discord Only', value: 'only' },
     { label: 'No Discord', value: 'none' },
   ]
+  const legacyFilters: FilterOption[] = [
+    { label: 'Legacy Match', value: 'matched' },
+    { label: 'No Legacy Match', value: 'missing' },
+  ]
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
     const buildHref = (filterValue: string | null): string =>
@@ -828,6 +847,10 @@ const tierTextClassMap: Record<string, string> = {
     only: 'Discord Only',
     none: 'No Discord',
   }
+  const legacyLabelMap: Record<string, string> = {
+    matched: 'Legacy Match',
+    missing: 'No Legacy Match',
+  }
   const activeFilters = [
     search ? `Search: ${search}` : null,
     normalizedParams.status
@@ -838,6 +861,9 @@ const tierTextClassMap: Record<string, string> = {
       : null,
     normalizedParams.discord
       ? `Discord: ${discordLabelMap[String(normalizedParams.discord)] ?? normalizedParams.discord}`
+      : null,
+    normalizedParams.legacy
+      ? `Legacy: ${legacyLabelMap[String(normalizedParams.legacy)] ?? normalizedParams.legacy}`
       : null,
   ].filter(Boolean) as string[]
 
@@ -890,6 +916,10 @@ const tierTextClassMap: Record<string, string> = {
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-base-content/60">Discord:</span>
                 {renderFilterOptions('discord', discordFilters)}
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-base-content/60">Legacy:</span>
+                {renderFilterOptions('legacy', legacyFilters)}
               </div>
             </div>
           </div>
@@ -952,6 +982,17 @@ const tierTextClassMap: Record<string, string> = {
                     const registrationNote = character.registration_note?.trim()
                     const reviewNote = character.review_note?.trim()
                     const hasRoom = (character.room_count ?? 0) > 0
+                    const legacyMatch = character.legacy_approval_match
+                    const hasLegacyApproval = Boolean(character.has_legacy_approval && legacyMatch)
+                    const legacyTitle = hasLegacyApproval
+                      ? [
+                        `Legacy approved as ${legacyMatch?.character_name}`,
+                        `Tier: ${String(legacyMatch?.tier ?? '').toUpperCase()}`,
+                        legacyMatch?.player_name ? `Player: ${legacyMatch.player_name}` : null,
+                        legacyMatch?.discord_name ? `Discord: ${legacyMatch.discord_name}` : null,
+                        legacyMatch?.room ? `Room: ${legacyMatch.room}` : null,
+                      ].filter(Boolean).join(' | ')
+                      : null
                     return (
                       <ListRow key={character.id} className={cn('grid-cols-1', isDraft && 'opacity-60')}>
                         <div className="col-span-full flex flex-wrap items-center gap-3 md:flex-nowrap">
@@ -1028,6 +1069,15 @@ const tierTextClassMap: Record<string, string> = {
                               <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/70">
                                 <Shield size={12} />
                                 <span>Admin</span>
+                              </span>
+                            ) : null}
+                            {hasLegacyApproval ? (
+                              <span
+                                className="flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-success"
+                                title={legacyTitle ?? undefined}
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>Legacy approved</span>
                               </span>
                             ) : null}
                             <AdminNoteModal character={character}>

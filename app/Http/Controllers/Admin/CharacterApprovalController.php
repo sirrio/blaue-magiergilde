@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\Character;
+use App\Models\LegacyCharacterApproval;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\DndBeyondCharacterLink;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,7 @@ class CharacterApprovalController extends Controller
         $status = $request->input('status');
         $tier = $request->input('tier');
         $discordFilter = $request->input('discord');
+        $legacyFilter = $request->input('legacy');
         $noDiscord = $request->boolean('no_discord');
 
         $charactersQuery = Character::query()
@@ -91,6 +94,61 @@ class CharacterApprovalController extends Controller
                 'avatar',
                 'simplified_tracking',
             ]);
+
+        $characterIdsByCharacterId = $characters
+            ->mapWithKeys(fn (Character $character) => [$character->id => DndBeyondCharacterLink::extractId($character->external_link)])
+            ->filter();
+
+        $legacyMatches = LegacyCharacterApproval::query()
+            ->whereIn('dndbeyond_character_id', $characterIdsByCharacterId->values())
+            ->get([
+                'id',
+                'discord_name',
+                'player_name',
+                'room',
+                'tier',
+                'character_name',
+                'external_link',
+                'dndbeyond_character_id',
+                'source_row',
+                'source_column',
+            ])
+            ->keyBy('dndbeyond_character_id');
+
+        $characters = $characters
+            ->map(function (Character $character) use ($characterIdsByCharacterId, $legacyMatches) {
+                $dndBeyondCharacterId = $characterIdsByCharacterId[$character->id] ?? null;
+                $legacyMatch = $dndBeyondCharacterId !== null ? $legacyMatches->get($dndBeyondCharacterId) : null;
+
+                $character->setAttribute('dndbeyond_character_id', $dndBeyondCharacterId);
+                $character->setAttribute('has_legacy_approval', $legacyMatch !== null);
+                $character->setAttribute('legacy_approval_match', $legacyMatch?->only([
+                    'id',
+                    'discord_name',
+                    'player_name',
+                    'room',
+                    'tier',
+                    'character_name',
+                    'external_link',
+                    'dndbeyond_character_id',
+                    'source_row',
+                    'source_column',
+                ]));
+
+                return $character;
+            })
+            ->filter(function (Character $character) use ($legacyFilter) {
+                if ($legacyFilter === 'matched') {
+                    return (bool) $character->getAttribute('has_legacy_approval');
+                }
+
+                if ($legacyFilter === 'missing') {
+                    return ! $character->getAttribute('has_legacy_approval');
+                }
+
+                return true;
+            })
+            ->values();
 
         return Inertia::render('character-approvals/list', [
             'characters' => $characters,

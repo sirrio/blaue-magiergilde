@@ -25,16 +25,48 @@ const getCsrfToken = () => {
   return meta?.content ?? ''
 }
 
+type LegacyCharacterApprovalImportPreview = {
+  preview_token: string
+  filename: string
+  summary: {
+    total_rows: number
+    new_rows: number
+    updated_rows: number
+    unchanged_rows: number
+    invalid_rows: number
+  }
+  row_samples: Array<{
+    line: number
+    action: 'new' | 'updated' | 'unchanged'
+    payload: {
+      discord_name?: string | null
+      player_name?: string | null
+      room?: string | null
+      tier: string
+      character_name: string
+      external_link: string
+      dndbeyond_character_id: number
+    }
+    changes?: Record<string, { from: string | number | boolean | null; to: string | number | boolean | null }>
+  }>
+  error_samples: Array<{ line?: number; message?: string }>
+}
+
 export default function Settings({
   discordBackup,
   discordBotSettings,
   sources,
   compendiumImportRuns,
+  legacyCharacterApprovalStats,
 }: {
   discordBackup: DiscordBackupStats
   discordBotSettings: DiscordBotSettings
   sources: Source[]
   compendiumImportRuns: CompendiumImportRun[]
+  legacyCharacterApprovalStats: {
+    total_rows: number
+    last_imported_at?: string | null
+  }
 }) {
   const { errors: pageErrors } = usePage<PageProps>().props
   const backupForm = useForm({})
@@ -90,6 +122,10 @@ export default function Settings({
     }>
     error_samples: Array<{ line?: number; message?: string }>
   } | null>(null)
+  const [legacyImportFile, setLegacyImportFile] = useState<File | null>(null)
+  const [legacyImportBusy, setLegacyImportBusy] = useState(false)
+  const [legacyApplyBusy, setLegacyApplyBusy] = useState(false)
+  const [legacyImportPreview, setLegacyImportPreview] = useState<LegacyCharacterApprovalImportPreview | null>(null)
 
   const fetchBackupStatus = useCallback(
     async (showToast: boolean) => {
@@ -569,6 +605,90 @@ export default function Settings({
     }
   }, [importPreview])
 
+  const handlePreviewLegacyImport = useCallback(async () => {
+    if (!legacyImportFile) {
+      toast.show('Select the legacy CSV file first.', 'error')
+      return
+    }
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', legacyImportFile)
+
+    setLegacyImportBusy(true)
+    try {
+      const response = await fetch(route('admin.settings.legacy-character-approvals.preview'), {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: formData,
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.message ?? 'Legacy preview failed.'), 'error')
+        return
+      }
+
+      setLegacyImportPreview(payload as LegacyCharacterApprovalImportPreview)
+      toast.show('Legacy preview ready.', 'info')
+    } catch {
+      toast.show('Legacy preview failed.', 'error')
+    } finally {
+      setLegacyImportBusy(false)
+    }
+  }, [legacyImportFile])
+
+  const handleApplyLegacyImport = useCallback(async () => {
+    if (!legacyImportPreview?.preview_token) {
+      toast.show('Run the legacy preview first.', 'error')
+      return
+    }
+
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    setLegacyApplyBusy(true)
+    try {
+      const response = await fetch(route('admin.settings.legacy-character-approvals.apply'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ preview_token: legacyImportPreview.preview_token }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.show(String(payload?.message ?? 'Legacy import apply failed.'), 'error')
+        return
+      }
+
+      setLegacyImportPreview(null)
+      setLegacyImportFile(null)
+      toast.show('Legacy approvals imported.', 'info')
+      router.reload({ only: ['legacyCharacterApprovalStats'] })
+    } catch {
+      toast.show('Legacy import apply failed.', 'error')
+    } finally {
+      setLegacyApplyBusy(false)
+    }
+  }, [legacyImportPreview])
+
   const sourceById = useMemo(() => {
     return Object.fromEntries(sources.map((source) => [source.id, `${source.shortcode} - ${source.name}`]))
   }, [sources])
@@ -1010,6 +1130,96 @@ export default function Settings({
               </div>
             )}
           </div>
+        </div>
+        <div className="rounded-box bg-base-100 p-3 shadow-md">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold">Legacy character approvals</h2>
+            <p className="text-xs text-base-content/60">
+              Import the old guild approval CSV and match current characters by D&amp;D Beyond character id.
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+            <span className="rounded-full border border-base-200 px-2 py-1">
+              Imported rows: {legacyCharacterApprovalStats.total_rows}
+            </span>
+            <span className="rounded-full border border-base-200 px-2 py-1">
+              Last import: {legacyCharacterApprovalStats.last_imported_at ? new Date(legacyCharacterApprovalStats.last_imported_at).toLocaleString() : 'Never'}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <label className="form-control">
+              <span className="label text-xs">Legacy CSV file</span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="file-input file-input-bordered file-input-sm w-full"
+                onChange={(event) => setLegacyImportFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => void handlePreviewLegacyImport()} disabled={legacyImportBusy}>
+                {legacyImportBusy ? 'Previewing...' : 'Preview'}
+              </Button>
+            </div>
+          </div>
+          {legacyImportPreview ? (
+            <div className="mt-4 space-y-3 rounded-lg border border-base-200 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full border border-base-200 px-2 py-1">Rows: {legacyImportPreview.summary.total_rows}</span>
+                <span className="rounded-full border border-success/40 px-2 py-1 text-success">New: {legacyImportPreview.summary.new_rows}</span>
+                <span className="rounded-full border border-warning/40 px-2 py-1 text-warning">Updated: {legacyImportPreview.summary.updated_rows}</span>
+                <span className="rounded-full border border-base-200 px-2 py-1">Unchanged: {legacyImportPreview.summary.unchanged_rows}</span>
+                <span className="rounded-full border border-error/40 px-2 py-1 text-error">Invalid: {legacyImportPreview.summary.invalid_rows}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table table-xs">
+                  <thead>
+                    <tr>
+                      <th>Line</th>
+                      <th>Action</th>
+                      <th>Character</th>
+                      <th>Tier</th>
+                      <th>Player</th>
+                      <th>Discord</th>
+                      <th>Room</th>
+                      <th>DDB id</th>
+                      <th>Changes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {legacyImportPreview.row_samples.map((sample) => (
+                      <tr key={`${sample.line}-${sample.payload.dndbeyond_character_id}`}>
+                        <td>{sample.line}</td>
+                        <td>{sample.action}</td>
+                        <td>{sample.payload.character_name}</td>
+                        <td>{sample.payload.tier.toUpperCase()}</td>
+                        <td>{sample.payload.player_name ?? '-'}</td>
+                        <td>{sample.payload.discord_name ?? '-'}</td>
+                        <td>{sample.payload.room ?? '-'}</td>
+                        <td>{sample.payload.dndbeyond_character_id}</td>
+                        <td>{sample.changes ? Object.keys(sample.changes).join(', ') || '-' : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {legacyImportPreview.error_samples.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-error">Errors</p>
+                  {legacyImportPreview.error_samples.map((error, index) => (
+                    <p key={`${error.line ?? index}-${index}`} className="text-xs text-error">
+                      Line {error.line ?? '-'}: {error.message ?? 'Invalid row'}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={() => void handleApplyLegacyImport()} disabled={legacyApplyBusy}>
+                  {legacyApplyBusy ? 'Applying...' : 'Apply import'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="rounded-box bg-base-100 shadow-md p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">

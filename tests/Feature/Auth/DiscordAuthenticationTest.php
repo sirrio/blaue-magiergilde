@@ -81,6 +81,32 @@ test('discord callback does not clear password for existing linked users', funct
         ->and(Hash::check('OriginalSecret123!', (string) $freshUser?->password))->toBeTrue();
 });
 
+test('discord callback restores a soft deleted linked user instead of creating a duplicate', function () {
+    $requiredVersion = (int) config('legal.privacy_policy.version', 0);
+
+    $user = User::factory()->create([
+        'discord_id' => 123456789012345681,
+        'privacy_policy_accepted_at' => now(),
+        'privacy_policy_accepted_version' => $requiredVersion,
+        'deleted_at' => now(),
+    ]);
+
+    Socialite::shouldReceive('driver->user')
+        ->once()
+        ->andReturn(fakeDiscordUser((string) $user->discord_id, 'Restored Discord Name'));
+
+    $this->get(route('discord.callback'))
+        ->assertRedirect(route('characters.index', absolute: false));
+
+    $freshUser = $user->fresh();
+
+    expect($freshUser)->not->toBeNull()
+        ->and($freshUser?->deleted_at)->toBeNull()
+        ->and($freshUser?->discord_username)->toBeNull();
+
+    $this->assertAuthenticatedAs($freshUser);
+});
+
 test('discord callback redirects to login with error when token exchange fails', function () {
     Socialite::shouldReceive('driver->user')
         ->once()

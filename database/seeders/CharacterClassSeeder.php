@@ -22,6 +22,7 @@ class CharacterClassSeeder extends Seeder
             'Fighter' => '/images/fighter.jpeg',
             'Monk' => '/images/monk.jpeg',
             'Paladin' => '/images/paladin.jpeg',
+            'Pugilist' => '/images/no-avatar.svg',
             'Ranger' => '/images/ranger.jpeg',
             'Rogue' => '/images/rogue.jpeg',
             'Sorcerer' => '/images/sorcerer.jpeg',
@@ -29,10 +30,10 @@ class CharacterClassSeeder extends Seeder
             'Wizard' => '/images/wizard.jpeg',
         ];
         foreach ($classes as $class => $src) {
-            CharacterClass::factory()->create([
-                'name' => $class,
-                'src' => $src,
-            ]);
+            CharacterClass::query()->updateOrCreate(
+                ['name' => $class],
+                ['src' => $src],
+            );
         }
     }
 }
