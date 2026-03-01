@@ -37,14 +37,14 @@ assert.equal(dmField?.value, '0 bubbles · 0 coins');
 const userField = embedData.fields.find((field) => field.name === 'User');
 assert.ok(userField?.value.includes('<@123456789012345678>'));
 
-const registrationField = embedData.fields.find((field) => field.name === 'Registration info');
+const registrationField = embedData.fields.find((field) => field.name === 'Registration notes');
 assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');
 
 const reviewField = embedData.fields.find((field) => field.name === 'Review note');
 assert.equal(reviewField?.value, 'Please provide a proper DnDBeyond link before approval.');
 
 const buttonLabels = message.components[0].toJSON().components.map((component) => component.label);
-assert.deepEqual(buttonLabels, ['Approve', 'Needs changes', 'Decline', 'Set pending']);
+assert.deepEqual(buttonLabels, ['Approve', 'Request changes', 'Decline', 'Move back to review']);
 assert.equal(message.components[0].toJSON().components[3].disabled, true);
 
 const approvedMessage = buildCharacterApprovalMessage({

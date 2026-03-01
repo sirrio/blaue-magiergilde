@@ -18,11 +18,11 @@ function notLinkedContent() {
     return [
         '**Your Discord is not connected to the Blaue Magiergilde app yet.**',
         '',
-        'To let the bot manage *your existing characters*, you need to connect Discord to your app account once.',
+        'Connect Discord to your existing app account once so the bot can use your characters.',
         '',
-        'If you **do not have** an account yet, you can create a new app account here (linked to your Discord ID).',
+        'If you **do not have** an account yet, create a new account here.',
         '',
-        '**Important:** If you already use the app, *do not create a new account*; connect Discord in your profile instead.',
+        '**Important:** If you already use the app, *do not create a new account*. Open your profile and connect Discord there instead.',
         '',
         legalLinksLine(),
     ].join('\n');
@@ -35,16 +35,16 @@ function buildNotLinkedButtons(discordUserId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`appJoinStart_${discordUserId}`)
-            .setLabel('Create account')
+            .setLabel('Create new account')
             .setStyle(ButtonStyle.Primary),
         profileUrl
             ? new ButtonBuilder()
-                .setLabel('I already have an account')
+                .setLabel('Connect existing account')
                 .setStyle(ButtonStyle.Link)
                 .setURL(profileUrl)
             : new ButtonBuilder()
                 .setCustomId(`appLinkInfo_${discordUserId}`)
-                .setLabel('I already have an account')
+                .setLabel('Connect existing account')
                 .setStyle(ButtonStyle.Secondary),
     );
 }

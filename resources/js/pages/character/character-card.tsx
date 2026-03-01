@@ -150,10 +150,11 @@ function SubmitForApprovalModal({
 }: {
   character: Character
   processing: boolean
-  onSubmit: (registrationNote: string, onSuccess: () => void) => void
+  onSubmit: (registrationNote: string, callbacks: { onSuccess: () => void; onError: (message: string) => void }) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [registrationNote, setRegistrationNote] = useState(character.registration_note ?? '')
+  const [localNotice, setLocalNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null)
   const fromLabel = (character.guild_status ?? 'draft') === 'needs_changes' ? 'needs changes' : 'draft'
 
   return (
@@ -165,6 +166,7 @@ function SubmitForApprovalModal({
           className="w-full justify-center"
           onClick={() => {
             setRegistrationNote(character.registration_note ?? '')
+            setLocalNotice(null)
             setIsOpen(true)
           }}
           disabled={processing}
@@ -177,26 +179,90 @@ function SubmitForApprovalModal({
       </ModalTrigger>
       <ModalTitle>Register Character With Magiergilde</ModalTitle>
       <ModalContent>
+        {localNotice ? (
+          <div className={cn('alert py-2 text-sm', localNotice.tone === 'error' ? 'alert-error alert-soft' : 'alert-success alert-soft')}>
+            {localNotice.message}
+          </div>
+        ) : null}
         <p className="text-sm text-base-content/80">
           This changes <span className="font-semibold">{character.name}</span> from {fromLabel} to active (pending) and registers it with
           the Magiergilde for review.
         </p>
+        <p className="text-xs text-base-content/60">
+          The review team checks whether the character can be used in the Magiergilde and may request changes if something is missing or needs
+          clarification.
+        </p>
         <TextArea
           value={registrationNote}
           onChange={(event) => setRegistrationNote(event.target.value)}
-          placeholder="Add relevant info for the support/review team..."
+          placeholder="Add review-relevant info, for example rare language choices, filler-character notes, or anything the Magiergilde should know..."
         >
-          Registration info (optional)
+          Registration notes (optional)
         </TextArea>
+        <p className="text-xs text-base-content/60">
+          Use this for anything the review team should know when checking the character, for example rare language choices, filler characters,
+          or special rulings.
+        </p>
         <p className="mt-2 text-xs text-base-content/60">
           After Magiergilde review, you cannot switch approved or declined characters back by yourself.
         </p>
       </ModalContent>
-      <ModalAction onClick={() => onSubmit(registrationNote.trim(), () => setIsOpen(false))} disabled={processing}>
-        Register now
+      <ModalAction
+        onClick={() => onSubmit(registrationNote.trim(), {
+          onSuccess: () => {
+            setLocalNotice({ tone: 'success', message: 'Character registered for review.' })
+            setIsOpen(false)
+          },
+          onError: (message) => {
+            setLocalNotice({ tone: 'error', message })
+          },
+        })}
+        disabled={processing}
+      >
+        Register character
       </ModalAction>
     </Modal>
   )
+}
+
+function getCharacterStatusBadgeClass(guildStatus: string): string {
+  if (guildStatus === 'approved') {
+    return 'badge-success badge-soft'
+  }
+
+  if (guildStatus === 'declined') {
+    return 'badge-error badge-soft'
+  }
+
+  if (guildStatus === 'needs_changes' || guildStatus === 'pending') {
+    return 'badge-warning badge-soft'
+  }
+
+  if (guildStatus === 'retired') {
+    return 'badge-neutral badge-soft'
+  }
+
+  return 'badge-ghost'
+}
+
+function getCharacterStatusHint(guildStatus: string): string {
+  if (guildStatus === 'draft') {
+    return 'Private draft. Register it with Magiergilde when it is ready for review.'
+  }
+
+  if (guildStatus === 'pending') {
+    return 'Submitted for review. Waiting for Magiergilde.'
+  }
+
+  if (guildStatus === 'needs_changes') {
+    return 'Changes requested. Update the character and register it again.'
+  }
+
+  if (guildStatus === 'declined') {
+    return 'Review declined. Check the review note before trying again.'
+  }
+
+  return ''
 }
 
 export function CharacterCard({
@@ -269,7 +335,7 @@ export function CharacterCard({
           ? 'text-base-content/60'
           : 'text-warning'
   const statusTooltip = guildStatus === 'draft'
-    ? 'Draft only. This character is not registered with the Magiergilde yet.'
+    ? 'Private draft. This character is not registered with the Magiergilde yet.'
     : guildStatus === 'declined'
       ? reviewNote
         ? `Declined by the Magiergilde. Note: ${reviewNote}`
@@ -279,8 +345,10 @@ export function CharacterCard({
         ? `Changes requested by the Magiergilde. Note: ${reviewNote}`
         : 'Changes requested by the Magiergilde. Update and register again for review.'
     : guildStatus === 'pending'
-      ? 'Registered with the Magiergilde. Waiting for review.'
+      ? 'Submitted to the Magiergilde. Waiting for review.'
       : `Status: ${statusLabel}`
+  const statusHint = getCharacterStatusHint(guildStatus)
+  const statusBadgeClass = getCharacterStatusBadgeClass(guildStatus)
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
@@ -308,7 +376,10 @@ export function CharacterCard({
   const adventuresCountWarningReason = 'Simple mode auto-level entries exist. Played adventures count is not reliable.'
   const factionLevelWarningReason = 'Simple mode auto-level entries exist. Faction level is not reliable.'
 
-  const submitForApproval = (registrationNote: string, onSuccess: () => void) => {
+  const submitForApproval = (
+    registrationNote: string,
+    callbacks: { onSuccess: () => void; onError: (message: string) => void },
+  ) => {
     if (isSubmittingForApproval || !canSubmitForApproval) {
       return
     }
@@ -323,7 +394,16 @@ export function CharacterCard({
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
-          onSuccess()
+          callbacks.onSuccess()
+        },
+        onError: (errors) => {
+          const message = String(
+            errors.registration_note
+            ?? errors.guild_status
+            ?? errors.character
+            ?? 'Character could not be registered. Check the form and try again.',
+          )
+          callbacks.onError(message)
         },
         onFinish: () => {
           setIsSubmittingForApproval(false)
@@ -390,6 +470,7 @@ export function CharacterCard({
               {statusIcon}
             </span>
             <span className="truncate">{character.name}</span>
+            <span className={cn('badge badge-xs shrink-0', statusBadgeClass)}>{statusLabel}</span>
             {hasRoom ? (
               <span className="text-primary/70" title="Room assigned">
                 <MapPin size={14} />
@@ -403,6 +484,7 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
             </div>
+            {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}

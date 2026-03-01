@@ -63,6 +63,78 @@ const STEP_LABELS: Record<string, string> = {
   completed: 'Completed',
 }
 
+type OperationHelp = {
+  tone: 'warning' | 'error' | 'info'
+  message: string
+}
+
+const isTimeoutError = (value: string | null | undefined): boolean => {
+  const normalized = String(value ?? '').toLowerCase()
+
+  return normalized.includes('timed out')
+    || normalized.includes('curl error 28')
+    || normalized.includes('did not respond in time')
+}
+
+const isQueueError = (value: string | null | undefined): boolean => {
+  const normalized = String(value ?? '').toLowerCase()
+
+  return normalized.includes('still queued') || normalized.includes('queue worker')
+}
+
+const isReachabilityError = (value: string | null | undefined): boolean => {
+  const normalized = String(value ?? '').toLowerCase()
+
+  return normalized.includes('not reachable')
+    || normalized.includes('could not read operation status')
+    || normalized.includes('polling failed')
+}
+
+const getOperationHelp = (operation: BotOperation | null, pendingTooLong: boolean): OperationHelp | null => {
+  if (!operation) {
+    return null
+  }
+
+  if (operation.status === 'failed') {
+    if (isTimeoutError(operation.error)) {
+      return {
+        tone: 'warning',
+        message: 'The bot did not answer in time. It may still be posting in the background. Check Discord, then retry only if nothing changed.',
+      }
+    }
+
+    if (isReachabilityError(operation.error)) {
+      return {
+        tone: 'error',
+        message: 'The app could not reach the bot or refresh its live status. Check that the bot is running, then reload this page and retry.',
+      }
+    }
+
+    if (isQueueError(operation.error)) {
+      return {
+        tone: 'warning',
+        message: 'This action stayed queued too long. Start the queue worker, then retry the action.',
+      }
+    }
+  }
+
+  if (pendingTooLong) {
+    return {
+      tone: 'warning',
+      message: 'This action is still queued. If it stays here, start the queue worker (`php artisan queue:work`).',
+    }
+  }
+
+  if (operation.status === 'posting_to_discord' && !operation.meta?.total_lines) {
+    return {
+      tone: 'info',
+      message: 'Waiting for live line progress from the bot.',
+    }
+  }
+
+  return null
+}
+
 export const isTerminalBotOperation = (operation: BotOperation | null) => {
   return operation ? operation.status === 'completed' || operation.status === 'failed' : true
 }
@@ -227,6 +299,11 @@ export default function BotOperationProgress({
     }
   }, [operation])
 
+  const operationHelp = useMemo(
+    () => getOperationHelp(operation, computed?.pendingTooLong ?? false),
+    [computed?.pendingTooLong, operation],
+  )
+
   if (!operation || !computed) {
     return null
   }
@@ -306,12 +383,18 @@ export default function BotOperationProgress({
       {computed.hasLineProgress && operation?.meta?.last_line ? (
         <p className="mt-2 text-xs text-base-content/70">Last line: {operation.meta.last_line}</p>
       ) : null}
-      {computed.isPostingToDiscord && !computed.hasLineProgress ? (
-        <p className="mt-2 text-xs text-base-content/70">Waiting for live line progress from bot...</p>
-      ) : null}
-      {computed.pendingTooLong ? (
-        <p className="mt-2 text-xs text-warning">
-          Operation is still queued. If this persists, start the queue worker (`php artisan queue:work`).
+      {operationHelp ? (
+        <p
+          className={cn(
+            'mt-2 rounded-lg border px-2.5 py-2 text-xs',
+            operationHelp.tone === 'error'
+              ? 'border-error/30 bg-error/10 text-error'
+              : operationHelp.tone === 'warning'
+                ? 'border-warning/30 bg-warning/10 text-warning'
+                : 'border-info/30 bg-info/10 text-info',
+          )}
+        >
+          {operationHelp.message}
         </p>
       ) : null}
     </div>

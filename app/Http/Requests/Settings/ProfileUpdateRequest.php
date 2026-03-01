@@ -20,7 +20,8 @@ class ProfileUpdateRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
 
             'email' => [
-                'required',
+                Rule::requiredIf(blank($this->user()?->discord_id)),
+                'nullable',
                 'string',
                 'lowercase',
                 'email',
@@ -34,6 +35,13 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'name' => 'nickname',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'email.required' => 'An email address is required unless your account is connected to Discord.',
         ];
     }
 }

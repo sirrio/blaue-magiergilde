@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auction\SyncAuctionVoiceRequest;
 use App\Models\AuctionSetting;
+use App\Support\BotRequestFailure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 
@@ -25,7 +26,9 @@ class AuctionVoiceSyncController extends Controller
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
-            return response()->json(['error' => 'Bot HTTP is not configured.'], 422);
+            $result = BotRequestFailure::unconfigured();
+
+            return response()->json(['error' => $result['error']], $result['status']);
         }
 
         $timeout = max(1, (int) config('services.bot.http_timeout', 10));
@@ -38,40 +41,15 @@ class AuctionVoiceSyncController extends Controller
                     'channel_id' => $settings->voice_channel_id,
                 ]);
         } catch (\Throwable $error) {
-            $detail = trim((string) $error->getMessage());
-            $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
+            $result = BotRequestFailure::fromThrowable($error);
 
-            return response()->json(['error' => $message], 502);
+            return response()->json(['error' => $result['error']], 502);
         }
 
         if (! $response->ok()) {
-            $detail = null;
-            $retryAfter = null;
-            try {
-                $payload = $response->json();
-                if (is_array($payload)) {
-                    $detail = $payload['error'] ?? $payload['message'] ?? null;
-                    $retryAfter = $payload['retry_after_ms'] ?? null;
-                }
-            } catch (\Throwable $error) {
-                $detail = null;
-            }
+            $result = BotRequestFailure::fromResponse($response);
 
-            if (! $detail) {
-                $body = trim((string) $response->body());
-                $detail = $body !== '' ? $body : null;
-            }
-
-            $message = sprintf('Bot request failed. (HTTP %d).', $response->status());
-            if ($detail) {
-                $message .= ' '.$detail;
-            }
-            if ($retryAfter !== null) {
-                $seconds = max(1, (int) ceil(((int) $retryAfter) / 1000));
-                $message .= sprintf(' Retry after %ds.', $seconds);
-            }
-
-            return response()->json(['error' => $message], 502);
+            return response()->json(['error' => $result['error']], 502);
         }
 
         $payload = $response->json();

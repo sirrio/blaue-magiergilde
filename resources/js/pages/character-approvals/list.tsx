@@ -80,7 +80,7 @@ const getStatusLabel = (status?: string | null) => {
   if (status === 'needs_changes') return 'Needs changes'
   if (status === 'retired') return 'Retired'
   if (status === 'draft') return 'Draft'
-  return 'Pending'
+  return 'Pending review'
 }
 
 const AdminNoteModal = ({
@@ -211,14 +211,14 @@ const CharacterActionsMenu = ({
   const modalTitle = targetStatus === 'approved'
     ? 'Approve character'
     : targetStatus === 'pending'
-      ? 'Set back to pending'
+      ? 'Move character back to review'
       : targetStatus === 'needs_changes'
         ? 'Request changes'
         : 'Decline character'
   const modalAction = targetStatus === 'approved'
     ? 'Approve'
     : targetStatus === 'pending'
-      ? 'Set to pending'
+      ? 'Move back to review'
       : targetStatus === 'needs_changes'
         ? 'Request changes'
         : 'Decline character'
@@ -226,7 +226,7 @@ const CharacterActionsMenu = ({
   const modalDescription = targetStatus === 'approved'
     ? 'Confirm setting this character to approved.'
     : targetStatus === 'pending'
-      ? 'Confirm moving this character back to pending review.'
+      ? 'Confirm moving this character back into review.'
       : targetStatus === 'needs_changes'
         ? 'Provide a review note with required fixes.'
         : 'Provide a review note explaining why this character is declined.'
@@ -259,7 +259,7 @@ const CharacterActionsMenu = ({
             onSelect: () => openStatusModal('approved'),
           },
           {
-            label: 'Needs changes',
+            label: 'Request changes',
             icon: <AlertTriangle size={14} />,
             disabled: !canReview,
             active: currentStatus === 'needs_changes',
@@ -276,7 +276,7 @@ const CharacterActionsMenu = ({
           { type: 'divider', id: 'status-actions' },
           { type: 'label', label: 'Override' },
           {
-            label: 'Set back to pending',
+            label: 'Move back to review',
             icon: <Clock size={14} />,
             disabled: !canOverrideToPending,
             active: currentStatus === 'pending',
@@ -384,7 +384,7 @@ const AdminCharacterModal = ({
   const currentStatus = character?.guild_status ?? 'pending'
   const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
   const statusLabelMap: Record<string, string> = {
-    pending: 'Active',
+    pending: 'Pending review',
     draft: 'Draft',
     approved: 'Approved',
     declined: 'Declined',
@@ -541,18 +541,24 @@ const AdminCharacterModal = ({
                 value={canEditStatus ? (data.guild_status ?? currentStatus) : currentStatus}
                 onChange={(e) => setData('guild_status', e.target.value as 'pending' | 'draft')}
               >
-                <SelectLabel>Visibility</SelectLabel>
+                <SelectLabel>Submission state</SelectLabel>
                 <SelectOptions>
                   {!canEditStatus ? (
                     <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
                   ) : (
                     <>
-                      <option value="pending">Active</option>
+                      <option value="pending">Pending review</option>
                       <option value="draft">Draft</option>
                     </>
                   )}
                 </SelectOptions>
               </Select>
+              {canEditStatus ? (
+                <p className="text-xs text-base-content/60">
+                  Admins can set new or not-yet-reviewed characters to draft or pending review here. Review decisions are handled separately in the
+                  review menu.
+                </p>
+              ) : null}
               <Input
                 placeholder="https://www.dndbeyond.com/characters/..."
                 errors={errors.external_link}
@@ -726,7 +732,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
   }
 
   const statusFilters: FilterOption[] = [
-    { label: 'Pending', value: 'pending' },
+    { label: 'Pending review', value: 'pending' },
     { label: 'Draft', value: 'draft' },
     { label: 'Approved', value: 'approved' },
     { label: 'Needs changes', value: 'needs_changes' },
@@ -822,7 +828,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
   const totalCharacters = characters.length
   const totalUsers = groups.length
   const statusLabelMap: Record<string, string> = {
-    pending: 'Pending',
+    pending: 'Pending review',
     draft: 'Draft',
     approved: 'Approved',
     needs_changes: 'Needs changes',
@@ -1019,12 +1025,12 @@ const tierTextClassMap: Record<string, string> = {
                               ) : null}
                               {registrationNote ? (
                                 <span className="max-w-xs truncate text-xs text-base-content/60" title={registrationNote}>
-                                  Registration: {registrationNote}
+                                  Registration notes: {registrationNote}
                                 </span>
                               ) : null}
                               {reviewNote ? (
                                 <span className="max-w-xs truncate text-xs text-base-content/70" title={reviewNote}>
-                                  Review: {reviewNote}
+                                  Review note: {reviewNote}
                                 </span>
                               ) : null}
                             </div>

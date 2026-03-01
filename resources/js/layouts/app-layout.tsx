@@ -449,11 +449,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <div>
                 <p className="font-semibold">Discord is not connected.</p>
                 <p className="text-sm opacity-80">
-                  Connect Discord in your profile to manage characters with the Discord bot.
+                  Connect Discord in your profile to let the bot use this existing account and its characters.
                 </p>
               </div>
               <Link href={route('profile.edit')} className="btn btn-sm">
-                Go to profile
+                Connect Discord
               </Link>
             </div>
           </div>

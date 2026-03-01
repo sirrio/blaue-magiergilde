@@ -27,10 +27,10 @@ async function handle(interaction) {
     if (action === 'appLinkInfo') {
         await interaction.update({
             content: '',
-            embeds: [buildInfoEmbed('Connect existing app account', [
+            embeds: [buildInfoEmbed('Connect existing account', [
                 notLinkedContent(),
                 '',
-                'If you already use the app: please connect Discord in your profile (Connect Discord).',
+                'If you already use the app, open your profile and use "Connect Discord to this account".',
             ].join('\n'))],
             components: [],
         });
@@ -40,12 +40,12 @@ async function handle(interaction) {
     if (action === 'appJoinStart') {
         await interaction.update({
             content: '',
-            embeds: [buildWarningEmbed('Create a new app account?', [
+            embeds: [buildWarningEmbed('Create new account?', [
                 '**Create a new app account?**',
                 '',
                 'This creates a new user account linked to your Discord ID.',
                 '',
-                '**Do not do this** if you already have an app account (otherwise you will end up with two accounts).',
+                '**Do not do this** if you already have an app account. Connect Discord to that existing account instead.',
                 '',
                 'By creating an account you confirm the legal notices below:',
                 legalLinksLine(),

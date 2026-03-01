@@ -5,6 +5,7 @@ import AppLayout from '@/layouts/app-layout'
 import { PageProps } from '@/types'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import { AlertTriangle, Link2, Lock, Trash, User } from 'lucide-react'
+import { useState } from 'react'
 
 export default function Profile() {
   const { auth, discordConnected, status, error } = usePage<PageProps & { status?: string; error?: string }>().props
@@ -25,20 +26,44 @@ export default function Profile() {
   const deleteForm = useForm({
     password: '',
   })
+  const [profileNotice, setProfileNotice] = useState<string | null>(null)
+  const [passwordNotice, setPasswordNotice] = useState<string | null>(null)
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
 
   const submitProfile = (e: React.FormEvent) => {
     e.preventDefault()
-    profileForm.patch(route('profile.update'))
+    setProfileNotice(null)
+    profileForm.patch(route('profile.update'), {
+      onSuccess: () => {
+        setProfileNotice('Profile updated.')
+      },
+      onError: () => {
+        setProfileNotice('Profile could not be saved. Check the highlighted fields and try again.')
+      },
+    })
   }
 
   const submitPassword = (e: React.FormEvent) => {
     e.preventDefault()
-    passwordForm.put(route('password.update'))
+    setPasswordNotice(null)
+    passwordForm.put(route('password.update'), {
+      onSuccess: () => {
+        setPasswordNotice('Password updated.')
+      },
+      onError: () => {
+        setPasswordNotice('Password could not be updated. Check the highlighted fields and try again.')
+      },
+    })
   }
 
   const submitDelete = (e: React.FormEvent) => {
     e.preventDefault()
-    deleteForm.delete(route('profile.destroy'))
+    setDeleteNotice(null)
+    deleteForm.delete(route('profile.destroy'), {
+      onError: () => {
+        setDeleteNotice('Account could not be deleted. Check the password field and try again.')
+      },
+    })
   }
 
   return (
@@ -73,11 +98,17 @@ export default function Profile() {
                 </>
               ) : (
                 <>
-                  <p className="text-base-content/80">
-                    Connect your account to Discord once to use bot features.
-                  </p>
+                  <div className="rounded-lg border border-primary/20 bg-primary/6 p-3">
+                    <p className="text-base-content text-sm font-semibold">Connect Discord to this existing account</p>
+                    <p className="mt-1 text-sm text-base-content/80">
+                      Use this if you already use the website and want the bot to access your current characters.
+                    </p>
+                    <p className="mt-1 text-xs text-base-content/65">
+                      Do not create a second account in the bot. Linking Discord here is the correct path for existing users.
+                    </p>
+                  </div>
                   <Button as="a" href={route('discord.login')} color="primary" size="sm" className="w-fit">
-                    Connect Discord
+                    Connect Discord to this account
                   </Button>
                 </>
               )}
@@ -100,13 +131,36 @@ export default function Profile() {
             </CardTitle>
             <CardContent>
               <form onSubmit={submitProfile} className="space-y-4">
-                <Input type="text" value={profileForm.data.name} onChange={(e) => profileForm.setData('name', e.target.value)} errors={profileForm.errors.name}>
+                {profileNotice ? (
+                  <div className={profileForm.hasErrors ? 'alert alert-error alert-soft py-2 text-sm' : 'alert alert-success alert-soft py-2 text-sm'}>
+                    {profileNotice}
+                  </div>
+                ) : null}
+                <Input type="text" autoComplete="nickname" value={profileForm.data.name} onChange={(e) => profileForm.setData('name', e.target.value)} errors={profileForm.errors.name}>
                   Nickname
                 </Input>
                 <p className="text-xs text-base-content/70">Use a nickname here, not your real name.</p>
-                <Input type="email" value={profileForm.data.email} onChange={(e) => profileForm.setData('email', e.target.value)} errors={profileForm.errors.email}>
+                <Input type="email" autoComplete="email" value={profileForm.data.email} onChange={(e) => profileForm.setData('email', e.target.value)} errors={profileForm.errors.email}>
                   Email
                 </Input>
+                {discordConnected ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-base-200 bg-base-200/40 px-3 py-2 text-xs text-base-content/70">
+                    <span>You can remove your stored email because this account is connected to Discord.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        profileForm.setData('email', '')
+                        setProfileNotice('Email will be removed when you save the profile.')
+                      }}
+                    >
+                      Remove email
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-base-content/70">Keep an email on the account unless Discord is connected.</p>
+                )}
                 <div className="flex justify-end">
                   <Button type="submit" className="btn-primary" disabled={profileForm.processing}>
                     Save
@@ -125,15 +179,20 @@ export default function Profile() {
             </CardTitle>
             <CardContent>
               <form onSubmit={submitPassword} className="space-y-4">
+                {passwordNotice ? (
+                  <div className={passwordForm.hasErrors ? 'alert alert-error alert-soft py-2 text-sm' : 'alert alert-success alert-soft py-2 text-sm'}>
+                    {passwordNotice}
+                  </div>
+                ) : null}
                 {hasPassword ? (
-                  <Input type="password" value={passwordForm.data.current_password} onChange={(e) => passwordForm.setData('current_password', e.target.value)} errors={passwordForm.errors.current_password}>
+                  <Input type="password" autoComplete="current-password" value={passwordForm.data.current_password} onChange={(e) => passwordForm.setData('current_password', e.target.value)} errors={passwordForm.errors.current_password}>
                     Current Password
                   </Input>
                 ) : null}
-                <Input type="password" value={passwordForm.data.password} onChange={(e) => passwordForm.setData('password', e.target.value)} errors={passwordForm.errors.password}>
+                <Input type="password" autoComplete="new-password" value={passwordForm.data.password} onChange={(e) => passwordForm.setData('password', e.target.value)} errors={passwordForm.errors.password}>
                   {hasPassword ? 'New Password' : 'Set Password'}
                 </Input>
-                <Input type="password" value={passwordForm.data.password_confirmation} onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)} errors={passwordForm.errors.password_confirmation}>
+                <Input type="password" autoComplete="new-password" value={passwordForm.data.password_confirmation} onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)} errors={passwordForm.errors.password_confirmation}>
                   Confirm Password
                 </Input>
                 <div className="flex justify-end">
@@ -155,7 +214,10 @@ export default function Profile() {
             <CardContent className="space-y-4">
               <p className="text-sm text-base-content/80">Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.</p>
               <form onSubmit={submitDelete} className="space-y-4">
-                <Input type="password" value={deleteForm.data.password} onChange={(e) => deleteForm.setData('password', e.target.value)} errors={deleteForm.errors.password}>
+                {deleteNotice ? (
+                  <div className="alert alert-error alert-soft py-2 text-sm">{deleteNotice}</div>
+                ) : null}
+                <Input type="password" autoComplete="current-password" value={deleteForm.data.password} onChange={(e) => deleteForm.setData('password', e.target.value)} errors={deleteForm.errors.password}>
                   Password
                 </Input>
                 <div className="flex justify-end">

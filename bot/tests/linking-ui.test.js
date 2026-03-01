@@ -24,9 +24,9 @@ assert.equal(content.toLowerCase().includes('impressum'), true);
 const buttons = buildNotLinkedButtons('123');
 const components = buttons.components.map((component) => component.toJSON());
 
-assert.equal(components[0].label, 'Create account');
+assert.equal(components[0].label, 'Create new account');
 assert.equal(components[0].custom_id, 'appJoinStart_123');
-assert.equal(components[1].label, 'I already have an account');
+assert.equal(components[1].label, 'Connect existing account');
 assert.equal(components[1].style, 5);
 assert.equal(components[1].url, 'https://blaue-magiergilde.de/settings/profile');
 

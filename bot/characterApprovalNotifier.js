@@ -132,7 +132,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         embed.addFields({ name: 'Notes', value: notes, inline: false });
     }
     if (isMeaningful(registrationNote) && registrationNote !== '—') {
-        embed.addFields({ name: 'Registration info', value: registrationNote, inline: false });
+        embed.addFields({ name: 'Registration notes', value: registrationNote, inline: false });
     }
     if (isMeaningful(reviewNote) && reviewNote !== '—') {
         embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
@@ -157,7 +157,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
-            .setLabel('Needs changes')
+            .setLabel('Request changes')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
@@ -167,7 +167,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Set pending')
+            .setLabel('Move back to review')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );

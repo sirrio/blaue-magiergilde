@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Character;
 use App\Models\DiscordBotSetting;
+use App\Support\BotRequestFailure;
 use Illuminate\Support\Facades\Http;
 
 class CharacterApprovalNotificationService
@@ -228,11 +229,7 @@ class CharacterApprovalNotificationService
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
-            return [
-                'ok' => false,
-                'status' => 422,
-                'error' => 'Bot HTTP is not configured.',
-            ];
+            return BotRequestFailure::unconfigured();
         }
 
         $timeout = max(1, (int) config('services.bot.http_timeout', 10));
@@ -243,37 +240,11 @@ class CharacterApprovalNotificationService
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').$path, $payload);
         } catch (\Throwable $error) {
-            $detail = trim((string) $error->getMessage());
-            $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
-
-            return [
-                'ok' => false,
-                'status' => 503,
-                'error' => $message,
-            ];
+            return BotRequestFailure::fromThrowable($error);
         }
 
         if (! $response->ok()) {
-            $errorDetail = null;
-            try {
-                $responsePayload = $response->json();
-                $errorDetail = is_array($responsePayload) ? ($responsePayload['error'] ?? $responsePayload['message'] ?? null) : null;
-            } catch (\Throwable $error) {
-                $errorDetail = null;
-            }
-
-            $fallbackDetail = trim((string) $response->body());
-            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
-            $message = sprintf('Bot request failed. (HTTP %d).', $response->status());
-            if ($detail) {
-                $message .= ' '.$detail;
-            }
-
-            return [
-                'ok' => false,
-                'status' => $response->status(),
-                'error' => $message,
-            ];
+            return BotRequestFailure::fromResponse($response);
         }
 
         $responseData = [];

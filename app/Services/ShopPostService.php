@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Shop;
+use App\Support\BotRequestFailure;
 use Illuminate\Support\Facades\Http;
 
 class ShopPostService
@@ -47,11 +48,7 @@ class ShopPostService
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
-            return [
-                'ok' => false,
-                'status' => 422,
-                'error' => 'Bot HTTP is not configured.',
-            ];
+            return BotRequestFailure::unconfigured();
         }
 
         $timeout = max(120, (int) config('services.bot.http_timeout', 60));
@@ -62,42 +59,11 @@ class ShopPostService
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').$path, $payload);
         } catch (\Throwable $error) {
-            $detail = trim((string) $error->getMessage());
-            $message = $detail === '' ? 'Bot is not reachable.' : 'Bot is not reachable. '.$detail;
-            $normalizedDetail = strtolower($detail);
-            $isTimeout = str_contains($normalizedDetail, 'curl error 28')
-                || str_contains($normalizedDetail, 'operation timed out')
-                || str_contains($normalizedDetail, 'timed out');
-
-            return [
-                'ok' => false,
-                'status' => 503,
-                'error' => $message,
-                'timed_out' => $isTimeout,
-            ];
+            return BotRequestFailure::fromThrowable($error);
         }
 
         if (! $response->ok()) {
-            $errorDetail = null;
-            try {
-                $responsePayload = $response->json();
-                $errorDetail = is_array($responsePayload) ? ($responsePayload['error'] ?? $responsePayload['message'] ?? null) : null;
-            } catch (\Throwable $error) {
-                $errorDetail = null;
-            }
-
-            $fallbackDetail = trim((string) $response->body());
-            $detail = $errorDetail ?: ($fallbackDetail !== '' ? $fallbackDetail : null);
-            $message = sprintf('Bot request failed. (HTTP %d).', $response->status());
-            if ($detail) {
-                $message .= ' '.$detail;
-            }
-
-            return [
-                'ok' => false,
-                'status' => $response->status(),
-                'error' => $message,
-            ];
+            return BotRequestFailure::fromResponse($response);
         }
 
         return [

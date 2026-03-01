@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
-use Illuminate\Http\Client\Response as HttpResponse;
+use App\Support\BotRequestFailure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +23,10 @@ class DiscordBackupController extends Controller
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
+            $result = BotRequestFailure::unconfigured();
+
             return redirect()->back()->withErrors([
-                'discord_backup' => 'Bot HTTP is not configured.',
+                'discord_backup' => $result['error'],
             ]);
         }
 
@@ -57,14 +59,18 @@ class DiscordBackupController extends Controller
                     'guilds' => $guildSelections,
                 ]);
         } catch (\Throwable $error) {
+            $result = BotRequestFailure::fromThrowable($error);
+
             return redirect()->back()->withErrors([
-                'discord_backup' => $this->buildBotExceptionMessage($error, 'Bot is not reachable.'),
+                'discord_backup' => $result['error'],
             ]);
         }
 
         if (! $response->ok()) {
+            $result = BotRequestFailure::fromResponse($response);
+
             return redirect()->back()->withErrors([
-                'discord_backup' => $this->buildBotRequestError($response, 'Bot request failed.'),
+                'discord_backup' => $result['error'],
             ]);
         }
 
@@ -94,9 +100,12 @@ class DiscordBackupController extends Controller
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
+            $result = BotRequestFailure::unconfigured();
+
             return response()->json([
                 'configured' => false,
                 'status' => null,
+                'error' => $result['error'],
             ]);
         }
 
@@ -108,14 +117,18 @@ class DiscordBackupController extends Controller
                 ->withHeaders(['X-Bot-Token' => $botToken])
                 ->post(rtrim($botUrl, '/').'/discord-backup/status');
         } catch (\Throwable $error) {
+            $result = BotRequestFailure::fromThrowable($error);
+
             return response()->json([
-                'error' => $this->buildBotExceptionMessage($error, 'Bot is not reachable.'),
+                'error' => $result['error'],
             ], 503);
         }
 
         if (! $response->ok()) {
+            $result = BotRequestFailure::fromResponse($response);
+
             return response()->json([
-                'error' => $this->buildBotRequestError($response, 'Bot request failed.'),
+                'error' => $result['error'],
             ], 502);
         }
 
@@ -142,9 +155,11 @@ class DiscordBackupController extends Controller
         $botToken = trim((string) config('services.bot.http_token', ''));
 
         if ($botUrl === '' || $botToken === '') {
+            $result = BotRequestFailure::unconfigured();
+
             return response()->json([
-                'error' => 'Bot HTTP is not configured.',
-            ], 422);
+                'error' => $result['error'],
+            ], $result['status']);
         }
 
         if ($discordChannel->is_thread) {
@@ -184,59 +199,21 @@ class DiscordBackupController extends Controller
                     ]],
                 ]);
         } catch (\Throwable $error) {
+            $result = BotRequestFailure::fromThrowable($error);
+
             return response()->json([
-                'error' => $this->buildBotExceptionMessage($error, 'Bot is not reachable.'),
+                'error' => $result['error'],
             ], 503);
         }
 
         if (! $response->ok()) {
+            $result = BotRequestFailure::fromResponse($response);
+
             return response()->json([
-                'error' => $this->buildBotRequestError($response, 'Bot request failed.'),
+                'error' => $result['error'],
             ], $response->status());
         }
 
         return response()->json(['status' => 'started']);
-    }
-
-    private function buildBotRequestError(HttpResponse $response, string $fallback): string
-    {
-        $detail = null;
-        $retryAfter = null;
-
-        try {
-            $payload = $response->json();
-            if (is_array($payload)) {
-                $detail = $payload['error'] ?? $payload['message'] ?? null;
-                $retryAfter = $payload['retry_after_ms'] ?? null;
-            }
-        } catch (\Throwable $error) {
-            $detail = null;
-        }
-
-        if (! $detail) {
-            $body = trim((string) $response->body());
-            $detail = $body !== '' ? $body : null;
-        }
-
-        $message = sprintf('%s (HTTP %d).', $fallback, $response->status());
-        if ($detail) {
-            $message .= ' '.$detail;
-        }
-        if ($retryAfter !== null) {
-            $seconds = max(1, (int) ceil(((int) $retryAfter) / 1000));
-            $message .= sprintf(' Retry after %ds.', $seconds);
-        }
-
-        return $message;
-    }
-
-    private function buildBotExceptionMessage(\Throwable $error, string $fallback): string
-    {
-        $detail = trim((string) $error->getMessage());
-        if ($detail === '') {
-            return $fallback;
-        }
-
-        return $fallback.' '.$detail;
     }
 }

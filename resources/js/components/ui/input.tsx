@@ -6,6 +6,7 @@ type InputProps = {
   children: ReactNode,
   type?: 'text' | 'number' | 'date' | 'time' | 'url' | 'email' | 'search' | 'password',
   value: string | number,
+  autoComplete?: string,
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void,
   onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void,
@@ -27,6 +28,7 @@ export const Input: React.FC<InputProps> = ({
                                               children,
                                               type = 'text',
                                               value,
+                                              autoComplete,
                                               placeholder,
                                               onChange,
                                               onBlur,
@@ -62,6 +64,7 @@ export const Input: React.FC<InputProps> = ({
              id={inputId}
              type={type}
              value={value}
+             autoComplete={autoComplete}
              onChange={onChange}
              onBlur={onBlur}
              onFocus={onFocus}

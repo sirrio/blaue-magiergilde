@@ -166,6 +166,29 @@ function guildStatusEmoji(value) {
     return '⏳';
 }
 
+function guildStatusNextStep(value) {
+    const status = normalizeGuildStatus(value);
+    if (status === 'draft') {
+        return 'Register with Magiergilde to submit this character for review.';
+    }
+    if (status === 'pending') {
+        return 'Waiting for Magiergilde review.';
+    }
+    if (status === 'needs_changes') {
+        return 'Apply the requested changes, then register the character again.';
+    }
+    if (status === 'declined') {
+        return 'Review declined. Check the review note before submitting again.';
+    }
+    if (status === 'approved') {
+        return 'Approved for Magiergilde.';
+    }
+    if (status === 'retired') {
+        return 'Retired.';
+    }
+    return null;
+}
+
 function tryBuildLocalAvatarAttachment(character) {
     const raw = String(character.avatar || '').trim();
     if (!raw) return null;
@@ -198,6 +221,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const classNames = String(character.class_names || '').trim();
     const statusLabel = guildStatusLabel(character.guild_status);
     const statusEmoji = guildStatusEmoji(character.guild_status);
+    const statusNextStep = guildStatusNextStep(character.guild_status);
     const hasRoom = safeInt(character.has_room) > 0;
 
     const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
@@ -234,6 +258,10 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );
+
+    if (statusNextStep) {
+        embed.addFields({ name: 'Next step', value: statusNextStep, inline: false });
+    }
 
     const externalLink = String(character.external_link || '').trim();
     const managerUrl = resolveCharacterManagerUrl(character.id);

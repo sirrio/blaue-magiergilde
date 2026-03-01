@@ -106,14 +106,22 @@ export default function Register() {
                 className={cn('gap-2 text-sm sm:text-base', buttonOutlineDiscord)}
               >
                 <DiscordIcon width={20} />
-                Mit Discord registrieren
+                Neuen Account mit Discord erstellen
               </Button>
+              <div className="rounded-lg border border-sky-400/20 bg-sky-400/8 p-3 text-xs text-sky-100/90">
+                <p className="font-semibold text-sky-100">Create a new account with Discord</p>
+                <p className="mt-1">This creates a new app account and links it to your Discord account in one step.</p>
+                <p className="mt-1 text-sky-100/75">
+                  If you already use the website, do not register again. Log in instead and connect Discord in your profile.
+                </p>
+              </div>
 
               <div className="divider my-0 opacity-60">oder</div>
 
               <form onSubmit={submit} className="space-y-3 sm:space-y-4">
                 <Input
                   type="text"
+                  autoComplete="nickname"
                   value={data.name}
                   onChange={(e) => setData('name', e.target.value)}
                   errors={errors.name}
@@ -122,11 +130,12 @@ export default function Register() {
                   Nickname
                 </Input>
                 <p className="text-xs text-white/70">Bitte verwende einen Nickname, nicht deinen echten Namen.</p>
-                <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} placeholder="you@example.com">
+                <Input type="email" autoComplete="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} placeholder="you@example.com">
                   Email
                 </Input>
                 <Input
                   type="password"
+                  autoComplete="new-password"
                   value={data.password}
                   onChange={(e) => setData('password', e.target.value)}
                   errors={errors.password}
@@ -136,6 +145,7 @@ export default function Register() {
                 </Input>
                 <Input
                   type="password"
+                  autoComplete="new-password"
                   value={data.password_confirmation}
                   onChange={(e) => setData('password_confirmation', e.target.value)}
                   errors={errors.password_confirmation}
@@ -158,7 +168,7 @@ export default function Register() {
                 <p className="text-center text-sm text-white/80">
                   Schon registriert?{' '}
                   <Link href={route('login')} className="underline underline-offset-4 text-white/80 transition-colors hover:text-white">
-                    Login
+                    Zum Login
                   </Link>
                 </p>
                 <Button as={Link as ElementType} href={route('home')} variant="outline" className={cn('btn-sm', buttonOutlineWhite)}>
