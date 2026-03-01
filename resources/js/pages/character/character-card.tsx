@@ -150,10 +150,11 @@ function SubmitForApprovalModal({
 }: {
   character: Character
   processing: boolean
-  onSubmit: (registrationNote: string, onSuccess: () => void) => void
+  onSubmit: (registrationNote: string, callbacks: { onSuccess: () => void; onError: (message: string) => void }) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [registrationNote, setRegistrationNote] = useState(character.registration_note ?? '')
+  const [localNotice, setLocalNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null)
   const fromLabel = (character.guild_status ?? 'draft') === 'needs_changes' ? 'needs changes' : 'draft'
 
   return (
@@ -165,6 +166,7 @@ function SubmitForApprovalModal({
           className="w-full justify-center"
           onClick={() => {
             setRegistrationNote(character.registration_note ?? '')
+            setLocalNotice(null)
             setIsOpen(true)
           }}
           disabled={processing}
@@ -177,6 +179,11 @@ function SubmitForApprovalModal({
       </ModalTrigger>
       <ModalTitle>Register Character With Magiergilde</ModalTitle>
       <ModalContent>
+        {localNotice ? (
+          <div className={cn('alert py-2 text-sm', localNotice.tone === 'error' ? 'alert-error alert-soft' : 'alert-success alert-soft')}>
+            {localNotice.message}
+          </div>
+        ) : null}
         <p className="text-sm text-base-content/80">
           This changes <span className="font-semibold">{character.name}</span> from {fromLabel} to active (pending) and registers it with
           the Magiergilde for review.
@@ -200,7 +207,18 @@ function SubmitForApprovalModal({
           After Magiergilde review, you cannot switch approved or declined characters back by yourself.
         </p>
       </ModalContent>
-      <ModalAction onClick={() => onSubmit(registrationNote.trim(), () => setIsOpen(false))} disabled={processing}>
+      <ModalAction
+        onClick={() => onSubmit(registrationNote.trim(), {
+          onSuccess: () => {
+            setLocalNotice({ tone: 'success', message: 'Character registered for review.' })
+            setIsOpen(false)
+          },
+          onError: (message) => {
+            setLocalNotice({ tone: 'error', message })
+          },
+        })}
+        disabled={processing}
+      >
         Register character
       </ModalAction>
     </Modal>
@@ -358,7 +376,10 @@ export function CharacterCard({
   const adventuresCountWarningReason = 'Simple mode auto-level entries exist. Played adventures count is not reliable.'
   const factionLevelWarningReason = 'Simple mode auto-level entries exist. Faction level is not reliable.'
 
-  const submitForApproval = (registrationNote: string, onSuccess: () => void) => {
+  const submitForApproval = (
+    registrationNote: string,
+    callbacks: { onSuccess: () => void; onError: (message: string) => void },
+  ) => {
     if (isSubmittingForApproval || !canSubmitForApproval) {
       return
     }
@@ -373,7 +394,16 @@ export function CharacterCard({
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
-          onSuccess()
+          callbacks.onSuccess()
+        },
+        onError: (errors) => {
+          const message = String(
+            errors.registration_note
+            ?? errors.guild_status
+            ?? errors.character
+            ?? 'Character could not be registered. Check the form and try again.',
+          )
+          callbacks.onError(message)
         },
         onFinish: () => {
           setIsSubmittingForApproval(false)

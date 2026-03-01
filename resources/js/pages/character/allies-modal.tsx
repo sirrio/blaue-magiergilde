@@ -3,7 +3,6 @@ import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
-import { toast } from '@/components/ui/toast'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
@@ -573,6 +572,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   const [search, setSearch] = useState('')
   const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
   const [quickAddCharacterId, setQuickAddCharacterId] = useState('')
+  const [localNotice, setLocalNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null)
   const linkedCharacterIds = useMemo(
     () => allies.map((ally) => ally.linked_character_id).filter(Boolean) as number[],
     [allies],
@@ -584,14 +584,15 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   const showFirstError = (errors: Record<string, string>) => {
     const firstError = Object.values(errors)[0]
     if (firstError) {
-      toast.show(firstError, 'error')
+      setLocalNotice({ tone: 'error', message: firstError })
       return
     }
 
-    toast.show('Ally could not be saved.', 'error')
+    setLocalNotice({ tone: 'error', message: 'Ally could not be saved. Check the highlighted fields and try again.' })
   }
 
   const handleSave = (ally: Ally) => {
+    setLocalNotice(null)
     const { linked_character: linkedCharacter, avatar, ...rest } = ally
     void linkedCharacter
     const payload: Record<string, FormDataConvertible> = { ...rest }
@@ -608,6 +609,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       router.post(route('allies.store'), payload, {
         preserveScroll: true,
         onSuccess: () => {
+          setLocalNotice({ tone: 'success', message: 'Ally saved.' })
           setEditingId(null)
         },
         onError: (errors) => {
@@ -618,6 +620,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       router.post(route('allies.update', ally.id), payload, {
         preserveScroll: true,
         onSuccess: () => {
+          setLocalNotice({ tone: 'success', message: 'Ally saved.' })
           setEditingId(null)
         },
         onError: (errors) => {
@@ -627,18 +630,21 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     }
   }
   const handleCancel = () => {
+    setLocalNotice(null)
     setEditingId(null)
   }
   const handleRemove = (ally: Ally) => {
     const label = getAllyDisplayName(ally)
     if (window.confirm(`Are you sure you want to remove ${label}?`)) {
+      setLocalNotice(null)
       router.delete(route('allies.destroy', ally.id), {
         preserveScroll: true,
         onSuccess: () => {
+          setLocalNotice({ tone: 'success', message: 'Ally removed.' })
           setEditingId(null)
         },
         onError: () => {
-          toast.show('Ally could not be removed.', 'error')
+          setLocalNotice({ tone: 'error', message: 'Ally could not be removed. Try again in a moment.' })
         },
       })
     }
@@ -717,6 +723,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   }, [allies, editingId])
 
   const handleSelectAlly = (allyId: number) => {
+    setLocalNotice(null)
     setEditingId(allyId)
   }
   return (
@@ -729,7 +736,13 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       </ModalTrigger>
       <ModalTitle>Manage Allies</ModalTitle>
       <ModalContent>
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:gap-6">
+        <div className="space-y-4">
+          {localNotice ? (
+            <div className={localNotice.tone === 'error' ? 'alert alert-error alert-soft py-2 text-sm' : 'alert alert-success alert-soft py-2 text-sm'}>
+              {localNotice.message}
+            </div>
+          ) : null}
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:gap-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -828,7 +841,10 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                 <p className="text-xs font-semibold uppercase text-base-content/50">Ally details</p>
                 <h3 className="text-base font-semibold">{selectedAlly ? getAllyDisplayName(selectedAlly) : 'Select an ally'}</h3>
               </div>
-              <Button size="sm" className="w-full sm:w-auto" onClick={() => setEditingId('new')}>
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => {
+                setLocalNotice(null)
+                setEditingId('new')
+              }}>
                 <PlusCircle size={16} className="mr-1" /> Add Ally
               </Button>
             </div>
@@ -869,6 +885,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
               </div>
             </div>
           </div>
+        </div>
         </div>
       </ModalContent>
     </Modal>
