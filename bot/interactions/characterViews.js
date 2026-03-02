@@ -15,6 +15,7 @@ const {
     resolvePublicAvatarUrl,
     tryBuildLocalAvatarAttachment,
 } = require('../commands/game/characters');
+const { t } = require('../i18n');
 const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
 const { formatIsoDate, formatLocalIsoDate } = require('../dateUtils');
 const { formatDurationSeconds } = require('../utils/time');
@@ -164,38 +165,38 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked }) {
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked, locale = null }) {
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_basic_${characterId}_${ownerDiscordId}`)
-                .setLabel('Name/Link/Notes')
+                .setLabel(t('characters.manageBasic', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_avatar_${characterId}_${ownerDiscordId}`)
-                .setLabel('Avatar')
+                .setLabel(t('characters.manageAvatar', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_classes_${characterId}_${ownerDiscordId}`)
-                .setLabel('Classes')
+                .setLabel(t('characters.manageClasses', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_faction_${characterId}_${ownerDiscordId}`)
-                .setLabel('Faction')
+                .setLabel(t('characters.manageFaction', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_dm_bubbles_${characterId}_${ownerDiscordId}`)
-                .setLabel('DM Bubbles')
+                .setLabel(t('characters.manageDmBubbles', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_dm_coins_${characterId}_${ownerDiscordId}`)
-                .setLabel('DM Coins')
+                .setLabel(t('characters.manageDmCoins', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
-                .setLabel('Bubble Shop')
+                .setLabel(t('characters.manageBubbleShop', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -203,25 +204,33 @@ function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTrack
     rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`characterManage_tracking_toggle_${characterId}_${ownerDiscordId}`)
-            .setLabel(`Tracking: ${simplifiedTracking ? 'Simplified' : 'Adventure'}`)
+            .setLabel(t(
+                simplifiedTracking ? 'characters.manageTrackingSimplified' : 'characters.manageTrackingAdventure',
+                {},
+                locale,
+            ))
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`characterManage_avatar_mask_toggle_${characterId}_${ownerDiscordId}`)
-            .setLabel(`Token mask: ${avatarMasked ? 'On' : 'Off'}`)
+            .setLabel(t(
+                avatarMasked ? 'characters.manageTokenMaskOn' : 'characters.manageTokenMaskOff',
+                {},
+                locale,
+            ))
             .setStyle(ButtonStyle.Secondary),
     ));
 
     rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`characterManage_back_${characterId}_${ownerDiscordId}`)
-            .setLabel('Back')
+            .setLabel(t('common.back', {}, locale))
             .setStyle(ButtonStyle.Secondary),
     ));
 
     return rows;
 }
 
-function buildCharacterManageView(character, { ownerDiscordId }) {
+function buildCharacterManageView(character, { ownerDiscordId, locale = null }) {
     const name = String(character.name || `Character ${character.id}`);
     const classNames = String(character.class_names || '').trim() || '-';
     const isFiller = Boolean(character.is_filler);
@@ -236,7 +245,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     const notesRaw = String(character.notes || '').trim();
     const notes = notesRaw ? notesRaw.slice(0, 1000) : '-';
     const avatarRaw = String(character.avatar || '').trim();
-    const avatar = avatarRaw ? 'Present' : 'No avatar';
+    const avatar = avatarRaw ? t('characters.avatarPresent', {}, locale) : t('characters.avatarMissing', {}, locale);
     const externalLink = String(character.external_link || character.externalLink || '').trim();
     const linkValue = externalLink
         ? (isHttpUrl(externalLink) ? `[Open link](${externalLink})` : externalLink.slice(0, 1000))
@@ -255,25 +264,25 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
     }
 
     const embed = new EmbedBuilder()
-        .setTitle('Manage character')
+        .setTitle(t('characters.manageTitle', {}, locale))
         .setColor(0x4f46e5)
         .setDescription(descriptionParts.join(' - '))
         .addFields(
-            { name: 'Classes', value: classNames, inline: false },
-            { name: 'Faction', value: faction, inline: true },
+            { name: t('characters.manageClasses', {}, locale), value: classNames, inline: false },
+            { name: t('characters.manageFaction', {}, locale), value: faction, inline: true },
             { name: 'Version', value: version, inline: true },
             { name: 'Level', value: String(level), inline: true },
-            { name: 'Current tier', value: currentTier, inline: true },
-            { name: 'Tracking', value: simplifiedTracking ? 'Simplified tracking' : 'Adventure-based tracking', inline: true },
-            { name: 'Status', value: statusLabel, inline: true },
-            { name: 'Starting tier', value: startTier, inline: true },
-            { name: 'Avatar', value: avatar, inline: true },
-            { name: 'Token mask', value: avatarMasked ? 'On' : 'Off', inline: true },
-            { name: 'DnDBeyond Link', value: linkValue, inline: false },
-            { name: 'Notes', value: notes, inline: false },
-            { name: 'DM Bubbles', value: dmBubbles, inline: true },
-            { name: 'DM Coins', value: dmCoins, inline: true },
-            { name: 'Bubble Shop', value: bubbleSpend, inline: true },
+            { name: t('characters.currentTier', {}, locale), value: currentTier, inline: true },
+            { name: t('characters.trackingField', {}, locale), value: t(simplifiedTracking ? 'characters.trackingSimplifiedBased' : 'characters.trackingAdventureBased', {}, locale), inline: true },
+            { name: t('characters.statusField', {}, locale), value: statusLabel, inline: true },
+            { name: t('characters.startingTier', {}, locale), value: startTier, inline: true },
+            { name: t('characters.avatarField', {}, locale), value: avatar, inline: true },
+            { name: t('characters.tokenMaskField', {}, locale), value: t(avatarMasked ? 'characters.tokenMaskValueOn' : 'characters.tokenMaskValueOff', {}, locale), inline: true },
+            { name: t('characters.dndBeyondLinkField', {}, locale), value: linkValue, inline: false },
+            { name: t('characters.notesField', {}, locale), value: notes, inline: false },
+            { name: t('characters.manageDmBubbles', {}, locale), value: dmBubbles, inline: true },
+            { name: t('characters.manageDmCoins', {}, locale), value: dmCoins, inline: true },
+            { name: t('characters.manageBubbleShop', {}, locale), value: bubbleSpend, inline: true },
         );
 
     return {
@@ -283,6 +292,7 @@ function buildCharacterManageView(character, { ownerDiscordId }) {
             ownerDiscordId,
             simplifiedTracking,
             avatarMasked,
+            locale,
         }),
     };
 }
@@ -334,12 +344,13 @@ function buildStepperNavRows({
     disableNext = false,
     disableBack = false,
     cancelLabel = 'Cancel',
+    locale = null,
 }) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(backId)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disableBack),
             new ButtonBuilder()
@@ -384,44 +395,49 @@ function getAdventureFieldValues(state, participantsLabel) {
 }
 
 function formatAdventureSummaryFields(state, participantsLabel) {
+    const locale = state?.locale || null;
     const values = getAdventureFieldValues(state, participantsLabel);
     return [
-        { name: 'Duration', value: values.duration, inline: true },
-        { name: 'Date', value: values.date, inline: true },
-        { name: 'Character quest', value: values.quest, inline: true },
-        { name: 'Title', value: values.title, inline: false },
-        { name: 'Game Master', value: values.gameMaster, inline: false },
-        { name: 'Notes', value: values.notes, inline: false },
-        { name: 'Participants', value: values.participants, inline: false },
+        { name: t('characters.durationField', {}, locale), value: values.duration, inline: true },
+        { name: t('characters.dateField', {}, locale), value: values.date, inline: true },
+        { name: t('characters.characterQuestField', {}, locale), value: values.quest, inline: true },
+        { name: t('characters.titleField', {}, locale), value: values.title, inline: false },
+        { name: t('characters.gameMasterField', {}, locale), value: values.gameMaster, inline: false },
+        { name: t('characters.notesField', {}, locale), value: values.notes, inline: false },
+        { name: t('characters.participantsField', {}, locale), value: values.participants, inline: false },
     ];
 }
 
 function formatAdventureStepFields(stepKey, state, participantsLabel) {
+    const locale = state?.locale || null;
     const values = getAdventureFieldValues(state, participantsLabel);
     switch (stepKey) {
         case 'duration':
-            return [{ name: 'Duration', value: values.duration, inline: true }];
+            return [{ name: t('characters.durationField', {}, locale), value: values.duration, inline: true }];
         case 'date':
-            return [{ name: 'Date', value: values.date, inline: true }];
+            return [{ name: t('characters.dateField', {}, locale), value: values.date, inline: true }];
         case 'title':
             return [
-                { name: 'Title', value: values.title, inline: false },
-                { name: 'Game Master', value: values.gameMaster, inline: false },
+                { name: t('characters.titleField', {}, locale), value: values.title, inline: false },
+                { name: t('characters.gameMasterField', {}, locale), value: values.gameMaster, inline: false },
             ];
         case 'quest':
-            return [{ name: 'Character quest', value: values.quest, inline: true }];
+            return [{ name: t('characters.characterQuestField', {}, locale), value: values.quest, inline: true }];
         case 'notes':
-            return [{ name: 'Notes', value: values.notes, inline: false }];
+            return [{ name: t('characters.notesField', {}, locale), value: values.notes, inline: false }];
         case 'participants':
-            return [{ name: 'Participants', value: values.participants, inline: false }];
+            return [{ name: t('characters.participantsField', {}, locale), value: values.participants, inline: false }];
         default:
             return [];
     }
 }
 
 function buildAdventureStepEmbed(stepKey, state, description, participantsLabel, footerNote) {
+    const locale = state?.locale || null;
     const stepNumber = getAdventureStepNumber(stepKey);
-    const title = state?.mode === 'edit' ? 'Edit adventure' : 'Create adventure';
+    const title = state?.mode === 'edit'
+        ? t('characters.editAdventureTitle', {}, locale)
+        : t('characters.createAdventureTitle', {}, locale);
     const footerText = footerNote
         ? `Step ${stepNumber}/7 • ${footerNote}`
         : `Step ${stepNumber}/7`;
@@ -442,6 +458,7 @@ function buildAdventureStepEmbed(stepKey, state, description, participantsLabel,
 
 function buildAdventureDurationRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const hasDuration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined;
     const rows = [
         new ActionRowBuilder().addComponents(
@@ -469,11 +486,14 @@ function buildAdventureDurationRows(state) {
         nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
         disableNext: !hasDuration,
+        cancelLabel: t('common.cancel', {}, locale),
+        locale,
     }));
 }
 
 function buildAdventureDateRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const hasDate = Boolean(state?.data?.startDate);
     const rows = [
         new ActionRowBuilder().addComponents(
@@ -497,11 +517,14 @@ function buildAdventureDateRows(state) {
         nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
         disableNext: !hasDate,
+        cancelLabel: t('common.cancel', {}, locale),
+        locale,
     }));
 }
 
 function buildAdventureTitleRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -515,25 +538,28 @@ function buildAdventureTitleRows(state) {
         backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
         nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+        cancelLabel: t('common.cancel', {}, locale),
+        locale,
     }));
 }
 
 function buildAdventureQuestRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const selected = state?.data?.hasAdditionalBubble;
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advCreate_quest_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select character quest...')
+        .setPlaceholder(t('characters.selectCharacterQuestPlaceholder', {}, locale))
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions(
             new StringSelectMenuOptionBuilder()
-                .setLabel('Yes, character quest (+1 bubble)')
+                .setLabel(t('characters.characterQuestYes', {}, locale))
                 .setValue('yes')
                 .setDefault(selected === true),
             new StringSelectMenuOptionBuilder()
-                .setLabel('No')
+                .setLabel(t('characters.characterQuestNo', {}, locale))
                 .setValue('no')
                 .setDefault(selected === false),
         );
@@ -543,16 +569,19 @@ function buildAdventureQuestRows(state) {
         nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
         disableNext: selected === null || selected === undefined,
+        cancelLabel: t('common.cancel', {}, locale),
+        locale,
     }));
 }
 
 function buildAdventureNotesRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_notes_edit_${characterId}_${ownerDiscordId}`)
-                .setLabel('Notes')
+                .setLabel(t('characters.notesField', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -561,17 +590,20 @@ function buildAdventureNotesRows(state) {
         backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
         nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+        cancelLabel: t('common.cancel', {}, locale),
+        locale,
     }));
 }
 
 function buildAdventureParticipantsRows(state, options) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const components = [];
 
     if (options.length > 0) {
         const select = new StringSelectMenuBuilder()
             .setCustomId(`advCreate_participants_${characterId}_${ownerDiscordId}`)
-            .setPlaceholder('Select participants...')
+            .setPlaceholder(t('characters.selectParticipantsPlaceholder', {}, locale))
             .setMinValues(0)
             .setMaxValues(Math.min(25, options.length));
 
@@ -589,7 +621,7 @@ function buildAdventureParticipantsRows(state, options) {
         components.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_participants_empty_${characterId}_${ownerDiscordId}`)
-                .setLabel('No participants available')
+                .setLabel(t('characters.participantsNoneAvailable', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(true),
         ));
@@ -599,11 +631,11 @@ function buildAdventureParticipantsRows(state, options) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_participants_search_${characterId}_${ownerDiscordId}`)
-                .setLabel('Search')
+                .setLabel(t('characters.search', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_participants_clear_${characterId}_${ownerDiscordId}`)
-                .setLabel('Remove all')
+                .setLabel(t('characters.removeAll', {}, locale))
                 .setStyle(ButtonStyle.Danger)
                 .setDisabled(
                     (state?.data?.allyIds?.length || 0) + (state?.data?.guildCharacterIds?.length || 0) === 0,
@@ -615,18 +647,23 @@ function buildAdventureParticipantsRows(state, options) {
         backId: `advCreate_back_${characterId}_${ownerDiscordId}`,
         nextId: `advCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `advCreate_cancel_${characterId}_${ownerDiscordId}`,
+        cancelLabel: t('common.cancel', {}, locale),
+        locale,
     }));
 }
 
 function buildAdventureConfirmRows(state) {
     const { characterId, ownerDiscordId } = state;
-    const confirmLabel = state?.mode === 'edit' ? 'Save adventure' : 'Create adventure';
+    const locale = state?.locale || null;
+    const confirmLabel = state?.mode === 'edit'
+        ? t('characters.saveAdventure', {}, locale)
+        : t('characters.newAdventure', {}, locale);
     const confirmStyle = state?.mode === 'edit' ? ButtonStyle.Primary : ButtonStyle.Success;
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_confirm_${characterId}_${ownerDiscordId}`)
@@ -636,44 +673,44 @@ function buildAdventureConfirmRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
+                .setLabel(t('common.cancel', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
-function buildAdventureMenuRow(character, ownerDiscordId) {
+function buildAdventureMenuRow(character, ownerDiscordId, locale = null) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`advAdd_${character.id}_${ownerDiscordId}`)
-            .setLabel('New adventure')
+            .setLabel(t('characters.newAdventure', {}, locale))
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`advList_${character.id}_${ownerDiscordId}`)
-            .setLabel('List')
+            .setLabel(t('common.list', {}, locale))
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
-            .setLabel('Back')
+            .setLabel(t('common.back', {}, locale))
             .setStyle(ButtonStyle.Secondary),
     );
 }
 
-function buildDowntimeMenuRow(character, ownerDiscordId) {
+function buildDowntimeMenuRow(character, ownerDiscordId, locale = null) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`dtAdd_${character.id}_${ownerDiscordId}`)
-            .setLabel('Add downtime')
+            .setLabel(t('characters.addDowntime', {}, locale))
             .setStyle(ButtonStyle.Success)
             .setDisabled(Boolean(character.is_filler)),
         new ButtonBuilder()
             .setCustomId(`dtList_${character.id}_${ownerDiscordId}`)
-            .setLabel('List')
+            .setLabel(t('common.list', {}, locale))
             .setStyle(ButtonStyle.Primary)
             .setDisabled(Boolean(character.is_filler)),
         new ButtonBuilder()
             .setCustomId(`characterCard_back_${character.id}_${ownerDiscordId}`)
-            .setLabel('Back')
+            .setLabel(t('common.back', {}, locale))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -695,9 +732,10 @@ function formatSelectedParticipantNames(options, selectedIds, maxLength = 900) {
 
 function buildAdventureDurationModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advCreate_durationModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Enter duration');
+        .setTitle(t('characters.enterDurationTitle', {}, locale));
 
     const durationValue = state?.data?.durationSeconds
         ? formatDurationSeconds(state.data.durationSeconds)
@@ -705,7 +743,7 @@ function buildAdventureDurationModal(state) {
 
     const durationInput = new TextInputBuilder()
         .setCustomId('advDuration')
-        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
+        .setLabel(t('characters.durationInputLabel', {}, locale))
         .setPlaceholder('03:00')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
@@ -717,13 +755,14 @@ function buildAdventureDurationModal(state) {
 
 function buildAdventureDateModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advCreate_dateModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Enter date');
+        .setTitle(t('characters.enterDateTitle', {}, locale));
 
     const dateInput = new TextInputBuilder()
         .setCustomId('advDate')
-        .setLabel('Date (YYYY-MM-DD)')
+        .setLabel(t('characters.dateInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(state?.data?.startDate || formatLocalIsoDate(), 10));
@@ -734,20 +773,21 @@ function buildAdventureDateModal(state) {
 
 function buildAdventureTitleModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advCreate_titleModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Title & GM');
+        .setTitle(t('characters.titleAndGmTitle', {}, locale));
 
     const titleInput = new TextInputBuilder()
         .setCustomId('advTitle')
-        .setLabel('Title (optional)')
+        .setLabel(t('characters.titleOptionalLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setValue(safeModalValue(state?.data?.title));
 
     const gmInput = new TextInputBuilder()
         .setCustomId('advGm')
-        .setLabel('Game Master (optional)')
+        .setLabel(t('characters.gameMasterOptionalLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setValue(safeModalValue(state?.data?.gameMaster));
@@ -761,13 +801,14 @@ function buildAdventureTitleModal(state) {
 
 function buildAdventureNotesModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advCreate_notesModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Notes');
+        .setTitle(t('characters.notesModalTitle', {}, locale));
 
     const notesInput = new TextInputBuilder()
         .setCustomId('advNotes')
-        .setLabel('Notes (optional)')
+        .setLabel(t('characters.notesOptionalLabel', {}, locale))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setValue(safeModalValue(state?.data?.notes));
@@ -780,7 +821,7 @@ function buildCreationCancelRow(ownerDiscordId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -796,7 +837,7 @@ function buildCreationEmbed(step, title, description) {
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_classes_${ownerDiscordId}`)
-        .setPlaceholder('Select classes...')
+        .setPlaceholder(t('characters.selectClassesPlaceholder'))
         .setMinValues(1)
         .setMaxValues(Math.min(25, classes.length));
 
@@ -817,7 +858,7 @@ function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
 function buildStartTierRow(ownerDiscordId, selectedValue) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_tier_${ownerDiscordId}`)
-        .setPlaceholder('Select starting tier...')
+        .setPlaceholder(t('characters.selectStartingTierPlaceholder'))
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions([
@@ -861,7 +902,7 @@ function buildFactionRow(ownerDiscordId, selectedValue) {
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_faction_${ownerDiscordId}`)
-        .setPlaceholder('Select faction...')
+        .setPlaceholder(t('characters.selectFactionPlaceholder'))
         .setMinValues(1)
         .setMaxValues(1);
 
@@ -880,7 +921,7 @@ function buildFactionRow(ownerDiscordId, selectedValue) {
 function buildVersionRow(ownerDiscordId, selectedValue) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_version_${ownerDiscordId}`)
-        .setPlaceholder('Select version...')
+        .setPlaceholder(t('characters.selectVersionPlaceholder'))
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions([
@@ -896,98 +937,101 @@ function buildVersionRow(ownerDiscordId, selectedValue) {
     return new ActionRowBuilder().addComponents(select);
 }
 
-function buildCreationConfirmRows(ownerDiscordId) {
+function buildCreationConfirmRows(ownerDiscordId, locale = null) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_confirm_${ownerDiscordId}`)
-                .setLabel('Create character')
+                .setLabel(t('characters.createCreateCharacter', {}, locale))
                 .setStyle(ButtonStyle.Success),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-                .setLabel('Cancel')
+                .setLabel(t('common.cancel', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
-function buildCreationBasicsRows(ownerDiscordId) {
+function buildCreationBasicsRows(ownerDiscordId, locale = null) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_basicopen_${ownerDiscordId}`)
-                .setLabel('Weiter')
+                .setLabel(t('common.next', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-                .setLabel('Cancel')
+                .setLabel(t('common.cancel', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
-function buildCreationStepActionRows(ownerDiscordId, stepKey) {
+function buildCreationStepActionRows(ownerDiscordId, stepKey, locale = null) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_back_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_next_${stepKey}_${ownerDiscordId}`)
-                .setLabel('Weiter')
+                .setLabel(t('common.next', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersCreate_cancel_${ownerDiscordId}`)
-                .setLabel('Cancel')
+                .setLabel(t('common.cancel', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
-function buildAvatarUploadRow(ownerDiscordId) {
+function buildAvatarUploadRow(ownerDiscordId, locale = null) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersCreate_avatar_dm_${ownerDiscordId}`)
-            .setLabel('Upload avatar in DM')
+            .setLabel(t('characters.createAvatarDmButton', {}, locale))
             .setStyle(ButtonStyle.Primary),
     );
 }
 
 function buildCreationBasicsEmbed(state, message) {
-    const embed = buildCreationEmbed(1, 'Create character', message || 'Bearbeite die Basisangaben.');
+    const locale = state?.locale || null;
+    const embed = buildCreationEmbed(1, t('characters.createTitle', {}, locale), message || t('characters.createBasicsDescription', {}, locale));
     embed.addFields(
-        { name: 'Name', value: state?.data?.name || '-', inline: false },
-        { name: 'DnDBeyond Link', value: state?.data?.externalLink || '-', inline: false },
-        { name: 'Avatar', value: state?.data?.avatar || 'No avatar', inline: false },
-        { name: 'Notes', value: state?.data?.notes || '-', inline: false },
+        { name: t('characters.createBasicsName', {}, locale), value: state?.data?.name || '-', inline: false },
+        { name: t('characters.createBasicsLink', {}, locale), value: state?.data?.externalLink || '-', inline: false },
+        { name: t('characters.createBasicsAvatar', {}, locale), value: state?.data?.avatar || t('characters.avatarMissing', {}, locale), inline: false },
+        { name: t('characters.createBasicsNotes', {}, locale), value: state?.data?.notes || '-', inline: false },
     );
     return embed;
 }
 
 function buildAvatarStepEmbed(state, message) {
+    const locale = state?.locale || null;
     const description = message
-        || 'Upload an avatar image (optional). Use **Upload avatar in DM** and click **Next**.';
-    const embed = buildCreationEmbed(2, 'Upload avatar', description);
+        || t('characters.createAvatarDescription', {}, locale);
+    const embed = buildCreationEmbed(2, t('characters.createAvatarTitle', {}, locale), description);
     embed.addFields({
-        name: 'Avatar',
-        value: state?.data?.avatar ? 'Uploaded' : 'No avatar',
+        name: t('characters.createBasicsAvatar', {}, locale),
+        value: state?.data?.avatar ? t('characters.createAvatarUploaded', {}, locale) : t('characters.avatarMissing', {}, locale),
         inline: false,
     });
     return embed;
 }
 
 async function buildCreationSummaryEmbed(state) {
+    const locale = state?.locale || null;
     const classes = await listCharacterClassesForDiscord();
     const classById = new Map(classes.map(entry => [Number(entry.id), entry.name]));
     const classNames = (state.data.classIds || [])
@@ -997,45 +1041,46 @@ async function buildCreationSummaryEmbed(state) {
     const tierLabel = state.data.isFiller ? 'Filler' : String(state.data.startTier || '').toUpperCase();
     const statusLabel = formatGuildStatusLabel(state.data.guildStatus);
     const embed = new EmbedBuilder()
-        .setTitle('Zusammenfassung')
+        .setTitle(t('characters.createSummaryTitle', {}, locale))
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Name', value: state.data.name || '-', inline: false },
-            { name: 'DnDBeyond Link', value: state.data.externalLink || '-', inline: false },
-            { name: 'Avatar', value: state.data.avatar || 'No avatar', inline: false },
-            { name: 'Classes', value: classNames.length > 0 ? classNames.join(', ') : '-', inline: false },
-            { name: 'Starting tier', value: tierLabel || '-', inline: true },
-            { name: 'Faction', value: state.data.faction || 'none', inline: true },
+            { name: t('characters.createBasicsName', {}, locale), value: state.data.name || '-', inline: false },
+            { name: t('characters.createBasicsLink', {}, locale), value: state.data.externalLink || '-', inline: false },
+            { name: t('characters.createBasicsAvatar', {}, locale), value: state.data.avatar || t('characters.avatarMissing', {}, locale), inline: false },
+            { name: t('characters.manageClasses', {}, locale), value: classNames.length > 0 ? classNames.join(', ') : '-', inline: false },
+            { name: t('characters.startingTier', {}, locale), value: tierLabel || '-', inline: true },
+            { name: t('characters.manageFaction', {}, locale), value: state.data.faction || 'none', inline: true },
             { name: 'Version', value: state.data.version || '2024', inline: true },
-            { name: 'Status', value: statusLabel, inline: true },
-            { name: 'Notes', value: state.data.notes ? state.data.notes : '-', inline: false },
+            { name: t('characters.statusField', {}, locale), value: statusLabel, inline: true },
+            { name: t('characters.createBasicsNotes', {}, locale), value: state.data.notes ? state.data.notes : '-', inline: false },
         );
 
     return embed;
 }
 
 function buildCreationBasicModal(ownerDiscordId, state) {
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`charactersCreate_basic_${ownerDiscordId}`)
-        .setTitle('Create character');
+        .setTitle(t('characters.createModalTitle', {}, locale));
 
     const nameInput = new TextInputBuilder()
         .setCustomId('createName')
-        .setLabel('Character name')
+        .setLabel(t('characters.createModalName', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(state?.data?.name));
 
     const linkInput = new TextInputBuilder()
         .setCustomId('createLink')
-        .setLabel('DnDBeyond Link (URL)')
+        .setLabel(t('characters.createModalLink', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(state?.data?.externalLink));
 
     const notesInput = new TextInputBuilder()
         .setCustomId('createNotes')
-        .setLabel('Notes (optional)')
+        .setLabel(t('characters.createModalNotes', {}, locale))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setValue(safeModalValue(state?.data?.notes));
@@ -1050,13 +1095,14 @@ function buildCreationBasicModal(ownerDiscordId, state) {
 }
 
 async function buildCharacterClassesView({ interaction, character, ownerDiscordId }) {
+    const locale = character?.locale || null;
     const classes = await listCharacterClassesForDiscord();
     const selectedIds = await listCharacterClassIdsForDiscord(interaction.user, character.id);
     const selectedSet = new Set(selectedIds.map(String));
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`characterClassesSelect_${character.id}_${ownerDiscordId}`)
-        .setPlaceholder('Select classes...')
+        .setPlaceholder(t('characters.selectClassesPlaceholder', {}, locale))
         .setMinValues(0)
         .setMaxValues(Math.min(25, classes.length));
 
@@ -1070,16 +1116,16 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
     });
 
     const embed = new EmbedBuilder()
-        .setTitle('Classes')
+        .setTitle(t('characters.classesTitle', {}, locale))
         .setColor(0x4f46e5)
-        .setDescription(`Selected for ${character.name}.`);
+        .setDescription(t('characters.selectedForCharacter', { name: character.name }, locale));
 
     const components = [
         new ActionRowBuilder().addComponents(select),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -1088,9 +1134,10 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
 }
 
 function buildCharacterFactionView({ character, ownerDiscordId }) {
+    const locale = character?.locale || null;
     const select = new StringSelectMenuBuilder()
         .setCustomId(`characterFactionSelect_${character.id}_${ownerDiscordId}`)
-        .setPlaceholder('Select faction...')
+        .setPlaceholder(t('characters.selectFactionPlaceholder', {}, locale))
         .setMinValues(1)
         .setMaxValues(1);
 
@@ -1104,16 +1151,16 @@ function buildCharacterFactionView({ character, ownerDiscordId }) {
     });
 
     const embed = new EmbedBuilder()
-        .setTitle('Faction')
+        .setTitle(t('characters.factionTitle', {}, locale))
         .setColor(0x4f46e5)
-        .setDescription(`Selected for ${character.name}.`);
+        .setDescription(t('characters.selectedForCharacter', { name: character.name }, locale));
 
     const components = [
         new ActionRowBuilder().addComponents(select),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_back_${character.id}_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -1125,11 +1172,11 @@ function buildDeleteConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`deleteCharacterConfirm_${characterId}_${ownerDiscordId}`)
-            .setLabel('Delete')
+            .setLabel(t('common.delete'))
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`deleteCharacterCancel_${characterId}_${ownerDiscordId}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -1138,11 +1185,11 @@ function buildAdventureDeleteConfirmRow({ adventureId, characterId, ownerDiscord
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`deleteAdventureConfirm_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Delete')
+            .setLabel(t('common.delete'))
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`deleteAdventureCancel_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -1151,11 +1198,11 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`deleteDowntimeConfirm_${downtimeId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Delete')
+            .setLabel(t('common.delete'))
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`deleteDowntimeCancel_${downtimeId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -1268,13 +1315,13 @@ function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialN
     return modal;
 }
 
-function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
+function buildAdventureListRows({ characterId, ownerDiscordId, adventures, locale = null }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advSelect_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select adventure...')
+        .setPlaceholder(t('characters.chooseAdventure', {}, locale))
         .addOptions(
             adventures.slice(0, 25).map(a => {
-                const title = String(a.title || '').trim() || '(No title)';
+                const title = String(a.title || '').trim() || t('characters.noTitleFallback', {}, locale);
                 const extra = a.has_additional_bubble ? ' +1' : '';
                 return new StringSelectMenuOptionBuilder()
                     .setLabel(`${title}${extra}`.slice(0, 100))
@@ -1287,7 +1334,7 @@ function buildAdventureListRows({ characterId, ownerDiscordId, adventures }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advListBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back to character')
+                .setLabel(t('characters.backToCharacter', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -1305,34 +1352,39 @@ function getDowntimeFieldValues(state) {
 }
 
 function formatDowntimeSummaryFields(state) {
+    const locale = state?.locale || null;
     const values = getDowntimeFieldValues(state);
     return [
-        { name: 'Duration', value: values.duration, inline: true },
-        { name: 'Date', value: values.date, inline: true },
-        { name: 'Type', value: values.type, inline: true },
-        { name: 'Notes', value: values.notes, inline: false },
+        { name: t('characters.durationField', {}, locale), value: values.duration, inline: true },
+        { name: t('characters.dateField', {}, locale), value: values.date, inline: true },
+        { name: t('characters.typeField', {}, locale), value: values.type, inline: true },
+        { name: t('characters.notesField', {}, locale), value: values.notes, inline: false },
     ];
 }
 
 function formatDowntimeStepFields(stepKey, state) {
+    const locale = state?.locale || null;
     const values = getDowntimeFieldValues(state);
     switch (stepKey) {
         case 'duration':
-            return [{ name: 'Duration', value: values.duration, inline: true }];
+            return [{ name: t('characters.durationField', {}, locale), value: values.duration, inline: true }];
         case 'date':
-            return [{ name: 'Date', value: values.date, inline: true }];
+            return [{ name: t('characters.dateField', {}, locale), value: values.date, inline: true }];
         case 'type':
-            return [{ name: 'Type', value: values.type, inline: true }];
+            return [{ name: t('characters.typeField', {}, locale), value: values.type, inline: true }];
         case 'notes':
-            return [{ name: 'Notes', value: values.notes, inline: false }];
+            return [{ name: t('characters.notesField', {}, locale), value: values.notes, inline: false }];
         default:
             return [];
     }
 }
 
 function buildDowntimeStepEmbed(stepKey, state, description) {
+    const locale = state?.locale || null;
     const stepNumber = getDowntimeStepNumber(stepKey);
-    const title = state?.mode === 'edit' ? 'Edit downtime' : 'Create downtime';
+    const title = state?.mode === 'edit'
+        ? t('characters.editDowntimeTitle', {}, locale)
+        : t('characters.createDowntimeTitle', {}, locale);
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(0x4f46e5)
@@ -1350,12 +1402,13 @@ function buildDowntimeStepEmbed(stepKey, state, description) {
 
 function buildDowntimeDurationRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const hasDuration = state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined;
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_duration_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Custom duration')
+                .setLabel(t('characters.enterDurationTitle', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -1364,6 +1417,7 @@ function buildDowntimeDurationRows(state) {
         backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
         nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+        locale,
         disableNext: !hasDuration,
     }));
 }
@@ -1390,11 +1444,12 @@ function buildDowntimeDateRows(state) {
 
 function buildDowntimeTypeRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const selected = String(state?.data?.type || 'other').toLowerCase();
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`dtCreate_type_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select type...')
+        .setPlaceholder(t('characters.selectTypePlaceholder', {}, locale))
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions(
@@ -1412,16 +1467,18 @@ function buildDowntimeTypeRows(state) {
         backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
         nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+        locale,
     }));
 }
 
 function buildDowntimeNotesRows(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_notes_edit_${characterId}_${ownerDiscordId}`)
-                .setLabel('Notes')
+                .setLabel(t('characters.notesField', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -1430,18 +1487,22 @@ function buildDowntimeNotesRows(state) {
         backId: `dtCreate_back_${characterId}_${ownerDiscordId}`,
         nextId: `dtCreate_next_${characterId}_${ownerDiscordId}`,
         cancelId: `dtCreate_cancel_${characterId}_${ownerDiscordId}`,
+        locale,
     }));
 }
 
 function buildDowntimeConfirmRows(state) {
     const { characterId, ownerDiscordId } = state;
-    const confirmLabel = state?.mode === 'edit' ? 'Save downtime' : 'Create downtime';
+    const locale = state?.locale || null;
+    const confirmLabel = state?.mode === 'edit'
+        ? t('characters.saveDowntime', {}, locale)
+        : t('characters.createDowntimeTitle', {}, locale);
     const confirmStyle = state?.mode === 'edit' ? ButtonStyle.Primary : ButtonStyle.Success;
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_back_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`dtCreate_confirm_${characterId}_${ownerDiscordId}`)
@@ -1451,7 +1512,7 @@ function buildDowntimeConfirmRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtCreate_cancel_${characterId}_${ownerDiscordId}`)
-                .setLabel('Cancel')
+                .setLabel(t('common.cancel', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -1459,13 +1520,14 @@ function buildDowntimeConfirmRows(state) {
 
 function buildDowntimeDurationModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`dtCreate_durationModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Downtime duration');
+        .setTitle(t('characters.downtimeField', {}, locale));
 
     const durationInput = new TextInputBuilder()
         .setCustomId('dtDuration')
-        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
+        .setLabel(t('characters.durationInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(state?.data?.durationSeconds !== null && state?.data?.durationSeconds !== undefined
@@ -1478,13 +1540,14 @@ function buildDowntimeDurationModal(state) {
 
 function buildDowntimeDateModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`dtCreate_dateModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Downtime date');
+        .setTitle(t('characters.downtimeField', {}, locale));
 
     const dateInput = new TextInputBuilder()
         .setCustomId('dtDate')
-        .setLabel('Date (YYYY-MM-DD)')
+        .setLabel(t('characters.dateInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(formatIsoDate(state?.data?.startDate, ''), 10));
@@ -1495,13 +1558,14 @@ function buildDowntimeDateModal(state) {
 
 function buildDowntimeNotesModal(state) {
     const { characterId, ownerDiscordId } = state;
+    const locale = state?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`dtCreate_notesModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Downtime notes');
+        .setTitle(t('characters.notesModalTitle', {}, locale));
 
     const notesInput = new TextInputBuilder()
         .setCustomId('dtNotes')
-        .setLabel('Notes (optional)')
+        .setLabel(t('characters.notesOptionalLabel', {}, locale))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setValue(safeModalValue(state?.data?.notes));
@@ -1511,13 +1575,14 @@ function buildDowntimeNotesModal(state) {
 }
 
 function buildDowntimeManageDurationModal({ downtimeId, characterId, ownerDiscordId, downtime }) {
+    const locale = downtime?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`dtManage_durationModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Downtime duration');
+        .setTitle(t('characters.downtimeField', {}, locale));
 
     const durationInput = new TextInputBuilder()
         .setCustomId('dtDuration')
-        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
+        .setLabel(t('characters.durationInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(formatDurationSeconds(Number(downtime.duration || 0)));
@@ -1527,13 +1592,14 @@ function buildDowntimeManageDurationModal({ downtimeId, characterId, ownerDiscor
 }
 
 function buildDowntimeManageDateModal({ downtimeId, characterId, ownerDiscordId, downtime }) {
+    const locale = downtime?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`dtManage_dateModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Downtime date');
+        .setTitle(t('characters.downtimeField', {}, locale));
 
     const dateInput = new TextInputBuilder()
         .setCustomId('dtDate')
-        .setLabel('Date (YYYY-MM-DD)')
+        .setLabel(t('characters.dateInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(formatIsoDate(downtime.start_date, ''), 10));
@@ -1543,13 +1609,14 @@ function buildDowntimeManageDateModal({ downtimeId, characterId, ownerDiscordId,
 }
 
 function buildDowntimeManageNotesModal({ downtimeId, characterId, ownerDiscordId, downtime }) {
+    const locale = downtime?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`dtManage_notesModal_${downtimeId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Downtime notes');
+        .setTitle(t('characters.notesModalTitle', {}, locale));
 
     const notesInput = new TextInputBuilder()
         .setCustomId('dtNotes')
-        .setLabel('Notes')
+        .setLabel(t('characters.notesField', {}, locale))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setValue(safeModalValue(downtime.notes, 1000));
@@ -1559,13 +1626,14 @@ function buildDowntimeManageNotesModal({ downtimeId, characterId, ownerDiscordId
 }
 
 function buildAdventureManageDurationModal({ adventureId, characterId, ownerDiscordId, adventure }) {
+    const locale = adventure?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advManage_durationModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Adventure duration');
+        .setTitle(t('characters.adventureField', {}, locale));
 
     const durationInput = new TextInputBuilder()
         .setCustomId('advDuration')
-        .setLabel('Duration (HH:MM, 400h 30m, or minutes)')
+        .setLabel(t('characters.durationInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(formatDurationSeconds(Number(adventure.duration || 0)));
@@ -1575,13 +1643,14 @@ function buildAdventureManageDurationModal({ adventureId, characterId, ownerDisc
 }
 
 function buildAdventureManageDateModal({ adventureId, characterId, ownerDiscordId, adventure }) {
+    const locale = adventure?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advManage_dateModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Adventure date');
+        .setTitle(t('characters.adventureField', {}, locale));
 
     const dateInput = new TextInputBuilder()
         .setCustomId('advDate')
-        .setLabel('Date (YYYY-MM-DD)')
+        .setLabel(t('characters.dateInputLabel', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(safeModalValue(formatIsoDate(adventure.start_date, ''), 10));
@@ -1591,20 +1660,21 @@ function buildAdventureManageDateModal({ adventureId, characterId, ownerDiscordI
 }
 
 function buildAdventureManageTitleModal({ adventureId, characterId, ownerDiscordId, adventure }) {
+    const locale = adventure?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advManage_titleModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Adventure title & GM');
+        .setTitle(t('characters.titleAndGmTitle', {}, locale));
 
     const titleInput = new TextInputBuilder()
         .setCustomId('advTitle')
-        .setLabel('Title')
+        .setLabel(t('characters.titleField', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setValue(safeModalValue(adventure.title, 100));
 
     const gmInput = new TextInputBuilder()
         .setCustomId('advGm')
-        .setLabel('Game Master')
+        .setLabel(t('characters.gameMasterField', {}, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setValue(safeModalValue(adventure.game_master, 100));
@@ -1617,13 +1687,14 @@ function buildAdventureManageTitleModal({ adventureId, characterId, ownerDiscord
 }
 
 function buildAdventureManageNotesModal({ adventureId, characterId, ownerDiscordId, adventure }) {
+    const locale = adventure?.locale || null;
     const modal = new ModalBuilder()
         .setCustomId(`advManage_notesModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-        .setTitle('Adventure notes');
+        .setTitle(t('characters.notesModalTitle', {}, locale));
 
     const notesInput = new TextInputBuilder()
         .setCustomId('advNotes')
-        .setLabel('Notes')
+        .setLabel(t('characters.notesField', {}, locale))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setValue(safeModalValue(adventure.notes, 1000));
@@ -1632,84 +1703,88 @@ function buildAdventureManageNotesModal({ adventureId, characterId, ownerDiscord
     return modal;
 }
 
-function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId, isPseudo }) {
+function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId, isPseudo, locale = null }) {
     const disabled = Boolean(isPseudo);
 
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advManage_duration_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Duration')
+                .setLabel(t('characters.durationField', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_date_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Date')
+                .setLabel(t('characters.dateField', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_title_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Title & GM')
+                .setLabel(t('characters.titleAndGmTitle', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_quest_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Character quest')
+                .setLabel(t('characters.characterQuestField', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advManage_notes_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Notes')
+                .setLabel(t('characters.notesField', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disabled),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advManage_participants_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Participants')
+                .setLabel(t('characters.participantsField', {}, locale))
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Delete')
+                .setLabel(t('common.delete', {}, locale))
                 .setStyle(ButtonStyle.Danger)
                 .setDisabled(disabled),
             new ButtonBuilder()
                 .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
 function buildAdventureManageEmbed(adventure, participants) {
-    const questValue = adventure.has_additional_bubble ? 'Yes (+1 bubble)' : 'No';
+    const locale = adventure?.locale || null;
+    const questValue = adventure.has_additional_bubble
+        ? t('characters.characterQuestYes', {}, locale)
+        : t('characters.characterQuestNo', {}, locale);
     const notesValue = String(adventure.notes || '').trim() || '-';
     const titleValue = String(adventure.title || '').trim() || '-';
     const gameMasterValue = String(adventure.game_master || '').trim() || '-';
     const participantValue = participants.length > 0 ? formatParticipantList(participants) : '-';
 
     const embed = new EmbedBuilder()
-        .setTitle('Manage adventure')
+        .setTitle(t('characters.editAdventureTitle', {}, locale))
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: formatIsoDate(adventure.start_date), inline: true },
-            { name: 'Duration', value: formatDurationSeconds(adventure.duration), inline: true },
-            { name: 'Character quest', value: questValue, inline: true },
-            { name: 'Title', value: titleValue, inline: false },
-            { name: 'Game Master', value: gameMasterValue, inline: false },
-            { name: 'Notes', value: notesValue.slice(0, 1024), inline: false },
-            { name: 'Participants', value: participantValue, inline: false },
+            { name: t('characters.dateField', {}, locale), value: formatIsoDate(adventure.start_date), inline: true },
+            { name: t('characters.durationField', {}, locale), value: formatDurationSeconds(adventure.duration), inline: true },
+            { name: t('characters.characterQuestField', {}, locale), value: questValue, inline: true },
+            { name: t('characters.titleField', {}, locale), value: titleValue, inline: false },
+            { name: t('characters.gameMasterField', {}, locale), value: gameMasterValue, inline: false },
+            { name: t('characters.notesField', {}, locale), value: notesValue.slice(0, 1024), inline: false },
+            { name: t('characters.participantsField', {}, locale), value: participantValue, inline: false },
         );
 
     if (adventure.is_pseudo) {
-        embed.setDescription('Auto-generated for simplified tracking. Editing is disabled.');
+        embed.setDescription(t('characters.pseudoAdventureNotEditable', {}, locale));
     }
 
     return embed;
 }
 
 function buildAdventureManageView({ adventure, participants, ownerDiscordId, characterId }) {
+    const locale = adventure?.locale || null;
     return {
         embed: buildAdventureManageEmbed(adventure, participants),
         components: buildAdventureManageRows({
@@ -1717,32 +1792,34 @@ function buildAdventureManageView({ adventure, participants, ownerDiscordId, cha
             characterId,
             ownerDiscordId,
             isPseudo: adventure.is_pseudo,
+            locale,
         }),
     };
 }
 
 function buildAdventureQuestManageView({ adventure, ownerDiscordId, characterId }) {
+    const locale = adventure?.locale || null;
     const selected = adventure.has_additional_bubble ? 'yes' : 'no';
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advManage_questSelect_${adventure.id}_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select character quest...')
+        .setPlaceholder(t('characters.selectCharacterQuestPlaceholder', {}, locale))
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions(
             new StringSelectMenuOptionBuilder()
-                .setLabel('Yes, character quest (+1 bubble)')
+                .setLabel(t('characters.characterQuestYes', {}, locale))
                 .setValue('yes')
                 .setDefault(selected === 'yes'),
             new StringSelectMenuOptionBuilder()
-                .setLabel('No')
+                .setLabel(t('characters.characterQuestNo', {}, locale))
                 .setValue('no')
                 .setDefault(selected === 'no'),
         );
 
     const embed = new EmbedBuilder()
-        .setTitle('Update character quest')
+        .setTitle(t('characters.updateCharacterQuestTitle', {}, locale))
         .setColor(0x4f46e5)
-        .setDescription('Select whether this was a character quest.');
+        .setDescription(t('characters.updateCharacterQuestDescription', {}, locale));
 
     return {
         embed,
@@ -1751,17 +1828,17 @@ function buildAdventureQuestManageView({ adventure, ownerDiscordId, characterId 
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`advManage_back_${adventure.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back')
+                    .setLabel(t('common.back', {}, locale))
                     .setStyle(ButtonStyle.Secondary),
             ),
         ],
     };
 }
 
-function buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }) {
+function buildDowntimeListRows({ characterId, ownerDiscordId, downtimes, locale = null }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`dtSelect_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select downtime...')
+        .setPlaceholder(t('characters.selectDowntimePlaceholder', {}, locale))
         .addOptions(
             downtimes.slice(0, 25).map(d =>
                 new StringSelectMenuOptionBuilder()
@@ -1775,72 +1852,75 @@ function buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtListBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back to character')
+                .setLabel(t('characters.backToCharacter', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
-function buildDowntimeManageRows({ downtimeId, characterId, ownerDiscordId }) {
+function buildDowntimeManageRows({ downtimeId, characterId, ownerDiscordId, locale = null }) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtManage_duration_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Duration')
+                .setLabel(t('characters.durationField', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`dtManage_date_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Date')
+                .setLabel(t('characters.dateField', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`dtManage_type_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Type')
+                .setLabel(t('characters.typeField', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`dtManage_notes_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Notes')
+                .setLabel(t('characters.notesField', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`dtDelete_${downtimeId}_${characterId}_${ownerDiscordId}`)
-                .setLabel('Delete')
+                .setLabel(t('common.delete', {}, locale))
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
                 .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
 }
 
 function buildDowntimeManageEmbed(downtime) {
+    const locale = downtime?.locale || null;
     const notesValue = String(downtime.notes || '').trim() || '-';
     const typeValue = String(downtime.type || 'other');
 
     return new EmbedBuilder()
-        .setTitle('Manage downtime')
+        .setTitle(t('characters.editDowntimeTitle', {}, locale))
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: formatIsoDate(downtime.start_date), inline: true },
-            { name: 'Duration', value: formatDurationSeconds(downtime.duration), inline: true },
-            { name: 'Type', value: typeValue, inline: true },
-            { name: 'Notes', value: notesValue.slice(0, 1024), inline: false },
+            { name: t('characters.dateField', {}, locale), value: formatIsoDate(downtime.start_date), inline: true },
+            { name: t('characters.durationField', {}, locale), value: formatDurationSeconds(downtime.duration), inline: true },
+            { name: t('characters.typeField', {}, locale), value: typeValue, inline: true },
+            { name: t('characters.notesField', {}, locale), value: notesValue.slice(0, 1024), inline: false },
         );
 }
 
 function buildDowntimeManageView({ downtime, ownerDiscordId, characterId }) {
+    const locale = downtime?.locale || null;
     return {
         embed: buildDowntimeManageEmbed(downtime),
-        components: buildDowntimeManageRows({ downtimeId: downtime.id, characterId, ownerDiscordId }),
+        components: buildDowntimeManageRows({ downtimeId: downtime.id, characterId, ownerDiscordId, locale }),
     };
 }
 
 function buildDowntimeTypeManageView({ downtime, ownerDiscordId, characterId }) {
+    const locale = downtime?.locale || null;
     const selected = String(downtime.type || 'other').toLowerCase();
     const select = new StringSelectMenuBuilder()
         .setCustomId(`dtManage_typeSelect_${downtime.id}_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select type...')
+        .setPlaceholder(t('characters.selectTypePlaceholder', {}, locale))
         .setMinValues(1)
         .setMaxValues(1)
         .addOptions(
@@ -1855,9 +1935,9 @@ function buildDowntimeTypeManageView({ downtime, ownerDiscordId, characterId }) 
         );
 
     const embed = new EmbedBuilder()
-        .setTitle('Update downtime type')
+        .setTitle(t('characters.updateDowntimeTypeTitle', {}, locale))
         .setColor(0x4f46e5)
-        .setDescription('Select the downtime type.');
+        .setDescription(t('characters.updateDowntimeTypeDescription', {}, locale));
 
     return {
         embed,
@@ -1866,7 +1946,7 @@ function buildDowntimeTypeManageView({ downtime, ownerDiscordId, characterId }) 
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtManage_back_${downtime.id}_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back')
+                    .setLabel(t('common.back', {}, locale))
                     .setStyle(ButtonStyle.Secondary),
             ),
         ],
@@ -1921,8 +2001,8 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
             ? `${linkedName} (${ally.name})`
             : String(ally.name);
         const description = ally.linked_character_id
-            ? linkedName ? `Linked - ${linkedName}` : 'Linked guild member'
-            : 'Custom ally';
+            ? linkedName ? `Linked - ${linkedName}` : t('characters.linkedGuildMember')
+            : t('characters.customAlly');
         return {
             key: `ally_${ally.id}`,
             type: 'ally',
@@ -1938,7 +2018,7 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
         type: 'guild',
         id: Number(character.id),
         label: String(character.name),
-        description: 'Guild member',
+        description: t('characters.guildMember'),
         selected: selectedGuildCharacterIds.includes(Number(character.id)),
     }));
 
@@ -1951,10 +2031,10 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
     return combined;
 }
 
-function buildAdventureParticipantsSelect({ adventureId, characterId, ownerDiscordId, options }) {
+function buildAdventureParticipantsSelect({ adventureId, characterId, ownerDiscordId, options, locale = null }) {
     const select = new StringSelectMenuBuilder()
         .setCustomId(`advParticipantsSelect_${adventureId}_${characterId}_${ownerDiscordId}`)
-        .setPlaceholder('Select participants...')
+        .setPlaceholder(t('characters.selectParticipantsPlaceholder', {}, locale))
         .setMinValues(0)
         .setMaxValues(Math.min(25, options.length));
 
@@ -1970,21 +2050,21 @@ function buildAdventureParticipantsSelect({ adventureId, characterId, ownerDisco
     return new ActionRowBuilder().addComponents(select);
 }
 
-function buildAdventureParticipantsActions({ adventureId, characterId, ownerDiscordId, hasParticipants, backCustomId }) {
+function buildAdventureParticipantsActions({ adventureId, characterId, ownerDiscordId, hasParticipants, backCustomId, locale = null }) {
     const backId = backCustomId || `advParticipantsBack_${adventureId}_${characterId}_${ownerDiscordId}`;
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`advParticipantsSearch_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Search')
+            .setLabel(t('characters.search', {}, locale))
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`advParticipantsClear_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setLabel('Remove all')
+            .setLabel(t('characters.removeAll', {}, locale))
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!hasParticipants),
         new ButtonBuilder()
             .setCustomId(backId)
-            .setLabel('Back')
+            .setLabel(t('common.back', {}, locale))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -2008,15 +2088,15 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
 
     const limitedOptions = options.slice(0, 25);
     const embed = new EmbedBuilder()
-        .setTitle('Edit participants')
+        .setTitle(t('characters.editParticipantsTitle'))
         .setColor(0x4f46e5)
-        .setDescription(`${formatIsoDate(adventure.start_date)} - ${String(adventure.title || '(No title)')}`)
-        .addFields({ name: 'Current', value: formatParticipantList(participants), inline: false });
+        .setDescription(`${formatIsoDate(adventure.start_date)} - ${String(adventure.title || t('characters.noTitleFallback'))}`)
+        .addFields({ name: t('characters.currentField'), value: formatParticipantList(participants), inline: false });
 
     if (search) {
-        embed.setFooter({ text: `Filter: ${search} (${limitedOptions.length}/${options.length})` });
+        embed.setFooter({ text: t('characters.participantsFilterFooter', { search, shown: limitedOptions.length, total: options.length }) });
     } else if (options.length > limitedOptions.length) {
-        embed.setFooter({ text: `Showing ${limitedOptions.length} of ${options.length}. Use search.` });
+        embed.setFooter({ text: t('characters.participantsShowingFooter', { shown: limitedOptions.length, total: options.length }) });
     }
 
     const components = [];
@@ -2027,6 +2107,7 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
                 characterId,
                 ownerDiscordId,
                 options: limitedOptions,
+                locale: null,
             }),
         );
     }
@@ -2037,6 +2118,7 @@ async function buildAdventureParticipantsView({ interaction, adventureId, charac
             ownerDiscordId,
             hasParticipants: participants.length > 0,
             backCustomId,
+            locale: null,
         }),
     );
 
