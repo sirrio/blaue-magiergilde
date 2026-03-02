@@ -342,9 +342,74 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
             .setCustomId(`charactersAction_refresh_${ownerDiscordId}`)
             .setLabel('Refresh')
             .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`charactersAction_settings_${ownerDiscordId}`)
+            .setLabel('Settings')
+            .setStyle(ButtonStyle.Secondary),
     ));
 
     return { embeds: [summary], components };
+}
+
+function buildCharactersSettingsView({ ownerDiscordId, characters }) {
+    const settings = new EmbedBuilder()
+        .setTitle('Character dashboard settings')
+        .setColor(0x4f46e5)
+        .setDescription('Manage account-level actions for your linked Blaue Magiergilde app account.')
+        .addFields({
+            name: 'Account',
+            value: [
+                `Characters in account: **${characters.length}**`,
+                'Delete account permanently removes your linked app account.',
+            ].join('\n'),
+            inline: false,
+        });
+
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_delete-account_${ownerDiscordId}`)
+                .setLabel('Delete account')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_back_${ownerDiscordId}`)
+                .setLabel('Back')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embeds: [settings], components };
+}
+
+function buildDeleteAccountConfirmView({ ownerDiscordId, characters }) {
+    const warning = new EmbedBuilder()
+        .setTitle('Delete account')
+        .setColor(0xef4444)
+        .setDescription('Delete your linked Blaue Magiergilde account? This cannot be undone.')
+        .addFields({
+            name: 'What will happen',
+            value: [
+                `Characters in account: **${characters.length}**`,
+                'Your account will be deleted from the app.',
+                'Use this only if you really want to remove the linked account.',
+            ].join('\n'),
+            inline: false,
+        });
+
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_confirm-delete-account_${ownerDiscordId}`)
+                .setLabel('Yes, delete account')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_cancel-delete-account_${ownerDiscordId}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embeds: [warning], components };
 }
 
 module.exports = {
@@ -390,4 +455,6 @@ module.exports = {
     resolvePublicAvatarUrl,
     tryBuildLocalAvatarAttachment,
     buildCharacterListView,
+    buildCharactersSettingsView,
+    buildDeleteAccountConfirmView,
 };

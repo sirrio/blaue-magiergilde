@@ -40,7 +40,7 @@ const {
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
 
-const { buildCharacterListView } = require('../commands/game/characters');
+const { buildCharacterListView, buildCharactersSettingsView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateLevel } = require('../utils/characterTier');
 
@@ -755,6 +755,56 @@ async function syncCharacterApprovalAnnouncement(characterId) {
     return { ok: false, reason: 'sync_failed' };
 }
 
+async function deleteLinkedAccountViaBot(discordUserId) {
+    const appUrls = resolveApiBaseUrls();
+    const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    if (appUrls.length === 0 || !token) {
+        console.warn('[bot] Account delete skipped: BOT_APP_URL/BOT_PUBLIC_APP_URL or BOT_HTTP_TOKEN missing.');
+        return { ok: false, reason: 'config_missing' };
+    }
+
+    for (const appUrl of appUrls) {
+        const endpoint = `${appUrl.replace(/\/$/, '')}/bot/account`;
+        enableInsecureTlsIfNeeded(endpoint);
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Bot-Token': token,
+                },
+                body: JSON.stringify({
+                    actor_discord_id: String(discordUserId),
+                }),
+                dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
+            });
+
+            if (response.ok) {
+                return { ok: true };
+            }
+
+            let detail = '';
+            try {
+                const payload = await response.json();
+                detail = payload?.error || payload?.message || '';
+            } catch {
+                detail = '';
+            }
+
+            return {
+                ok: false,
+                status: response.status,
+                reason: detail || 'delete_failed',
+            };
+        } catch (error) {
+            console.warn('[bot] Account delete error.', error);
+        }
+    }
+
+    return { ok: false, reason: 'delete_failed' };
+}
+
 async function updateCharacterForDiscordAndSync(discordUser, characterId, payload) {
     const result = await updateCharacterForDiscord(discordUser, characterId, payload);
     if (result.ok) {
@@ -1153,6 +1203,118 @@ async function handle(interaction) {
         const characters = await listCharactersForDiscord(interaction.user);
         const listView = buildCharacterListView({ ownerDiscordId, characters });
         await updateManageMessage(interaction, { ...listView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_settings_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_settings_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const settingsView = buildCharactersSettingsView({ ownerDiscordId, characters });
+        await interaction.update({ ...settingsView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_back_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_back_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        await interaction.update({ ...listView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_delete-account_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_delete-account_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters });
+        await interaction.update({ ...confirmView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_cancel-delete-account_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_cancel-delete-account_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        await interaction.update({ ...listView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_confirm-delete-account_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_confirm-delete-account_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.deferUpdate().catch(() => undefined);
+        const deleteResult = await deleteLinkedAccountViaBot(interaction.user.id);
+
+        if (!deleteResult.ok) {
+            const detail = deleteResult.reason === 'config_missing'
+                ? 'Bot account deletion is temporarily unavailable.'
+                : deleteResult.reason === 'Linked account not found.'
+                    ? 'No linked app account was found for this Discord user.'
+                    : 'Account could not be deleted. Please try again later or use the website.';
+            const characters = await listCharactersForDiscord(interaction.user).catch(() => []);
+            const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters });
+            await updateManageMessage(interaction, { ...confirmView, content: detail });
+            return true;
+        }
+
+        await updateManageMessage(interaction, {
+            content: `**Account deleted.**\n\n${notLinkedContent()}`,
+            embeds: [],
+            components: [buildNotLinkedButtons(interaction.user.id)],
+        });
         return true;
     }
 

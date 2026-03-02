@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Bot\BotAccountController;
 use App\Http\Controllers\Bot\CharacterApprovalController;
 use App\Http\Controllers\Bot\CharacterAvatarController;
 use App\Http\Controllers\Bot\DiscordBackupController;
@@ -29,4 +30,7 @@ Route::prefix('bot')
 
         Route::post('character-approvals/sync', [CharacterApprovalController::class, 'sync'])
             ->name('bot.character-approvals.sync');
+
+        Route::delete('account', [BotAccountController::class, 'destroy'])
+            ->name('bot.account.destroy');
     });
