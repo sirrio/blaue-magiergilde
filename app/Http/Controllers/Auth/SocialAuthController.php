@@ -20,6 +20,8 @@ class SocialAuthController extends Controller
     public function redirectToProvider(): RedirectResponse
     {
         return Socialite::driver('discord')
+            ->setScopes(['identify'])
+            ->withConsent()
             ->redirect();
     }
 
