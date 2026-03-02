@@ -1,4 +1,5 @@
 const { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const db = require('./db');
 const { withInsecureDispatcher, shouldAllowInsecure } = require('./httpClient');
 const { resolveChannelId } = require('./channelOverride');
 const { t } = require('./i18n');
@@ -73,6 +74,28 @@ function isMeaningful(value) {
         return value.trim() !== '' && value.trim() !== '—';
     }
     return true;
+}
+
+function normalizeLocale(value) {
+    const locale = String(value || '').trim().toLowerCase();
+    if (locale === 'en') {
+        return 'en';
+    }
+
+    if (locale === 'de') {
+        return 'de';
+    }
+
+    return null;
+}
+
+async function getLocaleForDiscordId(discordUserId) {
+    if (!discordUserId) {
+        return null;
+    }
+
+    const [rows] = await db.execute('SELECT locale FROM users WHERE discord_id = ? LIMIT 1', [String(discordUserId)]);
+    return normalizeLocale(rows[0]?.locale);
 }
 
 function buildCharacterApprovalMessage(payload, options = {}) {
@@ -229,6 +252,8 @@ async function sendCharacterApprovalDm({
         return { ok: false, status: 404, error: 'Discord user not found.' };
     }
 
+    const locale = await getLocaleForDiscordId(discordUserId);
+
     const { label, color } = buildStatusInfo(status);
     const safeName = characterName || 'Unknown';
     const tierBadge = characterTier ? String(characterTier).toUpperCase() : '';
@@ -240,13 +265,13 @@ async function sendCharacterApprovalDm({
 
     let description = '';
     if (label.toLowerCase() === 'approved') {
-        description = t('approvals.approvedDmDescription');
+        description = t('approvals.approvedDmDescription', {}, locale);
     } else if (label.toLowerCase() === 'needs changes') {
-        description = t('approvals.needsChangesDmDescription');
+        description = t('approvals.needsChangesDmDescription', {}, locale);
     } else if (label.toLowerCase() === 'declined') {
-        description = t('approvals.declinedDmDescription');
+        description = t('approvals.declinedDmDescription', {}, locale);
     } else {
-        description = t('approvals.genericDmDescription', { status: label });
+        description = t('approvals.genericDmDescription', { status: label }, locale);
     }
 
     const embed = new EmbedBuilder()
@@ -271,7 +296,7 @@ async function sendCharacterApprovalDm({
     }
 
     if (isMeaningful(reviewNote) && reviewNote !== '—' && (status === 'needs_changes' || status === 'declined')) {
-        embed.addFields({ name: t('approvals.reviewNoteField'), value: reviewNote, inline: false });
+        embed.addFields({ name: t('approvals.reviewNoteField', {}, locale), value: reviewNote, inline: false });
     }
 
     let avatarAttachment = null;
@@ -297,7 +322,7 @@ async function sendCharacterApprovalDm({
     if (externalLink) {
         buttons.addComponents(
             new ButtonBuilder()
-                .setLabel(t('approvals.openExternalLink'))
+                .setLabel(t('approvals.openExternalLink', {}, locale))
                 .setStyle(ButtonStyle.Link)
                 .setURL(externalLink),
         );
@@ -305,7 +330,7 @@ async function sendCharacterApprovalDm({
     if (charactersUrl) {
         buttons.addComponents(
             new ButtonBuilder()
-                .setLabel(t('approvals.yourCharacters'))
+                .setLabel(t('approvals.yourCharacters', {}, locale))
                 .setStyle(ButtonStyle.Link)
                 .setURL(charactersUrl),
         );

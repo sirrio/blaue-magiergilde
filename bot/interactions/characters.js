@@ -17,8 +17,10 @@ const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
+    getLinkedUserLocaleForDiscord,
     listCharactersForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateLinkedUserLocaleForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
     listCharacterClassesForDiscord,
@@ -40,7 +42,7 @@ const {
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
 
-const { buildCharacterListView, buildCharactersSettingsView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
+const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateLevel } = require('../utils/characterTier');
 
@@ -149,11 +151,20 @@ function clearAvatarUpdateState(userId) {
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters });
+    const locale = await getLinkedUserLocaleForDiscord(interaction.user);
+    const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
     await interaction.update({
         ...listView,
         content: '',
     });
+}
+
+async function resolveInteractionLocale(interaction) {
+    try {
+        return await getLinkedUserLocaleForDiscord(interaction.user);
+    } catch {
+        return null;
+    }
 }
 
 async function editNotLinked(interaction) {
@@ -1201,7 +1212,8 @@ async function handle(interaction) {
 
         await interaction.deferUpdate().catch(() => undefined);
         const characters = await listCharactersForDiscord(interaction.user);
-        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        const locale = await resolveInteractionLocale(interaction);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
         await updateManageMessage(interaction, { ...listView, content: '' });
         return true;
     }
@@ -1220,8 +1232,61 @@ async function handle(interaction) {
         }
 
         const characters = await listCharactersForDiscord(interaction.user);
-        const settingsView = buildCharactersSettingsView({ ownerDiscordId, characters });
+        const locale = await resolveInteractionLocale(interaction);
+        const settingsView = buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale: locale });
         await interaction.update({ ...settingsView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_language_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_language_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const languageView = buildCharacterLanguageView({ ownerDiscordId, locale, selectedLocale: locale });
+        await interaction.update({ ...languageView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && /^charactersAction_locale_(de|en)_/.test(interaction.customId)) {
+        const match = interaction.customId.match(/^charactersAction_locale_(de|en)_(.+)$/);
+        if (!match) {
+            return false;
+        }
+
+        const [, selectedLocale, ownerDiscordId] = match;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const persistedLocale = await updateLinkedUserLocaleForDiscord(interaction.user, selectedLocale);
+        const characters = await listCharactersForDiscord(interaction.user);
+        const settingsView = buildCharactersSettingsView({
+            ownerDiscordId,
+            characters,
+            locale: persistedLocale,
+            selectedLocale: persistedLocale,
+        });
+        await interaction.update({
+            ...settingsView,
+            content: persistedLocale === 'en' ? 'Language saved.' : 'Sprache gespeichert.',
+        });
         return true;
     }
 
@@ -1239,7 +1304,8 @@ async function handle(interaction) {
         }
 
         const characters = await listCharactersForDiscord(interaction.user);
-        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        const locale = await resolveInteractionLocale(interaction);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
         await interaction.update({ ...listView, content: '' });
         return true;
     }
@@ -1258,7 +1324,8 @@ async function handle(interaction) {
         }
 
         const characters = await listCharactersForDiscord(interaction.user);
-        const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters });
+        const locale = await resolveInteractionLocale(interaction);
+        const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale });
         await interaction.update({ ...confirmView, content: '' });
         return true;
     }
@@ -1277,7 +1344,8 @@ async function handle(interaction) {
         }
 
         const characters = await listCharactersForDiscord(interaction.user);
-        const listView = buildCharacterListView({ ownerDiscordId, characters });
+        const locale = await resolveInteractionLocale(interaction);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
         await interaction.update({ ...listView, content: '' });
         return true;
     }
@@ -1305,7 +1373,8 @@ async function handle(interaction) {
                     ? 'No linked app account was found for this Discord user.'
                     : 'Account could not be deleted. Please try again later or use the website.';
             const characters = await listCharactersForDiscord(interaction.user).catch(() => []);
-            const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters });
+            const locale = await resolveInteractionLocale(interaction);
+            const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale });
             await updateManageMessage(interaction, { ...confirmView, content: detail });
             return true;
         }
@@ -1422,7 +1491,8 @@ async function handle(interaction) {
         clearCreationState(ownerDiscordId);
         try {
             const characters = await listCharactersForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            const locale = await resolveInteractionLocale(interaction);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
             await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
@@ -2357,7 +2427,8 @@ async function handle(interaction) {
             await interaction.deferUpdate();
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
-                const listView = buildCharacterListView({ ownerDiscordId, characters });
+                const locale = await resolveInteractionLocale(interaction);
+                const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
                 await interaction.editReply({
                     ...listView,
                     content: '',

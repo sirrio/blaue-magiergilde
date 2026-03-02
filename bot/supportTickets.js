@@ -1,6 +1,8 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { supportStaffRoleIds } = require('./config');
 const { getChannelOverrideId } = require('./channelOverride');
+const { getUserLocaleByDiscordId } = require('./appDb');
+const { t } = require('./i18n');
 
 const CLOSE_COMMANDS = new Set(['close', '/close', '!close', 'ticket close', '!ticket close']);
 const CLAIM_COMMANDS = new Set(['claim', '/claim', '!claim', 'ticket claim', '!ticket claim']);
@@ -54,7 +56,7 @@ function normalizeCommandText(content) {
 
 function formatUserLabel(user) {
     if (!user) {
-        return 'Unknown User';
+        return t('support.unknownUser');
     }
 
     if (user.tag) {
@@ -107,6 +109,10 @@ function statusBadge(status) {
 
 function statusColor(status) {
     return statusMeta(status).color;
+}
+
+async function resolveLocaleForDiscordId(discordUserId) {
+    return await getUserLocaleByDiscordId(discordUserId);
 }
 
 function buildTicketStateLine(status, assignedToDiscordId) {
@@ -180,28 +186,36 @@ function buildTicketThreadName(user) {
     return `ticket-${base}`.slice(0, 90);
 }
 
-function buildUserRelayContent(message) {
+function buildUserRelayContent(message, locale = null) {
     const userName = formatUserLabel(message?.author);
     const body = normalizeMessageText(message?.content);
     const attachmentUrls = attachmentUrlsFromMessage(message);
-    const sections = [`👤 ${userName}: ${body !== '' ? truncateText(body) : '_No text_'}`];
+    const sections = [`👤 ${userName}: ${body !== '' ? truncateText(body) : t('support.relayNoText', {}, locale)}`];
 
     if (attachmentUrls.length > 0) {
-        sections.push(`📎 ${attachmentUrls.length} attachment${attachmentUrls.length === 1 ? '' : 's'}`);
+        sections.push(t(
+            attachmentUrls.length === 1 ? 'support.relayAttachmentCountSingular' : 'support.relayAttachmentCountPlural',
+            { count: attachmentUrls.length },
+            locale,
+        ));
         sections.push(buildAttachmentLinks(attachmentUrls));
     }
 
     return truncateText(sections.join('\n\n'));
 }
 
-function buildStaffRelayContent(message) {
+function buildStaffRelayContent(message, locale = null) {
     const supportName = formatUserLabel(message?.author);
     const body = normalizeMessageText(message?.content);
     const attachmentUrls = attachmentUrlsFromMessage(message);
-    const sections = [`🛠 ${supportName}: ${body !== '' ? truncateText(body) : '_No text_'}`];
+    const sections = [`🛠 ${supportName}: ${body !== '' ? truncateText(body) : t('support.relayNoText', {}, locale)}`];
 
     if (attachmentUrls.length > 0) {
-        sections.push(`📎 ${attachmentUrls.length} attachment${attachmentUrls.length === 1 ? '' : 's'}`);
+        sections.push(t(
+            attachmentUrls.length === 1 ? 'support.relayAttachmentCountSingular' : 'support.relayAttachmentCountPlural',
+            { count: attachmentUrls.length },
+            locale,
+        ));
         sections.push(buildAttachmentLinks(attachmentUrls));
     }
 
@@ -209,34 +223,35 @@ function buildStaffRelayContent(message) {
 }
 
 function buildTicketHeaderEmbed(ticket) {
-    const assigned = ticket.assigned_to_discord_id ? `<@${ticket.assigned_to_discord_id}>` : 'Unassigned';
     const status = String(ticket.status || 'open');
+    const locale = ticket.locale || null;
+    const assignee = ticket.assigned_to_discord_id ? `<@${ticket.assigned_to_discord_id}>` : t('support.unassigned', {}, locale);
 
     return new EmbedBuilder()
         .setColor(statusColor(status))
-        .setTitle(`Support Ticket #${ticket.id}`)
+        .setTitle(t('support.headerTitle', { id: ticket.id }, locale))
         .setDescription([
-            `User: <@${ticket.user_discord_id}>`,
-            `Status: ${statusBadge(status)}`,
-            `Assignee: ${assigned}`,
-            `Updated: ${toRelativeTimestamp(ticket.updated_at)}`,
+            t('support.headerUser', { userId: ticket.user_discord_id }, locale),
+            t('support.headerStatus', { status: statusBadge(status) }, locale),
+            t('support.headerAssignee', { assignee }, locale),
+            t('support.headerUpdated', { timestamp: toRelativeTimestamp(ticket.updated_at) }, locale),
         ].join('\n'))
         .setTimestamp(new Date());
 }
 
-function buildTicketSummaryContent(ticket, userLabel) {
+function buildTicketSummaryContent(ticket, userLabel, locale = null) {
     const cleanLabel = normalizeWhitespace(userLabel) || `user-${String(ticket?.user_discord_id || 'unknown')}`;
-    const assigned = ticket?.assigned_to_discord_id ? `<@${ticket.assigned_to_discord_id}>` : 'Unassigned';
+    const assigned = ticket?.assigned_to_discord_id ? `<@${ticket.assigned_to_discord_id}>` : t('support.unassigned', {}, locale);
     const status = String(ticket?.status || 'open');
     return [
-        `🎫 Support ticket #${ticket.id} from <@${ticket.user_discord_id}> (${cleanLabel})`,
-        `Status: ${statusBadge(status)}`,
-        `Assignee: ${assigned}`,
-        `Updated: ${toRelativeTimestamp(ticket.updated_at)}`,
+        t('support.summaryTitle', { id: ticket.id, userId: ticket.user_discord_id, label: cleanLabel }, locale),
+        t('support.summaryStatus', { status: statusBadge(status) }, locale),
+        t('support.summaryAssignee', { assignee: assigned }, locale),
+        t('support.summaryUpdated', { timestamp: toRelativeTimestamp(ticket.updated_at) }, locale),
     ].join('\n');
 }
 
-function buildTicketHeaderComponents(ticket) {
+function buildTicketHeaderComponents(ticket, locale = null) {
     const status = String(ticket?.status || 'open');
     const isClosed = status === 'closed';
     const hasAssignee = String(ticket?.assigned_to_discord_id || '').trim() !== '';
@@ -244,22 +259,22 @@ function buildTicketHeaderComponents(ticket) {
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`support-ticket:claim:${ticket.id}`)
-            .setLabel('Claim')
+            .setLabel(t('support.buttonClaim', {}, locale))
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(isClosed || hasAssignee),
         new ButtonBuilder()
             .setCustomId(`support-ticket:unclaim:${ticket.id}`)
-            .setLabel('Unclaim')
+            .setLabel(t('support.buttonUnclaim', {}, locale))
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(isClosed || !hasAssignee),
         new ButtonBuilder()
             .setCustomId(`support-ticket:close:${ticket.id}`)
-            .setLabel('Close')
+            .setLabel(t('support.buttonClose', {}, locale))
             .setStyle(ButtonStyle.Danger)
             .setDisabled(isClosed),
         new ButtonBuilder()
             .setCustomId(`support-ticket:reopen:${ticket.id}`)
-            .setLabel('Reopen')
+            .setLabel(t('support.buttonReopen', {}, locale))
             .setStyle(ButtonStyle.Success)
             .setDisabled(!isClosed)
     );
@@ -335,7 +350,7 @@ function withErrorPrefix(title) {
 function supportDmNotice(title, details = '', kind = null) {
     const cleanDetails = String(details || '').trim();
     const noticeKind = kind || detectNoticeKind(cleanDetails);
-    const baseTitle = normalizeWhitespace(title) || 'Support Ticket';
+    const baseTitle = normalizeWhitespace(title) || t('support.noticeTitle');
     const finalTitle = noticeKind === 'error' ? withErrorPrefix(baseTitle) : baseTitle;
     const embed = new EmbedBuilder()
         .setColor(NOTICE_COLORS[noticeKind] || NOTICE_COLORS.info)
@@ -349,13 +364,13 @@ function supportDmNotice(title, details = '', kind = null) {
     return embed;
 }
 
-async function sendThreadAck(channel, content) {
+async function sendThreadAck(channel, content, locale = null) {
     await channel.send({
-        embeds: [supportDmNotice('Ticket action', content, detectNoticeKind(content))],
+        embeds: [supportDmNotice(t('support.actionTitle', {}, locale), content, detectNoticeKind(content))],
     }).catch(() => null);
 }
 
-async function sendTemporaryMessage(channel, content) {
+async function sendTemporaryMessage(channel, content, locale = null) {
     let payload;
     if (content instanceof EmbedBuilder) {
         payload = { embeds: [content] };
@@ -363,14 +378,14 @@ async function sendTemporaryMessage(channel, content) {
         payload = content;
     } else {
         const text = String(content || '');
-        payload = { embeds: [supportDmNotice('Support Ticket', text, detectNoticeKind(text))] };
+        payload = { embeds: [supportDmNotice(t('support.noticeTitle', {}, locale), text, detectNoticeKind(text))] };
     }
 
     return channel.send(payload).catch(() => null);
 }
 
-async function sendTemporaryDm(user, content) {
-    return sendTemporaryMessage(user, content);
+async function sendTemporaryDm(user, content, locale = null) {
+    return sendTemporaryMessage(user, content, locale);
 }
 
 async function deleteCommandMessage(message) {
@@ -577,9 +592,11 @@ async function fetchThread(client, threadId) {
 }
 
 async function ensureTicketHeaderMessage(thread, ticket) {
+    const locale = ticket.locale || await getUserLocaleByDiscordId(ticket.user_discord_id);
+    ticket.locale = locale;
     const embedPayload = {
         embeds: [buildTicketHeaderEmbed(ticket)],
-        components: buildTicketHeaderComponents(ticket),
+        components: buildTicketHeaderComponents(ticket, locale),
     };
     const headerMessageId = String(ticket.header_message_id || '').trim();
     if (headerMessageId) {
@@ -630,7 +647,9 @@ async function syncTicketSummaryMessage(ticket, client, thread, knownUserLabel =
     }
 
     const userLabel = await resolveTicketUserLabel(client, ticket.user_discord_id, knownUserLabel);
-    const content = buildTicketSummaryContent(ticket, userLabel);
+    const locale = ticket.locale || await getUserLocaleByDiscordId(ticket.user_discord_id);
+    ticket.locale = locale;
+    const content = buildTicketSummaryContent(ticket, userLabel, locale);
     if (starterMessage.content === content) {
         return true;
     }
@@ -658,7 +677,7 @@ async function createTicketForUser(message) {
 
     const userLabel = formatUserLabel(message.author);
     const createdMessage = await supportChannel.send({
-        content: `🎫 New support ticket from <@${message.author.id}> (${userLabel})`,
+        content: t('support.newTicketFrom', { userId: message.author.id, label: userLabel }),
     });
 
     const thread = await createdMessage.startThread({
@@ -684,13 +703,17 @@ async function createTicketForUser(message) {
         assigned_to_discord_id: null,
         header_message_id: null,
         updated_at: new Date().toISOString(),
+        locale: await getUserLocaleByDiscordId(message.author.id),
     };
 
     await syncTicketHeader(ticket, message.client, thread, userLabel);
 
     await sendTemporaryDm(
         message.author,
-        supportDmNotice('Support Ticket Opened', `✅ Ticket #${ticket.id} is now open.`)
+        supportDmNotice(
+            t('support.openedTitle', {}, ticket.locale),
+            t('support.openedBody', { id: ticket.id }, ticket.locale),
+        )
     );
 
     return { ok: true, ticket, thread };
@@ -706,7 +729,8 @@ async function relayUserMessageToThread(ticket, message, existingThread = null) 
         await thread.setArchived(false).catch(() => undefined);
     }
 
-    const content = buildUserRelayContent(message);
+    const locale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
+    const content = buildUserRelayContent(message, locale);
     await thread.send({ content });
     return { ok: true, thread };
 }
@@ -717,7 +741,8 @@ async function relayStaffMessageToUser(ticket, message) {
         return false;
     }
 
-    const content = buildStaffRelayContent(message);
+    const locale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
+    const content = buildStaffRelayContent(message, locale);
     await user.send({ content }).catch(() => undefined);
     return true;
 }
@@ -725,7 +750,8 @@ async function relayStaffMessageToUser(ticket, message) {
 async function closeTicketByUserDm(ticket, message) {
     const closed = await closeActiveTicket(ticket.id, message.author.id);
     if (!closed) {
-        await sendTemporaryDm(message.author, supportDmNotice('Support Ticket', 'ℹ️ No open ticket to close.'));
+        const locale = ticket.locale || await getUserLocaleByDiscordId(message.author.id);
+        await sendTemporaryDm(message.author, supportDmNotice(t('support.noticeTitle', {}, locale), t('support.noOpenTicket', {}, locale)));
         return true;
     }
 
@@ -738,7 +764,8 @@ async function closeTicketByUserDm(ticket, message) {
         await thread.setArchived(true).catch(() => undefined);
     }
 
-    await sendTemporaryDm(message.author, supportDmNotice('Support Ticket Closed', '🔒 Your ticket has been closed.'));
+    const locale = ticket.locale || await getUserLocaleByDiscordId(message.author.id);
+    await sendTemporaryDm(message.author, supportDmNotice(t('support.closedTitle', {}, locale), t('support.closedBody', {}, locale)));
     return true;
 }
 
@@ -746,9 +773,11 @@ async function handleSupportTicketDirectMessage(message) {
     const supportTicketChannelId = await loadSupportTicketChannelId();
     if (!supportTicketChannelId) {
         if (hasRelayPayload(message)) {
+            const locale = await resolveLocaleForDiscordId(message.author.id);
             await sendTemporaryDm(
                 message.author,
-                supportDmNotice('Support Unavailable', '⚠️ Support ticket system is not configured yet.')
+                supportDmNotice(t('support.unavailableTitle', {}, locale), t('support.unavailableBody', {}, locale), null),
+                locale,
             );
             return true;
         }
@@ -764,21 +793,25 @@ async function handleSupportTicketDirectMessage(message) {
 
     if (isTicketReopenCommand(message.content)) {
         if (existingTicket) {
-            await sendTemporaryDm(message.author, supportDmNotice('Support Ticket', 'ℹ️ Your ticket is already open.'));
+            const locale = await getUserLocaleByDiscordId(message.author.id);
+            await sendTemporaryDm(message.author, supportDmNotice(t('support.noticeTitle', {}, locale), t('support.alreadyOpen', {}, locale)));
             return true;
         }
 
         const latestTicket = await findLatestTicketByUserId(message.author.id);
         if (!latestTicket || String(latestTicket.status) !== 'closed') {
-            await sendTemporaryDm(message.author, supportDmNotice('Support Ticket', 'ℹ️ No closed ticket found to reopen.'));
+            const locale = await getUserLocaleByDiscordId(message.author.id);
+            await sendTemporaryDm(message.author, supportDmNotice(t('support.noticeTitle', {}, locale), t('support.noClosedTicket', {}, locale)));
             return true;
         }
 
         const reopened = await reopenClosedTicket(latestTicket.id, 'pending_staff');
         if (!reopened) {
+            const locale = await resolveLocaleForDiscordId(message.author.id);
             await sendTemporaryDm(
                 message.author,
-                supportDmNotice('Support Ticket', '❌ Could not reopen your ticket right now. Please try again.')
+                supportDmNotice(t('support.noticeTitle', {}, locale), t('support.reopenFailed', {}, locale)),
+                locale,
             );
             return true;
         }
@@ -798,14 +831,19 @@ async function handleSupportTicketDirectMessage(message) {
 
         await sendTemporaryDm(
             message.author,
-            supportDmNotice('Support Ticket Reopened', `↩️ Ticket #${latestTicket.id} has been reopened.`)
+            supportDmNotice(
+                t('support.reopenedTitle', {}, latestTicket.locale),
+                t('support.reopenedByStaff', { id: latestTicket.id }, latestTicket.locale),
+            ),
+            latestTicket.locale,
         );
         return true;
     }
 
     if (isTicketCloseCommand(message.content)) {
         if (!existingTicket) {
-            await sendTemporaryDm(message.author, supportDmNotice('Support Ticket', 'ℹ️ No open ticket found.'));
+            const locale = await getUserLocaleByDiscordId(message.author.id);
+            await sendTemporaryDm(message.author, supportDmNotice(t('support.noticeTitle', {}, locale), t('support.noOpenTicket', {}, locale)));
             return true;
         }
 
@@ -818,9 +856,11 @@ async function handleSupportTicketDirectMessage(message) {
     if (!ticket) {
         const created = await createTicketForUser(message);
         if (!created.ok) {
+            const locale = await resolveLocaleForDiscordId(message.author.id);
             await sendTemporaryDm(
                 message.author,
-                supportDmNotice('Support Ticket', '❌ Could not start a support ticket right now. Please try again later.')
+                supportDmNotice(t('support.noticeTitle', {}, locale), t('support.createFailed', {}, locale)),
+                locale,
             );
             return true;
         }
@@ -833,7 +873,7 @@ async function handleSupportTicketDirectMessage(message) {
     if (!relayed.ok) {
         await sendTemporaryDm(
             message.author,
-            supportDmNotice('Support Ticket', '⚠️ Your ticket is currently unavailable. Please send your message again in a moment.')
+            supportDmNotice(t('support.noticeTitle', {}, ticket.locale), t('support.threadUnavailable', {}, ticket.locale))
         );
         return true;
     }
@@ -859,18 +899,21 @@ async function handleSupportTicketThreadMessage(message) {
 
     if (isTicketReopenCommand(command)) {
         if (!isStaffTicketMessage(message)) {
-            await sendThreadAck(message.channel, '⛔ Only support staff can reopen tickets.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.onlyStaffReopen', {}, locale), locale);
             return true;
         }
 
         if (String(ticket.status) !== 'closed') {
-            await sendThreadAck(message.channel, 'ℹ️ Ticket is already open.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.ticketAlreadyOpen', {}, locale), locale);
             return true;
         }
 
         const reopened = await reopenClosedTicket(ticket.id, 'pending_user');
         if (!reopened) {
-            await sendThreadAck(message.channel, '❌ Could not reopen ticket.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.couldNotReopen', {}, locale), locale);
             return true;
         }
 
@@ -886,27 +929,35 @@ async function handleSupportTicketThreadMessage(message) {
 
         const user = await message.client.users.fetch(String(ticket.user_discord_id)).catch(() => null);
         if (user) {
+            const locale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
             await sendTemporaryDm(
                 user,
-                supportDmNotice('Support Ticket Reopened', `↩️ Ticket #${ticket.id} was reopened by the support team.`)
+                supportDmNotice(
+                    t('support.reopenedTitle', {}, locale),
+                    t('support.reopenedByStaff', { id: ticket.id }, locale),
+                ),
+                locale,
             );
         }
         return true;
     }
 
     if (!isActiveTicketStatus(ticket.status)) {
-        await sendThreadAck(message.channel, 'ℹ️ Ticket is closed. Use the Reopen button.');
+        const locale = await resolveLocaleForDiscordId(message.author.id);
+        await sendThreadAck(message.channel, t('support.ticketClosedUseReopenButton', {}, locale), locale);
         return true;
     }
 
     if (isTicketClaimCommand(command)) {
         if (!isStaffTicketMessage(message)) {
-            await sendThreadAck(message.channel, '⛔ Only support staff can claim tickets.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.onlyStaffClaim', {}, locale), locale);
             return true;
         }
 
         if (isClaimedByOther(ticket, message.author.id)) {
-            await sendThreadAck(message.channel, `⛔ Already claimed by <@${ticket.assigned_to_discord_id}>.`);
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.alreadyClaimedBy', { userId: ticket.assigned_to_discord_id }, locale), locale);
             return true;
         }
 
@@ -919,17 +970,20 @@ async function handleSupportTicketThreadMessage(message) {
 
     if (isTicketUnclaimCommand(command)) {
         if (!isStaffTicketMessage(message)) {
-            await sendThreadAck(message.channel, '⛔ Only support staff can unclaim tickets.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.onlyStaffUnclaim', {}, locale), locale);
             return true;
         }
 
         if (!ticket.assigned_to_discord_id) {
-            await sendThreadAck(message.channel, 'ℹ️ Ticket is not claimed.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.ticketNotClaimed', {}, locale), locale);
             return true;
         }
 
         if (isClaimedByOther(ticket, message.author.id)) {
-            await sendThreadAck(message.channel, `⛔ Only <@${ticket.assigned_to_discord_id}> can unclaim.`);
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.onlyAssigneeCanUnclaim', { userId: ticket.assigned_to_discord_id }, locale), locale);
             return true;
         }
 
@@ -941,19 +995,22 @@ async function handleSupportTicketThreadMessage(message) {
     }
 
     if (isClaimedByOther(ticket, message.author.id)) {
-        await sendThreadAck(message.channel, `⛔ Ticket is claimed by <@${ticket.assigned_to_discord_id}>.`);
+        const locale = await resolveLocaleForDiscordId(message.author.id);
+        await sendThreadAck(message.channel, t('support.claimedBy', { userId: ticket.assigned_to_discord_id }, locale), locale);
         return true;
     }
 
     if (isTicketCloseCommand(command)) {
         if (!isStaffTicketMessage(message)) {
-            await sendThreadAck(message.channel, '⛔ Only support staff can close tickets.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.onlyStaffClose', {}, locale), locale);
             return true;
         }
 
         const closed = await closeActiveTicket(ticket.id, message.author.id);
         if (!closed) {
-            await sendThreadAck(message.channel, '❌ Could not close ticket.');
+            const locale = await resolveLocaleForDiscordId(message.author.id);
+            await sendThreadAck(message.channel, t('support.couldNotClose', {}, locale), locale);
             return true;
         }
 
@@ -963,9 +1020,14 @@ async function handleSupportTicketThreadMessage(message) {
 
         const user = await message.client.users.fetch(String(ticket.user_discord_id)).catch(() => null);
         if (user) {
+            const locale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
             await sendTemporaryDm(
                 user,
-                supportDmNotice('Support Ticket Closed', `🔒 Ticket #${ticket.id} was closed by the support team.`)
+                supportDmNotice(
+                    t('support.closedTitle', {}, locale),
+                    t('support.closedByStaff', { id: ticket.id }, locale),
+                ),
+                locale,
             );
         }
 
@@ -992,18 +1054,18 @@ async function handleSupportTicketThreadMessage(message) {
     return true;
 }
 
-async function replyInteractionNotice(interaction, content) {
+async function replyInteractionNotice(interaction, content, locale = null) {
     if (!interaction.deferred && !interaction.replied) {
         await interaction.deferUpdate().catch(() => undefined);
     }
 
     if (interaction.channel?.isTextBased?.() && typeof interaction.channel.send === 'function') {
-        await sendThreadAck(interaction.channel, content);
+        await sendThreadAck(interaction.channel, content, locale);
         return;
     }
 
     const payload = {
-        embeds: [supportDmNotice('Ticket action', content, detectNoticeKind(content))],
+        embeds: [supportDmNotice(t('support.actionTitle', {}, locale), content, detectNoticeKind(content))],
     };
     if (interaction.deferred || interaction.replied) {
         await interaction.followUp(payload).catch(() => undefined);
@@ -1023,36 +1085,38 @@ async function handleSupportTicketInteraction(interaction) {
         return false;
     }
 
+    const locale = await resolveLocaleForDiscordId(interaction.user.id);
+
     if (!interaction.channel?.isThread?.()) {
-        await replyInteractionNotice(interaction, '⛔ Ticket controls only work inside ticket threads.');
+        await replyInteractionNotice(interaction, t('support.controlsOnlyInThread', {}, locale), locale);
         return true;
     }
 
     const ticket = await findTicketById(parsed.ticketId);
     if (!ticket) {
-        await replyInteractionNotice(interaction, '❌ Ticket not found.');
+        await replyInteractionNotice(interaction, t('support.ticketNotFound', {}, locale), locale);
         return true;
     }
 
     if (String(ticket.thread_id) !== String(interaction.channel.id)) {
-        await replyInteractionNotice(interaction, '⛔ This control does not belong to this thread.');
+        await replyInteractionNotice(interaction, t('support.controlWrongThread', {}, locale), locale);
         return true;
     }
 
     if (!isStaffTicketActor(interaction.guildId, interaction.member)) {
-        await replyInteractionNotice(interaction, '⛔ Only support staff can use these controls.');
+        await replyInteractionNotice(interaction, t('support.controlsOnlyStaff', {}, locale), locale);
         return true;
     }
 
     if (parsed.action === 'reopen') {
         if (String(ticket.status) !== 'closed') {
-            await replyInteractionNotice(interaction, 'ℹ️ Ticket is already open.');
+            await replyInteractionNotice(interaction, t('support.ticketAlreadyOpen', {}, locale), locale);
             return true;
         }
 
         const reopened = await reopenClosedTicket(ticket.id, 'pending_user');
         if (!reopened) {
-            await replyInteractionNotice(interaction, '❌ Could not reopen ticket.');
+            await replyInteractionNotice(interaction, t('support.couldNotReopen', {}, locale), locale);
             return true;
         }
 
@@ -1068,29 +1132,34 @@ async function handleSupportTicketInteraction(interaction) {
 
         const user = await interaction.client.users.fetch(String(ticket.user_discord_id)).catch(() => null);
         if (user) {
+            const userLocale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
             await sendTemporaryDm(
                 user,
-                supportDmNotice('Support Ticket Reopened', `↩️ Ticket #${ticket.id} was reopened by the support team.`)
+                supportDmNotice(
+                    t('support.reopenedTitle', {}, userLocale),
+                    t('support.reopenedByStaff', { id: ticket.id }, userLocale),
+                ),
+                userLocale,
             );
         }
 
-        await replyInteractionNotice(interaction, '↩️ Ticket reopened.');
+        await replyInteractionNotice(interaction, t('support.ticketReopened', {}, locale), locale);
         return true;
     }
 
     if (!isActiveTicketStatus(ticket.status)) {
-        await replyInteractionNotice(interaction, 'ℹ️ Ticket is closed. Use Reopen.');
+        await replyInteractionNotice(interaction, t('support.ticketClosedUseReopen', {}, locale), locale);
         return true;
     }
 
     if (parsed.action === 'claim') {
         if (isClaimedByOther(ticket, interaction.user.id)) {
-            await replyInteractionNotice(interaction, `⛔ Already claimed by <@${ticket.assigned_to_discord_id}>.`);
+            await replyInteractionNotice(interaction, t('support.alreadyClaimedBy', { userId: ticket.assigned_to_discord_id }, locale), locale);
             return true;
         }
 
         if (String(ticket.assigned_to_discord_id || '') === String(interaction.user.id)) {
-            await replyInteractionNotice(interaction, 'ℹ️ Ticket is already claimed by you.');
+            await replyInteractionNotice(interaction, t('support.ticketAlreadyClaimedByYou', {}, locale), locale);
             return true;
         }
 
@@ -1098,18 +1167,18 @@ async function handleSupportTicketInteraction(interaction) {
         ticket.assigned_to_discord_id = String(interaction.user.id);
         markTicketUpdated(ticket);
         await syncTicketHeader(ticket, interaction.client, interaction.channel);
-        await replyInteractionNotice(interaction, '✅ Ticket claimed.');
+        await replyInteractionNotice(interaction, t('support.ticketClaimed', {}, locale), locale);
         return true;
     }
 
     if (parsed.action === 'unclaim') {
         if (!ticket.assigned_to_discord_id) {
-            await replyInteractionNotice(interaction, 'ℹ️ Ticket is not claimed.');
+            await replyInteractionNotice(interaction, t('support.ticketNotClaimed', {}, locale), locale);
             return true;
         }
 
         if (isClaimedByOther(ticket, interaction.user.id)) {
-            await replyInteractionNotice(interaction, `⛔ Only <@${ticket.assigned_to_discord_id}> can unclaim.`);
+            await replyInteractionNotice(interaction, t('support.onlyAssigneeCanUnclaim', { userId: ticket.assigned_to_discord_id }, locale), locale);
             return true;
         }
 
@@ -1117,19 +1186,19 @@ async function handleSupportTicketInteraction(interaction) {
         ticket.assigned_to_discord_id = null;
         markTicketUpdated(ticket);
         await syncTicketHeader(ticket, interaction.client, interaction.channel);
-        await replyInteractionNotice(interaction, '✅ Ticket unclaimed.');
+        await replyInteractionNotice(interaction, t('support.ticketUnclaimed', {}, locale), locale);
         return true;
     }
 
     if (parsed.action === 'close') {
         if (isClaimedByOther(ticket, interaction.user.id)) {
-            await replyInteractionNotice(interaction, `⛔ Ticket is claimed by <@${ticket.assigned_to_discord_id}>.`);
+            await replyInteractionNotice(interaction, t('support.claimedBy', { userId: ticket.assigned_to_discord_id }, locale), locale);
             return true;
         }
 
         const closed = await closeActiveTicket(ticket.id, interaction.user.id);
         if (!closed) {
-            await replyInteractionNotice(interaction, '❌ Could not close ticket.');
+            await replyInteractionNotice(interaction, t('support.couldNotClose', {}, locale), locale);
             return true;
         }
 
@@ -1139,19 +1208,24 @@ async function handleSupportTicketInteraction(interaction) {
 
         const user = await interaction.client.users.fetch(String(ticket.user_discord_id)).catch(() => null);
         if (user) {
+            const userLocale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
             await sendTemporaryDm(
                 user,
-                supportDmNotice('Support Ticket Closed', `🔒 Ticket #${ticket.id} was closed by the support team.`)
+                supportDmNotice(
+                    t('support.closedTitle', {}, userLocale),
+                    t('support.closedByStaff', { id: ticket.id }, userLocale),
+                ),
+                userLocale,
             );
         }
 
-        await replyInteractionNotice(interaction, '🔒 Ticket closed.');
+        await replyInteractionNotice(interaction, t('support.ticketClosed', {}, locale), locale);
         await interaction.channel.setLocked(true).catch(() => undefined);
         await interaction.channel.setArchived(true).catch(() => undefined);
         return true;
     }
 
-    await replyInteractionNotice(interaction, '❌ Unknown ticket action.');
+    await replyInteractionNotice(interaction, t('support.unknownTicketAction', {}, locale), locale);
     return true;
 }
 

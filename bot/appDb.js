@@ -49,6 +49,7 @@ const allowedFactions = new Set([
 ]);
 const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'needs_changes', 'retired', 'draft']);
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
+const allowedBotLocales = new Set(['de', 'en']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
 function guildCharacterStatusesForAllies() {
@@ -89,6 +90,15 @@ function normalizeBoolean(value, fallback = false) {
     const text = String(value || '').trim().toLowerCase();
     if (['1', 'true', 'yes', 'y', 'ja', 'j'].includes(text)) return true;
     if (['0', 'false', 'no', 'n', 'nein'].includes(text)) return false;
+    return fallback;
+}
+
+function normalizeBotLocale(value, fallback = null) {
+    const locale = String(value || '').trim().toLowerCase();
+    if (allowedBotLocales.has(locale)) {
+        return locale;
+    }
+
     return fallback;
 }
 
@@ -164,11 +174,16 @@ class DiscordNotLinkedError extends Error {
 }
 
 async function getLinkedUserIdForDiscord(discordUser) {
+    const linkedUser = await getLinkedUserForDiscord(discordUser);
+    return linkedUser?.id ?? null;
+}
+
+async function getLinkedUserForDiscord(discordUser) {
     const discordId = String(discordUser.id);
     const name = pickDiscordDisplayName(discordUser);
     const avatar = pickDiscordAvatarUrl(discordUser);
 
-    const [existing] = await db.execute('SELECT id, deleted_at FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
+    const [existing] = await db.execute('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
     if (existing.length > 0) {
         const userId = existing[0].id;
         const deletedAt = existing[0].deleted_at;
@@ -177,10 +192,38 @@ async function getLinkedUserIdForDiscord(discordUser) {
         } else {
             await db.execute('UPDATE users SET name = ?, avatar = ?, updated_at = ? WHERE id = ?', [name, avatar, nowSql(), userId]);
         }
-        return userId;
+        return {
+            id: userId,
+            locale: normalizeBotLocale(existing[0].locale),
+        };
     }
 
     return null;
+}
+
+async function getLinkedUserLocaleForDiscord(discordUser) {
+    const linkedUser = await getLinkedUserForDiscord(discordUser);
+    return linkedUser?.locale ?? null;
+}
+
+async function getUserLocaleByDiscordId(discordUserId) {
+    if (!discordUserId) {
+        return null;
+    }
+
+    const [rows] = await db.execute('SELECT locale FROM users WHERE discord_id = ? LIMIT 1', [String(discordUserId)]);
+    return normalizeBotLocale(rows[0]?.locale);
+}
+
+async function updateLinkedUserLocaleForDiscord(discordUser, locale) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) {
+        throw new DiscordNotLinkedError();
+    }
+
+    const normalizedLocale = normalizeBotLocale(locale, 'de');
+    await db.execute('UPDATE users SET locale = ?, updated_at = ? WHERE id = ?', [normalizedLocale, nowSql(), userId]);
+    return normalizedLocale;
 }
 
 async function createUserForDiscord(discordUser) {
@@ -1605,7 +1648,11 @@ async function removeHiddenBidForDiscord(discordIdentity, auctionItemId) {
 
 module.exports = {
     DiscordNotLinkedError,
+    getLinkedUserForDiscord,
     getLinkedUserIdForDiscord,
+    getLinkedUserLocaleForDiscord,
+    getUserLocaleByDiscordId,
+    updateLinkedUserLocaleForDiscord,
     createUserForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,

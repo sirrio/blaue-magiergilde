@@ -37,15 +37,15 @@ const threadName = buildTicketThreadName(sampleMessage.author);
 assert.equal(threadName.startsWith('ticket-'), true);
 assert.equal(threadName.includes('#'), false);
 
-const userRelay = buildUserRelayContent(sampleMessage);
+const userRelay = buildUserRelayContent(sampleMessage, 'de');
 assert.equal(userRelay.startsWith('👤 '), true);
 assert.equal(userRelay.includes('sirrio#0001:'), true);
 assert.equal(userRelay.includes('Need help with my character sheet.'), true);
-assert.equal(userRelay.includes('📎 2 attachments'), true);
+assert.equal(userRelay.includes('📎 2 Anhänge'), true);
 assert.equal(userRelay.includes('[Attachment 1]('), true);
 assert.equal(userRelay.includes('From:'), false);
 
-const staffRelay = buildStaffRelayContent(sampleMessage);
+const staffRelay = buildStaffRelayContent(sampleMessage, 'en');
 assert.equal(staffRelay.startsWith('🛠 '), true);
 assert.equal(staffRelay.includes('sirrio#0001:'), true);
 assert.equal(staffRelay.includes('Need help with my character sheet.'), true);
@@ -62,10 +62,10 @@ const summary = buildTicketSummaryContent({
     status: 'pending_user',
     assigned_to_discord_id: '98765',
     updated_at: new Date().toISOString(),
-}, 'sirrio#0001');
-assert.equal(summary.includes('Support ticket #42'), true);
+}, 'sirrio#0001', 'de');
+assert.equal(summary.includes('Support-Ticket #42'), true);
 assert.equal(summary.includes('pending_user'), false);
 assert.equal(summary.includes('Pending user'), true);
-assert.equal(summary.includes('Assignee: <@98765>'), true);
+assert.equal(summary.includes('Zuständig: <@98765>'), true);
 
 console.log('support-tickets.test.js passed');
