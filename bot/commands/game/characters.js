@@ -223,6 +223,9 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     const statusEmoji = guildStatusEmoji(character.guild_status);
     const statusNextStep = guildStatusNextStep(character.guild_status);
     const hasRoom = safeInt(character.has_room) > 0;
+    const simplifiedTracking = Boolean(character.simplified_tracking);
+    const hasAutoLevelAdventure = Boolean(safeInt(character.has_pseudo_adventure));
+    const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure;
 
     const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -237,6 +240,15 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
+    const adventuresValue = downtimeDisabledInSimpleMode
+        ? `Played: **?**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`
+        : `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`;
+    const factionsValue = downtimeDisabledInSimpleMode
+        ? `${factionName}\nLevel: **?**`
+        : `${factionName}\nLevel: **${factionLevel}**`;
+    const downtimeValue = downtimeDisabledInSimpleMode
+        ? 'Cannot calculate downtime while simple mode entries exist.'
+        : `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`;
 
     const titleParts = [
         String(character.name || `Character ${character.id}`),
@@ -252,9 +264,9 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
             { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
             { name: 'Progress', value: `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`, inline: false },
-            { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
-            { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },
-            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
+            { name: 'Adventures', value: adventuresValue, inline: true },
+            { name: 'Factions', value: factionsValue, inline: true },
+            { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );

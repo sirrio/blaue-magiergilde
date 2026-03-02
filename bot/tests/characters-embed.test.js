@@ -37,6 +37,24 @@ const draftEmbed = buildCharacterEmbed({ ...character, guild_status: 'draft' }, 
 const draftNextStep = draftEmbed.fields.find((field) => field.name === 'Next step');
 assert.equal(draftNextStep?.value, 'Register with Magiergilde to submit this character for review.');
 
+const simpleModeEmbed = buildCharacterEmbed({
+    ...character,
+    simplified_tracking: 1,
+    has_pseudo_adventure: 1,
+    faction: 'bibliothekare',
+    adventures_count: 12,
+    faction_downtime: 360000,
+    total_downtime: 400000,
+}, { thumbnailUrlOrAttachment: null }).toJSON();
+
+const simpleModeAdventures = simpleModeEmbed.fields.find((field) => field.name === 'Adventures');
+const simpleModeFactions = simpleModeEmbed.fields.find((field) => field.name === 'Factions');
+const simpleModeDowntime = simpleModeEmbed.fields.find((field) => field.name === 'Downtime');
+
+assert.equal(simpleModeAdventures?.value.includes('Played: **?**'), true);
+assert.equal(simpleModeFactions?.value.includes('Level: **?**'), true);
+assert.equal(simpleModeDowntime?.value, 'Cannot calculate downtime while simple mode entries exist.');
+
 if (originalBaseUrl === undefined) {
     delete process.env.BOT_PUBLIC_APP_URL;
 } else {

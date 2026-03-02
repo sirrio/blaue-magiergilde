@@ -242,6 +242,7 @@ async function listCharactersForDiscord(discordUser) {
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
+                COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -252,7 +253,8 @@ async function listCharactersForDiscord(discordUser) {
                 SELECT
                     character_id,
                     COUNT(*) AS adventures_count,
-                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles
+                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles,
+                    MAX(CASE WHEN is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
                 FROM adventures
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
@@ -309,6 +311,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
+                COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -319,7 +322,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 SELECT
                     character_id,
                     COUNT(*) AS adventures_count,
-                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles
+                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles,
+                    MAX(CASE WHEN is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
                 FROM adventures
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
