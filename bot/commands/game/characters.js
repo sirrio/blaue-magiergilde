@@ -11,6 +11,7 @@ const {
     StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const { commandName } = require('../../commandConfig');
+const { t } = require('../../i18n');
 const {
     DiscordNotLinkedError,
     listCharactersForDiscord,
@@ -169,22 +170,22 @@ function guildStatusEmoji(value) {
 function guildStatusNextStep(value) {
     const status = normalizeGuildStatus(value);
     if (status === 'draft') {
-        return 'Register with Magiergilde to submit this character for review.';
+        return t('characters.nextStepDraft');
     }
     if (status === 'pending') {
-        return 'Waiting for Magiergilde review.';
+        return t('characters.nextStepPending');
     }
     if (status === 'needs_changes') {
-        return 'Apply the requested changes, then register the character again.';
+        return t('characters.nextStepNeedsChanges');
     }
     if (status === 'declined') {
-        return 'Review declined. Check the review note before submitting again.';
+        return t('characters.nextStepDeclined');
     }
     if (status === 'approved') {
-        return 'Approved for Magiergilde.';
+        return t('characters.nextStepApproved');
     }
     if (status === 'retired') {
-        return 'Retired.';
+        return t('characters.nextStepRetired');
     }
     return null;
 }
@@ -303,19 +304,19 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
     }).length;
 
     const summary = new EmbedBuilder()
-        .setTitle('Your Characters')
+        .setTitle(t('characters.dashboardTitle'))
         .setColor(0x4f46e5)
         .setDescription(
             characters.length > 0
-                ? `**${characters.length}** active. Choose a character or create a new one.`
-                : 'No characters yet. Create your first with **New**.',
+                ? t('characters.dashboardDescription', { count: characters.length })
+                : t('characters.dashboardDescriptionEmpty'),
         );
     summary.addFields({
-        name: 'Per-character settings',
+        name: t('characters.perCharacterSettingsTitle'),
         value: [
-            `Simplified tracking: **${simplifiedCount}**/${characters.length || 0}`,
-            `Unmasked token: **${unmaskedCount}**/${characters.length || 0}`,
-            'Change these in **Manage** per character.',
+            t('characters.perCharacterSimplifiedTracking', { count: simplifiedCount, total: characters.length || 0 }),
+            t('characters.perCharacterUnmaskedToken', { count: unmaskedCount, total: characters.length || 0 }),
+            t('characters.perCharacterManageHint'),
         ].join('\n'),
         inline: false,
     });
@@ -325,7 +326,7 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
     if (selection.length > 0) {
         const select = new StringSelectMenuBuilder()
             .setCustomId(`charactersSelect_${ownerDiscordId}`)
-            .setPlaceholder('Select character...')
+            .setPlaceholder(t('characters.selectPlaceholder'))
             .addOptions(
                 selection.map(character => {
                     const option = new StringSelectMenuOptionBuilder()
@@ -341,22 +342,22 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
         components.push(new ActionRowBuilder().addComponents(select));
 
         if (characters.length > selection.length) {
-            summary.setFooter({ text: `Showing ${selection.length} of ${characters.length}.` });
+            summary.setFooter({ text: t('characters.showingCount', { shown: selection.length, total: characters.length }) });
         }
     }
 
     components.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
-            .setLabel('New')
+            .setLabel(t('common.new'))
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`charactersAction_refresh_${ownerDiscordId}`)
-            .setLabel('Refresh')
+            .setLabel(t('common.refresh'))
             .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`charactersAction_settings_${ownerDiscordId}`)
-            .setLabel('Settings')
+            .setLabel(t('common.settings'))
             .setStyle(ButtonStyle.Secondary),
     ));
 
@@ -365,14 +366,14 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
 
 function buildCharactersSettingsView({ ownerDiscordId, characters }) {
     const settings = new EmbedBuilder()
-        .setTitle('Character dashboard settings')
+        .setTitle(t('characters.settingsTitle'))
         .setColor(0x4f46e5)
-        .setDescription('Manage account-level actions for your linked Blaue Magiergilde app account.')
+        .setDescription(t('characters.settingsDescription'))
         .addFields({
-            name: 'Account',
+            name: t('characters.settingsAccountTitle'),
             value: [
-                `Characters in account: **${characters.length}**`,
-                'Delete account permanently removes your linked app account.',
+                t('characters.settingsCharactersInAccount', { count: characters.length }),
+                t('characters.settingsDeleteHint'),
             ].join('\n'),
             inline: false,
         });
@@ -381,11 +382,11 @@ function buildCharactersSettingsView({ ownerDiscordId, characters }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersAction_delete-account_${ownerDiscordId}`)
-                .setLabel('Delete account')
+                .setLabel(t('characters.deleteAccount'))
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
                 .setCustomId(`charactersAction_back_${ownerDiscordId}`)
-                .setLabel('Back')
+                .setLabel(t('common.back'))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -395,15 +396,15 @@ function buildCharactersSettingsView({ ownerDiscordId, characters }) {
 
 function buildDeleteAccountConfirmView({ ownerDiscordId, characters }) {
     const warning = new EmbedBuilder()
-        .setTitle('Delete account')
+        .setTitle(t('characters.deleteAccountTitle'))
         .setColor(0xef4444)
-        .setDescription('Delete your linked Blaue Magiergilde account? This cannot be undone.')
+        .setDescription(t('characters.deleteAccountDescription'))
         .addFields({
-            name: 'What will happen',
+            name: t('characters.deleteAccountWhatHappens'),
             value: [
-                `Characters in account: **${characters.length}**`,
-                'Your account will be deleted from the app.',
-                'Use this only if you really want to remove the linked account.',
+                t('characters.deleteAccountBodyCharacters', { count: characters.length }),
+                t('characters.deleteAccountBodyDeleted'),
+                t('characters.deleteAccountBodyWarning'),
             ].join('\n'),
             inline: false,
         });
@@ -412,11 +413,11 @@ function buildDeleteAccountConfirmView({ ownerDiscordId, characters }) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersAction_confirm-delete-account_${ownerDiscordId}`)
-                .setLabel('Yes, delete account')
+                .setLabel(t('characters.confirmDeleteAccount'))
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
                 .setCustomId(`charactersAction_cancel-delete-account_${ownerDiscordId}`)
-                .setLabel('Cancel')
+                .setLabel(t('common.cancel'))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -427,14 +428,14 @@ function buildDeleteAccountConfirmView({ ownerDiscordId, characters }) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription('Your characters (dashboard) with Edit/Delete/New.'),
+        .setDescription(t('characters.commandDescription')),
     async execute(interaction) {
         if (!interaction.inGuild()) {
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             }
             if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ content: 'Please use this command in a server (not in DMs).', components: [] });
+                await interaction.editReply({ content: t('characters.useInServer'), components: [] });
             }
             return;
         }

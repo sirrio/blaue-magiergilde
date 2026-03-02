@@ -10,6 +10,7 @@ const {
 const { resolveApiBaseUrls } = require('../appUrls');
 const { withInsecureDispatcher } = require('../httpClient');
 const { buildErrorEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
+const { t } = require('../i18n');
 
 const APPROVAL_STATUS_LABELS = new Set(['pending', 'approved', 'declined', 'needs changes', 'needs_changes', 'retired', 'draft']);
 
@@ -23,22 +24,22 @@ function isTimeoutMessage(value) {
 
 function buildReachabilityDetail(endpoint, lastErrorMessage) {
     if (isTimeoutMessage(lastErrorMessage)) {
-        return `Failed to reach the app (${endpoint}). The website did not respond in time. Wait a moment and try again.`;
+        return t('approvals.reachabilityTimeout', { endpoint });
     }
 
-    return `Failed to reach the app (${endpoint}). The website may be restarting or unreachable. Wait a moment and try again.`;
+    return t('approvals.reachabilityUnreachable', { endpoint });
 }
 
 function buildRequestFailureDetail(detail) {
     if (!detail) {
-        return 'Request failed. Wait a moment and try again.';
+        return t('approvals.requestFailedNoDetail');
     }
 
     if (isTimeoutMessage(detail)) {
-        return `${detail} Wait a moment and try again.`;
+        return `${detail} ${t('approvals.requestFailedNoDetail')}`;
     }
 
-    return `Request failed: ${detail}`;
+    return t('approvals.requestFailedWithDetail', { detail });
 }
 
 function parseApprovalAction(customId) {
@@ -139,22 +140,22 @@ function buildApprovalActionRow(status, characterId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`character-approval:approve:${characterIdValue}`)
-            .setLabel('Approve')
+            .setLabel(t('approvals.approve'))
             .setStyle(ButtonStyle.Success)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
-            .setLabel('Request changes')
+            .setLabel(t('approvals.requestChanges'))
             .setStyle(ButtonStyle.Primary)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:decline:${characterIdValue}`)
-            .setLabel('Decline')
+            .setLabel(t('approvals.decline'))
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Set pending')
+            .setLabel(t('approvals.setPending'))
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );
@@ -169,7 +170,7 @@ function preserveSecondaryRows(message) {
 function buildInlineConfirmRow(action, sourceStatus) {
     const characterIdValue = String(action.characterId);
     const source = normalizeApprovalStatus(sourceStatus) || 'pending';
-    const confirmLabel = action.status === 'approved' ? 'Confirm approve' : 'Confirm set pending';
+    const confirmLabel = action.status === 'approved' ? t('approvals.confirmApprove') : t('approvals.confirmSetPending');
 
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -178,7 +179,7 @@ function buildInlineConfirmRow(action, sourceStatus) {
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`character-approval-cancel:${action.status}:${characterIdValue}:${source}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -201,7 +202,7 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
 
     if (appUrls.length === 0 || !token) {
         await interaction.reply({
-            embeds: [buildErrorEmbed('Bot HTTP not configured', 'Set BOT_APP_URL or BOT_PUBLIC_APP_URL and BOT_HTTP_TOKEN.')],
+            embeds: [buildErrorEmbed(t('approvals.botHttpNotConfiguredTitle'), t('approvals.botHttpNotConfiguredBody'))],
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -244,7 +245,7 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
 
     if (!response) {
         const payload = {
-            embeds: [buildErrorEmbed('App request failed', buildReachabilityDetail(lastEndpoint, lastErrorMessage))],
+            embeds: [buildErrorEmbed(t('approvals.appRequestFailedTitle'), buildReachabilityDetail(lastEndpoint, lastErrorMessage))],
         };
         if (usesInlineConfirm) {
             await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
@@ -265,7 +266,7 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
 
         const message = buildRequestFailureDetail(detail);
         const payload = {
-            embeds: [buildErrorEmbed('Approval update failed', message)],
+            embeds: [buildErrorEmbed(t('approvals.approvalUpdateFailedTitle'), message)],
         };
         if (usesInlineConfirm) {
             await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
@@ -280,15 +281,15 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
         return true;
     }
 
-    const verb = action.status === 'approved'
-        ? 'Approved'
+    const message = action.status === 'approved'
+        ? t('approvals.approvedCharacter')
         : action.status === 'needs_changes'
-            ? 'Requested changes for'
+            ? t('approvals.requestedChangesCharacter')
             : action.status === 'declined'
-                ? 'Declined'
-                : 'Set to pending';
+                ? t('approvals.declinedCharacter')
+                : t('approvals.setPendingCharacter');
     await interaction.editReply({
-        embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
+        embeds: [buildSuccessEmbed(t('approvals.statusUpdatedTitle'), message)],
     });
 
     return true;
@@ -333,16 +334,16 @@ async function handle(interaction) {
 
         const modal = new ModalBuilder()
             .setCustomId(`character-approval-note:${action.status}:${action.characterId}`)
-            .setTitle(action.status === 'declined' ? 'Decline character' : 'Request changes');
+            .setTitle(action.status === 'declined' ? t('approvals.declineTitle') : t('approvals.requestChangesTitle'));
 
         const reviewNoteInput = new TextInputBuilder()
             .setCustomId('review_note')
-            .setLabel('Review note (required)')
+            .setLabel(t('approvals.reviewNoteLabel'))
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true)
             .setMaxLength(2000)
             .setMinLength(1)
-            .setPlaceholder('Explain why this character was declined or what needs to be fixed.');
+            .setPlaceholder(t('approvals.reviewNotePlaceholder'));
 
         modal.addComponents(new ActionRowBuilder().addComponents(reviewNoteInput));
         await interaction.showModal(modal);
@@ -357,7 +358,7 @@ async function handle(interaction) {
     const reviewNote = String(interaction.fields.getTextInputValue('review_note') || '').trim();
     if (!reviewNote) {
         await interaction.reply({
-            embeds: [buildErrorEmbed('Missing review note', 'Please provide a review note before submitting.')],
+            embeds: [buildErrorEmbed(t('approvals.missingReviewNoteTitle'), t('approvals.missingReviewNoteBody'))],
             flags: MessageFlags.Ephemeral,
         });
         return true;

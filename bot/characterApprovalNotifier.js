@@ -1,6 +1,7 @@
 const { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { withInsecureDispatcher, shouldAllowInsecure } = require('./httpClient');
 const { resolveChannelId } = require('./channelOverride');
+const { t } = require('./i18n');
 
 function resolveAvatarExtension(contentType, fallback) {
     if (!contentType) return fallback;
@@ -115,11 +116,11 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         fields.push({ name: 'Faction', value: faction, inline: true });
     }
     fields.push({ name: 'Classes', value: trimField(classes), inline: false });
-    fields.push({ name: 'User', value: trimField(userLine, 1024), inline: false });
+    fields.push({ name: t('approvals.userField'), value: trimField(userLine, 1024), inline: false });
     fields.push({ name: 'DM', value: dmSummary, inline: true });
     fields.push({ name: 'Filler', value: filler, inline: true });
     if (shopSpend !== null && shopSpend > 0) {
-        fields.push({ name: 'Shop spend', value: String(shopSpend), inline: true });
+        fields.push({ name: t('approvals.shopSpendField'), value: String(shopSpend), inline: true });
     }
 
     embed.addFields(fields);
@@ -129,13 +130,13 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
 
     if (isMeaningful(notes) && notes !== '—') {
-        embed.addFields({ name: 'Notes', value: notes, inline: false });
+        embed.addFields({ name: t('approvals.notesField'), value: notes, inline: false });
     }
     if (isMeaningful(registrationNote) && registrationNote !== '—') {
-        embed.addFields({ name: 'Registration notes', value: registrationNote, inline: false });
+        embed.addFields({ name: t('approvals.registrationNotesField'), value: registrationNote, inline: false });
     }
     if (isMeaningful(reviewNote) && reviewNote !== '—') {
-        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
+        embed.addFields({ name: t('approvals.reviewNoteField'), value: reviewNote, inline: false });
     }
 
     if (payload?.character_id) {
@@ -152,22 +153,22 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     actionButtons.addComponents(
         new ButtonBuilder()
             .setCustomId(`character-approval:approve:${characterIdValue}`)
-            .setLabel('Approve')
+            .setLabel(t('approvals.approve'))
             .setStyle(ButtonStyle.Success)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
-            .setLabel('Request changes')
+            .setLabel(t('approvals.requestChanges'))
             .setStyle(ButtonStyle.Primary)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:decline:${characterIdValue}`)
-            .setLabel('Decline')
+            .setLabel(t('approvals.decline'))
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Set pending')
+            .setLabel(t('approvals.setPending'))
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );
@@ -177,7 +178,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     if (approvalUrl) {
         linkButtons.addComponents(
             new ButtonBuilder()
-                .setLabel('Open approvals')
+                .setLabel(t('approvals.openApprovals'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(approvalUrl),
         );
@@ -186,7 +187,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     if (externalLink) {
         linkButtons.addComponents(
             new ButtonBuilder()
-                .setLabel('Open external link')
+                .setLabel(t('approvals.openExternalLink'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(externalLink),
         );
@@ -239,13 +240,13 @@ async function sendCharacterApprovalDm({
 
     let description = '';
     if (label.toLowerCase() === 'approved') {
-        description = 'Your character is now approved and ready to play.';
+        description = t('approvals.approvedDmDescription');
     } else if (label.toLowerCase() === 'needs changes') {
-        description = 'Your character needs changes. Please update it and register again for review.';
+        description = t('approvals.needsChangesDmDescription');
     } else if (label.toLowerCase() === 'declined') {
-        description = 'Your character was declined. Please review the details and update if needed.';
+        description = t('approvals.declinedDmDescription');
     } else {
-        description = `Your character status is now **${label}**.`;
+        description = t('approvals.genericDmDescription', { status: label });
     }
 
     const embed = new EmbedBuilder()
@@ -270,7 +271,7 @@ async function sendCharacterApprovalDm({
     }
 
     if (isMeaningful(reviewNote) && reviewNote !== '—' && (status === 'needs_changes' || status === 'declined')) {
-        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
+        embed.addFields({ name: t('approvals.reviewNoteField'), value: reviewNote, inline: false });
     }
 
     let avatarAttachment = null;
@@ -296,7 +297,7 @@ async function sendCharacterApprovalDm({
     if (externalLink) {
         buttons.addComponents(
             new ButtonBuilder()
-                .setLabel('Open external link')
+                .setLabel(t('approvals.openExternalLink'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(externalLink),
         );
@@ -304,7 +305,7 @@ async function sendCharacterApprovalDm({
     if (charactersUrl) {
         buttons.addComponents(
             new ButtonBuilder()
-                .setLabel('Your characters')
+                .setLabel(t('approvals.yourCharacters'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(charactersUrl),
         );

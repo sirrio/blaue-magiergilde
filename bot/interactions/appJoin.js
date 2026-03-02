@@ -3,6 +3,7 @@ const { buildJoinConfirmButtons, legalLinksLine, notLinkedContent } = require('.
 const { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
+const { t } = require('../i18n');
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -18,7 +19,7 @@ async function handle(interaction) {
     if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
         await updateManageMessage(interaction, {
             content: '',
-            embeds: [buildErrorEmbed('Action denied', 'You cannot perform this action.')],
+            embeds: [buildErrorEmbed(t('common.actionDeniedTitle'), t('common.actionDeniedBody'))],
             components: [],
         });
         return true;
@@ -27,10 +28,10 @@ async function handle(interaction) {
     if (action === 'appLinkInfo') {
         await interaction.update({
             content: '',
-            embeds: [buildInfoEmbed('Connect existing account', [
+            embeds: [buildInfoEmbed(t('linking.connectExistingAccountTitle'), [
                 notLinkedContent(),
                 '',
-                'If you already use the app, open your profile and use "Connect Discord to this account".',
+                t('linking.connectExistingAccountHint'),
             ].join('\n'))],
             components: [],
         });
@@ -40,14 +41,14 @@ async function handle(interaction) {
     if (action === 'appJoinStart') {
         await interaction.update({
             content: '',
-            embeds: [buildWarningEmbed('Create new account?', [
-                '**Create a new app account?**',
+            embeds: [buildWarningEmbed(t('linking.createNewAccountPromptTitle'), [
+                t('linking.createNewAccountPromptHeading'),
                 '',
-                'This creates a new user account linked to your Discord ID.',
+                t('linking.createNewAccountPromptBody'),
                 '',
-                '**Do not do this** if you already have an app account. Connect Discord to that existing account instead.',
+                t('linking.createNewAccountPromptWarning'),
                 '',
-                'By creating an account you confirm the legal notices below:',
+                t('linking.createNewAccountPromptLegal'),
                 legalLinksLine(),
             ].join('\n'))],
             components: [buildJoinConfirmButtons(ownerDiscordId)],
@@ -58,7 +59,7 @@ async function handle(interaction) {
     if (action === 'appJoinCancel') {
         await interaction.update({
             content: '',
-            embeds: [buildInfoEmbed('Canceled')],
+            embeds: [buildInfoEmbed(t('linking.canceled'))],
             components: [],
         });
         return true;
@@ -71,8 +72,8 @@ async function handle(interaction) {
                 content: '',
                 embeds: [
                     result.created
-                        ? buildSuccessEmbed('Account created', 'Account created and linked to Discord. You can run the command again now.')
-                        : buildInfoEmbed('Already linked', 'Your Discord is already linked to an account. You can run the command again now.'),
+                        ? buildSuccessEmbed(t('linking.accountCreatedTitle'), t('linking.accountCreatedBody'))
+                        : buildInfoEmbed(t('linking.alreadyLinkedTitle'), t('linking.alreadyLinkedBody')),
                 ],
                 components: [],
             });
@@ -81,7 +82,7 @@ async function handle(interaction) {
             console.error(error);
             await interaction.update({
                 content: '',
-                embeds: [buildErrorEmbed('Create failed', `Failed to create: ${error.message}`)],
+                embeds: [buildErrorEmbed(t('linking.createFailedTitle'), t('linking.createFailedBody', { message: error.message }))],
                 components: [],
             });
         }
@@ -90,7 +91,7 @@ async function handle(interaction) {
 
     await updateManageMessage(interaction, {
         content: '',
-        embeds: [buildErrorEmbed('Unknown action')],
+        embeds: [buildErrorEmbed(t('common.unknownAction'))],
         components: [],
     });
     return true;

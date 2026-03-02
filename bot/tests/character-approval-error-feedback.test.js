@@ -60,8 +60,8 @@ async function testReachabilityHint() {
 
         assert.equal(handled, true);
         assert.equal(followUps.length, 1);
-        assert.match(followUps[0].embeds[0].data.title, /App request failed/);
-        assert.match(followUps[0].embeds[0].data.description, /did not respond in time/i);
+        assert.match(followUps[0].embeds[0].data.title, /App-Anfrage fehlgeschlagen/);
+        assert.match(followUps[0].embeds[0].data.description, /nicht rechtzeitig geantwortet/i);
     } finally {
         global.fetch = originalFetch;
         process.env.BOT_PUBLIC_APP_URL = originalAppUrl;
@@ -93,8 +93,8 @@ async function testRequestFailureHint() {
 
         assert.equal(handled, true);
         assert.equal(followUps.length, 1);
-        assert.match(followUps[0].embeds[0].data.title, /Approval update failed/);
-        assert.match(followUps[0].embeds[0].data.description, /wait a moment and try again/i);
+        assert.match(followUps[0].embeds[0].data.title, /Status-Update fehlgeschlagen/);
+        assert.match(followUps[0].embeds[0].data.description, /warte kurz und versuche es erneut/i);
     } finally {
         global.fetch = originalFetch;
         process.env.BOT_PUBLIC_APP_URL = originalAppUrl;
