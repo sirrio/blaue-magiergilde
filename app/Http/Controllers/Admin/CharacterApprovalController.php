@@ -35,7 +35,7 @@ class CharacterApprovalController extends Controller
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->withCount('room')
             ->with([
-                'user:id,name,discord_id,discord_username,discord_display_name',
+                'user:id,name,discord_id,discord_username,discord_display_name,avatar',
                 'adventures:id,character_id,duration,has_additional_bubble',
                 'characterClasses:id,name',
             ]);

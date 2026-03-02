@@ -384,6 +384,7 @@ export interface Character {
     discord_id?: number | null
     discord_username?: string | null
     discord_display_name?: string | null
+    avatar?: string | null
     simplified_tracking?: boolean
     avatar_masked?: boolean
   }

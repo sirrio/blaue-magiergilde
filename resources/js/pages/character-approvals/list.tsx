@@ -70,6 +70,7 @@ type CharacterGroup = {
   label: string
   discordHandle?: string | null
   discordId?: number | null
+  discordAvatar?: string | null
   simplifiedTracking?: boolean
   characters: AdminCharacter[]
 }
@@ -842,6 +843,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
       const discordDisplayName = character.user?.discord_display_name?.trim()
       const discordHandle = discordUsername || discordDisplayName || null
       const discordId = character.user?.discord_id ?? null
+      const discordAvatar = character.user?.avatar ?? null
       const simplifiedTracking = Boolean(character.simplified_tracking)
       const groupKey = String(userId)
       if (!grouped.has(groupKey)) {
@@ -850,6 +852,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
           label: userName,
           discordHandle,
           discordId,
+          discordAvatar,
           simplifiedTracking,
           characters: [],
         })
@@ -859,6 +862,9 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
 
       if (!group.discordHandle && discordHandle) {
         group.discordHandle = discordHandle
+      }
+      if (!group.discordAvatar && discordAvatar) {
+        group.discordAvatar = discordAvatar
       }
       group.simplifiedTracking = Boolean(group.simplifiedTracking || simplifiedTracking)
       group.characters.push(character)
@@ -979,13 +985,26 @@ const tierTextClassMap: Record<string, string> = {
             {groups.map((group) => (
               <div key={group.key} className="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/70 bg-base-200/70 px-4 py-2 text-xs font-semibold uppercase text-base-content/60">
-                  <span className="normal-case">
-                    {group.label}
-                    {group.discordHandle ? (
-                      <span className="ml-1 text-[11px] font-normal normal-case text-base-content/60">| {group.discordHandle}</span>
+                  <span className="flex items-center gap-2 normal-case">
+                    {group.discordAvatar ? (
+                      <img
+                        src={resolveAvatarSrc(group.discordAvatar)}
+                        alt={`${group.label} Discord avatar`}
+                        className="h-5 w-5 rounded-full object-cover ring-1 ring-base-300"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null
+                          event.currentTarget.src = '/images/no-avatar.svg'
+                        }}
+                      />
                     ) : null}
-                    <span className="ml-2 text-[10px] font-normal normal-case text-base-content/50">
-                      ({group.characters.length})
+                    <span>
+                      {group.label}
+                      {group.discordHandle ? (
+                        <span className="ml-1 text-[11px] font-normal normal-case text-base-content/60">| {group.discordHandle}</span>
+                      ) : null}
+                      <span className="ml-2 text-[10px] font-normal normal-case text-base-content/50">
+                        ({group.characters.length})
+                      </span>
                     </span>
                   </span>
                   <span className="flex items-center gap-2 font-normal normal-case text-base-content/60">
