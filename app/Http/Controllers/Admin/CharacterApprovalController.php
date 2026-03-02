@@ -196,7 +196,7 @@ class CharacterApprovalController extends Controller
                 && $character->guild_status !== 'pending'
             ) {
                 return redirect()->back()->withErrors([
-                    'guild_status' => 'Only characters in pending review can be reviewed. Move the character back to review first.',
+                    'guild_status' => 'Only pending characters can be reviewed. Move the character back to pending first.',
                 ]);
             }
 

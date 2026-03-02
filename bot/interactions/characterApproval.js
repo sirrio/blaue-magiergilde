@@ -154,7 +154,7 @@ function buildApprovalActionRow(status, characterId) {
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Move back to review')
+            .setLabel('Set pending')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );
@@ -169,7 +169,7 @@ function preserveSecondaryRows(message) {
 function buildInlineConfirmRow(action, sourceStatus) {
     const characterIdValue = String(action.characterId);
     const source = normalizeApprovalStatus(sourceStatus) || 'pending';
-    const confirmLabel = action.status === 'approved' ? 'Confirm approve' : 'Confirm move back to review';
+    const confirmLabel = action.status === 'approved' ? 'Confirm approve' : 'Confirm set pending';
 
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -286,7 +286,7 @@ async function sendStatusUpdate(interaction, action, reviewNote = '') {
             ? 'Requested changes for'
             : action.status === 'declined'
                 ? 'Declined'
-                : 'Moved back to review';
+                : 'Set to pending';
     await interaction.editReply({
         embeds: [buildSuccessEmbed('Character status updated', `${verb} character.`)],
     });

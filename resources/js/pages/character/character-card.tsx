@@ -225,26 +225,6 @@ function SubmitForApprovalModal({
   )
 }
 
-function getCharacterStatusBadgeClass(guildStatus: string): string {
-  if (guildStatus === 'approved') {
-    return 'badge-success badge-soft'
-  }
-
-  if (guildStatus === 'declined') {
-    return 'badge-error badge-soft'
-  }
-
-  if (guildStatus === 'needs_changes' || guildStatus === 'pending') {
-    return 'badge-warning badge-soft'
-  }
-
-  if (guildStatus === 'retired') {
-    return 'badge-neutral badge-soft'
-  }
-
-  return 'badge-ghost'
-}
-
 function getCharacterStatusHint(guildStatus: string): string {
   if (guildStatus === 'draft') {
     return 'Private draft. Register it with Magiergilde when it is ready for review.'
@@ -348,7 +328,6 @@ export function CharacterCard({
       ? 'Submitted to the Magiergilde. Waiting for review.'
       : `Status: ${statusLabel}`
   const statusHint = getCharacterStatusHint(guildStatus)
-  const statusBadgeClass = getCharacterStatusBadgeClass(guildStatus)
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
@@ -469,10 +448,9 @@ export function CharacterCard({
             >
               {statusIcon}
             </span>
-            <span className="truncate">{character.name}</span>
-            <span className={cn('badge badge-xs shrink-0', statusBadgeClass)}>{statusLabel}</span>
+            <span className="min-w-0 flex-1 truncate">{character.name}</span>
             {hasRoom ? (
-              <span className="text-primary/70" title="Room assigned">
+              <span className="shrink-0 text-primary/70" title="Room assigned">
                 <MapPin size={14} />
               </span>
             ) : null}

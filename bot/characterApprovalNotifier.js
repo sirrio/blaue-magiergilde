@@ -167,7 +167,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Move back to review')
+            .setLabel('Set pending')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );
