@@ -83,6 +83,48 @@ const getStatusLabel = (status?: string | null) => {
   return 'Pending'
 }
 
+const resolveAvatarSrc = (avatar?: string | null) => {
+  const value = String(avatar ?? '').trim()
+  if (!value) return '/images/no-avatar.svg'
+  return value.startsWith('http') ? value : `/storage/${value}`
+}
+
+const CharacterAvatarPreview = ({ character }: { character: AdminCharacter }) => {
+  const src = resolveAvatarSrc(character.avatar)
+
+  return (
+    <Modal>
+      <ModalTrigger>
+        <button type="button" className="cursor-zoom-in" aria-label={`Open avatar for ${character.name}`} title={`Open avatar for ${character.name}`}>
+          <img
+            src={src}
+            alt={character.name}
+            className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-base-200 transition-transform hover:scale-105"
+            onError={(event) => {
+              event.currentTarget.onerror = null
+              event.currentTarget.src = '/images/no-avatar.svg'
+            }}
+          />
+        </button>
+      </ModalTrigger>
+      <ModalTitle>{character.name}</ModalTitle>
+      <ModalContent>
+        <div className="flex justify-center">
+          <img
+            src={src}
+            alt={character.name}
+            className="max-h-[70vh] w-full max-w-md rounded-2xl object-contain ring-1 ring-base-200"
+            onError={(event) => {
+              event.currentTarget.onerror = null
+              event.currentTarget.src = '/images/no-avatar.svg'
+            }}
+          />
+        </div>
+      </ModalContent>
+    </Modal>
+  )
+}
+
 const AdminNoteModal = ({
   character,
   isOpen: controlledIsOpen,
@@ -1003,6 +1045,7 @@ const tierTextClassMap: Record<string, string> = {
                       <ListRow key={character.id} className={cn('grid-cols-1', isDraft && 'opacity-60')}>
                         <div className="col-span-full flex flex-wrap items-center gap-3 md:flex-nowrap">
                           <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <CharacterAvatarPreview character={character} />
                             <div className="flex w-6 justify-center" title="Current tier">
                               <LogoTier tier={currentTier} width={16} />
                             </div>
