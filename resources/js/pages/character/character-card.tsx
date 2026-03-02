@@ -444,7 +444,7 @@ export function CharacterCard({
             <span
               className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
               data-tip={statusTooltip}
-              title={statusTooltip}
+              aria-label={statusTooltip}
             >
               {statusIcon}
             </span>
@@ -514,7 +514,7 @@ export function CharacterCard({
                     <InfoBoxLine>
                       Played:{' '}
                       {downtimeDisabledInSimpleMode ? (
-                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={adventuresCountWarningReason} title={adventuresCountWarningReason}>
+                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={adventuresCountWarningReason} aria-label={adventuresCountWarningReason}>
                           <span className="cursor-help font-semibold text-warning">?</span>
                         </span>
                       ) : (
@@ -537,7 +537,7 @@ export function CharacterCard({
                     <InfoBoxLine>
                       Level:{' '}
                       {downtimeDisabledInSimpleMode ? (
-                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={factionLevelWarningReason} title={factionLevelWarningReason}>
+                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={factionLevelWarningReason} aria-label={factionLevelWarningReason}>
                           <span className="cursor-help font-semibold text-warning">?</span>
                         </span>
                       ) : (
@@ -556,7 +556,7 @@ export function CharacterCard({
                         <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
                         <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
                         <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
-                        <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} title={remainingDowntimeTooltip}>
+                        <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
                           <InfoBoxLine className="font-semibold cursor-help">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
                         </div>
                       </>
@@ -606,14 +606,13 @@ export function CharacterCard({
                 <div
                   className="tooltip tooltip-bottom w-full"
                   data-tip={submissionRequiredReason}
-                  title={submissionRequiredReason}
+                  aria-label={submissionRequiredReason}
                 >
                   <Button
                     size="sm"
                     className="w-full justify-center gap-1"
                     disabled
                     aria-label={simplifiedTracking ? 'Set level disabled' : 'Add adventure disabled'}
-                    title={submissionRequiredReason}
                   >
                     {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
                     <span className="md:hidden">{simplifiedTracking ? 'Set level' : 'Adventure'}</span>
@@ -628,14 +627,13 @@ export function CharacterCard({
                 <div
                   className="tooltip tooltip-bottom w-full"
                   data-tip={submissionRequiredReason}
-                  title={submissionRequiredReason}
+                  aria-label={submissionRequiredReason}
                 >
                   <Button
                     size="sm"
                     className="w-full justify-center gap-1"
                     disabled
                     aria-label="Add downtime disabled"
-                    title={submissionRequiredReason}
                   >
                     <FlameKindling size={14} />
                     <span className="md:hidden">Downtime</span>
@@ -643,13 +641,12 @@ export function CharacterCard({
                 </div>
               ) : canLogActivity ? (
                 downtimeDisabledInSimpleMode ? (
-                  <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} title={downtimeDisabledReason}>
+                  <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} aria-label={downtimeDisabledReason}>
                     <Button
                       size="sm"
                       className="w-full justify-center gap-1"
                       disabled
                       aria-label="Add downtime disabled"
-                      title={downtimeDisabledReason}
                     >
                       <FlameKindling size={14} />
                       <span className="md:hidden">Downtime</span>
@@ -663,14 +660,13 @@ export function CharacterCard({
                 <div
                   className="tooltip tooltip-bottom w-full"
                   data-tip={submissionRequiredReason}
-                  title={submissionRequiredReason}
+                  aria-label={submissionRequiredReason}
                 >
                   <Button
                     size="sm"
                     className="w-full justify-center gap-1"
                     disabled
                     aria-label="Manage allies disabled"
-                    title={submissionRequiredReason}
                   >
                     <BookHeart size={14} />
                     <span className="md:hidden">Allies</span>
