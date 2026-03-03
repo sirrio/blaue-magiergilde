@@ -3,6 +3,7 @@ import { toast } from '@/components/ui/toast'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateClassString } from '@/helper/calculateClassString'
 import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
@@ -14,6 +15,7 @@ import { Archive, BookUser, Copy, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
+  const t = useTranslate()
   const { features } = usePage<PageProps>().props
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
@@ -76,7 +78,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
       formatBlock(':Plus1:', charactersByTier.filler, 'Filler Character')
 
     navigator.clipboard.writeText(result).then(() => {
-      toast.show('Characters copied to clipboard', 'info')
+      toast.show(t('characters.copyCharactersCopied'), 'info')
     })
   }
 
@@ -132,35 +134,38 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
 
   return (
     <AppLayout>
-      <Head title="Characters" />
+      <Head title={t('characters.pageTitle')} />
       <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
         <section className="flex flex-col justify-between gap-3 border-b border-base-200 pb-3 sm:flex-row sm:items-start">
           <div>
             <h1 className="text-2xl font-bold">
-              Your Characters{' '}
-              <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{activeCharacterCount}/8 Active</span>
+              {t('characters.heading')}{' '}
+              <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{t('characters.activeCount', { count: activeCharacterCount })}</span>
             </h1>
-            <p className="text-xs text-base-content/70 sm:text-sm">Manage all your characters easily below.</p>
+            <p className="text-xs text-base-content/70 sm:text-sm">{t('characters.subtitle')}</p>
             {isStatusSwitchEnabled && (draftCharacterCount > 0 || needsChangesCharacterCount > 0) ? (
               <p className="mt-1 text-xs text-warning">
-                {draftCharacterCount > 0 ? `${draftCharacterCount} draft ${draftCharacterCount === 1 ? 'character is' : 'characters are'} still private.` : ''}
+                {draftCharacterCount > 0 ? t(draftCharacterCount === 1 ? 'characters.draftHintSingle' : 'characters.draftHintPlural', {
+                  drafts: draftCharacterCount,
+                }) : ''}
                 {draftCharacterCount > 0 && needsChangesCharacterCount > 0 ? ' ' : ''}
-                {needsChangesCharacterCount > 0 ? `${needsChangesCharacterCount} ${needsChangesCharacterCount === 1 ? 'character needs' : 'characters need'} fixes and re-registration.` : ''}
-                {' '}Use "Register with Magiergilde" on a card when a character is ready for review. Add rare languages, filler-character notes,
-                and other review-relevant info in the registration notes.
+                {needsChangesCharacterCount > 0 ? t(needsChangesCharacterCount === 1 ? 'characters.needsChangesHintSingle' : 'characters.needsChangesHintPlural', {
+                  count: needsChangesCharacterCount,
+                }) : ''}
+                {' '}{t('characters.registrationHint')}
               </p>
             ) : null}
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <Button size="sm" variant="ghost" className="flex items-center gap-1.5" onClick={() => copyCharactersToClipboard(characters)}>
-              <Copy size={16} /> <span>Copy Characters</span>
+              <Copy size={16} /> <span>{t('characters.copyCharacters')}</span>
             </Button>
             {chars.length > 0 && (
               <>
                 <StoreCharacterModal>
                   <Button size="sm" variant="outline" className="flex items-center gap-2">
                     <Plus size={16} />
-                    <span>Add Character</span>
+                    <span>{t('characters.addCharacter')}</span>
                   </Button>
                 </StoreCharacterModal>
                 <Button as="a" href={route('characters.deleted')} size="sm" modifier="square" variant="outline">
@@ -173,13 +178,13 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
         {chars.length === 0 ? (
           <div className="py-10 text-center">
             <BookUser size={64} className="text-base-content mx-auto mb-4" />
-            <h2 className="text-base-content text-lg font-semibold">No characters yet</h2>
-            <p className="text-base-content/70 text-sm">Start by creating your first character.</p>
+            <h2 className="text-base-content text-lg font-semibold">{t('characters.noCharactersTitle')}</h2>
+            <p className="text-base-content/70 text-sm">{t('characters.noCharactersBody')}</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <StoreCharacterModal>
                 <Button variant="outline" className="flex items-center gap-2">
                   <Plus size={16} />
-                  <span>Create Character</span>
+                  <span>{t('characters.createCharacter')}</span>
                 </Button>
               </StoreCharacterModal>
             </div>

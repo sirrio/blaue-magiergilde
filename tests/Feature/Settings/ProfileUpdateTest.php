@@ -28,6 +28,23 @@ test('profile information can be updated', function () {
     expect($user->refresh()->email)->toBe('test@example.com');
 });
 
+test('profile locale can be updated', function () {
+    $user = User::factory()->create([
+        'locale' => 'de',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->patch('/settings/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'locale' => 'en',
+        ]);
+
+    $response->assertRedirect(route('profile.edit', absolute: false));
+    expect($user->refresh()->locale)->toBe('en');
+});
+
 test('profile email can be removed when discord is connected', function () {
     $user = User::factory()->create([
         'email' => 'test@example.com',

@@ -3,11 +3,13 @@ import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Head, Link, useForm } from '@inertiajs/react'
 import type { ElementType } from 'react'
 
 export default function Login() {
+  const t = useTranslate()
   const { data, setData, post, processing, errors } = useForm({
     email: '',
     password: '',
@@ -23,7 +25,7 @@ export default function Login() {
 
   return (
     <>
-      <Head title="Login" />
+      <Head title={t('common.login')} />
 
       <div className="relative min-h-screen overflow-hidden bg-[#070A12] text-white" data-theme="dark">
         <div className="pointer-events-none absolute inset-0">
@@ -40,8 +42,8 @@ export default function Login() {
                   <img className={cn('h-14 w-14 sm:h-20 sm:w-20')} src="/images/icon_magiergilde_white.svg" alt="Blaue Magiergilde" />
                 </Link>
                 <div>
-                  <h1 className="text-xl leading-tight font-bold sm:text-2xl">Willkommen zur Blauen Magiergilde</h1>
-                  <p className="text-xs text-white/70 sm:text-sm">Melde dich an, um deine Charaktere zu verwalten.</p>
+                  <h1 className="text-xl leading-tight font-bold sm:text-2xl">{t('auth.loginTitle')}</h1>
+                  <p className="text-xs text-white/70 sm:text-sm">{t('auth.loginSubtitle')}</p>
                 </div>
               </div>
 
@@ -53,17 +55,17 @@ export default function Login() {
                 className={cn('gap-2 text-sm sm:text-base', buttonOutlineDiscord)}
               >
                 <DiscordIcon width={20} />
-                Mit Discord anmelden
+                {t('auth.loginWithDiscord')}
               </Button>
               <div className="rounded-lg border border-sky-400/20 bg-sky-400/8 p-3 text-xs text-sky-100/90">
-                <p className="font-semibold text-sky-100">Discord already connected?</p>
-                <p className="mt-1">Use this if your app account is already linked to Discord.</p>
+                <p className="font-semibold text-sky-100">{t('auth.discordAlreadyConnected')}</p>
+                <p className="mt-1">{t('auth.discordLoginHint')}</p>
                 <p className="mt-1 text-sky-100/75">
-                  If you already use the website but Discord is not linked yet, log in below once and connect Discord in your profile.
+                  {t('auth.discordExistingHint')}
                 </p>
               </div>
 
-              <div className="divider my-0 opacity-60">oder</div>
+              <div className="divider my-0 opacity-60">{t('auth.or')}</div>
 
               <form onSubmit={submit} className="space-y-3 sm:space-y-4">
                 <Input
@@ -72,9 +74,9 @@ export default function Login() {
                   value={data.email}
                   onChange={(e) => setData('email', e.target.value)}
                   errors={errors.email}
-                  placeholder="you@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                 >
-                  Email
+                  {t('common.email')}
                 </Input>
                 <Input
                   type="password"
@@ -84,7 +86,7 @@ export default function Login() {
                   errors={errors.password}
                   placeholder="********"
                 >
-                  Password
+                  {t('common.password')}
                 </Input>
                 <Button
                   type="submit"
@@ -93,19 +95,19 @@ export default function Login() {
                   modifier="block"
                   className={cn('text-sm sm:text-base', buttonOutlineWhite)}
                 >
-                  Login
+                  {t('common.login')}
                 </Button>
               </form>
 
               <div className="flex flex-col items-center gap-3">
                 <p className="text-center text-sm text-white/80">
-                  Kein Account?{' '}
+                  {t('auth.noAccountYet')}{' '}
                   <Link href={route('register')} className="underline underline-offset-4 text-white/80 transition-colors hover:text-white">
-                    Neuen Account erstellen
+                    {t('auth.createNewAccount')}
                   </Link>
                 </p>
                 <Button as={Link as ElementType} href={route('home')} variant="outline" className={cn('btn-sm', buttonOutlineWhite)}>
-                  Zurück zur Startseite
+                  {t('common.backToHome')}
                 </Button>
               </div>
             </CardBody>

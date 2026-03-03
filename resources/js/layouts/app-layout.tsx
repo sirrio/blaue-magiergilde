@@ -1,3 +1,4 @@
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
@@ -27,69 +28,10 @@ interface AppLayoutProps {
   children: ReactNode
 }
 
-const menuLinks = [
-  { name: 'Characters', route: 'characters.index', method: 'get' as const, icon: Users },
-  { name: 'Game Master Log', route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
-  { name: 'Compendium', route: 'compendium.items.index', method: 'get' as const, icon: Package },
-  { name: 'Rooms', route: 'rooms.index', method: 'get' as const, icon: Map },
-  { name: 'Games', route: 'games.index', method: 'get' as const, icon: CalendarDays },
-  { name: 'Guild Handbook', route: 'handbook.index', method: 'get' as const, icon: BookOpen },
-]
-
-const compendiumLinks = [
-  { name: 'Items', route: 'compendium.items.index', method: 'get' as const, icon: Package },
-  { name: 'Spells', route: 'compendium.spells.index', method: 'get' as const, icon: Sparkles },
-]
-
-const accountLinks = [
-  { name: 'Profile', route: 'profile.edit', method: 'get' as const },
-]
-
-const legalLinks = [
-  { name: 'Impressum', route: 'impressum', method: 'get' as const },
-  { name: 'Datenschutz', route: 'datenschutz', method: 'get' as const },
-]
-
-const authLinks = [
-  { name: 'Logout', route: 'logout', method: 'post' as const },
-]
-
-const adminSections = [
-  {
-    label: 'Marketplace',
-    links: [
-      { name: 'Shop', route: 'admin.shops.index', method: 'get' as const, icon: Store },
-      { name: 'Auctions', route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
-      { name: 'Backstock', route: 'admin.backstock.index', method: 'get' as const, icon: Archive },
-    ],
-  },
-  {
-    label: 'Compendium',
-    links: [
-      { name: 'Items', route: 'admin.items.index', method: 'get' as const, icon: Package },
-      { name: 'Spells', route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
-      { name: 'Suggestions', route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: MessageSquarePlus },
-    ],
-  },
-  {
-    label: 'Administration',
-    links: [
-      { name: 'Character Approvals', route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
-      { name: 'Games', route: 'admin.games', method: 'get' as const, icon: CalendarDays },
-      { name: 'Manage Rooms', route: 'admin.rooms.index', method: 'get' as const, icon: Map },
-    ],
-  },
-  {
-    label: 'System',
-    links: [
-      { name: 'Settings', route: 'admin.settings', method: 'get' as const, icon: Settings },
-    ],
-  },
-]
-
 export default function AppLayout({ children }: AppLayoutProps) {
   const { auth, discordConnected, handbookChannels, activeChannelId, features } =
     usePage<PageProps>().props
+  const t = useTranslate()
   const needsPasswordFallback = Boolean(auth.user?.needs_password_fallback)
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
@@ -113,13 +55,67 @@ export default function AppLayout({ children }: AppLayoutProps) {
     handbookMobileRef.current?.removeAttribute('open')
   )
 
+  const menuLinks = [
+    { name: t('nav.characters'), route: 'characters.index', method: 'get' as const, icon: Users },
+    { name: t('nav.gameMasterLog'), route: 'game-master-log.index', method: 'get' as const, icon: ScrollText },
+    { name: t('nav.compendium'), route: 'compendium.items.index', method: 'get' as const, icon: Package },
+    { name: t('nav.rooms'), route: 'rooms.index', method: 'get' as const, icon: Map },
+    { name: t('nav.games'), route: 'games.index', method: 'get' as const, icon: CalendarDays },
+    { name: t('nav.guildHandbook'), route: 'handbook.index', method: 'get' as const, icon: BookOpen },
+  ]
+  const compendiumLinks = [
+    { name: t('nav.items'), route: 'compendium.items.index', method: 'get' as const, icon: Package },
+    { name: t('nav.spells'), route: 'compendium.spells.index', method: 'get' as const, icon: Sparkles },
+  ]
+  const accountLinks = [
+    { name: t('common.profile'), route: 'profile.edit', method: 'get' as const },
+  ]
+  const legalLinks = [
+    { name: t('legal.imprint'), route: 'impressum', method: 'get' as const },
+    { name: t('legal.privacy'), route: 'datenschutz', method: 'get' as const },
+  ]
+  const authLinks = [
+    { name: t('common.logout'), route: 'logout', method: 'post' as const },
+  ]
+  const adminSections = [
+    {
+      label: t('nav.marketplace'),
+      links: [
+        { name: t('nav.shop'), route: 'admin.shops.index', method: 'get' as const, icon: Store },
+        { name: t('nav.auctions'), route: 'admin.auctions.index', method: 'get' as const, icon: Gavel },
+        { name: t('nav.backstock'), route: 'admin.backstock.index', method: 'get' as const, icon: Archive },
+      ],
+    },
+    {
+      label: t('nav.compendium'),
+      links: [
+        { name: t('nav.items'), route: 'admin.items.index', method: 'get' as const, icon: Package },
+        { name: t('nav.spells'), route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
+        { name: t('nav.suggestions'), route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: MessageSquarePlus },
+      ],
+    },
+    {
+      label: t('nav.administration'),
+      links: [
+        { name: t('nav.characterApprovals'), route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
+        { name: t('nav.games'), route: 'admin.games', method: 'get' as const, icon: CalendarDays },
+        { name: t('nav.manageRooms'), route: 'admin.rooms.index', method: 'get' as const, icon: Map },
+      ],
+    },
+    {
+      label: t('nav.system'),
+      links: [
+        { name: t('common.settings'), route: 'admin.settings', method: 'get' as const, icon: Settings },
+      ],
+    },
+  ]
   const handbookChannelList = handbookChannels ?? []
   const showHandbookDropdown = handbookChannelList.length > 0
   const showCompendiumDropdown = compendiumLinks.length > 0
   const isCompendiumActive = route().current('compendium.items.index') || route().current('compendium.spells.index')
   const isHandbookActive = route().current('handbook.index')
-  const compendiumLabel = 'Compendium'
-  const handbookLabel = 'Guild Handbook'
+  const compendiumLabel = t('nav.compendium')
+  const handbookLabel = t('nav.guildHandbook')
   const filteredMenuLinks = menuLinks.filter((menuLink) => {
     if (menuLink.route === 'games.index') {
       return features?.games_calendar ?? true
@@ -223,7 +219,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <li role="none">
                   <a className="flex items-center">
                     <Shield size={16} className="mr-2" />
-                    Administration
+                    {t('nav.administration')}
                   </a>
                   <ul className="p-2">
                     {adminSections.map((section) => (
@@ -335,7 +331,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <details ref={adminDetailsRef}>
                   <summary className="flex items-center">
                     <Shield size={16} className="mr-2" />
-                    Administration
+                    {t('nav.administration')}
                   </summary>
                   <ul className="z-30 w-52 p-2">
                     {adminSections.map((section) => (
@@ -380,7 +376,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
               {needsPasswordFallback ? (
-                <span className="badge badge-warning badge-xs absolute -right-0.5 -top-0.5" aria-label="Password fallback required">
+                <span className="badge badge-warning badge-xs absolute -right-0.5 -top-0.5" aria-label={t('nav.passwordFallbackRequired')}>
                   !
                 </span>
               ) : null}
@@ -447,13 +443,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="container mx-auto max-w-5xl px-4 pt-4">
             <div className="alert alert-warning">
               <div>
-                <p className="font-semibold">Discord is not connected.</p>
+                <p className="font-semibold">{t('nav.noDiscordConnected')}</p>
                 <p className="text-sm opacity-80">
-                  Connect Discord in your profile to let the bot use this existing account and its characters.
+                  {t('nav.noDiscordDescription')}
                 </p>
               </div>
               <Link href={route('profile.edit')} className="btn btn-sm">
-                Connect Discord
+                {t('common.connectDiscord')}
               </Link>
             </div>
           </div>

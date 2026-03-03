@@ -18,6 +18,7 @@ import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { AlliesModal } from '@/pages/character/allies-modal'
 import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
@@ -82,6 +83,7 @@ function CharacterSettingsModal({
   triggerSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   triggerClassName?: string
 }) {
+  const t = useTranslate()
   return (
     <Modal>
       <ModalTrigger>
@@ -90,17 +92,17 @@ function CharacterSettingsModal({
           variant={triggerVariant}
           modifier="square"
           className={triggerClassName}
-          aria-label="Character settings"
-          title="Character settings"
+          aria-label={t('characters.characterSettings')}
+          title={t('characters.characterSettings')}
         >
           <Settings size={14} />
         </Button>
       </ModalTrigger>
-      <ModalTitle>Character Settings</ModalTitle>
+      <ModalTitle>{t('characters.characterSettings')}</ModalTitle>
       <ModalContent>
         <div className="space-y-3">
           <label className={cn('flex items-center justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
-            <span>Simplified tracking</span>
+            <span>{t('characters.simplifiedTracking')}</span>
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
@@ -110,7 +112,7 @@ function CharacterSettingsModal({
             />
           </label>
           <label className={cn('flex items-center justify-between gap-3 text-sm', isAvatarMaskedUpdating && 'opacity-60')}>
-            <span>Token mask</span>
+            <span>{t('characters.tokenMask')}</span>
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
@@ -123,7 +125,7 @@ function CharacterSettingsModal({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button as="a" href={route('characters.download', characterId)} size="sm" variant="outline" className="w-full">
                 <Download size={14} />
-                Download JSON
+                {t('characters.downloadJson')}
               </Button>
               <Button
                 as="a"
@@ -133,7 +135,7 @@ function CharacterSettingsModal({
                 className="w-full"
               >
                 <Download size={14} />
-                Download Pretty
+                {t('characters.downloadPretty')}
               </Button>
             </div>
           </div>
@@ -152,6 +154,7 @@ function SubmitForApprovalModal({
   processing: boolean
   onSubmit: (registrationNote: string, callbacks: { onSuccess: () => void; onError: (message: string) => void }) => void
 }) {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const [registrationNote, setRegistrationNote] = useState(character.registration_note ?? '')
   const [localNotice, setLocalNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null)
@@ -170,14 +173,14 @@ function SubmitForApprovalModal({
             setIsOpen(true)
           }}
           disabled={processing}
-          aria-label="Register with Magiergilde"
-          title="Register with Magiergilde"
+          aria-label={t('characters.registerWithMagiergilde')}
+          title={t('characters.registerWithMagiergilde')}
         >
           <Clock size={14} />
-          <span>Register with Magiergilde</span>
+          <span>{t('characters.registerWithMagiergilde')}</span>
         </Button>
       </ModalTrigger>
-      <ModalTitle>Register Character With Magiergilde</ModalTitle>
+      <ModalTitle>{t('characters.registerTitle')}</ModalTitle>
       <ModalContent>
         {localNotice ? (
           <div className={cn('alert py-2 text-sm', localNotice.tone === 'error' ? 'alert-error alert-soft' : 'alert-success alert-soft')}>
@@ -185,32 +188,29 @@ function SubmitForApprovalModal({
           </div>
         ) : null}
         <p className="text-sm text-base-content/80">
-          This changes <span className="font-semibold">{character.name}</span> from {fromLabel} to active (pending) and registers it with
-          the Magiergilde for review.
+          {t('characters.registerBody', { name: character.name, from: fromLabel })}
         </p>
         <p className="text-xs text-base-content/60">
-          The review team checks whether the character can be used in the Magiergilde and may request changes if something is missing or needs
-          clarification.
+          {t('characters.registerReviewHint')}
         </p>
         <TextArea
           value={registrationNote}
           onChange={(event) => setRegistrationNote(event.target.value)}
-          placeholder="Add review-relevant info, for example rare language choices, filler-character notes, or anything the Magiergilde should know..."
+          placeholder={t('characters.registrationNotesHint')}
         >
-          Registration notes (optional)
+          {t('characters.registrationNotes')}
         </TextArea>
         <p className="text-xs text-base-content/60">
-          Use this for anything the review team should know when checking the character, for example rare language choices, filler characters,
-          or special rulings.
+          {t('characters.registrationNotesHint')}
         </p>
         <p className="mt-2 text-xs text-base-content/60">
-          After Magiergilde review, you cannot switch approved or declined characters back by yourself.
+          {t('characters.registerFinalHint')}
         </p>
       </ModalContent>
       <ModalAction
         onClick={() => onSubmit(registrationNote.trim(), {
           onSuccess: () => {
-            setLocalNotice({ tone: 'success', message: 'Character registered for review.' })
+            setLocalNotice({ tone: 'success', message: t('characters.registeredSuccess') })
             setIsOpen(false)
           },
           onError: (message) => {
@@ -219,27 +219,27 @@ function SubmitForApprovalModal({
         })}
         disabled={processing}
       >
-        Register character
+        {t('characters.registerWithMagiergilde')}
       </ModalAction>
     </Modal>
   )
 }
 
-function getCharacterStatusHint(guildStatus: string): string {
+function getCharacterStatusHint(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (guildStatus === 'draft') {
-    return 'Private draft. Register it with Magiergilde when it is ready for review.'
+    return t('characters.statusDraftHint')
   }
 
   if (guildStatus === 'pending') {
-    return 'Submitted for review. Waiting for Magiergilde.'
+    return t('characters.statusPendingHint')
   }
 
   if (guildStatus === 'needs_changes') {
-    return 'Changes requested. Update the character and register it again.'
+    return t('characters.statusNeedsChangesHint')
   }
 
   if (guildStatus === 'declined') {
-    return 'Review declined. Check the review note before trying again.'
+    return t('characters.statusDeclinedHint')
   }
 
   return ''
@@ -260,6 +260,7 @@ export function CharacterCard({
   onAvatarMaskedChange?: (value: boolean) => void
   isAvatarMaskedUpdating?: boolean
 }) {
+  const t = useTranslate()
   const { features } = usePage<PageProps>().props
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
@@ -315,19 +316,19 @@ export function CharacterCard({
           ? 'text-base-content/60'
           : 'text-warning'
   const statusTooltip = guildStatus === 'draft'
-    ? 'Private draft. This character is not registered with the Magiergilde yet.'
+    ? t('characters.statusDraftHint')
     : guildStatus === 'declined'
       ? reviewNote
-        ? `Declined by the Magiergilde. Note: ${reviewNote}`
-        : 'Declined by the Magiergilde.'
+        ? `${t('characters.statusDeclinedHint')} ${t('common.note')}: ${reviewNote}`
+        : t('characters.statusDeclinedHint')
     : guildStatus === 'needs_changes'
       ? reviewNote
-        ? `Changes requested by the Magiergilde. Note: ${reviewNote}`
-        : 'Changes requested by the Magiergilde. Update and register again for review.'
+        ? `${t('characters.statusNeedsChangesHint')} ${t('common.note')}: ${reviewNote}`
+        : t('characters.statusNeedsChangesHint')
     : guildStatus === 'pending'
-      ? 'Submitted to the Magiergilde. Waiting for review.'
-      : `Status: ${statusLabel}`
-  const statusHint = getCharacterStatusHint(guildStatus)
+      ? t('characters.statusPendingHint')
+      : statusLabel
+  const statusHint = getCharacterStatusHint(guildStatus, t)
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
@@ -340,7 +341,7 @@ export function CharacterCard({
   const remainingDowntimeGoldLabel = Number.isInteger(remainingDowntimeGold)
     ? remainingDowntimeGold.toString()
     : remainingDowntimeGold.toFixed(1).replace(/\.0$/, '')
-  const remainingDowntimeTooltip = `Potential earnings: ${remainingDowntimeGoldLabel} Gold (15 Gold / hour)`
+  const remainingDowntimeTooltip = t('characters.potentialEarnings', { amount: remainingDowntimeGoldLabel })
   const formattedDowntimes = {
     total: secondsToHourMinuteString(totalDowntimeSeconds),
     faction: secondsToHourMinuteString(factionDowntimeSeconds),
@@ -350,10 +351,10 @@ export function CharacterCard({
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
   const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
   const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
-  const downtimeDisabledReason = 'Downtime cannot be calculated correctly after simple mode auto-level adventures.'
-  const submissionRequiredReason = 'Register with the Magiergilde first.'
-  const adventuresCountWarningReason = 'Simple mode auto-level entries exist. Played adventures count is not reliable.'
-  const factionLevelWarningReason = 'Simple mode auto-level entries exist. Faction level is not reliable.'
+  const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
+  const submissionRequiredReason = t('characters.submissionRequired')
+  const adventuresCountWarningReason = t('characters.adventuresSimpleModeBlocked')
+  const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
 
   const submitForApproval = (
     registrationNote: string,
@@ -380,7 +381,7 @@ export function CharacterCard({
             errors.registration_note
             ?? errors.guild_status
             ?? errors.character
-            ?? 'Character could not be registered. Check the form and try again.',
+            ?? t('characters.registerErrorFallback'),
           )
           callbacks.onError(message)
         },
@@ -409,8 +410,8 @@ export function CharacterCard({
               className="flex"
               size="xs"
               modifier="square"
-              aria-label="Reorder character"
-              title="Reorder character"
+              aria-label={t('characters.reorderCharacter')}
+              title={t('characters.reorderCharacter')}
               {...attributes}
               {...listeners}
             >
@@ -421,8 +422,8 @@ export function CharacterCard({
                 className="flex"
                 size="xs"
                 modifier="square"
-                aria-label="Edit character"
-                title="Edit character"
+                aria-label={t('characters.editCharacter')}
+                title={t('characters.editCharacter')}
               >
                 <Pencil size={14} />
               </Button>
@@ -433,8 +434,8 @@ export function CharacterCard({
                 size="xs"
                 modifier="square"
                 color="error"
-                aria-label="Delete character"
-                title="Delete character"
+                aria-label={t('characters.deleteCharacter')}
+                title={t('characters.deleteCharacter')}
               >
                 <XCircle size={14} />
               </Button>
@@ -450,7 +451,7 @@ export function CharacterCard({
             </span>
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
             {hasRoom ? (
-              <span className="shrink-0 text-primary/70" title="Room assigned">
+              <span className="shrink-0 text-primary/70" title={t('characters.roomAssigned')}>
                 <MapPin size={14} />
               </span>
             ) : null}
@@ -477,12 +478,12 @@ export function CharacterCard({
                 triggerClassName="w-full justify-center"
               />
               <UpdateCharacterModal character={character}>
-                <Button size="sm" variant="outline" className="w-full justify-center" aria-label="Edit character" title="Edit character">
+                <Button size="sm" variant="outline" className="w-full justify-center" aria-label={t('characters.editCharacter')} title={t('characters.editCharacter')}>
                   <Pencil size={14} />
                 </Button>
               </UpdateCharacterModal>
               <DestroyCharacterModal character={character}>
-                <Button size="sm" variant="outline" color="error" className="w-full justify-center" aria-label="Delete character" title="Delete character">
+                <Button size="sm" variant="outline" color="error" className="w-full justify-center" aria-label={t('characters.deleteCharacter')} title={t('characters.deleteCharacter')}>
                   <XCircle size={14} />
                 </Button>
               </DestroyCharacterModal>
@@ -493,14 +494,14 @@ export function CharacterCard({
                 {!simplifiedTracking ? (
                   <>
                     <Progress value={progressValue} max={progressMax} />
-                    <div className="flex items-center justify-end text-xs">
-                      {isBubbleOverspent ? (
-                        <span className="text-error/80">Overspent bubbles</span>
+                      <div className="flex items-center justify-end text-xs">
+                        {isBubbleOverspent ? (
+                        <span className="text-error/80">{t('characters.overspentBubbles')}</span>
                       ) : (
                         <>
                           <span>{bubblesToNextLevel}</span>
                           <Droplets size={13} />
-                          <span> to next level</span>
+                          <span> {t('characters.toNextLevel')}</span>
                         </>
                       )}
                     </div>
@@ -509,10 +510,10 @@ export function CharacterCard({
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   <InfoBox>
                     <InfoBoxTitle>
-                      <Swords size={15} /> Adventures
+                      <Swords size={15} /> {t('characters.adventures')}
                     </InfoBoxTitle>
                     <InfoBoxLine>
-                      Played:{' '}
+                      {t('characters.played')}:{' '}
                       {downtimeDisabledInSimpleMode ? (
                         <span className="tooltip tooltip-warning tooltip-bottom" data-tip={adventuresCountWarningReason} aria-label={adventuresCountWarningReason}>
                           <span className="cursor-help font-semibold text-warning">?</span>
@@ -522,20 +523,20 @@ export function CharacterCard({
                       )}
                     </InfoBoxLine>
                     <InfoBoxLine>
-                      Started in: <LogoTier width={13} tier={character.start_tier} />
+                      {t('characters.startedIn')}: <LogoTier width={13} tier={character.start_tier} />
                     </InfoBoxLine>
                     <InfoBoxLine>
-                      Bubble Shop: {character.bubble_shop_spend}
+                      {t('characters.bubbleShop')}: {character.bubble_shop_spend}
                       <Droplets size={13} />
                     </InfoBoxLine>
                   </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
-                      <Anvil size={15} /> Factions
+                      <Anvil size={15} /> {t('characters.factions')}
                     </InfoBoxTitle>
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
                     <InfoBoxLine>
-                      Level:{' '}
+                      {t('characters.levelLabel')}:{' '}
                       {downtimeDisabledInSimpleMode ? (
                         <span className="tooltip tooltip-warning tooltip-bottom" data-tip={factionLevelWarningReason} aria-label={factionLevelWarningReason}>
                           <span className="cursor-help font-semibold text-warning">?</span>
@@ -547,31 +548,31 @@ export function CharacterCard({
                   </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
-                      <FlameKindling size={15} /> Downtime
+                      <FlameKindling size={15} /> {t('characters.downtime')}
                     </InfoBoxTitle>
                     {downtimeDisabledInSimpleMode ? (
-                      <InfoBoxLine className="text-warning">Cannot calculate downtime while simple mode entries exist.</InfoBoxLine>
+                      <InfoBoxLine className="text-warning">{t('characters.cannotCalculateDowntime')}</InfoBoxLine>
                     ) : (
                       <>
-                        <InfoBoxLine>Total: {formattedDowntimes.total}</InfoBoxLine>
+                        <InfoBoxLine>{t('characters.total')}: {formattedDowntimes.total}</InfoBoxLine>
                         <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
-                        <InfoBoxLine>Other: {formattedDowntimes.other}</InfoBoxLine>
+                        <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
                         <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
-                          <InfoBoxLine className="font-semibold cursor-help">Remaining: {formattedDowntimes.remaining}</InfoBoxLine>
+                          <InfoBoxLine className="font-semibold cursor-help">{t('characters.remaining')}: {formattedDowntimes.remaining}</InfoBoxLine>
                         </div>
                       </>
                     )}
                   </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
-                      <Crown size={15} /> Game Master
+                      <Crown size={15} /> {t('characters.gameMaster')}
                     </InfoBoxTitle>
                     <InfoBoxLine>
-                      Bubbles: {character.dm_bubbles}
+                      {t('characters.bubbles')}: {character.dm_bubbles}
                       <Droplets size={13} />
                     </InfoBoxLine>
                     <InfoBoxLine>
-                      Coins: {character.dm_coins}
+                      {t('characters.coins')}: {character.dm_coins}
                       <Coins size={13} />
                     </InfoBoxLine>
                   </InfoBox>
@@ -580,10 +581,10 @@ export function CharacterCard({
             ) : (
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center whitespace-pre-wrap">
-                  <LogoFiller /> Filler character
+                  <LogoFiller /> {t('characters.fillerCharacter')}
                 </div>
                 <div className="mt-1 flex items-center whitespace-pre-wrap">
-                  <Swords size={15} /> Adventures: {character.adventures.length}
+                  <Swords size={15} /> {t('characters.adventures')}: {character.adventures.length}
                 </div>
               </div>
             )}
@@ -599,7 +600,7 @@ export function CharacterCard({
               ) : (
                 <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
                   <BookOpen size={14} />
-                  Details
+                  {t('characters.details')}
                 </Button>
               )}
               {requiresSubmissionBeforeDowntime ? (
@@ -612,10 +613,10 @@ export function CharacterCard({
                     size="sm"
                     className="w-full justify-center gap-1"
                     disabled
-                    aria-label={simplifiedTracking ? 'Set level disabled' : 'Add adventure disabled'}
+                    aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
                   >
                     {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
-                    <span className="md:hidden">{simplifiedTracking ? 'Set level' : 'Adventure'}</span>
+                    <span className="md:hidden">{simplifiedTracking ? t('characters.setLevel') : t('characters.adventure')}</span>
                   </Button>
                 </div>
               ) : simplifiedTracking ? (
@@ -633,10 +634,10 @@ export function CharacterCard({
                     size="sm"
                     className="w-full justify-center gap-1"
                     disabled
-                    aria-label="Add downtime disabled"
+                    aria-label={t('characters.addDowntimeDisabled')}
                   >
                     <FlameKindling size={14} />
-                    <span className="md:hidden">Downtime</span>
+                    <span className="md:hidden">{t('characters.downtime')}</span>
                   </Button>
                 </div>
               ) : canLogActivity ? (
@@ -646,10 +647,10 @@ export function CharacterCard({
                       size="sm"
                       className="w-full justify-center gap-1"
                       disabled
-                      aria-label="Add downtime disabled"
+                      aria-label={t('characters.addDowntimeDisabled')}
                     >
                       <FlameKindling size={14} />
-                      <span className="md:hidden">Downtime</span>
+                      <span className="md:hidden">{t('characters.downtime')}</span>
                     </Button>
                   </div>
                 ) : (
@@ -666,10 +667,10 @@ export function CharacterCard({
                     size="sm"
                     className="w-full justify-center gap-1"
                     disabled
-                    aria-label="Manage allies disabled"
+                    aria-label={t('characters.manageAlliesDisabled')}
                   >
                     <BookHeart size={14} />
-                    <span className="md:hidden">Allies</span>
+                    <span className="md:hidden">{t('characters.allies')}</span>
                   </Button>
                 </div>
               ) : (
@@ -680,11 +681,11 @@ export function CharacterCard({
                 size="sm"
                 href={character.external_link}
                 target="_blank"
-                aria-label="Open external link"
-                title="Open external link"
+                aria-label={t('characters.openExternalLink')}
+                title={t('characters.openExternalLink')}
               >
                 <ExternalLink size={14} />
-                <span className="sm:hidden">Link</span>
+                <span className="sm:hidden">{t('characters.link')}</span>
               </Button>
             </div>
           </CardContent>

@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import type { ElementType } from 'react'
 
 export default function Register() {
+  const t = useTranslate()
   const { privacyPolicyVersion, privacyPolicyUpdatedNotice } = usePage<{
     privacyPolicyVersion: number
     privacyPolicyUpdatedNotice: string
@@ -30,7 +32,7 @@ export default function Register() {
       return true
     }
 
-    setError('privacy_policy_accepted', 'Bitte bestaetige die Datenschutzerklaerung.')
+    setError('privacy_policy_accepted', t('auth.privacyConsentRequired'))
     return false
   }
 
@@ -57,7 +59,7 @@ export default function Register() {
 
   return (
     <>
-      <Head title="Register" />
+      <Head title={t('auth.registerTitle')} />
 
       <div className="relative min-h-screen overflow-hidden bg-[#070A12] text-white" data-theme="dark">
         <div className="pointer-events-none absolute inset-0">
@@ -74,13 +76,13 @@ export default function Register() {
                   <img className={cn('h-14 w-14 sm:h-20 sm:w-20')} src="/images/icon_magiergilde_white.svg" alt="Blaue Magiergilde" />
                 </Link>
                 <div>
-                  <h1 className="text-xl leading-tight font-bold sm:text-2xl">Account erstellen</h1>
-                  <p className="text-xs text-white/70 sm:text-sm">Starte mit der Verwaltung deiner Charaktere.</p>
+                  <h1 className="text-xl leading-tight font-bold sm:text-2xl">{t('auth.registerTitle')}</h1>
+                  <p className="text-xs text-white/70 sm:text-sm">{t('auth.registerSubtitle')}</p>
                 </div>
               </div>
 
               <div className="rounded-lg border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning-content sm:p-3">
-                <p className="font-semibold">Datenschutz-Update</p>
+                <p className="font-semibold">{t('auth.privacyUpdatedTitle')}</p>
                 <p className="mt-1 text-white/85">
                   {privacyPolicyUpdatedNotice} (Version {privacyPolicyVersion})
                 </p>
@@ -90,11 +92,11 @@ export default function Register() {
                 onChange={(e) => handlePrivacyAcceptedChange(e.target.checked)}
                 errors={errors.privacy_policy_accepted}
               >
-                Ich habe die{' '}
+                {t('auth.privacyAcceptancePrefix')}{' '}
                 <Link href={route('datenschutz')} className="link text-white" target="_blank">
-                  Datenschutzerklaerung
+                  {t('auth.privacyLinkLabel')}
                 </Link>{' '}
-                gelesen und akzeptiere sie.
+                {t('auth.privacyAcceptanceSuffix')}
               </Checkbox>
 
               <Button
@@ -106,17 +108,17 @@ export default function Register() {
                 className={cn('gap-2 text-sm sm:text-base', buttonOutlineDiscord)}
               >
                 <DiscordIcon width={20} />
-                Neuen Account mit Discord erstellen
+                {t('auth.createWithDiscord')}
               </Button>
               <div className="rounded-lg border border-sky-400/20 bg-sky-400/8 p-3 text-xs text-sky-100/90">
-                <p className="font-semibold text-sky-100">Create a new account with Discord</p>
-                <p className="mt-1">This creates a new app account and links it to your Discord account in one step.</p>
+                <p className="font-semibold text-sky-100">{t('auth.createWithDiscordTitle')}</p>
+                <p className="mt-1">{t('auth.createWithDiscordHint')}</p>
                 <p className="mt-1 text-sky-100/75">
-                  If you already use the website, do not register again. Log in instead and connect Discord in your profile.
+                  {t('auth.createWithDiscordExistingWarning')}
                 </p>
               </div>
 
-              <div className="divider my-0 opacity-60">oder</div>
+              <div className="divider my-0 opacity-60">{t('auth.or')}</div>
 
               <form onSubmit={submit} className="space-y-3 sm:space-y-4">
                 <Input
@@ -125,13 +127,13 @@ export default function Register() {
                   value={data.name}
                   onChange={(e) => setData('name', e.target.value)}
                   errors={errors.name}
-                  placeholder="Dein Nickname (kein Klarname)"
+                  placeholder={t('auth.nicknameHint')}
                 >
-                  Nickname
+                  {t('common.nickName')}
                 </Input>
-                <p className="text-xs text-white/70">Bitte verwende einen Nickname, nicht deinen echten Namen.</p>
-                <Input type="email" autoComplete="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} placeholder="you@example.com">
-                  Email
+                <p className="text-xs text-white/70">{t('auth.nicknameHint')}</p>
+                <Input type="email" autoComplete="email" value={data.email} onChange={(e) => setData('email', e.target.value)} errors={errors.email} placeholder={t('auth.emailPlaceholder')}>
+                  {t('common.email')}
                 </Input>
                 <Input
                   type="password"
@@ -141,7 +143,7 @@ export default function Register() {
                   errors={errors.password}
                   placeholder="********"
                 >
-                  Password
+                  {t('common.password')}
                 </Input>
                 <Input
                   type="password"
@@ -151,7 +153,7 @@ export default function Register() {
                   errors={errors.password_confirmation}
                   placeholder="********"
                 >
-                  Confirm Password
+                  {t('common.confirmPassword')}
                 </Input>
                 <Button
                   type="submit"
@@ -160,19 +162,19 @@ export default function Register() {
                   modifier="block"
                   className={cn('text-sm sm:text-base', buttonOutlineWhite)}
                 >
-                  Register
+                  {t('auth.registerButton')}
                 </Button>
               </form>
 
               <div className="flex flex-col items-center gap-3">
                 <p className="text-center text-sm text-white/80">
-                  Schon registriert?{' '}
+                  {t('auth.alreadyRegistered')}{' '}
                   <Link href={route('login')} className="underline underline-offset-4 text-white/80 transition-colors hover:text-white">
-                    Zum Login
+                    {t('auth.goToLogin')}
                   </Link>
                 </p>
                 <Button as={Link as ElementType} href={route('home')} variant="outline" className={cn('btn-sm', buttonOutlineWhite)}>
-                  Zurück zur Startseite
+                  {t('common.backToHome')}
                 </Button>
               </div>
             </CardBody>

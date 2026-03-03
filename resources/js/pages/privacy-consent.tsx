@@ -2,11 +2,13 @@ import LegalLinks from '@/components/legal-links'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Head, Link, useForm, usePage } from '@inertiajs/react'
 import type { ElementType } from 'react'
 
 export default function PrivacyConsent() {
+  const t = useTranslate()
   const { privacyPolicyVersion, privacyPolicyUpdatedNotice } = usePage<{
     privacyPolicyVersion: number
     privacyPolicyUpdatedNotice: string
@@ -21,7 +23,7 @@ export default function PrivacyConsent() {
       return true
     }
 
-    setError('privacy_policy_accepted', 'Bitte bestaetige die Datenschutzerklaerung.')
+    setError('privacy_policy_accepted', t('auth.privacyConsentRequired'))
     return false
   }
 
@@ -44,7 +46,7 @@ export default function PrivacyConsent() {
 
   return (
     <>
-      <Head title="Datenschutz bestaetigen" />
+      <Head title={t('privacyConsent.pageTitle')} />
 
       <div className="relative min-h-screen overflow-hidden bg-[#070A12] text-white" data-theme="dark">
         <div className="pointer-events-none absolute inset-0">
@@ -57,14 +59,14 @@ export default function PrivacyConsent() {
           <Card className="border border-white/10 bg-white/5 shadow-xl backdrop-blur">
             <CardBody className="space-y-4 p-4 sm:space-y-5 sm:p-8">
               <div className="space-y-2 text-center">
-                <h1 className="text-xl leading-tight font-bold sm:text-2xl">Datenschutz bestaetigen</h1>
+                <h1 className="text-xl leading-tight font-bold sm:text-2xl">{t('privacyConsent.heading')}</h1>
                 <p className="text-xs text-white/80 sm:text-sm">
-                  Die Datenschutzerklaerung wurde geaendert. Bitte bestaetige die aktuelle Version, um fortzufahren.
+                  {t('privacyConsent.body')}
                 </p>
               </div>
 
               <div className="rounded-lg border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning-content sm:p-3">
-                <p className="font-semibold">Aenderungshinweis</p>
+                <p className="font-semibold">{t('privacyConsent.changeNotice')}</p>
                 <p className="mt-1 text-white/85">
                   {privacyPolicyUpdatedNotice} (Version {privacyPolicyVersion})
                 </p>
@@ -76,11 +78,11 @@ export default function PrivacyConsent() {
                   onChange={(e) => handlePrivacyAcceptedChange(e.target.checked)}
                   errors={errors.privacy_policy_accepted}
                 >
-                  Ich habe die{' '}
+                  {t('auth.privacyAcceptancePrefix')}{' '}
                   <Link href={route('datenschutz')} className="link text-white" target="_blank">
-                    Datenschutzerklaerung
+                    {t('auth.privacyLinkLabel')}
                   </Link>{' '}
-                  gelesen und akzeptiere sie.
+                  {t('auth.privacyAcceptanceSuffix')}
                 </Checkbox>
 
                 <Button
@@ -90,7 +92,7 @@ export default function PrivacyConsent() {
                   modifier="block"
                   className={cn('text-sm sm:text-base', buttonOutlineWhite)}
                 >
-                  Datenschutzerklaerung akzeptieren
+                  {t('privacyConsent.acceptButton')}
                 </Button>
               </form>
 
@@ -102,7 +104,7 @@ export default function PrivacyConsent() {
                 modifier="block"
                 className={cn('btn-sm', buttonOutlineWhite)}
               >
-                Abmelden
+                {t('common.logout')}
               </Button>
             </CardBody>
           </Card>

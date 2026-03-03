@@ -23,6 +23,7 @@ class ProfileController extends Controller
             'status' => $request->session()->get('status'),
             'discordConnected' => (bool) $request->user()->discord_id,
             'error' => $request->session()->get('error'),
+            'availableLocales' => ['de', 'en'],
         ]);
     }
 

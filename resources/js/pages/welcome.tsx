@@ -2,6 +2,7 @@ import LegalLinks from '@/components/legal-links'
 import DiscordIcon from '@/components/discord-icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardTitle } from '@/components/ui/card'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Head, Link } from '@inertiajs/react'
 import { BookOpen, CalendarCheck2, Compass, Crown, ScrollText, Sparkles, Users } from 'lucide-react'
@@ -48,7 +49,8 @@ function FeatureCard({
 }
 
 export default function Welcome() {
-  const appLabel = 'Zur App'
+  const t = useTranslate()
+  const appLabel = t('welcome.appLabel')
   const buttonOutlineWhite = 'border-white/15 bg-white/0 text-white hover:bg-white/10 hover:text-white'
   const buttonOutlineDiscord = 'border-sky-400/35 bg-white/0 text-sky-200 hover:bg-sky-400/10 hover:text-sky-100'
 
@@ -70,7 +72,7 @@ export default function Welcome() {
                 <img src="/images/icon_magiergilde_white.svg" className="h-9 w-9" alt="Blaue Magiergilde" />
                 <div className="leading-tight">
                   <div className="text-sm font-semibold">Blaue Magiergilde</div>
-                  <div className="text-xs opacity-70">Offenes D&amp;D-Spielsystem</div>
+                  <div className="text-xs opacity-70">{t('welcome.systemLabel')}</div>
                 </div>
               </div>
 
@@ -93,7 +95,7 @@ export default function Welcome() {
                   rel="noreferrer"
                 >
                   <DiscordIcon width={20} />
-                  Discord beitreten
+                  {t('welcome.joinDiscord')}
                 </Button>
               </div>
             </header>
@@ -102,19 +104,18 @@ export default function Welcome() {
               <div className="space-y-6">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
                   <Sparkles size={14} />
-                  Community-first - Westmarch-artig - Flexibel
+                  {t('welcome.chip')}
                 </div>
 
                 <div className="space-y-3">
                   <h1 className="text-3xl font-extrabold leading-tight sm:text-4xl md:text-6xl">
-                    Spiele D&amp;D, wann du Zeit hast.
+                    {t('welcome.title')}
                     <span className="block bg-gradient-to-r from-sky-300 via-indigo-300 to-purple-300 bg-clip-text text-transparent">
-                      In einer freundlichen Gilde.
+                      {t('welcome.titleAccent')}
                     </span>
                   </h1>
                   <p className="max-w-2xl text-sm text-white/85 sm:text-base md:text-lg">
-                    Die Blaue Magiergilde ist ein offenes Spielsystem, in dem Spieler:innen und Spielleiter:innen gemeinsam magische
-                    Geschichten erleben - ohne Kampagnenzwang, aber mit langfristiger Charakterentwicklung.
+                    {t('welcome.subtitle')}
                   </p>
                 </div>
 
@@ -128,7 +129,7 @@ export default function Welcome() {
                     rel="noreferrer"
                   >
                     <DiscordIcon width={20} />
-                    Discord beitreten
+                    {t('welcome.joinDiscord')}
                   </Button>
                   <Button
                     as={Link as ElementType}
@@ -143,22 +144,22 @@ export default function Welcome() {
 
                 <a href={FAQ_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
                   <BookOpen size={16} />
-                  FAQ öffnen
+                  {t('welcome.openFaq')}
                 </a>
 
                 <div className="flex flex-wrap gap-2 text-xs text-white/75">
-                  <InfoChip>Einsteiger:innen &amp; Erfahrene</InfoChip>
-                  <InfoChip>Respektvolles Miteinander</InfoChip>
-                  <InfoChip>Gemeinsames Setting</InfoChip>
+                  <InfoChip>{t('welcome.beginners')}</InfoChip>
+                  <InfoChip>{t('welcome.respectful')}</InfoChip>
+                  <InfoChip>{t('welcome.sharedSetting')}</InfoChip>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Stat label="Format" value="Offenes Westmarch-System" />
-                  <Stat label="Fokus" value="Community-first & Fair Play" />
-                  <Stat label="Spielstil" value="Oneshots & Runden" />
-                  <Stat label="Progression" value="Charakterentwicklung inklusive" />
+                  <Stat label={t('welcome.format')} value={t('welcome.formatValue')} />
+                  <Stat label={t('welcome.focus')} value={t('welcome.focusValue')} />
+                  <Stat label={t('welcome.playStyle')} value={t('welcome.playStyleValue')} />
+                  <Stat label={t('welcome.progression')} value={t('welcome.progressionValue')} />
                 </div>
 
                 <div
@@ -169,15 +170,13 @@ export default function Welcome() {
                   <div className="relative p-6">
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <Crown size={16} />
-                      Wer wir sind
+                      {t('welcome.whoWeAre')}
                     </div>
                     <p className="mt-2 text-sm text-white/80">
-                      Eine offene Gemeinschaft von Spieler:innen und DMs. Wir setzen auf ein freundliches, respektvolles Miteinander
-                      und darauf, dass jede:r sich in der Runde wohl fühlt.
+                      {t('welcome.whoWeAreBody')}
                     </p>
                     <p className="mt-3 text-xs text-white/65">
-                      Unsere Gilde verbindet viele Spielstile unter einem gemeinsamen Rahmen, damit neue und erfahrene Gruppen
-                      gleichermaßen schnell ins Spiel finden.
+                      {t('welcome.whoWeAreFootnote')}
                     </p>
                   </div>
                 </div>
@@ -190,18 +189,18 @@ export default function Welcome() {
           <div className="grid gap-4 md:grid-cols-3">
             <FeatureCard
               icon={CalendarCheck2}
-              title="Flexibel spielen"
-              body="Runden finden statt, wenn du Zeit hast. Keine langfristigen Verpflichtungen wie bei klassischen Kampagnen."
+              title={t('welcome.featureFlexibleTitle')}
+              body={t('welcome.featureFlexibleBody')}
             />
             <FeatureCard
               icon={Users}
-              title="Für alle Erfahrungsstufen"
-              body="Ob du gerade erst startest oder schon lange spielst: Bei uns findest du passende Runden und Unterstützung."
+              title={t('welcome.featureAllLevelsTitle')}
+              body={t('welcome.featureAllLevelsBody')}
             />
             <FeatureCard
               icon={Compass}
-              title="Leiten willkommen"
-              body="Du willst leiten? Sehr gern. Es gibt einen gemeinsamen Rahmen und Support, damit der Einstieg leicht fällt."
+              title={t('welcome.featureDmsTitle')}
+              body={t('welcome.featureDmsBody')}
             />
           </div>
         </section>
@@ -211,10 +210,9 @@ export default function Welcome() {
             <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
               <Card className="border border-white/10 bg-white/5 shadow-xl">
                 <CardBody className="space-y-3">
-                  <CardTitle className="text-lg">Starte in 2 Klicks</CardTitle>
+                  <CardTitle className="text-lg">{t('welcome.quickStartTitle')}</CardTitle>
                   <p className="text-sm text-white/80">
-                    Der schnellste Einstieg: Discord beitreten und direkt Teil der Community werden. Wenn du die App nutzen willst,
-                    logge dich mit deinem Account ein.
+                    {t('welcome.quickStartBody')}
                   </p>
                   <div className="grid gap-2 sm:flex sm:flex-wrap">
                     <Button
@@ -226,7 +224,7 @@ export default function Welcome() {
                       rel="noreferrer"
                     >
                       <DiscordIcon width={20} />
-                      Discord beitreten
+                      {t('welcome.joinDiscord')}
                     </Button>
                     <Button
                       as={Link as ElementType}
@@ -243,11 +241,11 @@ export default function Welcome() {
 
               <Card className="border border-white/10 bg-white/5 shadow-xl">
                 <CardBody className="space-y-3">
-                  <CardTitle className="text-lg">Was dich erwartet</CardTitle>
+                  <CardTitle className="text-lg">{t('welcome.expectationsTitle')}</CardTitle>
                   <ul className="list-disc space-y-1 pl-5 text-sm text-white/80">
-                    <li>Offenes Spielsystem im gemeinsamen Setting (Faerûn und darüber hinaus).</li>
-                    <li>Community, die Newcomer unterstützt und kreativen Ideen Raum gibt.</li>
-                    <li>Ein klarer Rahmen - aber genug Freiheit für magische Geschichten.</li>
+                    <li>{t('welcome.expectationOne')}</li>
+                    <li>{t('welcome.expectationTwo')}</li>
+                    <li>{t('welcome.expectationThree')}</li>
                   </ul>
                 </CardBody>
               </Card>
