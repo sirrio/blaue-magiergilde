@@ -439,8 +439,8 @@ function buildAdventureStepEmbed(stepKey, state, description, participantsLabel,
         ? t('characters.editAdventureTitle', {}, locale)
         : t('characters.createAdventureTitle', {}, locale);
     const footerText = footerNote
-        ? `Step ${stepNumber}/7 • ${footerNote}`
-        : `Step ${stepNumber}/7`;
+        ? t('characters.stepFooterWithNote', { current: stepNumber, total: 7, note: footerNote }, locale)
+        : t('characters.stepFooter', { current: stepNumber, total: 7 }, locale);
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(0x4f46e5)
@@ -464,19 +464,19 @@ function buildAdventureDurationRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_10800_${characterId}_${ownerDiscordId}`)
-                .setLabel('1 Bubble (3h)')
+                .setLabel(t('characters.bubbleOne', {}, locale))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_21600_${characterId}_${ownerDiscordId}`)
-                .setLabel('2 Bubbles (6h)')
+                .setLabel(t('characters.bubbleTwo', {}, locale))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_32400_${characterId}_${ownerDiscordId}`)
-                .setLabel('3 Bubbles (9h)')
+                .setLabel(t('characters.bubbleThree', {}, locale))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_duration_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Custom duration')
+                .setLabel(t('characters.customDuration', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -499,15 +499,15 @@ function buildAdventureDateRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_date_today_${characterId}_${ownerDiscordId}`)
-                .setLabel('Today')
+                .setLabel(t('characters.today', {}, locale))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_date_yesterday_${characterId}_${ownerDiscordId}`)
-                .setLabel('Yesterday')
+                .setLabel(t('characters.yesterday', {}, locale))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`advCreate_date_custom_${characterId}_${ownerDiscordId}`)
-                .setLabel('Custom date')
+                .setLabel(t('characters.customDate', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -529,7 +529,7 @@ function buildAdventureTitleRows(state) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advCreate_title_edit_${characterId}_${ownerDiscordId}`)
-                .setLabel('Title & GM')
+                .setLabel(t('characters.titleAndGmShort', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ),
     ];
@@ -1216,7 +1216,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
-                .setLabel('Register with Magiergilde')
+                .setLabel(t('characters.registerWithMagiergilde'))
                 .setStyle(ButtonStyle.Success)
                 .setDisabled(!isCharacterStatusSwitchEnabled),
         );
@@ -1225,11 +1225,11 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
-                .setLabel('Adventure')
+                .setLabel(t('characters.adventureShort'))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
-                .setLabel('Downtime')
+                .setLabel(t('characters.downtimeShort'))
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(Boolean(isFiller)),
         );
@@ -1238,14 +1238,14 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_manual_level_${characterId}_${ownerDiscordId}`)
-                .setLabel('Set level')
+                .setLabel(t('characters.setLevelShort'))
                 .setStyle(ButtonStyle.Primary),
         );
     }
     primaryRow.addComponents(
         new ButtonBuilder()
             .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
-            .setLabel('Manage')
+            .setLabel(t('characters.manageShort'))
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
@@ -1258,7 +1258,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
-                .setLabel('Back to list')
+                .setLabel(t('characters.backToList'))
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
@@ -1268,11 +1268,11 @@ function buildCharacterRegisterConfirmRow({ characterId, ownerDiscordId }) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`characterRegisterConfirm_${characterId}_${ownerDiscordId}`)
-            .setLabel('Register with Magiergilde')
+            .setLabel(t('characters.registerWithMagiergilde'))
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`characterRegisterCancel_${characterId}_${ownerDiscordId}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -1280,15 +1280,14 @@ function buildCharacterRegisterConfirmRow({ characterId, ownerDiscordId }) {
 function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
     const name = String(character?.name || `Character ${character?.id || ''}`).trim() || `Character ${character?.id || ''}`;
     const currentStatus = String(character?.guild_status || '').trim().toLowerCase();
-    const fromStatus = currentStatus === 'needs_changes' ? 'needs changes' : 'draft';
+    const locale = character?.locale || null;
+    const descriptionKey = currentStatus === 'needs_changes'
+        ? 'characters.registerConfirmDescriptionNeedsChanges'
+        : 'characters.registerConfirmDescriptionDraft';
     const embed = new EmbedBuilder()
-        .setTitle('Register Character With Magiergilde')
+        .setTitle(t('characters.registerConfirmTitle', {}, locale))
         .setColor(0xf59e0b)
-        .setDescription(
-            `This changes **${name}** from **${fromStatus}** to **active (pending)** and registers it with the Magiergilde for review.\n\n`
-            + 'The review team checks whether the character can be used in the Magiergilde and may request changes if something is missing or needs clarification.\n\n'
-            + 'After Magiergilde review, you cannot switch approved or declined characters back by yourself.',
-        );
+        .setDescription(t(descriptionKey, { name }, locale));
 
     return {
         embeds: [embed],
@@ -1299,15 +1298,15 @@ function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
 function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialNote = '' }) {
     const modal = new ModalBuilder()
         .setCustomId(`characterRegisterNoteModal_${characterId}_${ownerDiscordId}`)
-        .setTitle('Registration notes');
+        .setTitle(t('characters.registrationNotesTitle'));
 
     const noteInput = new TextInputBuilder()
         .setCustomId('registrationNote')
-        .setLabel('Review-relevant notes (optional)')
+        .setLabel(t('characters.registrationNotesLabel'))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setMaxLength(2000)
-        .setPlaceholder('Rare languages, filler character, special rulings, ...')
+        .setPlaceholder(t('characters.registrationNotesPlaceholder'))
         .setValue(safeModalValue(initialNote, 2000));
 
     modal.addComponents(new ActionRowBuilder().addComponents(noteInput));
@@ -1959,18 +1958,18 @@ function buildAdventureEmbed(adventure, title, participants = []) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: formatIsoDate(adventure.start_date), inline: true },
-            { name: 'Duration', value: `${formatDurationSeconds(adventure.duration)}${extra}`, inline: true },
-            { name: 'ID', value: String(adventure.id), inline: true },
+            { name: t('characters.dateField'), value: formatIsoDate(adventure.start_date), inline: true },
+            { name: t('characters.durationField'), value: `${formatDurationSeconds(adventure.duration)}${extra}`, inline: true },
+            { name: t('characters.idField'), value: String(adventure.id), inline: true },
         );
 
     if (participants.length > 0) {
-        embed.addFields({ name: 'Participants', value: formatParticipantList(participants), inline: false });
+        embed.addFields({ name: t('characters.participantsField'), value: formatParticipantList(participants), inline: false });
     }
 
-    if (adventure.title) embed.addFields({ name: 'Title', value: String(adventure.title).slice(0, 1024), inline: false });
-    if (adventure.game_master) embed.addFields({ name: 'GM', value: String(adventure.game_master).slice(0, 1024), inline: false });
-    if (adventure.notes) embed.addFields({ name: 'Notes', value: String(adventure.notes).slice(0, 1024), inline: false });
+    if (adventure.title) embed.addFields({ name: t('characters.titleField'), value: String(adventure.title).slice(0, 1024), inline: false });
+    if (adventure.game_master) embed.addFields({ name: t('characters.gameMasterField'), value: String(adventure.game_master).slice(0, 1024), inline: false });
+    if (adventure.notes) embed.addFields({ name: t('characters.notesField'), value: String(adventure.notes).slice(0, 1024), inline: false });
     return embed;
 }
 
@@ -1979,13 +1978,13 @@ function buildDowntimeEmbed(downtime, title) {
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
-            { name: 'Date', value: formatIsoDate(downtime.start_date), inline: true },
-            { name: 'Duration', value: formatDurationSeconds(downtime.duration), inline: true },
-            { name: 'Type', value: String(downtime.type || 'other'), inline: true },
-            { name: 'ID', value: String(downtime.id), inline: true },
+            { name: t('characters.dateField'), value: formatIsoDate(downtime.start_date), inline: true },
+            { name: t('characters.durationField'), value: formatDurationSeconds(downtime.duration), inline: true },
+            { name: t('characters.typeField'), value: String(downtime.type || 'other'), inline: true },
+            { name: t('characters.idField'), value: String(downtime.id), inline: true },
         );
 
-    if (downtime.notes) embed.addFields({ name: 'Notes', value: String(downtime.notes).slice(0, 1024), inline: false });
+    if (downtime.notes) embed.addFields({ name: t('characters.notesField'), value: String(downtime.notes).slice(0, 1024), inline: false });
     return embed;
 }
 

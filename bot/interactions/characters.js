@@ -1160,7 +1160,7 @@ async function handle(interaction) {
         }
 
         if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1224,7 +1224,7 @@ async function handle(interaction) {
         }
 
         if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1245,7 +1245,7 @@ async function handle(interaction) {
         }
 
         if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1265,7 +1265,7 @@ async function handle(interaction) {
         }
 
         if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1303,7 +1303,7 @@ async function handle(interaction) {
         });
         await interaction.update({
             ...settingsView,
-            content: persistedLocale === 'en' ? 'Language saved.' : 'Sprache gespeichert.',
+            content: t('characters.languageUpdated', { language: persistedLocale === 'en' ? 'English' : 'Deutsch' }, persistedLocale),
         });
         return true;
     }
@@ -1317,7 +1317,7 @@ async function handle(interaction) {
         }
 
         if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1416,7 +1416,7 @@ async function handle(interaction) {
 
         const selectedId = Number(interaction.values[0]);
         if (!Number.isFinite(selectedId) || selectedId < 1) {
-            await updateManageMessage(interaction, { content: 'Invalid selection.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidSelection'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1432,7 +1432,7 @@ async function handle(interaction) {
         }
 
         if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1452,7 +1452,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1461,11 +1461,11 @@ async function handle(interaction) {
         const notes = interaction.fields.getTextInputValue('createNotes').trim();
 
         if (!name) {
-            await showCreationError(interaction, state, ownerDiscordId, 'Name fehlt.');
+            await showCreationError(interaction, state, ownerDiscordId, t('characters.createNameMissing', {}, state.locale));
             return true;
         }
         if (!isExternalCharacterLink(externalLink)) {
-            await showCreationError(interaction, state, ownerDiscordId, 'Bitte nutze einen DnDBeyond-Charakterlink (https://www.dndbeyond.com/characters/...).');
+            await showCreationError(interaction, state, ownerDiscordId, t('characters.createInvalidLink', {}, state.locale));
             return true;
         }
 
@@ -1535,7 +1535,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1546,7 +1546,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
+                buildCreationEmbed(3, t('characters.createClassesTitle', {}, state.locale), t('characters.createClassesDescription', {}, state.locale)),
             ],
             components: [
                 buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1566,7 +1566,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1583,7 +1583,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
+                buildCreationEmbed(4, t('characters.createTierTitle', {}, state.locale), t('characters.createTierDescription', {}, state.locale)),
             ],
             components: [
                 buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1603,7 +1603,7 @@ async function handle(interaction) {
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1613,7 +1613,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
+                buildCreationEmbed(5, t('characters.createFactionTitle', {}, state.locale), t('characters.createFactionDescription', {}, state.locale)),
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
@@ -2068,7 +2068,7 @@ async function handle(interaction) {
 
         const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { faction });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2242,12 +2242,12 @@ async function handle(interaction) {
         }
 
         if (!character.simplified_tracking) {
-            await updateManageMessage(interaction, { content: 'Set level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.setLevelOnlySimplified'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!canCharacterLogActivity(character)) {
-            await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFirst'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2255,7 +2255,7 @@ async function handle(interaction) {
         const parsedLevel = Number(rawLevel);
         const level = Number.isFinite(parsedLevel) ? Math.floor(parsedLevel) : NaN;
         if (!Number.isFinite(level) || level < 1 || level > 20) {
-            await updateManageMessage(interaction, { content: 'Please enter a level between 1 and 20.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.levelBetweenOneAndTwenty'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2263,18 +2263,18 @@ async function handle(interaction) {
         if (!result.ok) {
             if (result.reason === 'below_real' && result.minLevel) {
                 await updateManageMessage(interaction, {
-                    content: `Level cannot be set below ${result.minLevel} based on recorded adventures.`,
+                    content: await translateInteraction(interaction, 'characters.levelCannotBeBelowReal', { level: result.minLevel }),
                     flags: MessageFlags.Ephemeral,
                 });
                 return true;
             }
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const refreshed = await findCharacterForDiscord(interaction.user, characterId);
         if (!refreshed) {
-            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterUpdated'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2298,13 +2298,13 @@ async function handle(interaction) {
         }
 
         if (!isCharacterStatusSwitchEnabled) {
-            await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registrationDisabled'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2324,13 +2324,13 @@ async function handle(interaction) {
             registrationNote,
         });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFailed'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const refreshed = await findCharacterForDiscord(interaction.user, characterId);
         if (!refreshed) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2345,7 +2345,7 @@ async function handle(interaction) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidCharacterId'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2365,7 +2365,7 @@ async function handle(interaction) {
             throw error;
         }
         if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2379,7 +2379,7 @@ async function handle(interaction) {
 
         if (action === 'del') {
             await interaction.update({
-                content: 'Delete character?',
+                content: await translateInteraction(interaction, 'characters.deleteCharacterPrompt'),
                 components: [buildDeleteConfirmRow({ characterId: character.id, ownerDiscordId })],
             });
             return true;
@@ -2387,7 +2387,7 @@ async function handle(interaction) {
 
         if (action === 'register') {
             if (!isCharacterStatusSwitchEnabled) {
-                await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registrationDisabled'), flags: MessageFlags.Ephemeral });
                 return true;
             }
 
@@ -2409,7 +2409,7 @@ async function handle(interaction) {
 
         if (action === 'adv') {
             if (!canCharacterLogActivity(character)) {
-                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFirst'), flags: MessageFlags.Ephemeral });
                 return true;
             }
             const row = buildAdventureMenuRow(character, ownerDiscordId, await resolveInteractionLocale(interaction));
@@ -2419,7 +2419,7 @@ async function handle(interaction) {
 
         if (action === 'dt') {
             if (!canCharacterLogActivity(character)) {
-                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFirst'), flags: MessageFlags.Ephemeral });
                 return true;
             }
             const row = buildDowntimeMenuRow(character, ownerDiscordId, await resolveInteractionLocale(interaction));
@@ -3854,7 +3854,7 @@ async function handle(interaction) {
             return null;
         })();
         if (!normalizedTypee) {
-            await updateManageMessage(interaction, { content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidType'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3863,11 +3863,11 @@ async function handle(interaction) {
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
         if (duration === null) {
-            await updateManageMessage(interaction, { content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidDuration'), flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
-            await updateManageMessage(interaction, { content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidDate'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3881,13 +3881,13 @@ async function handle(interaction) {
             });
 
             if (!result.ok) {
-                await updateManageMessage(interaction, { content: 'Downtime could not be saved.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeSaveFailed'), flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const downtime = await findDowntimeForDiscord(interaction.user, result.id);
             if (!downtime) {
-                await updateManageMessage(interaction, { content: 'Downtime saved.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeSaved'), flags: MessageFlags.Ephemeral });
                 return true;
             }
 
@@ -3904,7 +3904,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await updateManageMessage(interaction, { content: 'Failed to save downtime.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeSaveFailed'), flags: MessageFlags.Ephemeral });
         }
         return true;
     }
