@@ -1,5 +1,6 @@
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { calculateLevel } from '@/helper/calculateLevel'
+import { useTranslate } from '@/lib/i18n'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,7 @@ const additionalBubblesForStartTier = (startTier?: Character['start_tier']): num
 }
 
 const SetCharacterLevelModal = ({ character }: { character: Character }) => {
+  const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const initialLevel = clampLevel(calculateLevel(character))
   const { data, setData, post, processing } = useForm({ level: initialLevel })
@@ -66,7 +68,7 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
       - Number(character.bubble_shop_spend ?? 0),
   )
   const minSelectableLevel = character.is_filler ? MIN_LEVEL : minAllowedLevel
-  const levelRestrictionReason = `Cannot set below level ${minSelectableLevel} due to non-simplified adventure progress.`
+  const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
 
   useEffect(() => {
     if (!isOpen) {
@@ -97,22 +99,22 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="sm" className="w-full justify-center gap-1" aria-label="Set level" title="Set level" onClick={() => setIsOpen(true)}>
+        <Button size="sm" className="w-full justify-center gap-1" aria-label={t('characters.setLevel')} title={t('characters.setLevel')} onClick={() => setIsOpen(true)}>
           <Gauge size={14} />
-          <span className="md:hidden">Set level</span>
+          <span className="md:hidden">{t('characters.setLevel')}</span>
         </Button>
       </ModalTrigger>
       <ModalTitle>
         <span className="inline-flex items-center gap-2">
           <Gauge size={16} />
-          Set level
+          {t('characters.setLevelTitle')}
         </span>
       </ModalTitle>
       <ModalContent>
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">Current: {initialLevel}</span>
-            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1 text-primary">Target: {targetLevel}</span>
+            <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">{t('characters.currentLevel', { level: initialLevel })}</span>
+            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1 text-primary">{t('characters.targetLevel', { level: targetLevel })}</span>
             {hasChanges ? (
               <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">
                 {levelDelta > 0 ? '+' : ''}
@@ -120,12 +122,12 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
               </span>
             ) : null}
             {!character.is_filler ? (
-              <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">Min allowed: {minSelectableLevel}</span>
+              <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">{t('characters.minAllowedLevel', { level: minSelectableLevel })}</span>
             ) : null}
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-base-content/50">Select level</p>
+            <p className="text-xs uppercase tracking-wide text-base-content/50">{t('characters.selectLevel')}</p>
             <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
               {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((level) => {
                 const isDisabled = processing || level < minSelectableLevel
@@ -155,8 +157,8 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
                       onMouseEnter={() => setHoveredLevel(level)}
                       onMouseLeave={() => setHoveredLevel(null)}
                       disabled={isDisabled}
-                      aria-label={`Set level ${level}`}
-                      title={isDisabled ? levelRestrictionReason : `Set level ${level}`}
+                      aria-label={t('characters.setLevelAria', { level })}
+                      title={isDisabled ? levelRestrictionReason : t('characters.setLevelAria', { level })}
                     >
                       {level}
                     </Button>
@@ -168,12 +170,12 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
           {errors.level ? <p className="text-xs text-error">{errors.level}</p> : null}
 
           <div className="rounded-box border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
-            Applies simplified-level adjustment. Adventure-based tracking values may become unreliable.
+            {t('characters.applyLevelHint')}
           </div>
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing || !hasChanges}>
-        Apply level
+        {t('characters.applyLevel')}
       </ModalAction>
     </Modal>
   )

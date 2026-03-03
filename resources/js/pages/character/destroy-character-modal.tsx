@@ -1,11 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { useTranslate } from '@/lib/i18n'
 import { Character } from '@/types'
 import { router } from '@inertiajs/react'
 import { Trash } from 'lucide-react'
 import React from 'react'
 
 const DestroyCharacterModal = ({ character, children }: { character: Character; children?: React.ReactNode }) => {
+  const t = useTranslate()
+
   const handleFormSubmit = () => {
     router.delete(route('characters.destroy', character.id), { preserveState: 'errors' })
   }
@@ -19,19 +22,19 @@ const DestroyCharacterModal = ({ character, children }: { character: Character; 
             size="xs"
             modifier="square"
             color="error"
-            aria-label="Delete character"
-            title="Delete character"
+            aria-label={t('characters.deleteCharacter')}
+            title={t('characters.deleteCharacter')}
           >
             <Trash size={14} />
           </Button>
         )}
       </ModalTrigger>
-      <ModalTitle>Delete</ModalTitle>
+      <ModalTitle>{t('characters.deleteModalTitle')}</ModalTitle>
       <ModalContent>
-        <p>Your character "{character.name}" will be deleted. Are you sure?</p>
+        <p>{t('characters.deleteModalBody', { name: character.name })}</p>
       </ModalContent>
       <ModalAction variant={'error'} onClick={handleFormSubmit}>
-        Delete
+        {t('common.delete')}
       </ModalAction>
     </Modal>
   )

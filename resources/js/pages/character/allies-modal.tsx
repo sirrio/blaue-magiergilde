@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
+import { useTranslate } from '@/lib/i18n'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
 import { BookHeart, ChevronDown, ChevronUp, Heart, Link2, PlusCircle, User, UserPlus } from 'lucide-react'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -35,6 +36,7 @@ const RatingHearts = ({
   rating: number
   onSelect?: (value: number) => void
 }) => {
+  const t = useTranslate()
   const normalized = Math.max(1, Math.min(5, rating || 3))
   return (
     <div className="flex items-center gap-1">
@@ -52,7 +54,7 @@ const RatingHearts = ({
             type="button"
             className="transition hover:scale-105"
             onClick={() => onSelect(value)}
-            aria-label={`Set rating to ${value}`}
+            aria-label={t('characters.allySetRating', { value })}
           >
             {icon}
           </button>
@@ -123,6 +125,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
   onRemove,
   large = false,
 }) => {
+  const t = useTranslate()
   const [editData, setEditData] = useState<Ally>(() => normalizeAlly(ally))
   const [avatarSrc, setAvatarSrc] = useState('')
   const [editAvatarSrc, setEditAvatarSrc] = useState('')
@@ -208,15 +211,15 @@ const AllyCard: React.FC<AllyCardProps> = ({
               </h4>
               <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
                 {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
-                {ally.linked_character_id ? 'Linked' : 'Custom'}
+                {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
               </span>
             </div>
             <p className="text-base-content text-xs">
-              {ally.classes && ally.classes.trim() !== '' ? ally.classes : 'No classes'} &bull;{' '}
-              {ally.species && ally.species.trim() !== '' ? ally.species : 'No species'}
+              {ally.classes && ally.classes.trim() !== '' ? ally.classes : t('characters.allyNoClasses')} &bull;{' '}
+              {ally.species && ally.species.trim() !== '' ? ally.species : t('characters.allyNoSpecies')}
             </p>
             {ownerName ? (
-              <p className="text-xs text-base-content/50">Owner: {ownerName}</p>
+              <p className="text-xs text-base-content/50">{t('characters.owner')}: {ownerName}</p>
             ) : null}
             <RatingHearts rating={ally.rating} />
           </div>
@@ -247,7 +250,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
         </Input>
       </div>
       <div className="mb-1">
-        <label className="label">Linked guild member</label>
+        <label className="label">{t('characters.allyLinkedGuildMember')}</label>
         <select
           value={editData.linked_character_id ?? ''}
           onChange={(e) => {
@@ -265,7 +268,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
           }}
           className="input input-bordered input-sm mb-2 w-full md:input-xs"
         >
-          <option value="">Custom ally (no link)</option>
+          <option value="">{t('characters.allyCustomNoLink')}</option>
           {linkedOptions.map((character) => (
             <option key={character.id} value={character.id}>
               {character.name}
@@ -309,37 +312,37 @@ const AllyCard: React.FC<AllyCardProps> = ({
       <Input
         type="text"
         value={editData.species ?? ''}
-        placeholder="Species"
+        placeholder={t('characters.allySpecies')}
         onChange={(e) => handleChange('species', e.target.value)}
         className="mb-1"
       >
-        Species
+        {t('characters.allySpecies')}
       </Input>
       <div className="mb-1">
         <TextArea
           value={editData.notes ?? ''}
-          placeholder="Notes"
+          placeholder={t('characters.notesLabel')}
           onChange={(e) => handleChange('notes', e.target.value)}
         >
-          Notes
+          {t('characters.notesLabel')}
         </TextArea>
       </div>
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
-        Avatar
+        {t('characters.allyAvatar')}
       </FileInput>
       <div className="mb-2">
-        <label className="label">Rating</label>
+        <label className="label">{t('characters.allyRating')}</label>
         <RatingHearts rating={editData.rating} onSelect={(value) => handleChange('rating', value as Ally['rating'])} />
       </div>
       <div className="flex gap-2">
         <Button size="xs" onClick={() => onSave(editData)}>
-          Save
+          {t('common.save')}
         </Button>
         <Button size="xs" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button className={'ml-auto'} size="xs" color="error" onClick={() => onRemove(ally)}>
-          Remove
+          {t('common.remove')}
         </Button>
       </div>
     </div>
@@ -353,6 +356,7 @@ interface AllyRowProps {
 }
 
 const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
+  const t = useTranslate()
   const [avatarSrc, setAvatarSrc] = useState('')
   useEffect(() => {
     const avatar = getAllyAvatarSrc(ally)
@@ -386,18 +390,18 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
             {displayName}
           </p>
           <p className="truncate text-xs text-base-content/60">
-            {ally.classes && ally.classes.trim() !== '' ? ally.classes : 'No classes'} •{' '}
-            {ally.species && ally.species.trim() !== '' ? ally.species : 'No species'}
+            {ally.classes && ally.classes.trim() !== '' ? ally.classes : t('characters.allyNoClasses')} •{' '}
+            {ally.species && ally.species.trim() !== '' ? ally.species : t('characters.allyNoSpecies')}
           </p>
           {ownerName ? (
-            <p className="truncate text-xs text-base-content/50">Owner: {ownerName}</p>
+            <p className="truncate text-xs text-base-content/50">{t('characters.owner')}: {ownerName}</p>
           ) : null}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1">
         <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
           {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
-          {ally.linked_character_id ? 'Linked' : 'Custom'}
+          {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
         </span>
         <RatingHearts rating={ally.rating} />
       </div>
@@ -424,6 +428,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
   onCancel,
   onEdit,
 }) => {
+  const t = useTranslate()
   const [editData, setEditData] = useState<Ally>({
     character_id: ownerCharacterId,
     id: 0,
@@ -454,7 +459,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
         onClick={onEdit}
       >
         <PlusCircle size={24} className="mx-auto" />
-        <p className="mt-2 text-sm">Add Ally</p>
+        <p className="mt-2 text-sm">{t('characters.allyAdd')}</p>
       </div>
     )
   }
@@ -470,7 +475,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
         Name
       </Input>
       <div className="mb-1">
-        <label className="label">Linked guild member</label>
+        <label className="label">{t('characters.allyLinkedGuildMember')}</label>
         <select
           value={editData.linked_character_id ?? ''}
           onChange={(e) => {
@@ -488,7 +493,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
           }}
           className="input input-bordered input-sm mb-2 w-full md:input-xs"
         >
-          <option value="">Custom ally (no link)</option>
+          <option value="">{t('characters.allyCustomNoLink')}</option>
           {linkedOptions.map((character) => (
             <option key={character.id} value={character.id}>
               {character.name}
@@ -532,34 +537,34 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
       <Input
         type="text"
         value={editData.species ?? ''}
-        placeholder="Species"
+        placeholder={t('characters.allySpecies')}
         onChange={(e) => handleChange('species', e.target.value)}
         className="mb-1"
       >
-        Species
+        {t('characters.allySpecies')}
       </Input>
       <div className="mb-1">
         <TextArea
           value={editData.notes ?? ''}
-          placeholder="Notes"
+          placeholder={t('characters.notesLabel')}
           onChange={(e) => handleChange('notes', e.target.value)}
         >
-          Notes
+          {t('characters.notesLabel')}
         </TextArea>
       </div>
       <FileInput onChange={(e) => handleChange('avatar', e.target.files?.[0] as never)}>
-        Avatar
+        {t('characters.allyAvatar')}
       </FileInput>
       <div className="mb-2">
-        <label className="label">Rating</label>
+        <label className="label">{t('characters.allyRating')}</label>
         <RatingHearts rating={editData.rating} onSelect={(value) => handleChange('rating', value as Ally['rating'])} />
       </div>
       <div className="flex gap-2">
         <Button size="xs" onClick={() => onSave(editData)}>
-          Save
+          {t('common.save')}
         </Button>
         <Button size="xs" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>
@@ -567,6 +572,7 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
 }
 
 export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharacters = [] }) => {
+  const t = useTranslate()
   const [allies, setAllies] = useState<Ally[]>(character.allies)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [search, setSearch] = useState('')
@@ -588,7 +594,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       return
     }
 
-    setLocalNotice({ tone: 'error', message: 'Ally could not be saved. Check the highlighted fields and try again.' })
+    setLocalNotice({ tone: 'error', message: t('characters.allySaveError') })
   }
 
   const handleSave = (ally: Ally) => {
@@ -609,7 +615,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       router.post(route('allies.store'), payload, {
         preserveScroll: true,
         onSuccess: () => {
-          setLocalNotice({ tone: 'success', message: 'Ally saved.' })
+          setLocalNotice({ tone: 'success', message: t('characters.allySaveSuccess') })
           setEditingId(null)
         },
         onError: (errors) => {
@@ -620,7 +626,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
       router.post(route('allies.update', ally.id), payload, {
         preserveScroll: true,
         onSuccess: () => {
-          setLocalNotice({ tone: 'success', message: 'Ally saved.' })
+          setLocalNotice({ tone: 'success', message: t('characters.allySaveSuccess') })
           setEditingId(null)
         },
         onError: (errors) => {
@@ -635,16 +641,16 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   }
   const handleRemove = (ally: Ally) => {
     const label = getAllyDisplayName(ally)
-    if (window.confirm(`Are you sure you want to remove ${label}?`)) {
+    if (window.confirm(t('characters.allyRemoveConfirm', { name: label }))) {
       setLocalNotice(null)
       router.delete(route('allies.destroy', ally.id), {
         preserveScroll: true,
         onSuccess: () => {
-          setLocalNotice({ tone: 'success', message: 'Ally removed.' })
+          setLocalNotice({ tone: 'success', message: t('characters.allyRemoveSuccess') })
           setEditingId(null)
         },
         onError: () => {
-          setLocalNotice({ tone: 'error', message: 'Ally could not be removed. Try again in a moment.' })
+          setLocalNotice({ tone: 'error', message: t('characters.allyRemoveError') })
         },
       })
     }
@@ -729,12 +735,12 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   return (
     <Modal wide>
       <ModalTrigger>
-        <Button size="sm" className="w-full justify-center gap-1" aria-label="Manage allies" title="Manage allies">
+        <Button size="sm" className="w-full justify-center gap-1" aria-label={t('characters.manageAllies')} title={t('characters.manageAllies')}>
           <BookHeart size={14} />
-          <span className="md:hidden">Allies</span>
+          <span className="md:hidden">{t('characters.allies')}</span>
         </Button>
       </ModalTrigger>
-      <ModalTitle>Manage Allies</ModalTitle>
+      <ModalTitle>{t('characters.manageAlliesTitle')}</ModalTitle>
       <ModalContent>
         <div className="space-y-4">
           {localNotice ? (
@@ -746,8 +752,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-base-content/50">Assigned allies</p>
-                <h3 className="text-base font-semibold">{allies.length} total</h3>
+                <p className="text-xs font-semibold uppercase text-base-content/50">{t('characters.allyAssignedTitle')}</p>
+                <h3 className="text-base font-semibold">{t('characters.allyTotal', { count: allies.length })}</h3>
               </div>
             </div>
 
@@ -757,31 +763,33 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search allies"
-                  aria-label="Search allies"
+                  placeholder={t('characters.allySearchPlaceholder')}
+                  aria-label={t('characters.allySearchLabel')}
                   className="flex-1"
                 >
-                  Search allies
+                  {t('characters.allySearchLabel')}
                 </Input>
                 <button
                   type="button"
                   className="btn btn-xs btn-ghost mb-1 shrink-0"
                   onClick={() => setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))}
-                  title="Sort by standing"
+                  title={t('characters.allySortStanding')}
                 >
-                  Standing
+                  {t('characters.standing')}
                   {allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                 </button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-base-content/60">
-                  {search.trim() !== '' ? `${filteredAllies.length} matches` : `${filteredAllies.length} shown`}
+                  {search.trim() !== ''
+                    ? t('characters.allyMatches', { count: filteredAllies.length })
+                    : t('characters.allyShown', { count: filteredAllies.length })}
                 </span>
               </div>
               <div className="rounded-lg border border-base-200 bg-base-100 p-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase text-base-content/60">Quick add guild member</p>
-                  <span className="text-xs text-base-content/50">{availableGuildMembers.length} available</span>
+                  <p className="text-xs font-semibold uppercase text-base-content/60">{t('characters.allyQuickAddTitle')}</p>
+                  <span className="text-xs text-base-content/50">{t('characters.allyAvailable', { count: availableGuildMembers.length })}</span>
                 </div>
                 {availableGuildMembers.length > 0 ? (
                   <div className="flex items-center gap-2">
@@ -790,7 +798,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                       onChange={(e) => setQuickAddCharacterId(e.target.value)}
                       className="select select-sm select-bordered w-full"
                     >
-                      <option value="">Select guild member</option>
+                      <option value="">{t('characters.allySelectGuildMember')}</option>
                       {availableGuildMembers.map((guildMember) => (
                         <option key={`quick-add-${guildMember.id}`} value={guildMember.id}>
                           {guildMember.name}
@@ -810,11 +818,11 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                       disabled={!selectedQuickAddGuildMember}
                     >
                       <UserPlus size={14} className="mr-1" />
-                      Add
+                      {t('characters.allyAdd')}
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-base-content/60">No guild members available for quick add.</p>
+                  <p className="text-xs text-base-content/60">{t('characters.allyNoGuildMembersAvailable')}</p>
                 )}
               </div>
             </div>
@@ -830,7 +838,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                   />
                 ))
               ) : (
-                <p className="text-xs text-base-content/60">No allies found.</p>
+                <p className="text-xs text-base-content/60">{t('characters.allyNoResults')}</p>
               )}
             </div>
           </div>
@@ -838,14 +846,14 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
           <div className="flex min-h-0 flex-col space-y-4 md:min-h-[520px]">
             <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-semibold uppercase text-base-content/50">Ally details</p>
-                <h3 className="text-base font-semibold">{selectedAlly ? getAllyDisplayName(selectedAlly) : 'Select an ally'}</h3>
+                <p className="text-xs font-semibold uppercase text-base-content/50">{t('characters.allyDetailsTitle')}</p>
+                <h3 className="text-base font-semibold">{selectedAlly ? getAllyDisplayName(selectedAlly) : t('characters.allySelectPrompt')}</h3>
               </div>
               <Button size="sm" className="w-full sm:w-auto" onClick={() => {
                 setLocalNotice(null)
                 setEditingId('new')
               }}>
-                <PlusCircle size={16} className="mr-1" /> Add Ally
+                <PlusCircle size={16} className="mr-1" /> {t('characters.allyAdd')}
               </Button>
             </div>
 
@@ -878,7 +886,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                   <div className="space-y-3">
                     <AllySkeletonCard />
                     <p className="text-center text-xs text-base-content/60">
-                      Select an ally on the left to edit, or add a new ally.
+                      {t('characters.allySelectToEdit')}
                     </p>
                   </div>
                 )}

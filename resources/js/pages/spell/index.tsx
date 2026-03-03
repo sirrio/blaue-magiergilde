@@ -5,6 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
 import SpellRow from '@/pages/spell/spell-row'
 import { Source, Spell } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
@@ -17,6 +18,7 @@ interface FilterOption {
 }
 
 const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
@@ -63,14 +65,14 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="sm" onClick={() => setIsOpen(true)}>
-          <Plus size={14} /> Add spell
+          <Plus size={14} /> {t('compendium.addSpell')}
         </Button>
       </ModalTrigger>
-      <ModalTitle>Add spell</ModalTitle>
+      <ModalTitle>{t('compendium.addSpell')}</ModalTitle>
       <ModalContent>
         <div className="space-y-4">
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.basic')}</p>
             <Input errors={errors.name} placeholder="Fireball" value={data.name} onChange={(e) => setData('name', e.target.value)}>
               Name
             </Input>
@@ -84,7 +86,7 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
               value={data.legacy_url}
               onChange={(e) => setData('legacy_url', e.target.value)}
             >
-              Legacy URL
+              {t('compendium.legacyUrl')}
             </Input>
             <Select
               errors={errors.source_id}
@@ -104,7 +106,7 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.classification')}</p>
             <Input
               errors={errors.spell_level}
               placeholder="3"
@@ -112,7 +114,7 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
               value={data.spell_level}
               onChange={(e) => setData('spell_level', Number(e.target.value))}
             >
-              Spell Level
+              {t('compendium.spellLevel')}
             </Input>
             <Select
               errors={errors.spell_school}
@@ -134,7 +136,7 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.options')}</p>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -144,7 +146,7 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
               />
               <span className="inline-flex items-center gap-2">
                 <Shield className="h-4 w-4 text-base-content/70" />
-                Allowed in guild
+                {t('compendium.allowedInGuild')}
               </span>
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -156,19 +158,19 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
               />
               <span className="inline-flex items-center gap-2">
                 <Scale className={data.ruling_changed ? 'h-4 w-4 text-warning' : 'h-4 w-4 text-base-content/70'} />
-                Ruling changed
+                {t('compendium.rulingChanged')}
               </span>
             </label>
             {data.ruling_changed ? (
-              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
-                Ruling note
+              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder={t('compendium.describeRuling')}>
+                {t('compendium.rulingNote')}
               </TextArea>
             ) : null}
           </div>
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
-        Save
+        {t('common.save')}
       </ModalAction>
     </Modal>
   )
@@ -185,6 +187,7 @@ export default function Index({
   canManage?: boolean
   indexRoute?: string
 }) {
+  const t = useTranslate()
   const spellSchoolFilters: FilterOption[] = [
     { label: 'Abjuration', value: 'abjuration' },
     { label: 'Conjuration', value: 'conjuration' },
@@ -285,15 +288,15 @@ export default function Index({
   const totalSpells = spells?.length ?? 0
   return (
     <AppLayout>
-      <Head title="Spells" />
+      <Head title={t('compendium.spellsTitle')} />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">Spells</h1>
+            <h1 className="text-2xl font-bold">{t('compendium.spellsTitle')}</h1>
             <p className="text-sm text-base-content/70">
               {canManage
-                ? 'Search the spell list by school or level.'
-                : 'Browse the compendium and suggest spell updates for review.'}
+                ? t('compendium.browseSpellsAdmin')
+                : t('compendium.browseSpellsPublic')}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -303,14 +306,14 @@ export default function Index({
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-xs uppercase text-base-content/50">Filters</p>
-              <h2 className="text-lg font-semibold">Spell filters</h2>
-              <p className="text-xs text-base-content/70">Narrow down by status, school, or level.</p>
+              <p className="text-xs uppercase text-base-content/50">{t('compendium.filters')}</p>
+              <h2 className="text-lg font-semibold">{t('compendium.spellFilters')}</h2>
+              <p className="text-xs text-base-content/70">{t('compendium.refineSpells')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">{totalSpells} spells</span>
               {activeFilters.length === 0 ? (
-                <span className="text-base-content/50">No filters</span>
+                <span className="text-base-content/50">{t('compendium.noFilters')}</span>
               ) : (
                 activeFilters.map((filter) => (
                   <span key={filter} className="rounded-full border border-base-200 px-2 py-1">
@@ -321,24 +324,24 @@ export default function Index({
             </div>
           </div>
           <div className="mt-3">
-            <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>
-              Search
+            <Input type="search" placeholder={t('compendium.searchByName')} value={search} onChange={handleSearch}>
+              {t('common.search')}
             </Input>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">School:</span>
+                <span className="text-base-content/60">{t('compendium.school')}:</span>
                 {renderFilterOptions('spell_school', spellSchoolFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Level:</span>
+                <span className="text-base-content/60">{t('compendium.level')}:</span>
                 {renderFilterOptions('spell_level', spellLevelFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Guild:</span>
+                <span className="text-base-content/60">{t('compendium.guild')}:</span>
                 {renderFilterOptions('guild', guildFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Ruling:</span>
+                <span className="text-base-content/60">{t('compendium.ruling')}:</span>
                 {renderFilterOptions('ruling', rulingFilters)}
               </div>
             </div>
@@ -348,7 +351,7 @@ export default function Index({
           fallback={
             <List>
               <ListRow>
-                <LoaderCircle className="animate-spin" /> Loading...
+                <LoaderCircle className="animate-spin" /> {t('compendium.loading')}
               </ListRow>
             </List>
           }

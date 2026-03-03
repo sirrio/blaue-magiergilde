@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { useTranslate } from '@/lib/i18n'
 import AppLayout from '@/layouts/app-layout'
 import { PageProps } from '@/types'
@@ -11,14 +10,13 @@ import { useState } from 'react'
 
 export default function Profile() {
   const t = useTranslate()
-  const { auth, discordConnected, status, error, availableLocales } = usePage<PageProps & { status?: string; error?: string }>().props
+  const { auth, discordConnected, status, error } = usePage<PageProps & { status?: string; error?: string }>().props
   const hasPassword = Boolean(auth.user.has_password)
   const needsPasswordFallback = Boolean(auth.user.needs_password_fallback)
 
   const profileForm = useForm({
     name: auth.user.name,
     email: auth.user.email ?? '',
-    locale: auth.user.locale ?? 'de',
   })
 
   const passwordForm = useForm({
@@ -147,21 +145,6 @@ export default function Profile() {
                 <Input type="email" autoComplete="email" value={profileForm.data.email} onChange={(e) => profileForm.setData('email', e.target.value)} errors={profileForm.errors.email}>
                   {t('common.email')}
                 </Input>
-                <Select
-                  value={profileForm.data.locale}
-                  onChange={(e) => profileForm.setData('locale', e.target.value as 'de' | 'en')}
-                  errors={profileForm.errors.locale}
-                >
-                  <SelectLabel>{t('profile.languageLabel')}</SelectLabel>
-                  <SelectOptions>
-                    {(availableLocales ?? ['de', 'en']).map((locale) => (
-                      <option key={locale} value={locale}>
-                        {locale === 'de' ? t('common.german') : t('common.english')}
-                      </option>
-                    ))}
-                  </SelectOptions>
-                </Select>
-                <p className="text-xs text-base-content/70">{t('profile.languageHelp')}</p>
                 {discordConnected ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-base-200 bg-base-200/40 px-3 py-2 text-xs text-base-content/70">
                     <span>{t('profile.removeEmailAllowed')}</span>

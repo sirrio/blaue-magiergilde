@@ -28,20 +28,18 @@ test('profile information can be updated', function () {
     expect($user->refresh()->email)->toBe('test@example.com');
 });
 
-test('profile locale can be updated', function () {
+test('profile locale can be updated through dedicated locale route', function () {
     $user = User::factory()->create([
         'locale' => 'de',
     ]);
 
     $response = $this
         ->actingAs($user)
-        ->patch('/settings/profile', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        ->patch('/settings/locale', [
             'locale' => 'en',
         ]);
 
-    $response->assertRedirect(route('profile.edit', absolute: false));
+    $response->assertRedirect();
     expect($user->refresh()->locale)->toBe('en');
 });
 

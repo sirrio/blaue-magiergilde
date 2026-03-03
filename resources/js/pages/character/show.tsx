@@ -4,6 +4,7 @@ import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
@@ -73,6 +74,7 @@ const formatParticipantSummary = (names: string[]) => {
 }
 
 export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
+  const t = useTranslate()
   const avatarMasked = character.avatar_masked ?? true
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
@@ -166,7 +168,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
   const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
 
   const handleAdventureDelete = (adventureId: number) => {
-    if (!window.confirm('Delete this adventure?')) return
+    if (!window.confirm(t('characters.deleteAdventureConfirm'))) return
     router.delete(route('adventures.destroy', { adventure: adventureId }), {
       preserveScroll: true,
     })
@@ -174,7 +176,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
   }
 
   const handleDowntimeDelete = (downtimeId: number) => {
-    if (!window.confirm('Delete this downtime?')) return
+    if (!window.confirm(t('characters.deleteDowntimeConfirm'))) return
     router.delete(route('downtimes.destroy', { downtime: downtimeId }), {
       preserveScroll: true,
     })
@@ -187,10 +189,10 @@ export default function Show({ character, guildCharacters }: { character: Charac
 
   return (
     <AppLayout>
-      <Head title={character.name + ' Details'} />
+      <Head title={t('characters.detailsPageTitle', { name: character.name })} />
       <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
         <Modal isOpen={Boolean(activeNotes)} onClose={() => setActiveNotes(null)}>
-          <ModalTitle>{activeNotes?.title || 'Notes'}</ModalTitle>
+          <ModalTitle>{activeNotes?.title || t('characters.noteTitle')}</ModalTitle>
           <ModalContent>
             <p className="whitespace-pre-wrap text-sm text-base-content/80">
               {activeNotes?.notes || ''}
@@ -199,15 +201,15 @@ export default function Show({ character, guildCharacters }: { character: Charac
         </Modal>
         <div className="space-y-2 border-b border-base-200 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-xl font-bold sm:text-2xl">{character.name} Details</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">{t('characters.detailsHeading', { name: character.name })}</h1>
             <Link href={route('characters.index')} className="btn btn-sm">
-              Back
+              {t('characters.back')}
             </Link>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="badge badge-ghost badge-sm">{character.adventures.length} Adventures</span>
+            <span className="badge badge-ghost badge-sm">{character.adventures.length} {t('characters.adventures')}</span>
             <span className="badge badge-ghost badge-sm">{character.downtimes.length} Downtimes</span>
-            <span className="badge badge-ghost badge-sm">{character.allies.length} Allies</span>
+            <span className="badge badge-ghost badge-sm">{character.allies.length} {t('characters.allies')}</span>
           </div>
         </div>
         <div className="flex justify-center">
@@ -232,10 +234,11 @@ export default function Show({ character, guildCharacters }: { character: Charac
                   <h2 className="text-base font-semibold">Adventures</h2>
                   <p className="text-xs text-base-content/60">
                     {character.adventures.length === 0
-                      ? 'No adventures recorded'
-                      : `${character.adventures.length} entries • ${secondsToHourMinuteString(
-                          adventureTotalDuration,
-                        )} total`}
+                      ? t('characters.noAdventuresRecorded')
+                      : t('characters.entriesTotal', {
+                          count: character.adventures.length,
+                          duration: secondsToHourMinuteString(adventureTotalDuration),
+                        })}
                   </p>
                 </div>
               </div>
@@ -253,7 +256,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                           setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
                         }
                       >
-                        Date
+                        {t('characters.date')}
                         {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
@@ -275,8 +278,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                       size="xs"
                                       variant="ghost"
                                       modifier="square"
-                                      aria-label="Show adventure notes"
-                                      title={notes ? 'Show adventure notes' : 'No notes'}
+                                      aria-label={t('characters.showAdventureNotes')}
+                                      title={notes ? t('characters.showAdventureNotes') : t('characters.noNotes')}
                                       disabled={!notes}
                                       onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
                                     >
@@ -284,7 +287,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     </Button>
                                   </div>
                                   {participantSummary ? (
-                                    <p className="text-xs text-base-content/50">Played with: {participantSummary}</p>
+                                    <p className="text-xs text-base-content/50">{t('characters.playedWith')}: {participantSummary}</p>
                                   ) : null}
                                   <p className="text-xs text-base-content/50">DM: {gameMasterName}</p>
                                 </div>
@@ -293,17 +296,17 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                 </span>
                               </div>
                               {adv.is_pseudo ? (
-                                <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                  Simplified tracking
-                                </span>
-                              ) : null}
+                                    <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                                      Simplified tracking
+                                    </span>
+                                  ) : null}
                               <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
                                 <span className="badge badge-ghost badge-sm font-medium">
                                   {secondsToHourMinuteString(adv.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   {adv.is_pseudo ? (
-                                    <span className="text-xs text-base-content/50">Auto</span>
+                                    <span className="text-xs text-base-content/50">{t('characters.auto')}</span>
                                   ) : (
                                     <>
                                       <UpdateAdventureModal
@@ -318,8 +321,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         size="xs"
                                         variant="ghost"
                                         modifier="square"
-                                        aria-label="Edit adventure"
-                                        title="Edit adventure"
+                                        aria-label={t('characters.editAdventure')}
+                                        title={t('characters.editAdventure')}
                                         onClick={() => setActiveAdventureModalId(adv.id)}
                                       >
                                         <Pencil size={14} />
@@ -329,8 +332,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         variant="ghost"
                                         modifier="square"
                                         color="error"
-                                        aria-label="Delete adventure"
-                                        title="Delete adventure"
+                                        aria-label={t('characters.deleteAdventure')}
+                                        title={t('characters.deleteAdventure')}
                                         onClick={() => handleAdventureDelete(adv.id)}
                                       >
                                         <Trash size={14} />
@@ -347,10 +350,10 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[760px]">
                         <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                          <span>Adventure</span>
-                          <span className="text-right">Time</span>
-                          <span className="text-right">Date</span>
-                          <span className="text-right">Actions</span>
+                          <span>{t('characters.adventure')}</span>
+                          <span className="text-right">{t('characters.time')}</span>
+                          <span className="text-right">{t('characters.date')}</span>
+                          <span className="text-right">{t('characters.actions')}</span>
                         </div>
                         <List className="shadow-none">
                           {sortedAdventures.map((adv) => {
@@ -370,15 +373,15 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         {adventureTitle}
                                       </h3>
                                       <Button
-                                        type="button"
-                                        size="xs"
-                                        variant="ghost"
-                                        modifier="square"
-                                        aria-label="Show adventure notes"
-                                        title={notes ? 'Show adventure notes' : 'No notes'}
-                                        disabled={!notes}
-                                        onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
-                                      >
+                                      type="button"
+                                      size="xs"
+                                      variant="ghost"
+                                      modifier="square"
+                                      aria-label={t('characters.showAdventureNotes')}
+                                      title={notes ? t('characters.showAdventureNotes') : t('characters.noNotes')}
+                                      disabled={!notes}
+                                      onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
+                                    >
                                         <ScrollText size={14} />
                                       </Button>
                                     </div>
@@ -390,7 +393,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                   </div>
                                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                                     <span>DM: {gameMasterName}</span>
-                                    {participantSummary ? <span>Played with: {participantSummary}</span> : null}
+                                    {participantSummary ? <span>{t('characters.playedWith')}: {participantSummary}</span> : null}
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">
@@ -401,7 +404,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                 </div>
                                 <div className="flex self-center justify-end gap-2">
                                   {adv.is_pseudo ? (
-                                    <span className="text-xs text-base-content/50">Auto</span>
+                                    <span className="text-xs text-base-content/50">{t('characters.auto')}</span>
                                   ) : (
                                     <>
                                       <UpdateAdventureModal
@@ -416,8 +419,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         size="xs"
                                         variant="ghost"
                                         modifier="square"
-                                        aria-label="Edit adventure"
-                                        title="Edit adventure"
+                                        aria-label={t('characters.editAdventure')}
+                                        title={t('characters.editAdventure')}
                                         onClick={() => setActiveAdventureModalId(adv.id)}
                                       >
                                         <Pencil size={14} />
@@ -427,8 +430,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         variant="ghost"
                                         modifier="square"
                                         color="error"
-                                        aria-label="Delete adventure"
-                                        title="Delete adventure"
+                                        aria-label={t('characters.deleteAdventure')}
+                                        title={t('characters.deleteAdventure')}
                                         onClick={() => handleAdventureDelete(adv.id)}
                                       >
                                         <Trash size={14} />
@@ -444,7 +447,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     </div>
                   </>
                 ) : (
-                  <p className="text-center text-sm text-base-content/70">No adventures</p>
+                  <p className="text-center text-sm text-base-content/70">{t('characters.noAdventuresShort')}</p>
                 )}
               </div>
             ) : null}
@@ -469,12 +472,13 @@ export default function Show({ character, guildCharacters }: { character: Charac
                   <h2 className="text-base font-semibold">Downtimes</h2>
                   <p className="text-xs text-base-content/60">
                     {character.downtimes.length === 0
-                      ? 'No downtimes recorded'
-                      : `${character.downtimes.length} entries • ${secondsToHourMinuteString(
-                          totalDowntimeDuration,
-                        )} total (${secondsToHourMinuteString(downtimeTotalDuration)} used + ${secondsToHourMinuteString(
-                          remainingDowntimeDuration,
-                        )} remaining)`}
+                      ? t('characters.noDowntimesRecorded')
+                      : t('characters.downtimeEntriesTotal', {
+                          count: character.downtimes.length,
+                          total: secondsToHourMinuteString(totalDowntimeDuration),
+                          used: secondsToHourMinuteString(downtimeTotalDuration),
+                          remaining: secondsToHourMinuteString(remainingDowntimeDuration),
+                        })}
                   </p>
                 </div>
               </div>
@@ -492,7 +496,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                           setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
                         }
                       >
-                        Date
+                        {t('characters.date')}
                         {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
@@ -510,8 +514,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     size="xs"
                                     variant="ghost"
                                     modifier="square"
-                                    aria-label="Show downtime notes"
-                                    title={notes ? 'Show downtime notes' : 'No notes'}
+                                    aria-label={t('characters.showDowntimeNotes')}
+                                    title={notes ? t('characters.showDowntimeNotes') : t('characters.noNotes')}
                                     disabled={!notes}
                                     onClick={() => openNotes(`${dt.type} Downtime Notes`, notes)}
                                   >
@@ -537,8 +541,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     size="xs"
                                     variant="ghost"
                                     modifier="square"
-                                    aria-label="Edit downtime"
-                                    title="Edit downtime"
+                                    aria-label={t('characters.editDowntime')}
+                                    title={t('characters.editDowntime')}
                                     onClick={() => setActiveDowntimeModalId(dt.id)}
                                   >
                                     <Pencil size={14} />
@@ -548,8 +552,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     variant="ghost"
                                     modifier="square"
                                     color="error"
-                                    aria-label="Delete downtime"
-                                    title="Delete downtime"
+                                    aria-label={t('characters.deleteDowntime')}
+                                    title={t('characters.deleteDowntime')}
                                     onClick={() => handleDowntimeDelete(dt.id)}
                                   >
                                     <Trash size={14} />
@@ -564,10 +568,10 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[760px]">
                         <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                          <span>Type</span>
-                          <span className="text-right">Time</span>
-                          <span className="text-right">Date</span>
-                          <span className="text-right">Actions</span>
+                          <span>{t('characters.type')}</span>
+                          <span className="text-right">{t('characters.time')}</span>
+                          <span className="text-right">{t('characters.date')}</span>
+                          <span className="text-right">{t('characters.actions')}</span>
                         </div>
                         <List className="shadow-none">
                           {sortedDowntimes.map((dt) => {
@@ -585,8 +589,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                       size="xs"
                                       variant="ghost"
                                       modifier="square"
-                                      aria-label="Show downtime notes"
-                                      title={notes ? 'Show downtime notes' : 'No notes'}
+                                      aria-label={t('characters.showDowntimeNotes')}
+                                      title={notes ? t('characters.showDowntimeNotes') : t('characters.noNotes')}
                                       disabled={!notes}
                                       onClick={() => openNotes(`${dt.type} Downtime Notes`, notes)}
                                     >
@@ -611,8 +615,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     size="xs"
                                     variant="ghost"
                                     modifier="square"
-                                    aria-label="Edit downtime"
-                                    title="Edit downtime"
+                                    aria-label={t('characters.editDowntime')}
+                                    title={t('characters.editDowntime')}
                                     onClick={() => setActiveDowntimeModalId(dt.id)}
                                   >
                                     <Pencil size={14} />
@@ -622,8 +626,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                     variant="ghost"
                                     modifier="square"
                                     color="error"
-                                    aria-label="Delete downtime"
-                                    title="Delete downtime"
+                                    aria-label={t('characters.deleteDowntime')}
+                                    title={t('characters.deleteDowntime')}
                                     onClick={() => handleDowntimeDelete(dt.id)}
                                   >
                                     <Trash size={14} />
@@ -637,7 +641,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     </div>
                   </>
                 ) : (
-                  <p className="text-center text-sm text-base-content/70">No downtimes</p>
+                  <p className="text-center text-sm text-base-content/70">{t('characters.noDowntimesShort')}</p>
                 )}
               </div>
             ) : null}
@@ -659,11 +663,11 @@ export default function Show({ character, guildCharacters }: { character: Charac
                 {alliesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 {isAlliesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                 <div>
-                  <h2 className="text-base font-semibold">Allies</h2>
+                  <h2 className="text-base font-semibold">{t('characters.allies')}</h2>
                   <p className="text-xs text-base-content/60">
                     {character.allies.length === 0
-                      ? 'No allies recorded'
-                      : `${character.allies.length} allies`}
+                      ? t('characters.noAlliesRecorded')
+                      : t('characters.alliesCount', { count: character.allies.length })}
                   </p>
                 </div>
               </div>
@@ -681,7 +685,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                           setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
                         }
                       >
-                        Standing
+                        {t('characters.standing')}
                         {allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
@@ -695,14 +699,14 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                 <div className="flex min-w-0 items-center gap-2">
                                   <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
                                   <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                    {ally.linked_character_id ? 'Linked' : 'Custom'}
-                                  </span>
-                                </div>
-                                {getAllyOwnerName(ally) ? (
-                                  <span className="truncate text-xs text-base-content/50">
-                                    Owner: {getAllyOwnerName(ally)}
-                                  </span>
-                                ) : null}
+                                      {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                    </span>
+                                  </div>
+                                  {getAllyOwnerName(ally) ? (
+                                    <span className="truncate text-xs text-base-content/50">
+                                    {t('characters.owner')}: {getAllyOwnerName(ally)}
+                                    </span>
+                                  ) : null}
                               </div>
                             </div>
                             <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-2">
@@ -716,8 +720,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[560px]">
                         <div className="grid grid-cols-[minmax(0,1fr)_140px_200px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                          <span>Ally</span>
-                          <span>Standing</span>
+                          <span>{t('characters.allies')}</span>
+                          <span>{t('characters.standing')}</span>
                           <span>Classes</span>
                         </div>
                         <List className="shadow-none">
@@ -734,12 +738,12 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                       {getAllyDisplayName(ally)}
                                     </span>
                                     <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                      {ally.linked_character_id ? 'Linked' : 'Custom'}
+                                      {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                     </span>
                                   </div>
                                   {getAllyOwnerName(ally) ? (
                                     <span className="truncate text-xs text-base-content/50">
-                                      Owner: {getAllyOwnerName(ally)}
+                                      {t('characters.owner')}: {getAllyOwnerName(ally)}
                                     </span>
                                   ) : null}
                                 </div>
@@ -753,7 +757,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                     </div>
                   </>
                 ) : (
-                  <p className="text-center text-sm text-base-content/70">No allies</p>
+                  <p className="text-center text-sm text-base-content/70">{t('characters.noAlliesShort')}</p>
                 )}
               </div>
             ) : null}

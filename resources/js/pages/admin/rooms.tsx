@@ -5,6 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle } from '@/components/ui/mo
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps, Room, RoomAsset, RoomCharacter, RoomMap } from '@/types'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
@@ -135,6 +136,7 @@ const RoomFormModal = ({
   onDelete?: () => void
   showGridInputs?: boolean
 }) => {
+  const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const [characterSearch, setCharacterSearch] = useState('')
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false)
@@ -193,7 +195,7 @@ const RoomFormModal = ({
       <ModalContent>
         <Input
           errors={errors.name}
-          placeholder="Room name"
+          placeholder={t('admin.roomName')}
           value={data.name}
           onChange={(e) => setData('name', e.target.value)}
         >
@@ -201,13 +203,13 @@ const RoomFormModal = ({
         </Input>
         <div className="relative w-full">
           <label className="label" htmlFor="room-character-search">
-            Assigned character
+            {t('admin.assignedCharacter')}
           </label>
           <input
             id="room-character-search"
             ref={characterInputRef}
             className="input w-full"
-            placeholder={selectedCharacter ? buildCharacterLabel(selectedCharacter) : 'Unassigned'}
+            placeholder={selectedCharacter ? buildCharacterLabel(selectedCharacter) : t('admin.unassigned')}
             value={characterSearch}
             onChange={(event) => {
               setCharacterSearch(event.target.value)
@@ -262,7 +264,7 @@ const RoomFormModal = ({
                 </button>
               ))}
               {characterSearch.trim() && filteredCharacters.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-base-content/50">No matches</div>
+                <div className="px-3 py-2 text-xs text-base-content/50">{t('admin.noMatches')}</div>
               ) : null}
             </div>
           ) : null}
@@ -311,13 +313,13 @@ const RoomFormModal = ({
                 Grid H
               </Input>
             </div>
-            <p className="text-xs text-base-content/60">Grid size: {map.grid_columns} x {map.grid_rows}</p>
+            <p className="text-xs text-base-content/60">{t('admin.gridSize', { columns: map.grid_columns, rows: map.grid_rows })}</p>
           </>
         ) : null}
         {onDelete ? (
           <div className="mt-4 flex justify-between">
             <Button variant="outline" color="error" onClick={onDelete} disabled={processing}>
-              <Trash2 size={14} /> Delete
+              <Trash2 size={14} /> {t('admin.deleteRoom')}
             </Button>
           </div>
         ) : null}
@@ -340,6 +342,7 @@ const RoomMapFormModal = ({
   map?: RoomMap | null
   onClose: () => void
 }) => {
+  const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const { data, setData, processing, reset, post, patch } = useForm<RoomMapFormData>({
     name: '',
@@ -377,11 +380,11 @@ const RoomMapFormModal = ({
 
   return (
     <Modal isOpen={open} onClose={onClose}>
-      <ModalTitle>{mode === 'create' ? 'Add floor' : 'Edit floor'}</ModalTitle>
+      <ModalTitle>{mode === 'create' ? t('admin.addFloor') : t('admin.editFloor')}</ModalTitle>
       <ModalContent>
         <Input
           errors={errors.name}
-          placeholder="Floor name"
+          placeholder={t('admin.floorName')}
           value={data.name}
           onChange={(e) => setData('name', e.target.value)}
         >
@@ -396,7 +399,7 @@ const RoomMapFormModal = ({
             value={data.grid_columns}
             onChange={(e) => setData('grid_columns', Number(e.target.value))}
           >
-            Grid columns
+            {t('admin.gridColumns')}
           </Input>
           <Input
             errors={errors.grid_rows}
@@ -406,23 +409,23 @@ const RoomMapFormModal = ({
             value={data.grid_rows}
             onChange={(e) => setData('grid_rows', Number(e.target.value))}
           >
-            Grid rows
+            {t('admin.gridRows')}
           </Input>
         </div>
         <FileInput
           errors={errors.image ? `${errors.image} The file might be too large.` : ''}
           onChange={(e) => setData('image', e.target?.files?.[0] ?? null)}
         >
-          {mode === 'create' ? 'Map image' : 'Replace image (optional)'}
+          {mode === 'create' ? t('admin.mapImage') : t('admin.replaceImageOptional')}
         </FileInput>
         <p className="text-xs text-base-content/60">
           {mode === 'create'
-            ? 'Upload a map and define the grid size for this floor.'
-            : 'Update the floor details or upload a new map image.'}
+            ? t('admin.mapCreateHint')
+            : t('admin.mapEditHint')}
         </p>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
-        {mode === 'create' ? 'Save' : 'Update'}
+        {mode === 'create' ? t('common.save') : t('admin.update')}
       </ModalAction>
     </Modal>
   )
@@ -439,6 +442,7 @@ export default function Rooms({
   characters: RoomCharacterEntry[]
   adminMode?: boolean
 }) {
+  const t = useTranslate()
   const { auth, errors } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
   const adminRouteActive = route().current('admin.rooms.index')
@@ -2461,7 +2465,7 @@ export default function Rooms({
       ) : null}
 
       <Modal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)}>
-        <ModalTitle>Upload asset</ModalTitle>
+        <ModalTitle>{t('admin.uploadAsset')}</ModalTitle>
         <ModalContent>
           <FileInput
             errors={errors?.image ? String(errors.image) : ''}
@@ -2469,16 +2473,16 @@ export default function Rooms({
           >
             Asset image
           </FileInput>
-          <p className="text-xs text-base-content/60">Images only. Place it by dragging on the map.</p>
+          <p className="text-xs text-base-content/60">{t('admin.imagesOnlyHint')}</p>
         </ModalContent>
         <ModalAction onClick={handleAssetUpload} disabled={assetUploading || !assetForm.image}>
-          Upload
+          {t('admin.upload')}
         </ModalAction>
       </Modal>
 
       {!canManageRooms ? (
         <Modal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)}>
-          <ModalTitle>Asset library</ModalTitle>
+          <ModalTitle>{t('admin.assetLibrary')}</ModalTitle>
           <ModalContent>
             <div className="space-y-3">
               <div className="relative">
@@ -2491,7 +2495,7 @@ export default function Rooms({
                   className="input w-full pl-9"
                   value={librarySearch}
                   onChange={(event) => setLibrarySearch(event.target.value)}
-                  placeholder="Search assets..."
+                  placeholder={t('admin.searchAssets')}
                   type="search"
                 />
               </div>
@@ -2511,7 +2515,7 @@ export default function Rooms({
               {libraryLoading ? (
                 <div className="flex items-center gap-2 text-xs text-base-content/60">
                   <Loader2 size={14} className="animate-spin" />
-                  Loading assets...
+                  {t('compendium.loading')}
                 </div>
               ) : libraryError ? (
                 <p className="text-xs text-error">{libraryError}</p>

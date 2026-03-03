@@ -1,7 +1,7 @@
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
-import { Link, usePage } from '@inertiajs/react'
+import { Link, router, usePage } from '@inertiajs/react'
 import {
   Archive,
   BookOpen,
@@ -19,7 +19,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
-import { ReactNode, useRef } from 'react'
+import { ReactNode, useRef, useState } from 'react'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useInitials } from '@/hooks/use-initials'
 import ThemeSwitcher from '@/components/theme-switcher'
@@ -29,9 +29,10 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, features } =
+  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales } =
     usePage<PageProps>().props
   const t = useTranslate()
+  const [localeUpdating, setLocaleUpdating] = useState(false)
   const needsPasswordFallback = Boolean(auth.user?.needs_password_fallback)
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
@@ -77,6 +78,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const authLinks = [
     { name: t('common.logout'), route: 'logout', method: 'post' as const },
   ]
+  const localeOptions = availableLocales ?? ['de', 'en']
   const adminSections = [
     {
       label: t('nav.marketplace'),
@@ -135,6 +137,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
       (_match, emoji, next) => `${emoji} ${next}`,
     )
     return withEmojiSpacing.replace(/\p{L}/u, (char) => char.toUpperCase())
+  }
+  const handleLocaleChange = (nextLocale: 'de' | 'en') => {
+    if (localeUpdating || (auth.user.locale ?? locale ?? 'de') === nextLocale) {
+      return
+    }
+
+    setLocaleUpdating(true)
+    router.patch(route('profile.locale.update'), {
+      locale: nextLocale,
+    }, {
+      preserveScroll: true,
+      preserveState: true,
+      onFinish: () => setLocaleUpdating(false),
+    })
   }
 
   return (
@@ -398,11 +414,42 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <li role="separator" className="my-1 p-0">
                 <hr className="border-base-300 pointer-events-none" />
               </li>
+              <li className="px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-base-content/50" role="none">
+                {t('common.appearance')}
+              </li>
               <li role="none">
                 <ThemeSwitcher />
               </li>
               <li role="separator" className="my-1 p-0">
                 <hr className="border-base-300 pointer-events-none" />
+              </li>
+              <li className="px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-base-content/50" role="none">
+                {t('common.language')}
+              </li>
+              {localeOptions.map((option) => {
+                const isActive = (auth.user.locale ?? locale ?? 'de') === option
+                const label = option === 'de' ? t('common.german') : t('common.english')
+
+                return (
+                  <li key={option} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={cn('flex w-full items-center justify-between gap-2', isActive ? 'menu-active' : '')}
+                      onClick={() => handleLocaleChange(option)}
+                      disabled={localeUpdating}
+                    >
+                      <span>{label}</span>
+                      {isActive ? <span className="text-xs text-base-content/60">●</span> : null}
+                    </button>
+                  </li>
+                )
+              })}
+              <li role="separator" className="my-1 p-0">
+                <hr className="border-base-300 pointer-events-none" />
+              </li>
+              <li className="px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-base-content/50" role="none">
+                {t('common.account')}
               </li>
               {accountLinks.map((link) => (
                 <li key={link.route} role="none">
@@ -417,6 +464,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <li role="separator" className="my-1 p-0">
                 <hr className="border-base-300 pointer-events-none" />
               </li>
+              <li className="px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-base-content/50" role="none">
+                {t('common.legal')}
+              </li>
               {legalLinks.map((link) => (
                 <li key={link.route} role="none">
                   <Link role="menuitem" method={link.method} href={route(link.route)}>
@@ -426,6 +476,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
               ))}
               <li role="separator" className="my-1 p-0">
                 <hr className="border-base-300 pointer-events-none" />
+              </li>
+              <li className="px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-base-content/50" role="none">
+                {t('common.session')}
               </li>
               {authLinks.map((link) => (
                 <li key={link.route} role="none">
