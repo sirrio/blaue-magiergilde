@@ -6,6 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import ItemRow from '@/pages/item/item-row'
 import { Item, MundaneItemVariant, Source } from '@/types'
@@ -177,6 +178,7 @@ const buildSuggestionItemValidationState = (
 }
 
 const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({})
@@ -309,14 +311,14 @@ const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; 
       <ModalTrigger>
         <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} className="gap-2">
           <MessageSquarePlus size={14} />
-          Suggest new item
+          {t('compendium.suggestNewItem')}
         </Button>
       </ModalTrigger>
-      <ModalTitle>Suggest new item</ModalTitle>
+      <ModalTitle>{t('compendium.suggestNewItemTitle')}</ModalTitle>
       <ModalContent>
         <div className="space-y-3">
           <p className="text-xs text-base-content/70">
-            Propose a new compendium item. The admin team reviews and approves it.
+            {t('compendium.suggestNewItemBody')}
           </p>
           <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
             Name
@@ -386,21 +388,22 @@ const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; 
             </SelectOptions>
           </Select>
           <Input value={data.source_url} onChange={(e) => setData('source_url', e.target.value)}>
-            Reference URL (optional)
+            {t('compendium.referenceUrl')}
           </Input>
           <TextArea value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
-            Note for reviewers (optional)
+            {t('compendium.noteForReviewers')}
           </TextArea>
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={isSubmitting}>
-        Submit
+        {t('compendium.submitSuggestion')}
       </ModalAction>
     </Modal>
   )
 }
 
 const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const { data, setData, post, processing, reset, errors } = useForm({
     name: '',
@@ -537,14 +540,14 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
         <Button size="sm" onClick={() => setIsOpen(true)}>
-          <Plus size={14} /> Add item
+          <Plus size={14} /> {t('compendium.addItem')}
         </Button>
       </ModalTrigger>
-      <ModalTitle>Add item</ModalTitle>
+      <ModalTitle>{t('compendium.addItem')}</ModalTitle>
       <ModalContent>
         <div className="space-y-4">
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Basic</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.basic')}</p>
             <Input errors={errors.name} placeholder="Blade of Truth" value={data.name} onChange={(e) => setData('name', e.target.value)}>
               Name
             </Input>
@@ -589,7 +592,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Classification</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.classification')}</p>
             <Select errors={errors.rarity} value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
               <SelectLabel>Rarity</SelectLabel>
               <SelectOptions>
@@ -615,7 +618,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Options</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.options')}</p>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -625,7 +628,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
               />
               <span className="inline-flex items-center gap-2">
                 <Store className="h-4 w-4 text-base-content/70" />
-                Include in shop rolls
+                {t('compendium.includeInShop')}
               </span>
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -637,7 +640,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
               />
               <span className="inline-flex items-center gap-2">
                 <Shield className="h-4 w-4 text-base-content/70" />
-                Allowed in guild
+                {t('compendium.allowedInGuild')}
               </span>
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -649,18 +652,18 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
               />
               <span className="inline-flex items-center gap-2">
                 <Scale className={cn('h-4 w-4', data.ruling_changed ? 'text-warning' : 'text-base-content/70')} />
-                Ruling changed
+                {t('compendium.rulingChanged')}
               </span>
             </label>
             {data.ruling_changed ? (
-              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder="Describe the ruling change...">
-                Ruling note
+              <TextArea value={data.ruling_note} onChange={(e) => setData('ruling_note', e.target.value)} placeholder={t('compendium.describeRuling')}>
+                {t('compendium.rulingNote')}
               </TextArea>
             ) : null}
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Auto-roll</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{t('compendium.autoRoll')}</p>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -670,13 +673,13 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
               />
               <span className="inline-flex items-center gap-2">
                 <ScrollText className="h-4 w-4 text-base-content/70" />
-                Auto-roll spell on shop
+                {t('compendium.autoRollSpellOnShop')}
               </span>
             </label>
             {data.default_spell_roll_enabled ? (
               <div className="space-y-3">
                 <div>
-                  <p className="label">Default spell levels</p>
+                  <p className="label">{t('compendium.defaultSpellLevels')}</p>
                   <div className="grid grid-cols-5 gap-1">
                     {spellLevels.map((level) => {
                       const id = `create-default-level-${level}`
@@ -698,7 +701,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
                   </div>
                 </div>
                 <div>
-                  <p className="label">Default spell schools</p>
+                  <p className="label">{t('compendium.defaultSpellSchools')}</p>
                   <div className="grid grid-cols-2 gap-1">
                     {spellSchools.map((school) => {
                       const id = `create-default-school-${school}`
@@ -728,7 +731,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
-        Save
+        {t('common.save')}
       </ModalAction>
     </Modal>
   )
@@ -747,6 +750,7 @@ export default function Index({
   canManage?: boolean
   indexRoute?: string
 }) {
+  const t = useTranslate()
   const rarityFilters: FilterOption[] = [
     { label: 'Common', value: 'common' },
     { label: 'Uncommon', value: 'uncommon' },
@@ -880,15 +884,15 @@ export default function Index({
   const totalItems = items?.length ?? 0
   return (
     <AppLayout>
-      <Head title="Items" />
+      <Head title={t('compendium.itemsTitle')} />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">Items</h1>
+            <h1 className="text-2xl font-bold">{t('compendium.itemsTitle')}</h1>
             <p className="text-sm text-base-content/70">
               {canManage
-                ? 'Browse and filter the guild inventory.'
-                : 'Browse the compendium and suggest improvements for review.'}
+                ? t('compendium.browseInventory')
+                : t('compendium.browseCompendiumItems')}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -899,14 +903,14 @@ export default function Index({
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-xs uppercase text-base-content/50">Filters</p>
-              <h2 className="text-lg font-semibold">Inventory filters</h2>
-              <p className="text-xs text-base-content/70">Refine the list by status, source, rarity, and rulings.</p>
+              <p className="text-xs uppercase text-base-content/50">{t('compendium.filters')}</p>
+              <h2 className="text-lg font-semibold">{t('compendium.inventoryFilters')}</h2>
+              <p className="text-xs text-base-content/70">{t('compendium.refineItems')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">{totalItems} items</span>
               {activeFilters.length === 0 ? (
-                <span className="text-base-content/50">No filters</span>
+                <span className="text-base-content/50">{t('compendium.noFilters')}</span>
               ) : (
                 activeFilters.map((filter) => (
                   <span key={filter} className="rounded-full border border-base-200 px-2 py-1">
@@ -917,19 +921,19 @@ export default function Index({
             </div>
           </div>
           <div className="mt-3">
-            <Input type="search" placeholder="Search by name..." value={search} onChange={handleSearch}>
-              Search
+            <Input type="search" placeholder={t('compendium.searchByName')} value={search} onChange={handleSearch}>
+              {t('common.search')}
             </Input>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
               <div className="flex items-center gap-2">
-                <span className="text-base-content/60">Source:</span>
+                <span className="text-base-content/60">{t('compendium.source')}:</span>
                 <select
                   className="select select-xs w-56"
                   value={selectedSource}
                   onChange={(event) => handleSourceFilterChange(event.target.value)}
                 >
-                  <option value="">All</option>
-                  <option value="none">No source</option>
+                  <option value="">{t('compendium.all')}</option>
+                  <option value="none">{t('compendium.noSource')}</option>
                   {sources.map((source) => (
                     <option key={source.id} value={source.id}>
                       {source.shortcode} - {source.name}
@@ -938,27 +942,27 @@ export default function Index({
                 </select>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Rarity:</span>
+                <span className="text-base-content/60">{t('compendium.rarity')}:</span>
                 {renderFilterOptions('rarity', rarityFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Type:</span>
+                <span className="text-base-content/60">{t('characters.type')}:</span>
                 {renderFilterOptions('type', typeFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Guild:</span>
+                <span className="text-base-content/60">{t('compendium.guild')}:</span>
                 {renderFilterOptions('guild', guildFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Shop:</span>
+                <span className="text-base-content/60">{t('compendium.shop')}:</span>
                 {renderFilterOptions('shop', shopFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Auto-roll:</span>
+                <span className="text-base-content/60">{t('compendium.autoRoll')}:</span>
                 {renderFilterOptions('spell', spellFilters)}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">Ruling:</span>
+                <span className="text-base-content/60">{t('compendium.ruling')}:</span>
                 {renderFilterOptions('ruling', rulingFilters)}
               </div>
             </div>
@@ -968,7 +972,7 @@ export default function Index({
           fallback={
             <List>
               <ListRow>
-                <LoaderCircle className="animate-spin" /> Loading...
+                <LoaderCircle className="animate-spin" /> {t('compendium.loading')}
               </ListRow>
             </List>
           }

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth'])->group(function () {
     Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/settings/locale', [ProfileController::class, 'updateLocale'])->name('profile.locale.update');
     Route::delete('/settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::delete('/settings/discord', [ProfileController::class, 'disconnectDiscord'])->name('discord.disconnect');

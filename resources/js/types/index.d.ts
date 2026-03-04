@@ -4,6 +4,8 @@ export interface PageProps {
   name: string
   quote: { message: string; author: string }
   auth: Auth
+  locale: 'de' | 'en'
+  availableLocales?: Array<'de' | 'en'>
   appearance: string
   classes: CharacterClass[]
   tiers: object
@@ -31,6 +33,7 @@ export interface User {
   discord_display_name?: string | null
   discord_id?: string | number | null
   avatar?: string
+  locale?: 'de' | 'en' | null
   created_at: string
   updated_at: string
   is_admin: boolean
@@ -384,6 +387,7 @@ export interface Character {
     discord_id?: number | null
     discord_username?: string | null
     discord_display_name?: string | null
+    avatar?: string | null
     simplified_tracking?: boolean
     avatar_masked?: boolean
   }

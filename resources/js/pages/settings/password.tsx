@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardContent, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useTranslate } from '@/lib/i18n'
 import AppLayout from '@/layouts/app-layout'
 import { PageProps } from '@/types'
 import { Head, useForm, usePage } from '@inertiajs/react'
 import { AlertTriangle, Lock } from 'lucide-react'
 
 export default function Password() {
+  const t = useTranslate()
   const { auth } = usePage<PageProps>().props
   const hasPassword = Boolean(auth.user.has_password)
   const needsPasswordFallback = Boolean(auth.user.needs_password_fallback)
@@ -23,23 +25,23 @@ export default function Password() {
 
   return (
     <AppLayout>
-      <Head title="Password" />
+      <Head title={t('password.pageTitle')} />
       <div className="container mx-auto max-w-3xl space-y-6 p-4">
         <section className="border-b border-base-200 pb-3">
-          <h1 className="text-xl font-bold sm:text-2xl">Password</h1>
-          <p className="text-sm text-base-content/70">Update your account password.</p>
+          <h1 className="text-xl font-bold sm:text-2xl">{t('password.pageTitle')}</h1>
+          <p className="text-sm text-base-content/70">{t('password.subtitle')}</p>
         </section>
         {needsPasswordFallback ? (
           <div className="alert alert-warning">
             <AlertTriangle size={16} />
-            <span>ALERT: Please set your password for fallback login.</span>
+            <span>{t('profile.passwordFallbackAlert')}</span>
           </div>
         ) : null}
         <Card className="border border-base-200">
           <CardBody>
             <CardTitle className="flex items-center gap-2 text-base">
               <Lock size={16} />
-              Change Password
+              {t('password.changePassword')}
             </CardTitle>
             <CardContent>
               <form onSubmit={submit} className="space-y-4">
@@ -50,7 +52,7 @@ export default function Password() {
                     onChange={(e) => form.setData('current_password', e.target.value)}
                     errors={form.errors.current_password}
                   >
-                    Current Password
+                    {t('common.currentPassword')}
                   </Input>
                 ) : null}
                 <Input
@@ -59,7 +61,7 @@ export default function Password() {
                   onChange={(e) => form.setData('password', e.target.value)}
                   errors={form.errors.password}
                 >
-                  {hasPassword ? 'New Password' : 'Set Password'}
+                  {hasPassword ? t('common.newPassword') : t('profile.setPassword')}
                 </Input>
                 <Input
                   type="password"
@@ -67,11 +69,11 @@ export default function Password() {
                   onChange={(e) => form.setData('password_confirmation', e.target.value)}
                   errors={form.errors.password_confirmation}
                 >
-                  Confirm Password
+                  {t('common.confirmPassword')}
                 </Input>
                 <div className="flex justify-end">
                   <Button type="submit" className="btn-primary" disabled={form.processing}>
-                    Save
+                    {t('common.save')}
                   </Button>
                 </div>
               </form>

@@ -49,6 +49,7 @@ const allowedFactions = new Set([
 ]);
 const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'needs_changes', 'retired', 'draft']);
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
+const allowedBotLocales = new Set(['de', 'en']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 
 function guildCharacterStatusesForAllies() {
@@ -89,6 +90,15 @@ function normalizeBoolean(value, fallback = false) {
     const text = String(value || '').trim().toLowerCase();
     if (['1', 'true', 'yes', 'y', 'ja', 'j'].includes(text)) return true;
     if (['0', 'false', 'no', 'n', 'nein'].includes(text)) return false;
+    return fallback;
+}
+
+function normalizeBotLocale(value, fallback = null) {
+    const locale = String(value || '').trim().toLowerCase();
+    if (allowedBotLocales.has(locale)) {
+        return locale;
+    }
+
     return fallback;
 }
 
@@ -164,11 +174,16 @@ class DiscordNotLinkedError extends Error {
 }
 
 async function getLinkedUserIdForDiscord(discordUser) {
+    const linkedUser = await getLinkedUserForDiscord(discordUser);
+    return linkedUser?.id ?? null;
+}
+
+async function getLinkedUserForDiscord(discordUser) {
     const discordId = String(discordUser.id);
     const name = pickDiscordDisplayName(discordUser);
     const avatar = pickDiscordAvatarUrl(discordUser);
 
-    const [existing] = await db.execute('SELECT id, deleted_at FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
+    const [existing] = await db.execute('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
     if (existing.length > 0) {
         const userId = existing[0].id;
         const deletedAt = existing[0].deleted_at;
@@ -177,10 +192,38 @@ async function getLinkedUserIdForDiscord(discordUser) {
         } else {
             await db.execute('UPDATE users SET name = ?, avatar = ?, updated_at = ? WHERE id = ?', [name, avatar, nowSql(), userId]);
         }
-        return userId;
+        return {
+            id: userId,
+            locale: normalizeBotLocale(existing[0].locale),
+        };
     }
 
     return null;
+}
+
+async function getLinkedUserLocaleForDiscord(discordUser) {
+    const linkedUser = await getLinkedUserForDiscord(discordUser);
+    return linkedUser?.locale ?? null;
+}
+
+async function getUserLocaleByDiscordId(discordUserId) {
+    if (!discordUserId) {
+        return null;
+    }
+
+    const [rows] = await db.execute('SELECT locale FROM users WHERE discord_id = ? LIMIT 1', [String(discordUserId)]);
+    return normalizeBotLocale(rows[0]?.locale);
+}
+
+async function updateLinkedUserLocaleForDiscord(discordUser, locale) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) {
+        throw new DiscordNotLinkedError();
+    }
+
+    const normalizedLocale = normalizeBotLocale(locale, 'de');
+    await db.execute('UPDATE users SET locale = ?, updated_at = ? WHERE id = ?', [normalizedLocale, nowSql(), userId]);
+    return normalizedLocale;
 }
 
 async function createUserForDiscord(discordUser) {
@@ -242,6 +285,7 @@ async function listCharactersForDiscord(discordUser) {
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
+                COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -252,7 +296,8 @@ async function listCharactersForDiscord(discordUser) {
                 SELECT
                     character_id,
                     COUNT(*) AS adventures_count,
-                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles
+                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles,
+                    MAX(CASE WHEN is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
                 FROM adventures
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
@@ -309,6 +354,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
+                COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -319,7 +365,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 SELECT
                     character_id,
                     COUNT(*) AS adventures_count,
-                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles
+                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles,
+                    MAX(CASE WHEN is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
                 FROM adventures
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
@@ -1601,7 +1648,11 @@ async function removeHiddenBidForDiscord(discordIdentity, auctionItemId) {
 
 module.exports = {
     DiscordNotLinkedError,
+    getLinkedUserForDiscord,
     getLinkedUserIdForDiscord,
+    getLinkedUserLocaleForDiscord,
+    getUserLocaleByDiscordId,
+    updateLinkedUserLocaleForDiscord,
     createUserForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,

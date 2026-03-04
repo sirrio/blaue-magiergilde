@@ -11,10 +11,12 @@ const {
 } = require('discord.js');
 const {
     findOpenAuctionItemForHiddenBid,
+    getUserLocaleByDiscordId,
     listOpenAuctionItemsForHiddenBids,
     removeHiddenBidForDiscord,
     upsertHiddenBidForDiscord,
 } = require('../appDb');
+const { t } = require('../i18n');
 const { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed } = require('../utils/noticeEmbeds');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
@@ -69,6 +71,10 @@ function buildIdentityFromInteraction(interaction) {
     };
 }
 
+async function resolveInteractionLocale(interaction) {
+    return await getUserLocaleByDiscordId(interaction?.user?.id);
+}
+
 function parseOwnerIdFromCustomId(customId, prefix) {
     if (!customId || !customId.startsWith(prefix)) return null;
     const ownerId = customId.slice(prefix.length).trim();
@@ -108,34 +114,41 @@ function ensureOwner(interaction, ownerId) {
     return interaction.user.id === ownerId;
 }
 
-async function replyOwnerMismatch(interaction) {
+async function replyOwnerMismatch(interaction, locale = null) {
     await interaction.reply({
         content: '',
-        embeds: [buildErrorEmbed('Action denied', 'This hidden-bid panel is not yours.')],
+        embeds: [buildErrorEmbed(t('hiddenBid.actionDeniedTitle', {}, locale), t('hiddenBid.actionDeniedBody', {}, locale))],
         flags: MessageFlags.Ephemeral,
     });
 }
 
-function buildSelectedItemEmbed(item) {
+function buildSelectedItemEmbed(item, locale = null) {
     const currency = String(item.auction_currency || 'GP').trim() || 'GP';
     const itemName = item.item_name || `Item #${item.auction_item_id}`;
     const notes = String(item.notes || '').trim();
-    const ownMax = item.user_hidden_max == null ? 'none' : `${item.user_hidden_max} ${currency}`;
+    const ownMax = item.user_hidden_max == null ? t('hiddenBid.noneValue', {}, locale) : `${item.user_hidden_max} ${currency}`;
     const highestBid = Number(item.highest_bid || 0);
-    const highestLabel = highestBid > 0 ? `${highestBid} ${currency}` : 'none';
+    const highestLabel = highestBid > 0 ? `${highestBid} ${currency}` : t('hiddenBid.noneValue', {}, locale);
 
     const lines = [
-        `Item: **${itemName}**${notes ? ` - ${notes}` : ''}`,
-        `Rarity: ${formatRarityLabel(item.item_rarity)} | Type: ${String(item.item_type || 'item')}`,
-        `Minimum now: **${item.min_bid} ${currency}** | Step: ${item.step}`,
-        `Highest visible: ${highestLabel}`,
-        `Your hidden max: **${ownMax}**`,
+        `${t('hiddenBid.selectedItemLabel', {}, locale)}: **${itemName}**${notes ? ` - ${notes}` : ''}`,
+        t('hiddenBid.selectedItemRarityType', {
+            rarity: formatRarityLabel(item.item_rarity),
+            type: String(item.item_type || 'item'),
+        }, locale),
+        t('hiddenBid.selectedItemMinimum', {
+            minBid: item.min_bid,
+            currency,
+            step: item.step,
+        }, locale),
+        t('hiddenBid.selectedItemHighestVisible', { highestBid: highestLabel }, locale),
+        t('hiddenBid.selectedItemOwnMax', { ownMax }, locale),
     ];
 
-    return buildInfoEmbed('Selected item', lines.join('\n'));
+    return buildInfoEmbed(t('hiddenBid.selectedItemTitle', {}, locale), lines.join('\n'));
 }
 
-function buildHiddenBidLine(item, duplicateLabelSet) {
+function buildHiddenBidLine(item, duplicateLabelSet, locale = null) {
     const currency = String(item.auction_currency || 'GP').trim() || 'GP';
     const itemName = item.item_name || `Item #${item.auction_item_id}`;
     const notes = String(item.notes || '').trim();
@@ -149,10 +162,16 @@ function buildHiddenBidLine(item, duplicateLabelSet) {
         return null;
     }
 
-    return `- **${truncateText(lineLabel, 90)}**: ${hiddenMax} ${currency} (min ${item.min_bid}, step ${item.step})`;
+    return t('hiddenBid.hiddenBidLine', {
+        itemLabel: truncateText(lineLabel, 90),
+        hiddenMax,
+        currency,
+        minBid: item.min_bid,
+        step: item.step,
+    }, locale);
 }
 
-function buildDashboardEmbeds({ items, ownConfiguredCount }) {
+function buildDashboardEmbeds({ items, ownConfiguredCount, locale = null }) {
     const configuredItems = items
         .filter(item => item.user_hidden_max != null)
         .sort((a, b) => {
@@ -177,30 +196,30 @@ function buildDashboardEmbeds({ items, ownConfiguredCount }) {
             .map(([key]) => key),
     );
     const configuredLines = configuredItems
-        .map(item => buildHiddenBidLine(item, duplicateLabelSet))
+        .map(item => buildHiddenBidLine(item, duplicateLabelSet, locale))
         .filter(line => typeof line === 'string');
 
     const summaryLines = [
-        'Select an open auction item, then use the actions below.',
-        'Only you can see this interaction.',
+        t('hiddenBid.summaryIntro', {}, locale),
+        t('hiddenBid.summaryVisibility', {}, locale),
         '',
-        `Open items: **${items.length}**`,
-        `Your hidden bids: **${ownConfiguredCount}**`,
+        t('hiddenBid.openItems', { count: items.length }, locale),
+        t('hiddenBid.ownBids', { count: ownConfiguredCount }, locale),
     ];
     if (items.length > MAX_OPTIONS) {
-        summaryLines.push(`Showing first **${MAX_OPTIONS}** items.`);
+        summaryLines.push(t('hiddenBid.showingFirst', { count: MAX_OPTIONS }, locale));
     }
 
     const summarySection = summaryLines.join('\n');
-    const listHeader = '\n\n**Your hidden bids**\n';
+    const listHeader = `\n\n${t('hiddenBid.ownBidsHeader', {}, locale)}\n`;
     const firstPrefix = `${summarySection}${listHeader}`;
-    const continuationPrefix = '**Your hidden bids (cont.)**\n';
+    const continuationPrefix = `${t('hiddenBid.ownBidsContinuation', {}, locale)}\n`;
     const maxDescriptionLength = 3800;
     const firstChunkLimit = Math.max(200, maxDescriptionLength - firstPrefix.length);
     const continuationChunkLimit = Math.max(200, maxDescriptionLength - continuationPrefix.length);
 
     if (configuredLines.length === 0) {
-        return [buildInfoEmbed('Hidden bid dashboard', `${summarySection}${listHeader}- none yet`)];
+        return [buildInfoEmbed(t('hiddenBid.dashboardTitle', {}, locale), `${summarySection}${listHeader}${t('hiddenBid.noneYet', {}, locale)}`)];
     }
 
     const embeds = [];
@@ -212,7 +231,9 @@ function buildDashboardEmbeds({ items, ownConfiguredCount }) {
     for (const line of configuredLines) {
         const addition = (currentChunkLines.length === 0 ? 0 : 1) + line.length;
         if (currentChunkLines.length > 0 && currentLength + addition > currentChunkLimit) {
-            const title = chunkIndex === 1 ? 'Hidden bid dashboard' : `Hidden bid dashboard (${chunkIndex})`;
+            const title = chunkIndex === 1
+                ? t('hiddenBid.dashboardTitle', {}, locale)
+                : t('hiddenBid.dashboardTitleContinuation', { index: chunkIndex }, locale);
             const description = chunkIndex === 1
                 ? `${firstPrefix}${currentChunkLines.join('\n')}`
                 : `${continuationPrefix}${currentChunkLines.join('\n')}`;
@@ -229,7 +250,9 @@ function buildDashboardEmbeds({ items, ownConfiguredCount }) {
     }
 
     if (currentChunkLines.length > 0) {
-        const title = chunkIndex === 1 ? 'Hidden bid dashboard' : `Hidden bid dashboard (${chunkIndex})`;
+        const title = chunkIndex === 1
+            ? t('hiddenBid.dashboardTitle', {}, locale)
+            : t('hiddenBid.dashboardTitleContinuation', { index: chunkIndex }, locale);
         const description = chunkIndex === 1
             ? `${firstPrefix}${currentChunkLines.join('\n')}`
             : `${continuationPrefix}${currentChunkLines.join('\n')}`;
@@ -244,6 +267,7 @@ async function buildPickerPayload({
     noticeEmbed = null,
     selectedItemId = null,
     removeConfirmItemId = null,
+    locale = null,
 }) {
     const items = await listOpenAuctionItemsForHiddenBids({ id: ownerId }, 250);
     const ownConfiguredCount = items.filter(item => item.user_hidden_max != null).length;
@@ -262,22 +286,29 @@ async function buildPickerPayload({
     }
 
     if (selectedItemId && !selectedItem && !noticeEmbed) {
-        embeds.push(buildErrorEmbed('Selection expired', 'Selected item is no longer open.'));
+        embeds.push(buildErrorEmbed(t('hiddenBid.itemUnavailableTitle', {}, locale), t('hiddenBid.itemUnavailableBody', {}, locale)));
     }
 
-    embeds.push(...buildDashboardEmbeds({ items, ownConfiguredCount }));
+    embeds.push(...buildDashboardEmbeds({ items, ownConfiguredCount, locale }));
 
     if (selectedItem) {
-        embeds.push(buildSelectedItemEmbed(selectedItem));
+        embeds.push(buildSelectedItemEmbed(selectedItem, locale));
     }
 
     const components = [];
     if (visibleItems.length > 0) {
         const options = visibleItems.map(item => {
             const summary = summarizeAuctionItem(item);
+            const currency = String(item.auction_currency || 'GP').trim() || 'GP';
+            const ownMax = item.user_hidden_max == null ? t('hiddenBid.noneValue', {}, locale) : `${item.user_hidden_max} ${currency}`;
             const option = new StringSelectMenuOptionBuilder()
                 .setLabel(summary.label)
-                .setDescription(summary.description)
+                .setDescription(truncateText(t('hiddenBid.selectDescription', {
+                    rarity: formatRarityLabel(item.item_rarity),
+                    minBid: item.min_bid,
+                    currency,
+                    ownMax,
+                }, locale), 100))
                 .setValue(String(item.auction_item_id));
 
             if (selectedItem && Number(item.auction_item_id) === Number(selectedItem.auction_item_id)) {
@@ -289,7 +320,7 @@ async function buildPickerPayload({
 
         const select = new StringSelectMenuBuilder()
             .setCustomId(`${SELECT_ID_PREFIX}${ownerId}`)
-            .setPlaceholder('Select item...')
+            .setPlaceholder(t('hiddenBid.selectPlaceholder', {}, locale))
             .addOptions(options);
 
         components.push(new ActionRowBuilder().addComponents(select));
@@ -299,7 +330,7 @@ async function buildPickerPayload({
         const actionButtons = [
             new ButtonBuilder()
                 .setCustomId(`${SET_ID_PREFIX}${selectedItem.auction_item_id}_${ownerId}`)
-                .setLabel(selectedItem.user_hidden_max == null ? 'Set max' : 'Update max')
+                .setLabel(t(selectedItem.user_hidden_max == null ? 'hiddenBid.setMax' : 'hiddenBid.updateMax', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         ];
 
@@ -307,7 +338,7 @@ async function buildPickerPayload({
             actionButtons.push(
                 new ButtonBuilder()
                     .setCustomId(`${REMOVE_ASK_ID_PREFIX}${selectedItem.auction_item_id}_${ownerId}`)
-                    .setLabel('Remove hidden bid')
+                    .setLabel(t('hiddenBid.removeBid', {}, locale))
                     .setStyle(ButtonStyle.Danger),
             );
         }
@@ -320,11 +351,11 @@ async function buildPickerPayload({
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`${REMOVE_CONFIRM_ID_PREFIX}${selectedItem.auction_item_id}_${ownerId}`)
-                    .setLabel('Confirm remove')
+                    .setLabel(t('hiddenBid.confirmRemove', {}, locale))
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`${REMOVE_CANCEL_ID_PREFIX}${selectedItem.auction_item_id}_${ownerId}`)
-                    .setLabel('Cancel')
+                    .setLabel(t('common.cancel', {}, locale))
                     .setStyle(ButtonStyle.Secondary),
             ),
         );
@@ -335,7 +366,7 @@ async function buildPickerPayload({
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`${REFRESH_ID_PREFIX}${ownerId}_${refreshSelectedId}`)
-                .setLabel('Refresh')
+                .setLabel(t('hiddenBid.refresh', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
     );
@@ -349,7 +380,8 @@ async function buildPickerPayload({
 
 async function showCommandPicker(interaction) {
     const ownerId = interaction.user.id;
-    const payload = await buildPickerPayload({ ownerId });
+    const locale = await resolveInteractionLocale(interaction);
+    const payload = await buildPickerPayload({ ownerId, locale });
 
     if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -362,9 +394,10 @@ async function showCommandPicker(interaction) {
 async function handleSelect(interaction) {
     const ownerId = parseOwnerIdFromCustomId(interaction.customId, SELECT_ID_PREFIX);
     if (!ownerId) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
@@ -373,7 +406,8 @@ async function handleSelect(interaction) {
     if (!Number.isFinite(auctionItemId) || auctionItemId <= 0) {
         const payload = await buildPickerPayload({
             ownerId,
-            noticeEmbed: buildErrorEmbed('Invalid item', 'Please select a valid auction item.'),
+            locale,
+            noticeEmbed: buildErrorEmbed(t('hiddenBid.invalidItemTitle', {}, locale), t('hiddenBid.invalidItemBody', {}, locale)),
         });
         await interaction.update(payload);
         return true;
@@ -383,7 +417,8 @@ async function handleSelect(interaction) {
     if (!item || item.auction_status !== 'open' || item.sold_at) {
         const payload = await buildPickerPayload({
             ownerId,
-            noticeEmbed: buildErrorEmbed('Item unavailable', 'The selected item is no longer open.'),
+            locale,
+            noticeEmbed: buildErrorEmbed(t('hiddenBid.itemUnavailableTitle', {}, locale), t('hiddenBid.itemUnavailableBody', {}, locale)),
         });
         await interaction.update(payload);
         return true;
@@ -392,6 +427,7 @@ async function handleSelect(interaction) {
     const payload = await buildPickerPayload({
         ownerId,
         selectedItemId: item.auction_item_id,
+        locale,
     });
     await interaction.update(payload);
     return true;
@@ -400,15 +436,17 @@ async function handleSelect(interaction) {
 async function handleRefresh(interaction) {
     const parsed = parseRefreshCustomId(interaction.customId);
     if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, parsed.ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
     const payload = await buildPickerPayload({
         ownerId: parsed.ownerId,
         selectedItemId: parsed.selectedItemId && parsed.selectedItemId > 0 ? parsed.selectedItemId : null,
+        locale,
     });
     await interaction.update(payload);
     return true;
@@ -417,9 +455,10 @@ async function handleRefresh(interaction) {
 async function handleSetAction(interaction) {
     const parsed = parseItemOwnerAction(interaction.customId, SET_ID_PREFIX);
     if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, parsed.ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
@@ -427,7 +466,8 @@ async function handleSetAction(interaction) {
     if (!item || item.auction_status !== 'open' || item.sold_at) {
         const payload = await buildPickerPayload({
             ownerId: parsed.ownerId,
-            noticeEmbed: buildErrorEmbed('Item unavailable', 'The selected item is no longer open.'),
+            locale,
+            noticeEmbed: buildErrorEmbed(t('hiddenBid.itemUnavailableTitle', {}, locale), t('hiddenBid.itemUnavailableBody', {}, locale)),
         });
         await interaction.update(payload);
         return true;
@@ -436,15 +476,15 @@ async function handleSetAction(interaction) {
     const currency = String(item.auction_currency || 'GP').trim() || 'GP';
     const modal = new ModalBuilder()
         .setCustomId(`${MODAL_ID_PREFIX}${item.auction_item_id}_${parsed.ownerId}`)
-        .setTitle('Set hidden max');
+        .setTitle(t('hiddenBid.setModalTitle', {}, locale));
 
     const maxInput = new TextInputBuilder()
         .setCustomId('hiddenBidMaxAmount')
-        .setLabel(`Max amount (${currency})`)
+        .setLabel(t('hiddenBid.setModalLabel', { currency }, locale))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setValue(String(item.user_hidden_max ?? item.min_bid))
-        .setPlaceholder(`Min ${item.min_bid}, step ${item.step}`);
+        .setPlaceholder(t('hiddenBid.setModalPlaceholder', { minBid: item.min_bid, step: item.step }, locale));
 
     modal.addComponents(new ActionRowBuilder().addComponents(maxInput));
     await interaction.showModal(modal);
@@ -454,9 +494,10 @@ async function handleSetAction(interaction) {
 async function handleRemoveAsk(interaction) {
     const parsed = parseItemOwnerAction(interaction.customId, REMOVE_ASK_ID_PREFIX);
     if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, parsed.ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
@@ -464,6 +505,7 @@ async function handleRemoveAsk(interaction) {
         ownerId: parsed.ownerId,
         selectedItemId: parsed.auctionItemId,
         removeConfirmItemId: parsed.auctionItemId,
+        locale,
     });
     await interaction.update(payload);
     return true;
@@ -472,15 +514,17 @@ async function handleRemoveAsk(interaction) {
 async function handleRemoveCancel(interaction) {
     const parsed = parseItemOwnerAction(interaction.customId, REMOVE_CANCEL_ID_PREFIX);
     if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, parsed.ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
     const payload = await buildPickerPayload({
         ownerId: parsed.ownerId,
         selectedItemId: parsed.auctionItemId,
+        locale,
     });
     await interaction.update(payload);
     return true;
@@ -489,25 +533,27 @@ async function handleRemoveCancel(interaction) {
 async function handleRemoveConfirm(interaction) {
     const parsed = parseItemOwnerAction(interaction.customId, REMOVE_CONFIRM_ID_PREFIX);
     if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, parsed.ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
     const result = await removeHiddenBidForDiscord(buildIdentityFromInteraction(interaction), parsed.auctionItemId);
     if (!result.ok) {
-        let message = 'Could not remove hidden bid.';
+        let message = t('hiddenBid.removeFailedBody', {}, locale);
         if (result.reason === 'hidden_bid_not_found') {
-            message = 'No hidden bid was stored for this item.';
+            message = t('hiddenBid.removeFailedMissing', {}, locale);
         } else if (result.reason === 'not_found' || result.reason === 'item_sold' || result.reason === 'auction_closed') {
-            message = 'This item is no longer available for hidden bids.';
+            message = t('hiddenBid.removeFailedUnavailable', {}, locale);
         }
 
         const payload = await buildPickerPayload({
             ownerId: parsed.ownerId,
             selectedItemId: parsed.auctionItemId,
-            noticeEmbed: buildErrorEmbed('Remove failed', message),
+            locale,
+            noticeEmbed: buildErrorEmbed(t('hiddenBid.removeFailedTitle', {}, locale), message),
         });
         await interaction.update(payload);
         return true;
@@ -517,9 +563,14 @@ async function handleRemoveConfirm(interaction) {
         ownerId: parsed.ownerId,
         selectedItemId: parsed.auctionItemId,
         noticeEmbed: buildSuccessEmbed(
-            'Hidden bid removed',
-            `Removed hidden bid for **${result.itemName}** (previous max ${result.previousMax} ${result.auctionCurrency}).`,
+            t('hiddenBid.removedTitle', {}, locale),
+            t('hiddenBid.removedBody', {
+                itemName: result.itemName,
+                previousMax: result.previousMax,
+                currency: result.auctionCurrency,
+            }, locale),
         ),
+        locale,
     });
     await interaction.update(payload);
     return true;
@@ -528,9 +579,10 @@ async function handleRemoveConfirm(interaction) {
 async function handleModal(interaction) {
     const parsed = parseModalCustomId(interaction.customId);
     if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
 
     if (!ensureOwner(interaction, parsed.ownerId)) {
-        await replyOwnerMismatch(interaction);
+        await replyOwnerMismatch(interaction, locale);
         return true;
     }
 
@@ -539,7 +591,8 @@ async function handleModal(interaction) {
         const payload = await buildPickerPayload({
             ownerId: parsed.ownerId,
             selectedItemId: parsed.auctionItemId,
-            noticeEmbed: buildErrorEmbed('Invalid amount', 'Please enter a whole number.'),
+            locale,
+            noticeEmbed: buildErrorEmbed(t('hiddenBid.invalidAmountTitle', {}, locale), t('hiddenBid.invalidAmountBody', {}, locale)),
         });
         await updateManageMessage(interaction, payload);
         return true;
@@ -552,34 +605,41 @@ async function handleModal(interaction) {
     );
 
     if (!result.ok) {
-        let message = 'Could not save your hidden bid.';
+        let message = t('hiddenBid.saveFailedBody', {}, locale);
         if (result.reason === 'not_found' || result.reason === 'item_sold' || result.reason === 'auction_closed') {
-            message = 'This item is no longer available for hidden bids.';
+            message = t('hiddenBid.saveFailedUnavailable', {}, locale);
         } else if (result.reason === 'below_minimum') {
-            message = `Minimum hidden bid is ${result.minBid} (step ${result.step}).`;
+            message = t('hiddenBid.saveFailedMinimum', { minBid: result.minBid, step: result.step }, locale);
         } else if (result.reason === 'invalid_step') {
-            message = `Hidden bids must follow step ${result.step}, based on start ${result.startingBid}.`;
+            message = t('hiddenBid.saveFailedStep', { step: result.step, startingBid: result.startingBid }, locale);
         } else if (result.reason === 'invalid_amount') {
-            message = 'Please enter a positive whole number.';
+            message = t('hiddenBid.saveFailedInvalid', {}, locale);
         }
 
         const payload = await buildPickerPayload({
             ownerId: parsed.ownerId,
             selectedItemId: parsed.auctionItemId,
-            noticeEmbed: buildErrorEmbed('Hidden bid rejected', message),
+            locale,
+            noticeEmbed: buildErrorEmbed(t('hiddenBid.rejectedTitle', {}, locale), message),
         });
         await updateManageMessage(interaction, payload);
         return true;
     }
 
-    const actionText = result.previousMax == null ? 'created' : 'updated';
+    const actionText = t(result.previousMax == null ? 'hiddenBid.savedCreated' : 'hiddenBid.savedUpdated', {}, locale);
     const payload = await buildPickerPayload({
         ownerId: parsed.ownerId,
         selectedItemId: parsed.auctionItemId,
         noticeEmbed: buildSuccessEmbed(
-            'Hidden bid saved',
-            `Your hidden max for **${result.itemName}** is now **${result.maxAmount} ${result.auctionCurrency}** (${actionText}).`,
+            t('hiddenBid.savedTitle', {}, locale),
+            t('hiddenBid.savedBody', {
+                itemName: result.itemName,
+                maxAmount: result.maxAmount,
+                currency: result.auctionCurrency,
+                actionText,
+            }, locale),
         ),
+        locale,
     });
     await updateManageMessage(interaction, payload);
     return true;
@@ -615,4 +675,6 @@ async function handle(interaction) {
 module.exports = {
     handle,
     showCommandPicker,
+    buildDashboardEmbeds,
+    buildSelectedItemEmbed,
 };

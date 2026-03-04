@@ -11,14 +11,17 @@ const {
 const { Agent } = require('undici');
 const { updateCreationReply } = require('./interactionReplies');
 const { resolveApiBaseUrls } = require('../appUrls');
+const { t } = require('../i18n');
 const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
 const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
+    getLinkedUserLocaleForDiscord,
     listCharactersForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateLinkedUserLocaleForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
     listCharacterClassesForDiscord,
@@ -40,7 +43,7 @@ const {
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
 
-const { buildCharacterListView } = require('../commands/game/characters');
+const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateLevel } = require('../utils/characterTier');
 
@@ -149,10 +152,30 @@ function clearAvatarUpdateState(userId) {
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
     const characters = await listCharactersForDiscord(interaction.user);
-    const listView = buildCharacterListView({ ownerDiscordId, characters });
+    const locale = await getLinkedUserLocaleForDiscord(interaction.user);
+    const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
     await interaction.update({
         ...listView,
         content: '',
+    });
+}
+
+async function resolveInteractionLocale(interaction) {
+    try {
+        return await getLinkedUserLocaleForDiscord(interaction.user);
+    } catch {
+        return null;
+    }
+}
+
+async function translateInteraction(interaction, key, params = {}) {
+    return t(key, params, await resolveInteractionLocale(interaction));
+}
+
+async function updateActionDenied(interaction, extra = {}) {
+    await updateManageMessage(interaction, {
+        content: await translateInteraction(interaction, 'common.actionDeniedBody'),
+        ...extra,
     });
 }
 
@@ -220,15 +243,16 @@ function parseManageIds(customId) {
 }
 
 async function loadEditableAdventure(interaction, adventureId, characterId) {
+    const locale = await resolveInteractionLocale(interaction);
     const adventure = await findAdventureForDiscord(interaction.user, adventureId);
     if (!adventure || Number(adventure.character_id) !== characterId) {
-        await updateManageMessage(interaction, { content: 'Adventure not found.', flags: MessageFlags.Ephemeral });
+        await updateManageMessage(interaction, { content: t('characters.adventureNotFound', {}, locale), flags: MessageFlags.Ephemeral });
         return null;
     }
 
     if (adventure.is_pseudo) {
         await updateManageMessage(interaction, {
-            content: 'Simplified tracking adventures are auto-generated and cannot be edited.',
+            content: t('characters.pseudoAdventureNotEditable', {}, locale),
             flags: MessageFlags.Ephemeral,
         });
         return null;
@@ -354,6 +378,7 @@ function getDowntimeNextStep(stepKey) {
 }
 
 async function buildAdventureStepPayload({ interaction, state, message }) {
+    const locale = state?.locale || null;
     const step = state.step;
     const { characterId } = state;
     const ownerDiscordId = state.ownerDiscordId;
@@ -395,35 +420,35 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
 
     if (step === 'duration') {
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Choose the adventure duration.', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, message || t('characters.chooseAdventureDuration', {}, locale), participantsLabel)],
             components: buildAdventureDurationRows(state),
         };
     }
 
     if (step === 'date') {
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Choose the date.', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, message || t('characters.chooseAdventureDate', {}, locale), participantsLabel)],
             components: buildAdventureDateRows(state),
         };
     }
 
     if (step === 'title') {
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Optional: add title and Game Master.', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, message || t('characters.chooseAdventureTitleAndGm', {}, locale), participantsLabel)],
             components: buildAdventureTitleRows(state),
         };
     }
 
     if (step === 'quest') {
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Was this a character quest (+1 bubble)?', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, message || t('characters.chooseAdventureQuest', {}, locale), participantsLabel)],
             components: buildAdventureQuestRows(state),
         };
     }
 
     if (step === 'notes') {
         return {
-            embeds: [buildAdventureStepEmbed(step, state, message || 'Add or edit notes.', participantsLabel)],
+            embeds: [buildAdventureStepEmbed(step, state, message || t('characters.chooseAdventureNotes', {}, locale), participantsLabel)],
             components: buildAdventureNotesRows(state),
         };
     }
@@ -432,13 +457,13 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
         const search = getParticipantSearch(searchKey, ownerDiscordId);
         const totalCount = participantTotal;
         const visibleCount = Math.min(25, participantOptions.length);
-        const baseMessage = message || 'Choose participants (approved characters).';
+        const baseMessage = message || t('characters.chooseAdventureParticipants', {}, locale);
         const participantsMessage = baseMessage;
         let footerNote = undefined;
         if (search) {
-            footerNote = `Filter: ${search} (${visibleCount}/${participantOptions.length})`;
+            footerNote = t('characters.participantsFilterFooter', { search, shown: visibleCount, total: participantOptions.length }, locale);
         } else if (totalCount > 25) {
-            footerNote = `Showing ${visibleCount} of ${totalCount}. Use search.`;
+            footerNote = t('characters.participantsShowingFooter', { shown: visibleCount, total: totalCount }, locale);
         }
         const components = buildAdventureParticipantsRows(state, participantOptions);
         return {
@@ -448,7 +473,7 @@ async function buildAdventureStepPayload({ interaction, state, message }) {
     }
 
     return {
-        embeds: [buildAdventureStepEmbed(step, state, message || 'Please confirm the details.', participantsLabel)],
+        embeds: [buildAdventureStepEmbed(step, state, message || t('characters.confirmAdventureDetails', {}, locale), participantsLabel)],
         components: buildAdventureConfirmRows(state),
     };
 }
@@ -755,6 +780,56 @@ async function syncCharacterApprovalAnnouncement(characterId) {
     return { ok: false, reason: 'sync_failed' };
 }
 
+async function deleteLinkedAccountViaBot(discordUserId) {
+    const appUrls = resolveApiBaseUrls();
+    const token = String(process.env.BOT_HTTP_TOKEN || '').trim();
+    if (appUrls.length === 0 || !token) {
+        console.warn('[bot] Account delete skipped: BOT_APP_URL/BOT_PUBLIC_APP_URL or BOT_HTTP_TOKEN missing.');
+        return { ok: false, reason: 'config_missing' };
+    }
+
+    for (const appUrl of appUrls) {
+        const endpoint = `${appUrl.replace(/\/$/, '')}/bot/account`;
+        enableInsecureTlsIfNeeded(endpoint);
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Bot-Token': token,
+                },
+                body: JSON.stringify({
+                    actor_discord_id: String(discordUserId),
+                }),
+                dispatcher: shouldAllowInsecure(endpoint) ? insecureAgent : undefined,
+            });
+
+            if (response.ok) {
+                return { ok: true };
+            }
+
+            let detail = '';
+            try {
+                const payload = await response.json();
+                detail = payload?.error || payload?.message || '';
+            } catch {
+                detail = '';
+            }
+
+            return {
+                ok: false,
+                status: response.status,
+                reason: detail || 'delete_failed',
+            };
+        } catch (error) {
+            console.warn('[bot] Account delete error.', error);
+        }
+    }
+
+    return { ok: false, reason: 'delete_failed' };
+}
+
 async function updateCharacterForDiscordAndSync(discordUser, characterId, payload) {
     const result = await updateCharacterForDiscord(discordUser, characterId, payload);
     if (result.ok) {
@@ -778,7 +853,7 @@ async function finalizeCharacterCreation(state) {
     const { data, ownerDiscordId } = state;
     if (!data.name || !data.externalLink || !data.startTier || !data.version || !data.guildStatus || !Array.isArray(data.classIds) || data.classIds.length === 0) {
         await updateCreationMessage(state, {
-            content: 'Character data incomplete. Please start again.',
+            content: t('characters.createIncomplete', {}, state.locale),
             embeds: [],
             components: [],
         });
@@ -803,7 +878,7 @@ async function finalizeCharacterCreation(state) {
 
     if (!result.ok) {
         await updateCreationMessage(state, {
-            content: 'Character could not be created.',
+            content: t('characters.createFailed', {}, state.locale),
             embeds: [],
             components: [],
         });
@@ -824,7 +899,7 @@ async function finalizeCharacterCreation(state) {
     const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
     if (!character) {
         await updateCreationMessage(state, {
-            content: 'Character created.',
+            content: t('characters.createSuccessFallback', {}, state.locale),
             embeds: [],
             components: [],
         });
@@ -855,8 +930,8 @@ async function handleCreationAvatarMessage(message) {
         const payload = {
             embeds: [buildAvatarStepEmbed(state, describeAvatarUploadIssue(validation.reason))],
             components: [
-                buildAvatarUploadRow(ownerDiscordId),
-                ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
+                buildAvatarUploadRow(ownerDiscordId, state.locale),
+                ...buildCreationStepActionRows(ownerDiscordId, 'avatar', state.locale),
             ],
             content: '',
         };
@@ -869,10 +944,10 @@ async function handleCreationAvatarMessage(message) {
     await message.delete().catch(() => undefined);
 
     const payload = {
-        embeds: [buildAvatarStepEmbed(state, 'Avatar saved. You can continue.')],
+        embeds: [buildAvatarStepEmbed(state, t('characters.createAvatarSaved', {}, state.locale))],
         components: [
-            buildAvatarUploadRow(ownerDiscordId),
-            ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
+            buildAvatarUploadRow(ownerDiscordId, state.locale),
+            ...buildCreationStepActionRows(ownerDiscordId, 'avatar', state.locale),
         ],
         content: '',
     };
@@ -929,7 +1004,7 @@ async function handleAvatarUpdateMessage(message) {
     }
 
     await state.promptMessage.edit({
-        ...buildCharacterManageView(character, { ownerDiscordId: state.ownerDiscordId }),
+        ...buildCharacterManageView(character, { ownerDiscordId: state.ownerDiscordId, locale: state.locale || await getLinkedUserLocaleForDiscord(message.author) }),
         content: '',
     }).catch(() => undefined);
     return true;
@@ -996,15 +1071,16 @@ async function updateDowntimeMessage(state, payload) {
 }
 
 async function buildDowntimeStepPayload({ state, message }) {
+    const locale = state?.locale || null;
     const step = state.step;
     const descriptionMap = {
-        duration: 'Choose the downtime duration.',
-        date: 'Choose the downtime date.',
-        type: 'Choose the downtime type.',
-        notes: 'Add or edit notes.',
-        confirm: 'Please confirm the details.',
+        duration: t('characters.chooseDowntimeDuration', {}, locale),
+        date: t('characters.chooseDowntimeDate', {}, locale),
+        type: t('characters.chooseDowntimeType', {}, locale),
+        notes: t('characters.chooseDowntimeNotes', {}, locale),
+        confirm: t('characters.confirmDowntimeDetails', {}, locale),
     };
-    const description = message || descriptionMap[step] || 'Continue.';
+    const description = message || descriptionMap[step] || t('common.next', {}, locale);
 
     if (step === 'duration') {
         return {
@@ -1040,10 +1116,11 @@ async function buildDowntimeStepPayload({ state, message }) {
 async function refreshAdventureManageView({ interaction, adventureId, characterId, ownerDiscordId }) {
     const { adventure, participants } = await getAdventureWithParticipants(interaction, adventureId);
     if (!adventure || Number(adventure.character_id) !== characterId) {
-        await updateManageMessage(interaction, { content: 'Adventure not found.', embeds: [], components: [] });
+        await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.adventureNotFound'), embeds: [], components: [] });
         return true;
     }
 
+    adventure.locale = await resolveInteractionLocale(interaction);
     const view = buildAdventureManageView({ adventure, participants, ownerDiscordId, characterId });
     await updateManageMessage(interaction, { content: '', embeds: [view.embed], components: view.components });
     return true;
@@ -1052,10 +1129,11 @@ async function refreshAdventureManageView({ interaction, adventureId, characterI
 async function refreshDowntimeManageView({ interaction, downtimeId, characterId, ownerDiscordId }) {
     const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
     if (!downtime || Number(downtime.character_id) !== characterId) {
-        await updateManageMessage(interaction, { content: 'Downtime not found.', embeds: [], components: [] });
+        await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), embeds: [], components: [] });
         return true;
     }
 
+    downtime.locale = await resolveInteractionLocale(interaction);
     const view = buildDowntimeManageView({ downtime, ownerDiscordId, characterId });
     await updateManageMessage(interaction, { content: '', embeds: [view.embed], components: view.components });
     return true;
@@ -1077,12 +1155,12 @@ async function handle(interaction) {
         const ownerDiscordId = interaction.customId.replace('charactersAction_new_', '');
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1099,7 +1177,7 @@ async function handle(interaction) {
             }
 
             await updateManageMessage(interaction, {
-                embeds: [buildCreationEmbed(1, 'Create character', 'You already have an open creation. Please finish it or click **Cancel**.')],
+                embeds: [buildCreationEmbed(1, t('characters.createTitle', {}, existingState.locale), t('characters.createExistingOpen', {}, existingState.locale))],
                 components: [buildCreationCancelRow(ownerDiscordId)],
                 flags: MessageFlags.Ephemeral,
             });
@@ -1110,6 +1188,7 @@ async function handle(interaction) {
             userId: ownerDiscordId,
             ownerDiscordId,
             channelId: interaction.channelId,
+            locale: await resolveInteractionLocale(interaction),
             step: 'basic',
             data: {
                 name: '',
@@ -1129,8 +1208,8 @@ async function handle(interaction) {
         setCreationState(ownerDiscordId, state);
 
         await interaction.update({
-            embeds: [buildCreationBasicsEmbed(state, 'Start with the basic details.')],
-            components: buildCreationBasicsRows(ownerDiscordId),
+            embeds: [buildCreationBasicsEmbed(state, t('characters.createBasicsStart', {}, state.locale))],
+            components: buildCreationBasicsRows(ownerDiscordId, state.locale),
             content: '',
         });
         return true;
@@ -1140,7 +1219,160 @@ async function handle(interaction) {
         const ownerDiscordId = interaction.customId.replace('charactersAction_refresh_', '');
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.deferUpdate().catch(() => undefined);
+        const characters = await listCharactersForDiscord(interaction.user);
+        const locale = await resolveInteractionLocale(interaction);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
+        await updateManageMessage(interaction, { ...listView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_settings_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_settings_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const locale = await resolveInteractionLocale(interaction);
+        const settingsView = buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale: locale });
+        await interaction.update({ ...settingsView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_language_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_language_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const languageView = buildCharacterLanguageView({ ownerDiscordId, locale, selectedLocale: locale });
+        await interaction.update({ ...languageView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && /^charactersAction_locale_(de|en)_/.test(interaction.customId)) {
+        const match = interaction.customId.match(/^charactersAction_locale_(de|en)_(.+)$/);
+        if (!match) {
+            return false;
+        }
+
+        const [, selectedLocale, ownerDiscordId] = match;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const persistedLocale = await updateLinkedUserLocaleForDiscord(interaction.user, selectedLocale);
+        const characters = await listCharactersForDiscord(interaction.user);
+        const settingsView = buildCharactersSettingsView({
+            ownerDiscordId,
+            characters,
+            locale: persistedLocale,
+            selectedLocale: persistedLocale,
+        });
+        await interaction.update({
+            ...settingsView,
+            content: t('characters.languageUpdated', { language: persistedLocale === 'en' ? 'English' : 'Deutsch' }, persistedLocale),
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_back_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_back_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const locale = await resolveInteractionLocale(interaction);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
+        await interaction.update({ ...listView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_delete-account_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_delete-account_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const locale = await resolveInteractionLocale(interaction);
+        const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale });
+        await interaction.update({ ...confirmView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_cancel-delete-account_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_cancel-delete-account_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const characters = await listCharactersForDiscord(interaction.user);
+        const locale = await resolveInteractionLocale(interaction);
+        const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
+        await interaction.update({ ...listView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_confirm-delete-account_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_confirm-delete-account_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
@@ -1150,16 +1382,33 @@ async function handle(interaction) {
         }
 
         await interaction.deferUpdate().catch(() => undefined);
-        const characters = await listCharactersForDiscord(interaction.user);
-        const listView = buildCharacterListView({ ownerDiscordId, characters });
-        await updateManageMessage(interaction, { ...listView, content: '' });
+        const deleteResult = await deleteLinkedAccountViaBot(interaction.user.id);
+
+        if (!deleteResult.ok) {
+            const detail = deleteResult.reason === 'config_missing'
+                ? 'Bot account deletion is temporarily unavailable.'
+                : deleteResult.reason === 'Linked account not found.'
+                    ? 'No linked app account was found for this Discord user.'
+                    : 'Account could not be deleted. Please try again later or use the website.';
+            const characters = await listCharactersForDiscord(interaction.user).catch(() => []);
+            const locale = await resolveInteractionLocale(interaction);
+            const confirmView = buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale });
+            await updateManageMessage(interaction, { ...confirmView, content: detail });
+            return true;
+        }
+
+        await updateManageMessage(interaction, {
+            content: `**Account deleted.**\n\n${notLinkedContent()}`,
+            embeds: [],
+            components: [buildNotLinkedButtons(interaction.user.id)],
+        });
         return true;
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersSelect_')) {
         const ownerDiscordId = interaction.customId.replace('charactersSelect_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
@@ -1167,7 +1416,7 @@ async function handle(interaction) {
 
         const selectedId = Number(interaction.values[0]);
         if (!Number.isFinite(selectedId) || selectedId < 1) {
-            await updateManageMessage(interaction, { content: 'Invalid selection.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidSelection'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1183,7 +1432,7 @@ async function handle(interaction) {
         }
 
         if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1197,13 +1446,13 @@ async function handle(interaction) {
     if (interaction.isModalSubmit() && interaction.customId.startsWith('charactersCreate_basic_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_basic_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1212,11 +1461,11 @@ async function handle(interaction) {
         const notes = interaction.fields.getTextInputValue('createNotes').trim();
 
         if (!name) {
-            await showCreationError(interaction, state, ownerDiscordId, 'Name fehlt.');
+            await showCreationError(interaction, state, ownerDiscordId, t('characters.createNameMissing', {}, state.locale));
             return true;
         }
         if (!isExternalCharacterLink(externalLink)) {
-            await showCreationError(interaction, state, ownerDiscordId, 'Bitte nutze einen DnDBeyond-Charakterlink (https://www.dndbeyond.com/characters/...).');
+            await showCreationError(interaction, state, ownerDiscordId, t('characters.createInvalidLink', {}, state.locale));
             return true;
         }
 
@@ -1253,14 +1502,15 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_cancel_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_cancel_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         clearCreationState(ownerDiscordId);
         try {
             const characters = await listCharactersForDiscord(interaction.user);
-            const listView = buildCharacterListView({ ownerDiscordId, characters });
+            const locale = await resolveInteractionLocale(interaction);
+            const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
             await interaction.update({ ...listView, content: '' });
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
@@ -1279,13 +1529,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_classes_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_classes_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1296,7 +1546,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
+                buildCreationEmbed(3, t('characters.createClassesTitle', {}, state.locale), t('characters.createClassesDescription', {}, state.locale)),
             ],
             components: [
                 buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
@@ -1310,13 +1560,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_tier_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_tier_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1333,7 +1583,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
+                buildCreationEmbed(4, t('characters.createTierTitle', {}, state.locale), t('characters.createTierDescription', {}, state.locale)),
             ],
             components: [
                 buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
@@ -1347,13 +1597,13 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_faction_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_faction_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         const state = getCreationState(ownerDiscordId);
         if (!state) {
-            await updateManageMessage(interaction, { content: 'No active creation found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.createNoActive'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1363,7 +1613,7 @@ async function handle(interaction) {
 
         await interaction.update({
             embeds: [
-                buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
+                buildCreationEmbed(5, t('characters.createFactionTitle', {}, state.locale), t('characters.createFactionDescription', {}, state.locale)),
             ],
             components: [
                 buildFactionRow(ownerDiscordId, state.data.faction),
@@ -1377,7 +1627,7 @@ async function handle(interaction) {
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('charactersCreate_version_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_version_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
@@ -1407,7 +1657,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_confirm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_confirm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
@@ -1427,7 +1677,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_back_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_back_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
@@ -1544,7 +1794,7 @@ async function handle(interaction) {
         const suffix = interaction.customId.replace('charactersCreate_next_', '');
         const [stepKey, ownerDiscordId] = suffix.split('_');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1711,7 +1961,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_basicopen_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_basicopen_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1730,7 +1980,7 @@ async function handle(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('charactersCreate_avatar_dm_')) {
         const ownerDiscordId = interaction.customId.replace('charactersCreate_avatar_dm_', '');
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1762,7 +2012,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1785,7 +2035,7 @@ async function handle(interaction) {
             }
 
             await interaction.update({
-                ...buildCharacterManageView(character, { ownerDiscordId }),
+                ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
                 content: '',
             });
         } catch (error) {
@@ -1804,7 +2054,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1818,7 +2068,7 @@ async function handle(interaction) {
 
         const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { faction });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1829,7 +2079,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterManageView(character, { ownerDiscordId }),
+            ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
             content: '',
         });
         return true;
@@ -1841,7 +2091,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1879,7 +2129,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterManageView(character, { ownerDiscordId }),
+            ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -1891,7 +2141,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1909,7 +2159,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterManageView(character, { ownerDiscordId }),
+            ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -1921,7 +2171,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1939,7 +2189,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterManageView(character, { ownerDiscordId }),
+            ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -1951,7 +2201,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1969,7 +2219,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterManageView(character, { ownerDiscordId }),
+            ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -1981,7 +2231,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1992,12 +2242,12 @@ async function handle(interaction) {
         }
 
         if (!character.simplified_tracking) {
-            await updateManageMessage(interaction, { content: 'Set level is only available in simplified tracking.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.setLevelOnlySimplified'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!canCharacterLogActivity(character)) {
-            await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFirst'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2005,7 +2255,7 @@ async function handle(interaction) {
         const parsedLevel = Number(rawLevel);
         const level = Number.isFinite(parsedLevel) ? Math.floor(parsedLevel) : NaN;
         if (!Number.isFinite(level) || level < 1 || level > 20) {
-            await updateManageMessage(interaction, { content: 'Please enter a level between 1 and 20.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.levelBetweenOneAndTwenty'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2013,23 +2263,23 @@ async function handle(interaction) {
         if (!result.ok) {
             if (result.reason === 'below_real' && result.minLevel) {
                 await updateManageMessage(interaction, {
-                    content: `Level cannot be set below ${result.minLevel} based on recorded adventures.`,
+                    content: await translateInteraction(interaction, 'characters.levelCannotBeBelowReal', { level: result.minLevel }),
                     flags: MessageFlags.Ephemeral,
                 });
                 return true;
             }
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const refreshed = await findCharacterForDiscord(interaction.user, characterId);
         if (!refreshed) {
-            await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterUpdated'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterManageView(refreshed, { ownerDiscordId }),
+            ...buildCharacterManageView(refreshed, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -2043,18 +2293,18 @@ async function handle(interaction) {
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!isCharacterStatusSwitchEnabled) {
-            await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registrationDisabled'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const character = await findCharacterForDiscord(interaction.user, characterId);
         if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2074,13 +2324,13 @@ async function handle(interaction) {
             registrationNote,
         });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Could not register character right now.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFailed'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const refreshed = await findCharacterForDiscord(interaction.user, characterId);
         if (!refreshed) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2095,12 +2345,12 @@ async function handle(interaction) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
-            await updateManageMessage(interaction, { content: 'Invalid character ID.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidCharacterId'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2115,13 +2365,13 @@ async function handle(interaction) {
             throw error;
         }
         if (!character) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         if (action === 'manage') {
             await interaction.update({
-                ...buildCharacterManageView(character, { ownerDiscordId }),
+                ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
                 content: '',
             });
             return true;
@@ -2129,7 +2379,7 @@ async function handle(interaction) {
 
         if (action === 'del') {
             await interaction.update({
-                content: 'Delete character?',
+                content: await translateInteraction(interaction, 'characters.deleteCharacterPrompt'),
                 components: [buildDeleteConfirmRow({ characterId: character.id, ownerDiscordId })],
             });
             return true;
@@ -2137,7 +2387,7 @@ async function handle(interaction) {
 
         if (action === 'register') {
             if (!isCharacterStatusSwitchEnabled) {
-                await updateManageMessage(interaction, { content: 'Registration is currently disabled.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registrationDisabled'), flags: MessageFlags.Ephemeral });
                 return true;
             }
 
@@ -2159,20 +2409,20 @@ async function handle(interaction) {
 
         if (action === 'adv') {
             if (!canCharacterLogActivity(character)) {
-                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFirst'), flags: MessageFlags.Ephemeral });
                 return true;
             }
-            const row = buildAdventureMenuRow(character, ownerDiscordId);
+            const row = buildAdventureMenuRow(character, ownerDiscordId, await resolveInteractionLocale(interaction));
             await interaction.update({ components: [row], content: '' });
             return true;
         }
 
         if (action === 'dt') {
             if (!canCharacterLogActivity(character)) {
-                await updateManageMessage(interaction, { content: 'Register with Magiergilde first.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFirst'), flags: MessageFlags.Ephemeral });
                 return true;
             }
-            const row = buildDowntimeMenuRow(character, ownerDiscordId);
+            const row = buildDowntimeMenuRow(character, ownerDiscordId, await resolveInteractionLocale(interaction));
             await interaction.update({ components: [row], content: '' });
             return true;
         }
@@ -2195,7 +2445,8 @@ async function handle(interaction) {
             await interaction.deferUpdate();
             try {
                 const characters = await listCharactersForDiscord(interaction.user);
-                const listView = buildCharacterListView({ ownerDiscordId, characters });
+                const locale = await resolveInteractionLocale(interaction);
+                const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
                 await interaction.editReply({
                     ...listView,
                     content: '',
@@ -2227,7 +2478,7 @@ async function handle(interaction) {
         }
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2294,7 +2545,7 @@ async function handle(interaction) {
             });
 
             await interaction.update({
-                ...buildCharacterManageView(character, { ownerDiscordId }),
+                ...buildCharacterManageView(character, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
                 content: '',
             });
             return true;
@@ -2302,6 +2553,7 @@ async function handle(interaction) {
 
         if (action === 'classes') {
             try {
+                character.locale = await resolveInteractionLocale(interaction);
                 const classesView = await buildCharacterClassesView({ interaction, character, ownerDiscordId });
                 await interaction.update({
                     embeds: [classesView.embed],
@@ -2319,6 +2571,7 @@ async function handle(interaction) {
         }
 
         if (action === 'faction') {
+            character.locale = await resolveInteractionLocale(interaction);
             const factionView = buildCharacterFactionView({ character, ownerDiscordId });
             await interaction.update({
                 embeds: [factionView.embed],
@@ -2343,7 +2596,7 @@ async function handle(interaction) {
             }
 
             await interaction.update({
-                ...buildCharacterManageView(refreshed, { ownerDiscordId }),
+                ...buildCharacterManageView(refreshed, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
                 content: '',
             });
             return true;
@@ -2366,7 +2619,7 @@ async function handle(interaction) {
             }
 
             await interaction.update({
-                ...buildCharacterManageView(refreshed, { ownerDiscordId }),
+                ...buildCharacterManageView(refreshed, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
                 content: '',
             });
             return true;
@@ -2457,7 +2710,7 @@ async function handle(interaction) {
             return true;
         }
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2509,7 +2762,7 @@ async function handle(interaction) {
             return true;
         }
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
         if (action === 'deleteCharacterCancel') {
@@ -2553,7 +2806,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2590,7 +2843,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2620,7 +2873,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2637,7 +2890,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2689,7 +2942,7 @@ async function handle(interaction) {
         const ownerDiscordId = parts[4];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2729,7 +2982,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2763,7 +3016,7 @@ async function handle(interaction) {
         const ownerDiscordId = parts[4];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2797,7 +3050,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2830,7 +3083,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2853,7 +3106,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2879,7 +3132,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2902,7 +3155,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2926,7 +3179,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3025,7 +3278,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3052,7 +3305,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3120,18 +3373,19 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const searchKey = `create-${characterId}`;
+        const locale = await resolveInteractionLocale(interaction);
         const modal = new ModalBuilder()
             .setCustomId(`advCreate_participants_searchModal_${characterId}_${ownerDiscordId}`)
-            .setTitle('Search participants');
+            .setTitle(t('characters.participantSearchTitle', {}, locale));
 
         const searchInput = new TextInputBuilder()
             .setCustomId('participantSearch')
-            .setLabel('Search by name')
+            .setLabel(t('characters.participantSearchCreateLabel', {}, locale))
             .setStyle(TextInputStyle.Short)
             .setRequired(false)
             .setValue(safeModalValue(getParticipantSearch(searchKey, ownerDiscordId), 100));
@@ -3149,7 +3403,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3174,7 +3428,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3197,19 +3451,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         try {
             const adventures = await listAdventuresForDiscord(interaction.user, characterId, 25);
             if (adventures.length === 0) {
-                await updateManageMessage(interaction, { content: 'No adventures found.', embeds: [], components: [] });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.noAdventuresFound'), embeds: [], components: [] });
                 return true;
             }
+            const locale = await resolveInteractionLocale(interaction);
             await updateManageMessage(interaction, {
-                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
-                components: buildAdventureListRows({ characterId, ownerDiscordId, adventures }),
+                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle(t('characters.adventureField', {}, locale)).setDescription(t('characters.chooseAdventure', {}, locale))],
+                components: buildAdventureListRows({ characterId, ownerDiscordId, adventures, locale }),
                 content: '',
             });
         } catch (error) {
@@ -3223,7 +3478,7 @@ async function handle(interaction) {
                 });
                 return true;
             }
-            await updateManageMessage(interaction, { content: 'Failed to load adventures.', embeds: [], components: [] });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.failedLoadAdventures'), embeds: [], components: [] });
         }
         return true;
     }
@@ -3236,7 +3491,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3248,7 +3503,7 @@ async function handle(interaction) {
         await updateDowntimeMessage(state, await buildDowntimeStepPayload({
             interaction,
             state,
-            message: 'Choose the downtime duration.',
+            message: t('characters.chooseDowntimeDuration', {}, state.locale),
         }));
         return true;
     }
@@ -3260,7 +3515,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3282,7 +3537,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3295,7 +3550,7 @@ async function handle(interaction) {
             await updateDowntimeMessage(state, await buildDowntimeStepPayload({
                 interaction,
                 state,
-                message: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.',
+                message: t('characters.invalidDuration', {}, state.locale),
             }));
             return true;
         }
@@ -3313,7 +3568,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3335,7 +3590,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3348,7 +3603,7 @@ async function handle(interaction) {
             await updateDowntimeMessage(state, await buildDowntimeStepPayload({
                 interaction,
                 state,
-                message: 'Invalid date. Use YYYY-MM-DD.',
+                message: t('characters.invalidDate', {}, state.locale),
             }));
             return true;
         }
@@ -3366,7 +3621,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3387,7 +3642,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3406,7 +3661,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3426,7 +3681,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3435,7 +3690,7 @@ async function handle(interaction) {
 
         if (state.step === 'duration') {
             clearDowntimeCreationState(ownerDiscordId);
-            await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId)] });
+            await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId, state.locale)] });
             return true;
         }
 
@@ -3452,12 +3707,12 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         clearDowntimeCreationState(ownerDiscordId);
-        await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId)] });
+        await interaction.update({ content: '', embeds: [], components: [buildDowntimeMenuRow({ id: characterId }, ownerDiscordId, await resolveInteractionLocale(interaction))] });
         return true;
     }
 
@@ -3469,7 +3724,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3480,7 +3735,7 @@ async function handle(interaction) {
             await updateDowntimeMessage(state, await buildDowntimeStepPayload({
                 interaction,
                 state,
-                message: 'Please set a duration before continuing.',
+                message: t('characters.continueWithDuration', {}, state.locale),
             }));
             return true;
         }
@@ -3489,7 +3744,7 @@ async function handle(interaction) {
             await updateDowntimeMessage(state, await buildDowntimeStepPayload({
                 interaction,
                 state,
-                message: 'Please set a date before continuing.',
+                message: t('characters.continueWithDate', {}, state.locale),
             }));
             return true;
         }
@@ -3507,7 +3762,7 @@ async function handle(interaction) {
         const ownerDiscordId = match[2];
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3588,7 +3843,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3599,7 +3854,7 @@ async function handle(interaction) {
             return null;
         })();
         if (!normalizedTypee) {
-            await updateManageMessage(interaction, { content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidType'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3608,11 +3863,11 @@ async function handle(interaction) {
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
 
         if (duration === null) {
-            await updateManageMessage(interaction, { content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidDuration'), flags: MessageFlags.Ephemeral });
             return true;
         }
         if (!startDate) {
-            await updateManageMessage(interaction, { content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidDate'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3626,13 +3881,13 @@ async function handle(interaction) {
             });
 
             if (!result.ok) {
-                await updateManageMessage(interaction, { content: 'Downtime could not be saved.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeSaveFailed'), flags: MessageFlags.Ephemeral });
                 return true;
             }
 
             const downtime = await findDowntimeForDiscord(interaction.user, result.id);
             if (!downtime) {
-                await updateManageMessage(interaction, { content: 'Downtime saved.', flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeSaved'), flags: MessageFlags.Ephemeral });
                 return true;
             }
 
@@ -3649,7 +3904,7 @@ async function handle(interaction) {
                 await replyNotLinked(interaction);
                 return true;
             }
-            await updateManageMessage(interaction, { content: 'Failed to save downtime.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeSaveFailed'), flags: MessageFlags.Ephemeral });
         }
         return true;
     }
@@ -3660,19 +3915,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', embeds: [], components: [] });
+            await updateActionDenied(interaction, { embeds: [], components: [] });
             return true;
         }
 
         try {
             const downtimes = await listDowntimesForDiscord(interaction.user, characterId, 25);
             if (downtimes.length === 0) {
-                await updateManageMessage(interaction, { content: 'No downtimes found.', embeds: [], components: [] });
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.noDowntimesFound'), embeds: [], components: [] });
                 return true;
             }
+            const locale = await resolveInteractionLocale(interaction);
             await updateManageMessage(interaction, {
-                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
-                components: buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }),
+                embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle(t('characters.downtimeField', {}, locale)).setDescription(t('characters.chooseDowntime', {}, locale))],
+                components: buildDowntimeListRows({ characterId, ownerDiscordId, downtimes, locale }),
                 content: '',
             });
         } catch (error) {
@@ -3686,7 +3942,7 @@ async function handle(interaction) {
                 });
                 return true;
             }
-            await updateManageMessage(interaction, { content: 'Failed to load downtimes.', embeds: [], components: [] });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.failedLoadDowntimes'), embeds: [], components: [] });
         }
         return true;
     }
@@ -3698,7 +3954,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1 || !Number.isFinite(adventureId) || adventureId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3713,20 +3969,21 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventure = await loadEditableAdventure(interaction, adventureId, characterId);
         if (!adventure) return true;
 
+        const locale = await resolveInteractionLocale(interaction);
         const modal = new ModalBuilder()
             .setCustomId(`advParticipantsSearchModal_${adventureId}_${characterId}_${ownerDiscordId}`)
-            .setTitle('Search participants');
+            .setTitle(t('characters.participantSearchTitle', {}, locale));
 
         const searchInput = new TextInputBuilder()
             .setCustomId('participantSearch')
-            .setLabel('Search (name or label)')
+            .setLabel(t('characters.participantSearchManageLabel', {}, locale))
             .setStyle(TextInputStyle.Short)
             .setRequired(false)
             .setValue(safeModalValue(getParticipantSearch(adventureId, ownerDiscordId), 100));
@@ -3743,7 +4000,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3768,7 +4025,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3825,7 +4082,7 @@ async function handle(interaction) {
 
         const view = await buildAdventureParticipantsView({ interaction, adventureId, characterId, ownerDiscordId });
         if (view.error) {
-            await interaction.update({ content: 'Adventure not found.', embeds: [], components: [] });
+            await interaction.update({ content: await translateInteraction(interaction, 'characters.adventureNotFound'), embeds: [], components: [] });
             return true;
         }
 
@@ -3840,7 +4097,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3870,7 +4127,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3885,7 +4142,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1 || !Number.isFinite(downtimeId) || downtimeId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3899,7 +4156,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3913,7 +4170,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3935,7 +4192,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3964,7 +4221,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3986,7 +4243,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4015,7 +4272,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4037,7 +4294,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4062,7 +4319,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4084,7 +4341,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4108,7 +4365,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4126,7 +4383,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4151,7 +4408,7 @@ async function handle(interaction) {
         const { recordId: adventureId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4175,7 +4432,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4183,7 +4440,7 @@ async function handle(interaction) {
         if (!adventure) return true;
 
         await interaction.update({
-            content: 'Delete adventure?',
+            content: await translateInteraction(interaction, 'characters.deleteAdventurePrompt'),
             components: [buildAdventureDeleteConfirmRow({ adventureId, characterId, ownerDiscordId })],
         });
         return true;
@@ -4196,7 +4453,7 @@ async function handle(interaction) {
         if (!Number.isFinite(adventureId) || adventureId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4213,17 +4470,18 @@ async function handle(interaction) {
         try {
             const result = await softDeleteAdventureForDiscord(interaction.user, adventureId);
             if (!result.ok) {
-                await interaction.update({ content: 'Adventure not found or already deleted.', embeds: [], components: [] });
+                await interaction.update({ content: await translateInteraction(interaction, 'characters.adventureNotFoundOrDeleted'), embeds: [], components: [] });
                 return true;
             }
 
+            const locale = await resolveInteractionLocale(interaction);
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back to list')
+                    .setLabel(t('characters.backToList', {}, locale))
                     .setStyle(ButtonStyle.Secondary),
             );
-            await interaction.update({ content: 'Adventure deleted.', embeds: [], components: [row] });
+            await interaction.update({ content: t('characters.adventureDeleted', {}, locale), embeds: [], components: [row] });
         } catch (error) {
              
             console.error(error);
@@ -4231,7 +4489,7 @@ async function handle(interaction) {
                 await interaction.update({ content: notLinkedContent(), embeds: [], components: [] });
                 return true;
             }
-            await interaction.update({ content: `Delete failed: ${error.message}`, embeds: [], components: [] });
+            await interaction.update({ content: await translateInteraction(interaction, 'characters.deleteFailed', { message: error.message }), embeds: [], components: [] });
         }
         return true;
     }
@@ -4242,19 +4500,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const adventures = await listAdventuresForDiscord(interaction.user, characterId, 25);
         if (adventures.length === 0) {
-            await interaction.update({ content: 'No adventures found.', embeds: [], components: [] });
+            await interaction.update({ content: await translateInteraction(interaction, 'characters.noAdventuresFound'), embeds: [], components: [] });
             return true;
         }
 
+        const locale = await resolveInteractionLocale(interaction);
         await interaction.update({
-            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Adventure').setDescription('Choose an adventure.')],
-            components: buildAdventureListRows({ characterId, ownerDiscordId, adventures }),
+            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle(t('characters.adventureField', {}, locale)).setDescription(t('characters.chooseAdventure', {}, locale))],
+            components: buildAdventureListRows({ characterId, ownerDiscordId, adventures, locale }),
             content: '',
         });
         return true;
@@ -4266,7 +4525,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4299,7 +4558,7 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4332,7 +4591,7 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4346,13 +4605,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4371,19 +4630,19 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const duration = parseDurationToSeconds(interaction.fields.getTextInputValue('dtDuration'));
         if (duration === null) {
-            await updateManageMessage(interaction, { content: 'Invalid duration. Use HH:MM (e.g. 03:00), 400h 30m, or minutes.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidDuration'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { duration });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4397,13 +4656,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4422,19 +4681,19 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const startDate = parseIsoDate(interaction.fields.getTextInputValue('dtDate'));
         if (!startDate) {
-            await updateManageMessage(interaction, { content: 'Invalid date. Use YYYY-MM-DD.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidDate'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { startDate });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4448,13 +4707,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4469,19 +4728,19 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const typeValue = String(interaction.values?.[0] || '').toLowerCase();
         if (typeValue !== 'faction' && typeValue !== 'other') {
-            await updateManageMessage(interaction, { content: 'Invalid type. Use `faction` or `other`.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.invalidType'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { type: typeValue });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4495,13 +4754,13 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtime = await findDowntimeForDiscord(interaction.user, downtimeId);
         if (!downtime || Number(downtime.character_id) !== characterId) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4520,14 +4779,14 @@ async function handle(interaction) {
         const { recordId: downtimeId, characterId, ownerDiscordId } = parsed;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const notes = (interaction.fields.getTextInputValue('dtNotes') || '').trim();
         const result = await updateDowntimeForDiscord(interaction.user, downtimeId, { notes });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Downtime not found.', flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.downtimeNotFound'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4542,12 +4801,12 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         await interaction.update({
-            content: 'Delete downtime?',
+            content: await translateInteraction(interaction, 'characters.deleteDowntimePrompt'),
             components: [buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId })],
         });
         return true;
@@ -4560,7 +4819,7 @@ async function handle(interaction) {
         if (!Number.isFinite(downtimeId) || downtimeId < 1 || !Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -4574,17 +4833,18 @@ async function handle(interaction) {
         try {
             const result = await softDeleteDowntimeForDiscord(interaction.user, downtimeId);
             if (!result.ok) {
-                await interaction.update({ content: 'Downtime not found or already deleted.', embeds: [], components: [] });
+                await interaction.update({ content: await translateInteraction(interaction, 'characters.downtimeNotFoundOrDeleted'), embeds: [], components: [] });
                 return true;
             }
 
+            const locale = await resolveInteractionLocale(interaction);
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dtBack_${characterId}_${ownerDiscordId}`)
-                    .setLabel('Back to list')
+                    .setLabel(t('characters.backToList', {}, locale))
                     .setStyle(ButtonStyle.Secondary),
             );
-            await interaction.update({ content: 'Downtime deleted.', embeds: [], components: [row] });
+            await interaction.update({ content: t('characters.downtimeDeleted', {}, locale), embeds: [], components: [row] });
         } catch (error) {
              
             console.error(error);
@@ -4592,7 +4852,7 @@ async function handle(interaction) {
                 await interaction.update({ content: notLinkedContent(), embeds: [], components: [] });
                 return true;
             }
-            await interaction.update({ content: `Delete failed: ${error.message}`, embeds: [], components: [] });
+            await interaction.update({ content: await translateInteraction(interaction, 'characters.deleteFailed', { message: error.message }), embeds: [], components: [] });
         }
         return true;
     }
@@ -4603,19 +4863,20 @@ async function handle(interaction) {
         if (!Number.isFinite(characterId) || characterId < 1) return false;
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
-            await updateManageMessage(interaction, { content: 'You cannot perform this action.', flags: MessageFlags.Ephemeral });
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
             return true;
         }
 
         const downtimes = await listDowntimesForDiscord(interaction.user, characterId, 25);
         if (downtimes.length === 0) {
-            await interaction.update({ content: 'No downtimes found.', embeds: [], components: [] });
+            await interaction.update({ content: await translateInteraction(interaction, 'characters.noDowntimesFound'), embeds: [], components: [] });
             return true;
         }
 
+        const locale = await resolveInteractionLocale(interaction);
         await interaction.update({
-            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle('Downtime').setDescription('Choose a downtime.')],
-            components: buildDowntimeListRows({ characterId, ownerDiscordId, downtimes }),
+            embeds: [new EmbedBuilder().setColor(0x4f46e5).setTitle(t('characters.downtimeField', {}, locale)).setDescription(t('characters.chooseDowntime', {}, locale))],
+            components: buildDowntimeListRows({ characterId, ownerDiscordId, downtimes, locale }),
             content: '',
         });
         return true;
@@ -4630,3 +4891,4 @@ module.exports = {
     handleAvatarUpdateMessage,
     storeCharacterAvatar,
 };
+

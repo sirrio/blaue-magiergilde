@@ -11,8 +11,10 @@ const {
     StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const { commandName } = require('../../commandConfig');
+const { t } = require('../../i18n');
 const {
     DiscordNotLinkedError,
+    getLinkedUserLocaleForDiscord,
     listCharactersForDiscord,
 } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
@@ -166,27 +168,45 @@ function guildStatusEmoji(value) {
     return '⏳';
 }
 
-function guildStatusNextStep(value) {
+function guildStatusNextStep(value, locale) {
     const status = normalizeGuildStatus(value);
     if (status === 'draft') {
-        return 'Register with Magiergilde to submit this character for review.';
+        return t('characters.nextStepDraft');
     }
     if (status === 'pending') {
-        return 'Waiting for Magiergilde review.';
+        return t('characters.nextStepPending');
     }
     if (status === 'needs_changes') {
-        return 'Apply the requested changes, then register the character again.';
+        return t('characters.nextStepNeedsChanges');
     }
     if (status === 'declined') {
-        return 'Review declined. Check the review note before submitting again.';
+        return t('characters.nextStepDeclined');
     }
     if (status === 'approved') {
-        return 'Approved for Magiergilde.';
+        return t('characters.nextStepApproved');
     }
     if (status === 'retired') {
-        return 'Retired.';
+        return t('characters.nextStepRetired');
     }
     return null;
+}
+
+function normalizeUserLocale(value) {
+    const locale = String(value || '').trim().toLowerCase();
+    if (locale === 'en') {
+        return 'en';
+    }
+
+    return 'de';
+}
+
+function languageLabel(value, locale) {
+    const normalized = normalizeUserLocale(value);
+    if (normalized === 'en') {
+        return t('characters.languageEnglish', {}, locale);
+    }
+
+    return t('characters.languageGerman', {}, locale);
 }
 
 function tryBuildLocalAvatarAttachment(character) {
@@ -215,14 +235,17 @@ function tryBuildLocalAvatarAttachment(character) {
     return { filePath, fileName: safeName };
 }
 
-function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
+function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level);
     const classNames = String(character.class_names || '').trim();
     const statusLabel = guildStatusLabel(character.guild_status);
     const statusEmoji = guildStatusEmoji(character.guild_status);
-    const statusNextStep = guildStatusNextStep(character.guild_status);
+    const statusNextStep = guildStatusNextStep(character.guild_status, locale);
     const hasRoom = safeInt(character.has_room) > 0;
+    const simplifiedTracking = Boolean(character.simplified_tracking);
+    const hasAutoLevelAdventure = Boolean(safeInt(character.has_pseudo_adventure));
+    const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure;
 
     const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -237,6 +260,15 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
+    const adventuresValue = downtimeDisabledInSimpleMode
+        ? `Played: **?**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`
+        : `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`;
+    const factionsValue = downtimeDisabledInSimpleMode
+        ? `${factionName}\nLevel: **?**`
+        : `${factionName}\nLevel: **${factionLevel}**`;
+    const downtimeValue = downtimeDisabledInSimpleMode
+        ? 'Cannot calculate downtime while simple mode entries exist.'
+        : `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`;
 
     const titleParts = [
         String(character.name || `Character ${character.id}`),
@@ -252,9 +284,9 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
             { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
             { name: 'Progress', value: `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`, inline: false },
-            { name: 'Adventures', value: `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`, inline: true },
-            { name: 'Factions', value: `${factionName}\nLevel: **${factionLevel}**`, inline: true },
-            { name: 'Downtime', value: `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`, inline: false },
+            { name: 'Adventures', value: adventuresValue, inline: true },
+            { name: 'Factions', value: factionsValue, inline: true },
+            { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
             { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
         );
@@ -281,7 +313,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment }) {
     return embed;
 }
 
-function buildCharacterListView({ ownerDiscordId, characters }) {
+function buildCharacterListView({ ownerDiscordId, characters, locale }) {
     const simplifiedCount = characters.filter(character => Boolean(character.simplified_tracking)).length;
     const unmaskedCount = characters.filter(character => {
         const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
@@ -291,19 +323,19 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
     }).length;
 
     const summary = new EmbedBuilder()
-        .setTitle('Your Characters')
+        .setTitle(t('characters.dashboardTitle', {}, locale))
         .setColor(0x4f46e5)
         .setDescription(
             characters.length > 0
-                ? `**${characters.length}** active. Choose a character or create a new one.`
-                : 'No characters yet. Create your first with **New**.',
+                ? t('characters.dashboardDescription', { count: characters.length }, locale)
+                : t('characters.dashboardDescriptionEmpty', {}, locale),
         );
     summary.addFields({
-        name: 'Per-character settings',
+        name: t('characters.perCharacterSettingsTitle', {}, locale),
         value: [
-            `Simplified tracking: **${simplifiedCount}**/${characters.length || 0}`,
-            `Unmasked token: **${unmaskedCount}**/${characters.length || 0}`,
-            'Change these in **Manage** per character.',
+            t('characters.perCharacterSimplifiedTracking', { count: simplifiedCount, total: characters.length || 0 }, locale),
+            t('characters.perCharacterUnmaskedToken', { count: unmaskedCount, total: characters.length || 0 }, locale),
+            t('characters.perCharacterManageHint', {}, locale),
         ].join('\n'),
         inline: false,
     });
@@ -313,7 +345,7 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
     if (selection.length > 0) {
         const select = new StringSelectMenuBuilder()
             .setCustomId(`charactersSelect_${ownerDiscordId}`)
-            .setPlaceholder('Select character...')
+            .setPlaceholder(t('characters.selectPlaceholder', {}, locale))
             .addOptions(
                 selection.map(character => {
                     const option = new StringSelectMenuOptionBuilder()
@@ -329,35 +361,142 @@ function buildCharacterListView({ ownerDiscordId, characters }) {
         components.push(new ActionRowBuilder().addComponents(select));
 
         if (characters.length > selection.length) {
-            summary.setFooter({ text: `Showing ${selection.length} of ${characters.length}.` });
+            summary.setFooter({ text: t('characters.showingCount', { shown: selection.length, total: characters.length }, locale) });
         }
     }
 
     components.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`charactersAction_new_${ownerDiscordId}`)
-            .setLabel('New')
+            .setLabel(t('common.new', {}, locale))
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId(`charactersAction_refresh_${ownerDiscordId}`)
-            .setLabel('Refresh')
+            .setLabel(t('common.refresh', {}, locale))
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`charactersAction_settings_${ownerDiscordId}`)
+            .setLabel(t('common.settings', {}, locale))
             .setStyle(ButtonStyle.Secondary),
     ));
 
     return { embeds: [summary], components };
 }
 
+function buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale }) {
+    const settings = new EmbedBuilder()
+        .setTitle(t('characters.settingsTitle', {}, locale))
+        .setColor(0x4f46e5)
+        .setDescription(t('characters.settingsDescription', {}, locale))
+        .addFields({
+            name: t('characters.settingsAccountTitle', {}, locale),
+            value: [
+                t('characters.settingsCharactersInAccount', { count: characters.length }, locale),
+                t('characters.settingsDeleteHint', {}, locale),
+            ].join('\n'),
+            inline: false,
+        }, {
+            name: t('characters.settingsLanguageTitle', {}, locale),
+            value: [
+                t('characters.settingsLanguageCurrent', { language: languageLabel(selectedLocale, locale) }, locale),
+                t('characters.settingsLanguageHint', {}, locale),
+            ].join('\n'),
+            inline: false,
+        });
+
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_language_${ownerDiscordId}`)
+                .setLabel(t('characters.language', {}, locale))
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_delete-account_${ownerDiscordId}`)
+                .setLabel(t('characters.deleteAccount', {}, locale))
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_back_${ownerDiscordId}`)
+                .setLabel(t('common.back', {}, locale))
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embeds: [settings], components };
+}
+
+function buildCharacterLanguageView({ ownerDiscordId, locale, selectedLocale }) {
+    const embed = new EmbedBuilder()
+        .setTitle(t('characters.languageSelectionTitle', {}, locale))
+        .setColor(0x4f46e5)
+        .setDescription(t('characters.languageSelectionDescription', {}, locale))
+        .addFields({
+            name: t('characters.settingsLanguageTitle', {}, locale),
+            value: t('characters.settingsLanguageCurrent', { language: languageLabel(selectedLocale, locale) }, locale),
+            inline: false,
+        });
+
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_locale_de_${ownerDiscordId}`)
+                .setLabel(t('characters.languageGerman', {}, locale))
+                .setStyle(normalizeUserLocale(selectedLocale) === 'de' ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_locale_en_${ownerDiscordId}`)
+                .setLabel(t('characters.languageEnglish', {}, locale))
+                .setStyle(normalizeUserLocale(selectedLocale) === 'en' ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_settings_${ownerDiscordId}`)
+                .setLabel(t('common.back', {}, locale))
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embeds: [embed], components };
+}
+
+function buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale }) {
+    const warning = new EmbedBuilder()
+        .setTitle(t('characters.deleteAccountTitle', {}, locale))
+        .setColor(0xef4444)
+        .setDescription(t('characters.deleteAccountDescription', {}, locale))
+        .addFields({
+            name: t('characters.deleteAccountWhatHappens', {}, locale),
+            value: [
+                t('characters.deleteAccountBodyCharacters', { count: characters.length }, locale),
+                t('characters.deleteAccountBodyDeleted', {}, locale),
+                t('characters.deleteAccountBodyWarning', {}, locale),
+            ].join('\n'),
+            inline: false,
+        });
+
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_confirm-delete-account_${ownerDiscordId}`)
+                .setLabel(t('characters.confirmDeleteAccount', {}, locale))
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_cancel-delete-account_${ownerDiscordId}`)
+                .setLabel(t('common.cancel', {}, locale))
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    return { embeds: [warning], components };
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription('Your characters (dashboard) with Edit/Delete/New.'),
+        .setDescription(t('characters.commandDescription')),
     async execute(interaction) {
         if (!interaction.inGuild()) {
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             }
             if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ content: 'Please use this command in a server (not in DMs).', components: [] });
+                await interaction.editReply({ content: t('characters.useInServer'), components: [] });
             }
             return;
         }
@@ -367,8 +506,10 @@ module.exports = {
         }
 
         let characters;
+        let locale = null;
         try {
             characters = await listCharactersForDiscord(interaction.user);
+            locale = interaction.user ? await getLinkedUserLocaleForDiscord(interaction.user) : null;
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
@@ -380,6 +521,7 @@ module.exports = {
         const listView = buildCharacterListView({
             ownerDiscordId: interaction.user.id,
             characters,
+            locale,
         });
 
         if (interaction.deferred || interaction.replied) {
@@ -390,4 +532,7 @@ module.exports = {
     resolvePublicAvatarUrl,
     tryBuildLocalAvatarAttachment,
     buildCharacterListView,
+    buildCharactersSettingsView,
+    buildCharacterLanguageView,
+    buildDeleteAccountConfirmView,
 };

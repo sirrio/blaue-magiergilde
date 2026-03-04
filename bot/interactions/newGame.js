@@ -13,7 +13,13 @@ const { updateManageMessage } = require('../utils/updateManageMessage');
 const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 const { buildErrorEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 const { pendingGames } = require('../state');
+const { getLinkedUserLocaleForDiscord } = require('../appDb');
+const { t } = require('../i18n');
 const { isThreadChannel, threadRestrictionMessage } = require('./newGameHelpers');
+
+async function resolveInteractionLocale(interaction) {
+    return await getLinkedUserLocaleForDiscord(interaction.user).catch(() => null);
+}
 
 async function handle(interaction) {
     attachRateLimitListener(interaction?.client);
@@ -22,13 +28,14 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('tier_')) {
+        const locale = await resolveInteractionLocale(interaction);
         const [, id, tier] = interaction.customId.split('_');
         const data = pendingGames.get(id);
 
         if (!data) {
             await updateManageMessage(interaction, {
                 content: '',
-                embeds: [buildErrorEmbed('No data found')],
+                embeds: [buildErrorEmbed(t('newGame.noDataFound', {}, locale))],
                 components: [],
             });
             return true;
@@ -49,7 +56,7 @@ async function handle(interaction) {
         const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`details_${id}`)
-                .setLabel('Next')
+                .setLabel(t('newGame.continue', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         );
 
@@ -58,13 +65,14 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('details_')) {
+        const locale = await resolveInteractionLocale(interaction);
         const id = interaction.customId.replace('details_', '');
         const data = pendingGames.get(id);
 
         if (!data) {
             await updateManageMessage(interaction, {
                 content: '',
-                embeds: [buildErrorEmbed('No data found')],
+                embeds: [buildErrorEmbed(t('newGame.noDataFound', {}, locale))],
                 components: [],
             });
             return true;
@@ -79,25 +87,25 @@ async function handle(interaction) {
 
         const modal = new ModalBuilder()
             .setCustomId(`detailsModal_${id}`)
-            .setTitle('Game details');
+            .setTitle(t('newGame.gameDetailsTitle', {}, locale));
 
         const dateInput = new TextInputBuilder()
             .setCustomId('gameDate')
-            .setLabel('Date (YYYY-MM-DD)')
+            .setLabel(t('newGame.dateLabel', {}, locale))
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(defaultDate);
 
         const timeInput = new TextInputBuilder()
             .setCustomId('gameTime')
-            .setLabel('Time (HH:mm)')
+            .setLabel(t('newGame.timeLabel', {}, locale))
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setValue(defaultTime);
 
         const textInput = new TextInputBuilder()
             .setCustomId('gameText')
-            .setLabel('Text')
+            .setLabel(t('newGame.textLabel', {}, locale))
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(false);
 
@@ -112,13 +120,14 @@ async function handle(interaction) {
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('detailsModal_')) {
+        const locale = await resolveInteractionLocale(interaction);
         const id = interaction.customId.replace('detailsModal_', '');
         const data = pendingGames.get(id);
 
         if (!data) {
             await updateManageMessage(interaction, {
                 content: '',
-                embeds: [buildErrorEmbed('No data found')],
+                embeds: [buildErrorEmbed(t('newGame.noDataFound', {}, locale))],
                 components: [],
             });
             return true;
@@ -127,7 +136,7 @@ async function handle(interaction) {
         if (isThreadChannel(interaction.channel)) {
             pendingGames.delete(id);
             await interaction.reply({
-                embeds: [buildWarningEmbed('Cannot create from thread', threadRestrictionMessage())],
+                embeds: [buildWarningEmbed(t('newGame.cannotCreateFromThreadTitle', {}, locale), threadRestrictionMessage(locale))],
                 flags: MessageFlags.Ephemeral,
             });
             return true;
@@ -137,7 +146,7 @@ async function handle(interaction) {
             pendingGames.delete(id);
             await updateManageMessage(interaction, {
                 content: '',
-                embeds: [buildWarningEmbed('Unsupported channel', 'Announcements can only be created in server text or announcement channels.')],
+                embeds: [buildWarningEmbed(t('newGame.unsupportedChannelTitle', {}, locale), t('newGame.unsupportedChannelBody', {}, locale))],
                 components: [],
             });
             return true;
@@ -174,7 +183,7 @@ async function handle(interaction) {
         await waitForDiscordRateLimit(interaction.client);
         const msg = await interaction.channel.send(announcement);
         await waitForDiscordRateLimit(interaction.client);
-        await msg.startThread({ name: 'Game thread', autoArchiveDuration: 1440 });
+        await msg.startThread({ name: t('newGame.gameThreadName', {}, locale), autoArchiveDuration: 1440 });
 
         if (data.commandInteraction) {
             await data.commandInteraction.deleteReply().catch(() => undefined);
@@ -182,7 +191,7 @@ async function handle(interaction) {
 
         await updateManageMessage(interaction, {
             content: '',
-            embeds: [buildSuccessEmbed('Announcement created')],
+            embeds: [buildSuccessEmbed(t('newGame.announcementCreated', {}, locale))],
             components: [],
         });
         return true;

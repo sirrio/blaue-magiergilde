@@ -23,10 +23,10 @@ let rows = buildCharacterCardRows({
 });
 let labels = labelsFromPrimaryRow(rows);
 
-assert.equal(labels.includes('Register with Magiergilde'), true);
+assert.equal(labels.includes('Bei der Magiergilde registrieren'), true);
 assert.equal(labels.includes('Adventure'), false);
 assert.equal(labels.includes('Downtime'), false);
-assert.equal(labels.includes('Set level'), false);
+assert.equal(labels.includes('Level setzen'), false);
 
 buildCharacterCardRows = loadBuildCharacterCardRows('true');
 rows = buildCharacterCardRows({
@@ -38,7 +38,7 @@ rows = buildCharacterCardRows({
 });
 labels = labelsFromPrimaryRow(rows);
 
-assert.equal(labels.includes('Set level'), false);
+assert.equal(labels.includes('Level setzen'), false);
 
 buildCharacterCardRows = loadBuildCharacterCardRows('true');
 rows = buildCharacterCardRows({
@@ -49,7 +49,7 @@ rows = buildCharacterCardRows({
     guildStatus: 'needs_changes',
 });
 labels = labelsFromPrimaryRow(rows);
-assert.equal(labels.includes('Register with Magiergilde'), true);
+assert.equal(labels.includes('Bei der Magiergilde registrieren'), true);
 assert.equal(labels.includes('Adventure'), false);
 
 buildCharacterCardRows = loadBuildCharacterCardRows('false');
@@ -62,7 +62,7 @@ rows = buildCharacterCardRows({
 });
 const primaryComponents = rows[0].toJSON().components;
 labels = primaryComponents.map(component => component.label);
-const registerButton = primaryComponents.find(component => component.label === 'Register with Magiergilde');
+const registerButton = primaryComponents.find(component => component.label === 'Bei der Magiergilde registrieren');
 
 assert.equal(labels.includes('Adventure'), true);
 assert.equal(labels.includes('Downtime'), true);

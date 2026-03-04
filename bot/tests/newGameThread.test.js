@@ -4,6 +4,7 @@ const {
     isThreadChannel,
     threadRestrictionMessage,
 } = require('../interactions/newGameHelpers');
+const command = require('../commands/game/new-game');
 
 (() => {
     const thread = {
@@ -24,7 +25,12 @@ const {
 })();
 
 (() => {
-    assert.match(threadRestrictionMessage(), /non-thread channel/i);
+    assert.match(threadRestrictionMessage('en'), /non-thread channel/i);
+    assert.match(threadRestrictionMessage('de'), /normalen Kanal/i);
+})();
+
+(() => {
+    assert.equal(command.data.description, 'Erstellt eine neue Spielankündigung.');
 })();
 
 console.log('newGameThread.test.js passed');

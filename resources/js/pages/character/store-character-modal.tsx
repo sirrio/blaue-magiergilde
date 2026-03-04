@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import LogoFiller from '@/components/logo-filler'
@@ -12,6 +13,7 @@ import { useForm, usePage } from '@inertiajs/react'
 import React, { useState } from 'react'
 
 const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
+  const t = useTranslate()
   const { classes, factions, versions, tiers, errors, features } = usePage<PageProps>().props
   const isCharacterStatusSwitchEnabled = features?.character_status_switch ?? true
   const startTierOptions = Object.entries(tiers).filter(([key]) => key !== 'et')
@@ -43,7 +45,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
   return (
     <Modal>
       <ModalTrigger>{children}</ModalTrigger>
-      <ModalTitle>Add character</ModalTitle>
+      <ModalTitle>{t('characters.addCharacterTitle')}</ModalTitle>
       <ModalContent>
         <form>
           <div role="tablist" className="tabs tabs-border mb-2">
@@ -53,7 +55,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               className={`tab ${activeTab === 'basics' ? 'tab-active' : ''}`}
               onClick={() => setActiveTab('basics')}
             >
-              Basics
+              {t('characters.basicsTab')}
             </button>
             <button
               type="button"
@@ -61,17 +63,17 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               className={`tab ${activeTab === 'details' ? 'tab-active' : ''}`}
               onClick={() => setActiveTab('details')}
             >
-              Details
+              {t('characters.detailsTab')}
             </button>
           </div>
           {activeTab === 'basics' ? (
             <div className="space-y-3">
               <Input placeholder="Mordenkainen" errors={errors.name} type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-                Name
+                {t('characters.nameLabel')}
               </Input>
               <CharacterClassToggle classes={classes} data={data} errors={errors} setData={setData}></CharacterClassToggle>
               <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
-                <SelectLabel>Start tier</SelectLabel>
+                <SelectLabel>{t('characters.startTierLabel')}</SelectLabel>
                 <SelectOptions>
                   {startTierOptions.map(([key, value]: [string, string]) => (
                     <option key={key} value={key}>
@@ -81,7 +83,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                 </SelectOptions>
               </Select>
               <Select errors={errors.faction} value={data.faction} onChange={(e) => setData('faction', e.target.value)}>
-                <SelectLabel>Factions</SelectLabel>
+                <SelectLabel>{t('characters.factionsLabel')}</SelectLabel>
                 <SelectOptions>
                   {Object.entries(factions).map(([key, value]: [string, string]) => (
                     <option key={key} value={key}>
@@ -91,7 +93,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                 </SelectOptions>
               </Select>
               <Select errors={errors.version} value={data.version} onChange={(e) => setData('version', e.target.value)}>
-                <SelectLabel>Versions</SelectLabel>
+                <SelectLabel>{t('characters.versionsLabel')}</SelectLabel>
                 <SelectOptions>
                   {versions.map((version) => (
                     <option key={version} value={version}>
@@ -102,8 +104,8 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               </Select>
               <p className="text-xs text-base-content/60">
                 {!isCharacterStatusSwitchEnabled
-                  ? 'Character submission is currently disabled. New characters stay draft.'
-                  : 'New characters start as draft. Use "Register with Magiergilde" on the character card when they are ready for review. Add rare languages, filler-character notes, and other review-relevant info in the registration notes.'}
+                  ? t('characters.creationHintDisabled')
+                  : t('characters.creationHintEnabled')}
               </p>
               <Input
                 placeholder="https://www.dndbeyond.com/characters/..."
@@ -112,21 +114,21 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                 value={data.external_link}
                 onChange={(e) => setData('external_link', e.target.value)}
               >
-                DnDBeyond Link
+                {t('characters.dndBeyondLink')}
               </Input>
               <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
-                Avatar
+                {t('characters.avatarLabel')}
               </FileInput>
-              <p className="text-xs text-base-content/60">Accepted: JPG, PNG, GIF, WEBP · Max. 5 MB</p>
+              <p className="text-xs text-base-content/60">{t('characters.avatarFormatsHint')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               <div className={cn('grid grid-cols-2 gap-2')}>
             <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-              DM Bubbles
+              {t('characters.dmBubbles')}
             </Input>
             <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-              DM Coins
+              {t('characters.dmCoins')}
             </Input>
           </div>
           <Input
@@ -137,22 +139,22 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
             value={data.bubble_shop_spend}
             onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
           >
-                Bubble Shop Spend
+                {t('characters.bubbleShopSpend')}
               </Input>
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-                Notes
+                {t('characters.notesLabel')}
               </TextArea>
               <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
                 <span className="flex items-center gap-2">
                   <LogoFiller width={14} />
-                  This character is a filler character.
+                  {t('characters.fillerLabel')}
                 </span>
               </Checkbox>
             </div>
           )}
         </form>
       </ModalContent>
-      <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
+      <ModalAction onClick={handleFormSubmit}>{t('characters.saveCharacter')}</ModalAction>
     </Modal>
   )
 }

@@ -70,6 +70,7 @@ type CharacterGroup = {
   label: string
   discordHandle?: string | null
   discordId?: number | null
+  discordAvatar?: string | null
   simplifiedTracking?: boolean
   characters: AdminCharacter[]
 }
@@ -80,7 +81,49 @@ const getStatusLabel = (status?: string | null) => {
   if (status === 'needs_changes') return 'Needs changes'
   if (status === 'retired') return 'Retired'
   if (status === 'draft') return 'Draft'
-  return 'Pending review'
+  return 'Pending'
+}
+
+const resolveAvatarSrc = (avatar?: string | null) => {
+  const value = String(avatar ?? '').trim()
+  if (!value) return '/images/no-avatar.svg'
+  return value.startsWith('http') ? value : `/storage/${value}`
+}
+
+const CharacterAvatarPreview = ({ character }: { character: AdminCharacter }) => {
+  const src = resolveAvatarSrc(character.avatar)
+
+  return (
+    <Modal>
+      <ModalTrigger>
+        <button type="button" className="cursor-zoom-in" aria-label={`Open avatar for ${character.name}`} title={`Open avatar for ${character.name}`}>
+          <img
+            src={src}
+            alt={character.name}
+            className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-base-200 transition-transform hover:scale-105"
+            onError={(event) => {
+              event.currentTarget.onerror = null
+              event.currentTarget.src = '/images/no-avatar.svg'
+            }}
+          />
+        </button>
+      </ModalTrigger>
+      <ModalTitle>{character.name}</ModalTitle>
+      <ModalContent>
+        <div className="flex justify-center">
+          <img
+            src={src}
+            alt={character.name}
+            className="max-h-[70vh] w-full max-w-md rounded-2xl object-contain ring-1 ring-base-200"
+            onError={(event) => {
+              event.currentTarget.onerror = null
+              event.currentTarget.src = '/images/no-avatar.svg'
+            }}
+          />
+        </div>
+      </ModalContent>
+    </Modal>
+  )
 }
 
 const AdminNoteModal = ({
@@ -211,14 +254,14 @@ const CharacterActionsMenu = ({
   const modalTitle = targetStatus === 'approved'
     ? 'Approve character'
     : targetStatus === 'pending'
-      ? 'Move character back to review'
+      ? 'Set character to pending'
       : targetStatus === 'needs_changes'
         ? 'Request changes'
         : 'Decline character'
   const modalAction = targetStatus === 'approved'
     ? 'Approve'
     : targetStatus === 'pending'
-      ? 'Move back to review'
+      ? 'Set pending'
       : targetStatus === 'needs_changes'
         ? 'Request changes'
         : 'Decline character'
@@ -226,7 +269,7 @@ const CharacterActionsMenu = ({
   const modalDescription = targetStatus === 'approved'
     ? 'Confirm setting this character to approved.'
     : targetStatus === 'pending'
-      ? 'Confirm moving this character back into review.'
+      ? 'Confirm setting this character back to pending.'
       : targetStatus === 'needs_changes'
         ? 'Provide a review note with required fixes.'
         : 'Provide a review note explaining why this character is declined.'
@@ -276,7 +319,7 @@ const CharacterActionsMenu = ({
           { type: 'divider', id: 'status-actions' },
           { type: 'label', label: 'Override' },
           {
-            label: 'Move back to review',
+            label: 'Set pending',
             icon: <Clock size={14} />,
             disabled: !canOverrideToPending,
             active: currentStatus === 'pending',
@@ -384,7 +427,7 @@ const AdminCharacterModal = ({
   const currentStatus = character?.guild_status ?? 'pending'
   const canEditStatus = currentStatus === 'pending' || currentStatus === 'draft'
   const statusLabelMap: Record<string, string> = {
-    pending: 'Pending review',
+    pending: 'Pending',
     draft: 'Draft',
     approved: 'Approved',
     declined: 'Declined',
@@ -547,7 +590,7 @@ const AdminCharacterModal = ({
                     <option value={currentStatus}>{statusLabelMap[currentStatus] ?? currentStatus}</option>
                   ) : (
                     <>
-                      <option value="pending">Pending review</option>
+                      <option value="pending">Pending</option>
                       <option value="draft">Draft</option>
                     </>
                   )}
@@ -555,7 +598,7 @@ const AdminCharacterModal = ({
               </Select>
               {canEditStatus ? (
                 <p className="text-xs text-base-content/60">
-                  Admins can set new or not-yet-reviewed characters to draft or pending review here. Review decisions are handled separately in the
+                  Admins can set new or not-yet-reviewed characters to draft or pending here. Review decisions are handled separately in the
                   review menu.
                 </p>
               ) : null}
@@ -732,7 +775,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
   }
 
   const statusFilters: FilterOption[] = [
-    { label: 'Pending review', value: 'pending' },
+    { label: 'Pending', value: 'pending' },
     { label: 'Draft', value: 'draft' },
     { label: 'Approved', value: 'approved' },
     { label: 'Needs changes', value: 'needs_changes' },
@@ -800,6 +843,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
       const discordDisplayName = character.user?.discord_display_name?.trim()
       const discordHandle = discordUsername || discordDisplayName || null
       const discordId = character.user?.discord_id ?? null
+      const discordAvatar = character.user?.avatar ?? null
       const simplifiedTracking = Boolean(character.simplified_tracking)
       const groupKey = String(userId)
       if (!grouped.has(groupKey)) {
@@ -808,6 +852,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
           label: userName,
           discordHandle,
           discordId,
+          discordAvatar,
           simplifiedTracking,
           characters: [],
         })
@@ -817,6 +862,9 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
 
       if (!group.discordHandle && discordHandle) {
         group.discordHandle = discordHandle
+      }
+      if (!group.discordAvatar && discordAvatar) {
+        group.discordAvatar = discordAvatar
       }
       group.simplifiedTracking = Boolean(group.simplifiedTracking || simplifiedTracking)
       group.characters.push(character)
@@ -828,7 +876,7 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
   const totalCharacters = characters.length
   const totalUsers = groups.length
   const statusLabelMap: Record<string, string> = {
-    pending: 'Pending review',
+    pending: 'Pending',
     draft: 'Draft',
     approved: 'Approved',
     needs_changes: 'Needs changes',
@@ -937,13 +985,26 @@ const tierTextClassMap: Record<string, string> = {
             {groups.map((group) => (
               <div key={group.key} className="rounded-box border border-base-300/70 bg-base-100 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300/70 bg-base-200/70 px-4 py-2 text-xs font-semibold uppercase text-base-content/60">
-                  <span className="normal-case">
-                    {group.label}
-                    {group.discordHandle ? (
-                      <span className="ml-1 text-[11px] font-normal normal-case text-base-content/60">| {group.discordHandle}</span>
+                  <span className="flex items-center gap-2 normal-case">
+                    {group.discordAvatar ? (
+                      <img
+                        src={resolveAvatarSrc(group.discordAvatar)}
+                        alt={`${group.label} Discord avatar`}
+                        className="h-5 w-5 rounded-full object-cover ring-1 ring-base-300"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null
+                          event.currentTarget.src = '/images/no-avatar.svg'
+                        }}
+                      />
                     ) : null}
-                    <span className="ml-2 text-[10px] font-normal normal-case text-base-content/50">
-                      ({group.characters.length})
+                    <span>
+                      {group.label}
+                      {group.discordHandle ? (
+                        <span className="ml-1 text-[11px] font-normal normal-case text-base-content/60">| {group.discordHandle}</span>
+                      ) : null}
+                      <span className="ml-2 text-[10px] font-normal normal-case text-base-content/50">
+                        ({group.characters.length})
+                      </span>
                     </span>
                   </span>
                   <span className="flex items-center gap-2 font-normal normal-case text-base-content/60">
@@ -1003,6 +1064,7 @@ const tierTextClassMap: Record<string, string> = {
                       <ListRow key={character.id} className={cn('grid-cols-1', isDraft && 'opacity-60')}>
                         <div className="col-span-full flex flex-wrap items-center gap-3 md:flex-nowrap">
                           <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <CharacterAvatarPreview character={character} />
                             <div className="flex w-6 justify-center" title="Current tier">
                               <LogoTier tier={currentTier} width={16} />
                             </div>

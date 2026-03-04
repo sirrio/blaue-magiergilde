@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
 import {
   CompendiumImportRun,
   DiscordBackupChannel,
@@ -68,6 +69,7 @@ export default function Settings({
     last_imported_at?: string | null
   }
 }) {
+  const t = useTranslate()
   const { errors: pageErrors, botChannelOverride } = usePage<PageProps>().props
   const backupForm = useForm({})
   const deleteForm = useForm({})
@@ -811,24 +813,24 @@ export default function Settings({
                     <SettingsIcon size={16} />
                   </Button>
                 </ModalTrigger>
-                <ModalTitle>Backup settings</ModalTitle>
+                <ModalTitle>{t('compendium.backupSettings')}</ModalTitle>
                 <ModalContent>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">Selected channels</p>
+                      <p className="text-sm font-semibold">{t('compendium.selectedChannels')}</p>
                       <DiscordChannelPickerModal
-                        title="Add backup channels"
-                        description="Select the text channels to include in backups. Threads are captured automatically."
-                        confirmLabel="Add channels"
+                        title={t('compendium.addBackupChannels')}
+                        description={t('compendium.backupChannelsDescription')}
+                        confirmLabel={t('compendium.addChannels')}
                         channelsRouteName="admin.settings.backup.channels.refresh"
                         excludedByGuild={selectedByGuild}
                         onConfirm={handleAddChannels}
                       >
-                        Add channels
+                        {t('compendium.addChannels')}
                       </DiscordChannelPickerModal>
                     </div>
                     {selectedChannelsFlat.length === 0 ? (
-                      <p className="text-xs text-base-content/70">No channels selected yet.</p>
+                      <p className="text-xs text-base-content/70">{t('compendium.noChannelsSelected')}</p>
                     ) : (
                       <div className="flex flex-col gap-2">
                         {selectedChannelsFlat.map((channel) => (
@@ -852,7 +854,7 @@ export default function Settings({
                                 onClick={() => void handleChannelSync(channel)}
                                 disabled={isBackupRunning || syncingChannelId === channel.id}
                               >
-                                {syncingChannelId === channel.id ? 'Sync...' : 'Sync'}
+                                {syncingChannelId === channel.id ? t('compendium.syncing') : t('compendium.sync')}
                               </Button>
                             </div>
                           </div>
@@ -861,7 +863,7 @@ export default function Settings({
                     )}
                     <div className="flex justify-end">
                       <Button size="sm" variant="outline" onClick={handleSaveSelection} disabled={selectionForm.processing}>
-                        Save selection
+                        {t('compendium.saveSelection')}
                       </Button>
                     </div>
                   </div>
@@ -915,7 +917,7 @@ export default function Settings({
               errors={createSourceForm.errors.name}
               placeholder="Player's Handbook"
             >
-              Source name
+              {t('compendium.sourceName')}
             </Input>
             <Input
               value={createSourceForm.data.shortcode}
@@ -923,10 +925,10 @@ export default function Settings({
               errors={createSourceForm.errors.shortcode}
               placeholder="PHB"
             >
-              Shortcode
+              {t('compendium.shortcode')}
             </Input>
             <Button size="sm" variant="outline" onClick={handleSourceCreate} disabled={createSourceForm.processing}>
-              Add source
+              {t('compendium.addSource')}
             </Button>
           </div>
           <div className="mt-4 space-y-2">
@@ -954,7 +956,7 @@ export default function Settings({
             )}
           </div>
           <Modal isOpen={editingSource !== null} onClose={() => setEditingSource(null)}>
-            <ModalTitle>Edit source</ModalTitle>
+            <ModalTitle>{t('compendium.editSource')}</ModalTitle>
             <ModalContent>
               <Input
                 value={sourceEditForm.data.name}
@@ -962,7 +964,7 @@ export default function Settings({
                 errors={sourceEditForm.errors.name}
                 placeholder="Player's Handbook"
               >
-                Source name
+                {t('compendium.sourceName')}
               </Input>
               <Input
                 value={sourceEditForm.data.shortcode}
@@ -970,11 +972,11 @@ export default function Settings({
                 errors={sourceEditForm.errors.shortcode}
                 placeholder="PHB"
               >
-                Shortcode
+                {t('compendium.shortcode')}
               </Input>
               <div className="flex justify-end">
                 <Button size="sm" variant="outline" onClick={handleSourceUpdate} disabled={sourceEditForm.processing}>
-                  Save source
+                  {t('compendium.saveSource')}
                 </Button>
               </div>
             </ModalContent>

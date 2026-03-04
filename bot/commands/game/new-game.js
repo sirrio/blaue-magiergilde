@@ -7,17 +7,20 @@ const {
 } = require('discord.js');
 const { pendingGames } = require('../../state');
 const { commandName } = require('../../commandConfig');
+const { getLinkedUserLocaleForDiscord } = require('../../appDb');
+const { t } = require('../../i18n');
 const { isThreadChannel, threadRestrictionMessage } = require('../../interactions/newGameHelpers');
 const { buildInfoEmbed, buildWarningEmbed } = require('../../utils/noticeEmbeds');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('new-game'))
-        .setDescription('Erstellt eine neue Spielankuendigung.'),
+        .setDescription(t('newGame.commandDescription')),
     async execute(interaction) {
+        const locale = await getLinkedUserLocaleForDiscord(interaction.user).catch(() => null);
         if (isThreadChannel(interaction.channel)) {
             await interaction.reply({
-                embeds: [buildWarningEmbed('Cannot create from thread', threadRestrictionMessage())],
+                embeds: [buildWarningEmbed(t('newGame.cannotCreateFromThreadTitle', {}, locale), threadRestrictionMessage(locale))],
                 flags: MessageFlags.Ephemeral,
             });
             return;
@@ -41,7 +44,7 @@ module.exports = {
         const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`details_${id}`)
-                .setLabel('Weiter')
+                .setLabel(t('newGame.continue', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         );
 
@@ -51,7 +54,7 @@ module.exports = {
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply({
                 content: '',
-                embeds: [buildInfoEmbed('Select tiers', 'Tiers auswählen und dann "Weiter" klicken:')],
+                embeds: [buildInfoEmbed(t('newGame.selectTiersTitle', {}, locale), t('newGame.selectTiersBody', {}, locale))],
                 components: [row1, row2],
             });
         }

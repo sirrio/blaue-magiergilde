@@ -34,17 +34,17 @@ assert.equal(factionField, undefined);
 const dmField = embedData.fields.find((field) => field.name === 'DM');
 assert.equal(dmField?.value, '0 bubbles · 0 coins');
 
-const userField = embedData.fields.find((field) => field.name === 'User');
+const userField = embedData.fields.find((field) => field.name === 'Nutzer');
 assert.ok(userField?.value.includes('<@123456789012345678>'));
 
-const registrationField = embedData.fields.find((field) => field.name === 'Registration notes');
+const registrationField = embedData.fields.find((field) => field.name === 'Registrierungsnotizen');
 assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');
 
-const reviewField = embedData.fields.find((field) => field.name === 'Review note');
+const reviewField = embedData.fields.find((field) => field.name === 'Review-Notiz');
 assert.equal(reviewField?.value, 'Please provide a proper DnDBeyond link before approval.');
 
 const buttonLabels = message.components[0].toJSON().components.map((component) => component.label);
-assert.deepEqual(buttonLabels, ['Approve', 'Request changes', 'Decline', 'Move back to review']);
+assert.deepEqual(buttonLabels, ['Genehmigen', 'Änderungen anfordern', 'Ablehnen', 'Auf Pending setzen']);
 assert.equal(message.components[0].toJSON().components[3].disabled, true);
 
 const approvedMessage = buildCharacterApprovalMessage({

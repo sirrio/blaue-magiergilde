@@ -38,6 +38,31 @@ test('discord callback redirects users without accepted privacy policy to consen
         ->and((int) ($user?->privacy_policy_accepted_version ?? 0))->toBe(0);
 });
 
+test('discord redirect only requests the identify scope', function () {
+    $provider = Mockery::mock();
+
+    Socialite::shouldReceive('driver')
+        ->once()
+        ->with('discord')
+        ->andReturn($provider);
+
+    $provider->shouldReceive('setScopes')
+        ->once()
+        ->with(['identify'])
+        ->andReturnSelf();
+
+    $provider->shouldReceive('withConsent')
+        ->once()
+        ->andReturnSelf();
+
+    $provider->shouldReceive('redirect')
+        ->once()
+        ->andReturn(redirect('https://discord.com/oauth2/authorize'));
+
+    $this->get(route('discord.login'))
+        ->assertRedirect('https://discord.com/oauth2/authorize');
+});
+
 test('discord callback redirects users with current privacy policy to characters page', function () {
     $requiredVersion = (int) config('legal.privacy_policy.version', 0);
 

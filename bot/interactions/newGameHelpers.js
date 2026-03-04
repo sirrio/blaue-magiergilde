@@ -1,9 +1,11 @@
+const { t } = require('../i18n');
+
 function isThreadChannel(channel) {
     return Boolean(channel?.isThread?.());
 }
 
-function threadRestrictionMessage() {
-    return 'Please run this command in a non-thread channel so the bot can create a new game thread.';
+function threadRestrictionMessage(locale = null) {
+    return t('newGame.threadRestriction', {}, locale);
 }
 
 module.exports = { isThreadChannel, threadRestrictionMessage };

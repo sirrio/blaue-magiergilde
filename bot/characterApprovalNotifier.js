@@ -1,6 +1,8 @@
 const { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const db = require('./db');
 const { withInsecureDispatcher, shouldAllowInsecure } = require('./httpClient');
 const { resolveChannelId } = require('./channelOverride');
+const { t } = require('./i18n');
 
 function resolveAvatarExtension(contentType, fallback) {
     if (!contentType) return fallback;
@@ -74,6 +76,28 @@ function isMeaningful(value) {
     return true;
 }
 
+function normalizeLocale(value) {
+    const locale = String(value || '').trim().toLowerCase();
+    if (locale === 'en') {
+        return 'en';
+    }
+
+    if (locale === 'de') {
+        return 'de';
+    }
+
+    return null;
+}
+
+async function getLocaleForDiscordId(discordUserId) {
+    if (!discordUserId) {
+        return null;
+    }
+
+    const [rows] = await db.execute('SELECT locale FROM users WHERE discord_id = ? LIMIT 1', [String(discordUserId)]);
+    return normalizeLocale(rows[0]?.locale);
+}
+
 function buildCharacterApprovalMessage(payload, options = {}) {
     const statusRaw = payload?.character_status || 'pending';
     const { label, color } = buildStatusInfo(statusRaw);
@@ -115,11 +139,11 @@ function buildCharacterApprovalMessage(payload, options = {}) {
         fields.push({ name: 'Faction', value: faction, inline: true });
     }
     fields.push({ name: 'Classes', value: trimField(classes), inline: false });
-    fields.push({ name: 'User', value: trimField(userLine, 1024), inline: false });
+    fields.push({ name: t('approvals.userField'), value: trimField(userLine, 1024), inline: false });
     fields.push({ name: 'DM', value: dmSummary, inline: true });
     fields.push({ name: 'Filler', value: filler, inline: true });
     if (shopSpend !== null && shopSpend > 0) {
-        fields.push({ name: 'Shop spend', value: String(shopSpend), inline: true });
+        fields.push({ name: t('approvals.shopSpendField'), value: String(shopSpend), inline: true });
     }
 
     embed.addFields(fields);
@@ -129,13 +153,13 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
 
     if (isMeaningful(notes) && notes !== '—') {
-        embed.addFields({ name: 'Notes', value: notes, inline: false });
+        embed.addFields({ name: t('approvals.notesField'), value: notes, inline: false });
     }
     if (isMeaningful(registrationNote) && registrationNote !== '—') {
-        embed.addFields({ name: 'Registration notes', value: registrationNote, inline: false });
+        embed.addFields({ name: t('approvals.registrationNotesField'), value: registrationNote, inline: false });
     }
     if (isMeaningful(reviewNote) && reviewNote !== '—') {
-        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
+        embed.addFields({ name: t('approvals.reviewNoteField'), value: reviewNote, inline: false });
     }
 
     if (payload?.character_id) {
@@ -152,22 +176,22 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     actionButtons.addComponents(
         new ButtonBuilder()
             .setCustomId(`character-approval:approve:${characterIdValue}`)
-            .setLabel('Approve')
+            .setLabel(t('approvals.approve'))
             .setStyle(ButtonStyle.Success)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:needs-changes:${characterIdValue}`)
-            .setLabel('Request changes')
+            .setLabel(t('approvals.requestChanges'))
             .setStyle(ButtonStyle.Primary)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:decline:${characterIdValue}`)
-            .setLabel('Decline')
+            .setLabel(t('approvals.decline'))
             .setStyle(ButtonStyle.Danger)
             .setDisabled(!isPending || !hasCharacterId),
         new ButtonBuilder()
             .setCustomId(`character-approval:set-pending:${characterIdValue}`)
-            .setLabel('Move back to review')
+            .setLabel(t('approvals.setPending'))
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(!canSetPending || !hasCharacterId),
     );
@@ -177,7 +201,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     if (approvalUrl) {
         linkButtons.addComponents(
             new ButtonBuilder()
-                .setLabel('Open approvals')
+                .setLabel(t('approvals.openApprovals'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(approvalUrl),
         );
@@ -186,7 +210,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     if (externalLink) {
         linkButtons.addComponents(
             new ButtonBuilder()
-                .setLabel('Open external link')
+                .setLabel(t('approvals.openExternalLink'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(externalLink),
         );
@@ -228,6 +252,8 @@ async function sendCharacterApprovalDm({
         return { ok: false, status: 404, error: 'Discord user not found.' };
     }
 
+    const locale = await getLocaleForDiscordId(discordUserId);
+
     const { label, color } = buildStatusInfo(status);
     const safeName = characterName || 'Unknown';
     const tierBadge = characterTier ? String(characterTier).toUpperCase() : '';
@@ -239,13 +265,13 @@ async function sendCharacterApprovalDm({
 
     let description = '';
     if (label.toLowerCase() === 'approved') {
-        description = 'Your character is now approved and ready to play.';
+        description = t('approvals.approvedDmDescription', {}, locale);
     } else if (label.toLowerCase() === 'needs changes') {
-        description = 'Your character needs changes. Please update it and register again for review.';
+        description = t('approvals.needsChangesDmDescription', {}, locale);
     } else if (label.toLowerCase() === 'declined') {
-        description = 'Your character was declined. Please review the details and update if needed.';
+        description = t('approvals.declinedDmDescription', {}, locale);
     } else {
-        description = `Your character status is now **${label}**.`;
+        description = t('approvals.genericDmDescription', { status: label }, locale);
     }
 
     const embed = new EmbedBuilder()
@@ -270,7 +296,7 @@ async function sendCharacterApprovalDm({
     }
 
     if (isMeaningful(reviewNote) && reviewNote !== '—' && (status === 'needs_changes' || status === 'declined')) {
-        embed.addFields({ name: 'Review note', value: reviewNote, inline: false });
+        embed.addFields({ name: t('approvals.reviewNoteField', {}, locale), value: reviewNote, inline: false });
     }
 
     let avatarAttachment = null;
@@ -296,7 +322,7 @@ async function sendCharacterApprovalDm({
     if (externalLink) {
         buttons.addComponents(
             new ButtonBuilder()
-                .setLabel('Open external link')
+                .setLabel(t('approvals.openExternalLink', {}, locale))
                 .setStyle(ButtonStyle.Link)
                 .setURL(externalLink),
         );
@@ -304,7 +330,7 @@ async function sendCharacterApprovalDm({
     if (charactersUrl) {
         buttons.addComponents(
             new ButtonBuilder()
-                .setLabel('Your characters')
+                .setLabel(t('approvals.yourCharacters', {}, locale))
                 .setStyle(ButtonStyle.Link)
                 .setURL(charactersUrl),
         );

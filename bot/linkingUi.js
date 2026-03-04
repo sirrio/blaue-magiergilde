@@ -1,14 +1,15 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { resolvePublicBaseUrl } = require('./appUrls');
+const { t } = require('./i18n');
 
 function legalLinksLine() {
     const baseUrl = resolvePublicBaseUrl();
     if (!baseUrl) {
-        return 'Rechtliches: Datenschutz und Impressum sind auf der Blaue-Magiergilde-Website verfuegbar.';
+        return t('linking.legalFallback');
     }
 
     return [
-        '**Rechtliches**',
+        t('linking.legalHeading'),
         `Datenschutz: <${baseUrl}/datenschutz>`,
         `Impressum: <${baseUrl}/impressum>`,
     ].join('\n');
@@ -16,13 +17,13 @@ function legalLinksLine() {
 
 function notLinkedContent() {
     return [
-        '**Your Discord is not connected to the Blaue Magiergilde app yet.**',
+        t('linking.notLinkedTitle'),
         '',
-        'Connect Discord to your existing app account once so the bot can use your characters.',
+        t('linking.notLinkedExisting'),
         '',
-        'If you **do not have** an account yet, create a new account here.',
+        t('linking.notLinkedNoAccount'),
         '',
-        '**Important:** If you already use the app, *do not create a new account*. Open your profile and connect Discord there instead.',
+        t('linking.notLinkedWarning'),
         '',
         legalLinksLine(),
     ].join('\n');
@@ -35,16 +36,16 @@ function buildNotLinkedButtons(discordUserId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`appJoinStart_${discordUserId}`)
-            .setLabel('Create new account')
+            .setLabel(t('linking.createNewAccount'))
             .setStyle(ButtonStyle.Primary),
         profileUrl
             ? new ButtonBuilder()
-                .setLabel('Connect existing account')
+                .setLabel(t('linking.connectExistingAccount'))
                 .setStyle(ButtonStyle.Link)
                 .setURL(profileUrl)
             : new ButtonBuilder()
                 .setCustomId(`appLinkInfo_${discordUserId}`)
-                .setLabel('Connect existing account')
+                .setLabel(t('linking.connectExistingAccount'))
                 .setStyle(ButtonStyle.Secondary),
     );
 }
@@ -53,11 +54,11 @@ function buildJoinConfirmButtons(discordUserId) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`appJoinConfirm_${discordUserId}`)
-            .setLabel('Yes, create account')
+            .setLabel(t('linking.confirmCreateAccount'))
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(`appJoinCancel_${discordUserId}`)
-            .setLabel('Cancel')
+            .setLabel(t('common.cancel'))
             .setStyle(ButtonStyle.Secondary),
     );
 }

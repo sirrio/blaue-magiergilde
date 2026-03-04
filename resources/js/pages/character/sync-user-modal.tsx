@@ -5,11 +5,13 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { cn } from '@/lib/utils'
+import { useTranslate } from '@/lib/i18n'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 
 const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
+  const t = useTranslate()
   const initialFormData = {
     name: '',
     class: [] as number[],
@@ -39,18 +41,18 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
   return (
     <Modal>
       <ModalTrigger>{children}</ModalTrigger>
-      <ModalTitle>Add character</ModalTitle>
+      <ModalTitle>{t('characters.addCharacterTitle')}</ModalTitle>
       <ModalContent>
         <form>
           <Input placeholder="Mordenkainen" errors={errors.name} type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}>
-            Name
+            {t('characters.nameLabel')}
           </Input>
           <CharacterClassToggle classes={classes} data={data} errors={errors} setData={setData}></CharacterClassToggle>
           <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
-            Filler
+            {t('characters.fillerCharacter')}
           </Checkbox>
           <Select errors={errors.start_tier} value={data.start_tier} onChange={(e) => setData('start_tier', e.target.value)}>
-            <SelectLabel>Start tier</SelectLabel>
+            <SelectLabel>{t('characters.startTierLabel')}</SelectLabel>
             <SelectOptions>
               {startTierOptions.map(([key, value]: [string, string]) => (
                 <option key={key} value={key}>
@@ -60,7 +62,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
             </SelectOptions>
           </Select>
           <Select errors={errors.faction} value={data.faction} onChange={(e) => setData('faction', e.target.value)}>
-            <SelectLabel>Factions</SelectLabel>
+            <SelectLabel>{t('characters.factionsLabel')}</SelectLabel>
             <SelectOptions>
               {Object.entries(factions).map(([key, value]: [string, string]) => (
                 <option key={key} value={key}>
@@ -70,7 +72,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
             </SelectOptions>
           </Select>
           <Select errors={errors.version} value={data.version} onChange={(e) => setData('version', e.target.value)}>
-            <SelectLabel>Versions</SelectLabel>
+            <SelectLabel>{t('characters.versionsLabel')}</SelectLabel>
             <SelectOptions>
               {versions.map((version) => (
                 <option key={version} value={version}>
@@ -81,10 +83,10 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
           </Select>
           <div className={cn('grid grid-cols-2 gap-2')}>
             <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-              DM Bubbles
+              {t('characters.dmBubbles')}
             </Input>
             <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-              DM Coins
+              {t('characters.dmCoins')}
             </Input>
           </div>
           <Input
@@ -95,7 +97,7 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
             value={data.bubble_shop_spend}
             onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
           >
-            Bubble Shop Spend
+            {t('characters.bubbleShopSpend')}
           </Input>
           <Input
             placeholder="https://www.dndbeyond.com/characters/..."
@@ -104,18 +106,18 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
             value={data.external_link}
             onChange={(e) => setData('external_link', e.target.value)}
           >
-            DnDBeyond Link
+            {t('characters.dndBeyondLink')}
           </Input>
           <FileInput errors={errors.avatar} onChange={(e) => setData('avatar', e.target?.files?.[0] as never)}>
-            Avatar
+            {t('characters.avatarLabel')}
           </FileInput>
-          <p className="text-xs text-base-content/60">Accepted: JPG, PNG, GIF, WEBP · Max. 5 MB</p>
+          <p className="text-xs text-base-content/60">{t('characters.avatarFormatsHint')}</p>
           <TextArea placeholder="Your notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-            Notes
+            {t('characters.notesLabel')}
           </TextArea>
         </form>
       </ModalContent>
-      <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
+      <ModalAction onClick={handleFormSubmit}>{t('common.save')}</ModalAction>
     </Modal>
   )
 }

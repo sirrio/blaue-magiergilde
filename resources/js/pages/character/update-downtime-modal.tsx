@@ -4,6 +4,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import DurationInputStack from '@/components/duration-input-stack'
+import { useTranslate } from '@/lib/i18n'
 import { Downtime, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Pencil } from 'lucide-react'
@@ -22,6 +23,7 @@ const UpdateDowntimeModal = ({
   onClose?: () => void
   showTrigger?: boolean
 }) => {
+  const t = useTranslate()
   const initialFormData = {
     duration: downtime.duration,
     start_date: downtime.start_date,
@@ -45,13 +47,13 @@ const UpdateDowntimeModal = ({
       {showTrigger ? (
         <ModalTrigger>
           {children ?? (
-            <Button size="xs" modifier="square" variant="ghost" aria-label="Edit downtime" title="Edit downtime">
+            <Button size="xs" modifier="square" variant="ghost" aria-label={t('characters.editDowntime')} title={t('characters.editDowntime')}>
               <Pencil size={14} />
             </Button>
           )}
         </ModalTrigger>
       ) : null}
-      <ModalTitle>Edit Downtime</ModalTitle>
+      <ModalTitle>{t('characters.editDowntimeTitle')}</ModalTitle>
       <ModalContent>
         <form>
           <DurationInputStack
@@ -61,21 +63,21 @@ const UpdateDowntimeModal = ({
             errors={errors.duration}
           />
           <Select value={data.type} onChange={(e) => setData('type', e.target.value as Downtime['type'])}>
-            <SelectLabel>Type</SelectLabel>
+            <SelectLabel>{t('characters.type')}</SelectLabel>
             <SelectOptions>
               <option value="faction">Faction</option>
-              <option value="other">Other (ex. Crafting, Spell Scribing, ...)</option>
+              <option value="other">{t('characters.downtimeTypeOther')}</option>
             </SelectOptions>
           </Select>
           <Input errors={errors.start_date} type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)}>
-            Date
+            {t('characters.dateLabel')}
           </Input>
           <TextArea placeholder="Notes" errors={errors.notes} value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
-            Notes
+            {t('characters.notesLabel')}
           </TextArea>
         </form>
       </ModalContent>
-      <ModalAction onClick={handleFormSubmit}>Save</ModalAction>
+      <ModalAction onClick={handleFormSubmit}>{t('common.save')}</ModalAction>
     </Modal>
   )
 }

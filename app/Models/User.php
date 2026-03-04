@@ -43,6 +43,7 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
+        'locale',
         'simplified_tracking',
         'avatar_masked',
         'privacy_policy_accepted_at',

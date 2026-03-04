@@ -35,7 +35,7 @@ class CharacterApprovalController extends Controller
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->withCount('room')
             ->with([
-                'user:id,name,discord_id,discord_username,discord_display_name',
+                'user:id,name,discord_id,discord_username,discord_display_name,avatar',
                 'adventures:id,character_id,duration,has_additional_bubble',
                 'characterClasses:id,name',
             ]);
@@ -196,7 +196,7 @@ class CharacterApprovalController extends Controller
                 && $character->guild_status !== 'pending'
             ) {
                 return redirect()->back()->withErrors([
-                    'guild_status' => 'Only characters in pending review can be reviewed. Move the character back to review first.',
+                    'guild_status' => 'Only pending characters can be reviewed. Move the character back to pending first.',
                 ]);
             }
 

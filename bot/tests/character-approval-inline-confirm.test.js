@@ -39,8 +39,8 @@ async function testApproveUsesInlineConfirm() {
     assert.equal(updatePayload.components.length, 2);
 
     const labels = updatePayload.components[0].components.map((component) => component.label);
-    assert.deepEqual(labels, ['Confirm approve', 'Cancel']);
-    assert.equal(updatePayload.components[1].components[0].label, 'Open approvals');
+    assert.deepEqual(labels, ['Genehmigen bestätigen', 'Abbrechen']);
+    assert.equal(updatePayload.components[1].components[0].label, 'Freigaben öffnen');
 }
 
 async function testCancelRestoresOriginalActions() {
@@ -60,11 +60,11 @@ async function testCancelRestoresOriginalActions() {
     const confirmRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('character-approval-confirm:pending:12:approved')
-            .setLabel('Confirm move back to review')
+            .setLabel('Pending bestätigen')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId('character-approval-cancel:pending:12:approved')
-            .setLabel('Cancel')
+            .setLabel('Abbrechen')
             .setStyle(ButtonStyle.Secondary),
     );
 
@@ -90,7 +90,7 @@ async function testCancelRestoresOriginalActions() {
     assert.equal(updatePayload.components.length, 2);
 
     const labels = updatePayload.components[0].components.map((component) => component.label);
-    assert.deepEqual(labels, ['Approve', 'Request changes', 'Decline', 'Move back to review']);
+    assert.deepEqual(labels, ['Genehmigen', 'Änderungen anfordern', 'Ablehnen', 'Auf Pending setzen']);
     assert.equal(updatePayload.components[0].components[3].disabled, false);
 }
 
