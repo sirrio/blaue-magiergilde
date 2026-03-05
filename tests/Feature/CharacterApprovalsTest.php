@@ -53,6 +53,42 @@ it('includes simplified tracking flag for character approvals', function () {
             ->where('characters.0.simplified_tracking', true));
 });
 
+it('includes users without characters in empty users list', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    Character::factory()->for($admin)->create();
+
+    $emptyUser = User::factory()->create([
+        'name' => 'No Characters Yet',
+        'discord_username' => 'empty-user',
+    ]);
+    $userWithCharacter = User::factory()->create();
+    Character::factory()->for($userWithCharacter)->create();
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals')
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('emptyUsers', 1)
+            ->where('emptyUsers.0.id', $emptyUser->id)
+            ->where('emptyUsers.0.discord_username', 'empty-user'));
+});
+
+it('does not include empty users when status filter is active', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    Character::factory()->for($admin)->create(['guild_status' => 'pending']);
+
+    User::factory()->create([
+        'name' => 'No Characters Yet',
+    ]);
+
+    $reviewUser = User::factory()->create();
+    Character::factory()->for($reviewUser)->create(['guild_status' => 'pending']);
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals?status=pending')
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('emptyUsers', 0));
+});
+
 it('requires review note when marking a character as needs changes', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $character = Character::factory()->create(['guild_status' => 'pending']);
