@@ -32,7 +32,7 @@ import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useState, useTransition } from 'react'
 import { useImage } from 'react-image'
 
 function CharacterImage({
@@ -332,6 +332,7 @@ export function CharacterCard({
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
+  const [, startNavigationTransition] = useTransition()
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
@@ -365,31 +366,33 @@ export function CharacterCard({
     }
 
     setIsSubmittingForApproval(true)
-    router.post(
-      route('characters.submit-approval', character.id),
-      {
-        registration_note: registrationNote,
-      },
-      {
-        preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-          callbacks.onSuccess()
+    startNavigationTransition(() => {
+      router.post(
+        route('characters.submit-approval', character.id),
+        {
+          registration_note: registrationNote,
         },
-        onError: (errors) => {
-          const message = String(
-            errors.registration_note
-            ?? errors.guild_status
-            ?? errors.character
-            ?? t('characters.registerErrorFallback'),
-          )
-          callbacks.onError(message)
+        {
+          preserveScroll: true,
+          preserveState: true,
+          onSuccess: () => {
+            callbacks.onSuccess()
+          },
+          onError: (errors) => {
+            const message = String(
+              errors.registration_note
+              ?? errors.guild_status
+              ?? errors.character
+              ?? t('characters.registerErrorFallback'),
+            )
+            callbacks.onError(message)
+          },
+          onFinish: () => {
+            setIsSubmittingForApproval(false)
+          },
         },
-        onFinish: () => {
-          setIsSubmittingForApproval(false)
-        },
-      },
-    )
+      )
+    })
   }
 
   return (
