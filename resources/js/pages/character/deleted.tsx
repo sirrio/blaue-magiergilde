@@ -5,7 +5,7 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import AppLayout from '@/layouts/app-layout'
 import { Character } from '@/types'
 import { Head, router, Link } from '@inertiajs/react'
-import { RotateCcw } from 'lucide-react'
+import { Eye, RotateCcw } from 'lucide-react'
 
 export default function Deleted({ characters }: { characters: Character[] }) {
   const restore = (id: number) => {
@@ -28,15 +28,18 @@ export default function Deleted({ characters }: { characters: Character[] }) {
         ) : (
           <List>
             {characters.map((char) => (
-              <ListRow key={char.id}>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-medium leading-none">{char.name}</p>
-                    <p className="text-xs text-base-content/70">
-                      Level {calculateLevel(char)} {calculateClassString(char)}
-                    </p>
-                  </div>
-                  <Button size="xs" modifier="square" onClick={() => restore(char.id)}>
+              <ListRow key={char.id} className="grid-cols-[minmax(0,1fr)_auto]">
+                <div className="min-w-0">
+                  <p className="truncate font-medium leading-none">{char.name}</p>
+                  <p className="text-xs text-base-content/70">
+                    Level {calculateLevel(char)} {calculateClassString(char)}
+                  </p>
+                </div>
+                <div className="justify-self-end flex items-center gap-2">
+                  <Link href={route('characters.deleted.show', char.id)} className="btn btn-xs btn-ghost btn-square" title="Details">
+                    <Eye size={14} />
+                  </Link>
+                  <Button size="xs" variant="ghost" modifier="square" onClick={() => restore(char.id)} title="Restore">
                     <RotateCcw size={14} />
                   </Button>
                 </div>

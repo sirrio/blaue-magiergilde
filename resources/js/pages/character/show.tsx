@@ -73,8 +73,17 @@ const formatParticipantSummary = (names: string[]) => {
   return remaining > 0 ? `${visible} +${remaining} more` : visible
 }
 
-export default function Show({ character, guildCharacters }: { character: Character; guildCharacters: Character[] }) {
+export default function Show({
+  character,
+  guildCharacters,
+  readOnly = false,
+}: {
+  character: Character
+  guildCharacters: Character[]
+  readOnly?: boolean
+}) {
   const t = useTranslate()
+  const isReadOnly = readOnly || Boolean(character.deleted_at)
   const avatarMasked = character.avatar_masked ?? true
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
@@ -202,7 +211,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
         <div className="space-y-2 border-b border-base-200 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-bold sm:text-2xl">{t('characters.detailsHeading', { name: character.name })}</h1>
-            <Link href={route('characters.index')} className="btn btn-sm">
+            <Link href={route(isReadOnly ? 'characters.deleted' : 'characters.index')} className="btn btn-sm">
               {t('characters.back')}
             </Link>
           </div>
@@ -307,7 +316,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                 <div className="flex items-center gap-2">
                                   {adv.is_pseudo ? (
                                     <span className="text-xs text-base-content/50">{t('characters.auto')}</span>
-                                  ) : (
+                                  ) : !isReadOnly ? (
                                     <>
                                       <UpdateAdventureModal
                                         adventure={adv}
@@ -339,7 +348,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         <Trash size={14} />
                                       </Button>
                                     </>
-                                  )}
+                                  ) : null
+                                  }
                                 </div>
                               </div>
                             </div>
@@ -405,7 +415,7 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                 <div className="flex self-center justify-end gap-2">
                                   {adv.is_pseudo ? (
                                     <span className="text-xs text-base-content/50">{t('characters.auto')}</span>
-                                  ) : (
+                                  ) : !isReadOnly ? (
                                     <>
                                       <UpdateAdventureModal
                                         adventure={adv}
@@ -437,7 +447,8 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                         <Trash size={14} />
                                       </Button>
                                     </>
-                                  )}
+                                  ) : null
+                                  }
                                 </div>
                               </ListRow>
                             )
@@ -531,33 +542,37 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                   {secondsToHourMinuteString(dt.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
-                                  <UpdateDowntimeModal
-                                    downtime={dt}
-                                    isOpen={activeDowntimeModalId === dt.id}
-                                    onClose={() => setActiveDowntimeModalId(null)}
-                                    showTrigger={false}
-                                  />
-                                  <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    modifier="square"
-                                    aria-label={t('characters.editDowntime')}
-                                    title={t('characters.editDowntime')}
-                                    onClick={() => setActiveDowntimeModalId(dt.id)}
-                                  >
-                                    <Pencil size={14} />
-                                  </Button>
-                                  <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    modifier="square"
-                                    color="error"
-                                    aria-label={t('characters.deleteDowntime')}
-                                    title={t('characters.deleteDowntime')}
-                                    onClick={() => handleDowntimeDelete(dt.id)}
-                                  >
-                                    <Trash size={14} />
-                                  </Button>
+                                  {!isReadOnly ? (
+                                    <>
+                                      <UpdateDowntimeModal
+                                        downtime={dt}
+                                        isOpen={activeDowntimeModalId === dt.id}
+                                        onClose={() => setActiveDowntimeModalId(null)}
+                                        showTrigger={false}
+                                      />
+                                      <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        modifier="square"
+                                        aria-label={t('characters.editDowntime')}
+                                        title={t('characters.editDowntime')}
+                                        onClick={() => setActiveDowntimeModalId(dt.id)}
+                                      >
+                                        <Pencil size={14} />
+                                      </Button>
+                                      <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        modifier="square"
+                                        color="error"
+                                        aria-label={t('characters.deleteDowntime')}
+                                        title={t('characters.deleteDowntime')}
+                                        onClick={() => handleDowntimeDelete(dt.id)}
+                                      >
+                                        <Trash size={14} />
+                                      </Button>
+                                    </>
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
@@ -605,33 +620,37 @@ export default function Show({ character, guildCharacters }: { character: Charac
                                   {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                                 </div>
                                 <div className="flex self-center justify-end gap-2">
-                                  <UpdateDowntimeModal
-                                    downtime={dt}
-                                    isOpen={activeDowntimeModalId === dt.id}
-                                    onClose={() => setActiveDowntimeModalId(null)}
-                                    showTrigger={false}
-                                  />
-                                  <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    modifier="square"
-                                    aria-label={t('characters.editDowntime')}
-                                    title={t('characters.editDowntime')}
-                                    onClick={() => setActiveDowntimeModalId(dt.id)}
-                                  >
-                                    <Pencil size={14} />
-                                  </Button>
-                                  <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    modifier="square"
-                                    color="error"
-                                    aria-label={t('characters.deleteDowntime')}
-                                    title={t('characters.deleteDowntime')}
-                                    onClick={() => handleDowntimeDelete(dt.id)}
-                                  >
-                                    <Trash size={14} />
-                                  </Button>
+                                  {!isReadOnly ? (
+                                    <>
+                                      <UpdateDowntimeModal
+                                        downtime={dt}
+                                        isOpen={activeDowntimeModalId === dt.id}
+                                        onClose={() => setActiveDowntimeModalId(null)}
+                                        showTrigger={false}
+                                      />
+                                      <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        modifier="square"
+                                        aria-label={t('characters.editDowntime')}
+                                        title={t('characters.editDowntime')}
+                                        onClick={() => setActiveDowntimeModalId(dt.id)}
+                                      >
+                                        <Pencil size={14} />
+                                      </Button>
+                                      <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        modifier="square"
+                                        color="error"
+                                        aria-label={t('characters.deleteDowntime')}
+                                        title={t('characters.deleteDowntime')}
+                                        onClick={() => handleDowntimeDelete(dt.id)}
+                                      >
+                                        <Trash size={14} />
+                                      </Button>
+                                    </>
+                                  ) : null}
                                 </div>
                               </ListRow>
                             )
