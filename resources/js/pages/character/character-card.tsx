@@ -32,7 +32,7 @@ import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useState, useTransition } from 'react'
 import { useImage } from 'react-image'
 
 function CharacterImage({
@@ -277,6 +277,8 @@ export function CharacterCard({
   const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
+  const reviewedByName = character.reviewed_by_name?.trim() ?? ''
+  const reviewedByHint = reviewedByName ? t('characters.reviewedByHint', { name: reviewedByName }) : ''
   const draftOnlyMode = !(features?.character_status_switch ?? true)
   const requiresRegistration = guildStatus === 'draft' || guildStatus === 'needs_changes'
   const canLogActivity = draftOnlyMode || !requiresRegistration
@@ -315,23 +317,48 @@ export function CharacterCard({
         : guildStatus === 'draft'
           ? 'text-base-content/60'
           : 'text-warning'
-  const statusTooltip = guildStatus === 'draft'
-    ? t('characters.statusDraftHint')
-    : guildStatus === 'declined'
-      ? reviewNote
-        ? `${t('characters.statusDeclinedHint')} ${t('common.note')}: ${reviewNote}`
-        : t('characters.statusDeclinedHint')
-    : guildStatus === 'needs_changes'
-      ? reviewNote
-        ? `${t('characters.statusNeedsChangesHint')} ${t('common.note')}: ${reviewNote}`
-        : t('characters.statusNeedsChangesHint')
-    : guildStatus === 'pending'
-      ? t('characters.statusPendingHint')
-      : statusLabel
+  const statusTooltip = (() => {
+    if (guildStatus === 'draft') {
+      return t('characters.statusDraftHint')
+    }
+
+    if (guildStatus === 'declined') {
+      const parts = [t('characters.statusDeclinedHint')]
+      if (reviewedByHint) {
+        parts.push(reviewedByHint)
+      }
+      if (reviewNote) {
+        parts.push(`${t('common.note')}: ${reviewNote}`)
+      }
+      return parts.join(' · ')
+    }
+
+    if (guildStatus === 'needs_changes') {
+      const parts = [t('characters.statusNeedsChangesHint')]
+      if (reviewedByHint) {
+        parts.push(reviewedByHint)
+      }
+      if (reviewNote) {
+        parts.push(`${t('common.note')}: ${reviewNote}`)
+      }
+      return parts.join(' · ')
+    }
+
+    if (guildStatus === 'pending') {
+      return t('characters.statusPendingHint')
+    }
+
+    if (guildStatus === 'approved' && reviewedByHint) {
+      return `${statusLabel} · ${reviewedByHint}`
+    }
+
+    return statusLabel
+  })()
   const statusHint = getCharacterStatusHint(guildStatus, t)
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
+  const [, startNavigationTransition] = useTransition()
 
   const factionDowntimeSeconds = calculateFactionDowntime(character)
   const otherDowntimeSeconds = calculateOtherDowntime(character)
@@ -365,31 +392,33 @@ export function CharacterCard({
     }
 
     setIsSubmittingForApproval(true)
-    router.post(
-      route('characters.submit-approval', character.id),
-      {
-        registration_note: registrationNote,
-      },
-      {
-        preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-          callbacks.onSuccess()
+    startNavigationTransition(() => {
+      router.post(
+        route('characters.submit-approval', character.id),
+        {
+          registration_note: registrationNote,
         },
-        onError: (errors) => {
-          const message = String(
-            errors.registration_note
-            ?? errors.guild_status
-            ?? errors.character
-            ?? t('characters.registerErrorFallback'),
-          )
-          callbacks.onError(message)
+        {
+          preserveScroll: true,
+          preserveState: true,
+          onSuccess: () => {
+            callbacks.onSuccess()
+          },
+          onError: (errors) => {
+            const message = String(
+              errors.registration_note
+              ?? errors.guild_status
+              ?? errors.character
+              ?? t('characters.registerErrorFallback'),
+            )
+            callbacks.onError(message)
+          },
+          onFinish: () => {
+            setIsSubmittingForApproval(false)
+          },
         },
-        onFinish: () => {
-          setIsSubmittingForApproval(false)
-        },
-      },
-    )
+      )
+    })
   }
 
   return (

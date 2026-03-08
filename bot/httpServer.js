@@ -270,6 +270,8 @@ function startHttpServer(client) {
             const characterAvatarUrl = payload?.character_avatar_url ? String(payload.character_avatar_url).trim() : '';
             const externalLink = typeof payload?.external_link === 'string' ? payload.external_link.trim() : '';
             const characterReviewNote = typeof payload?.character_review_note === 'string' ? payload.character_review_note.trim() : '';
+            const reviewerName = typeof payload?.reviewer_name === 'string' ? payload.reviewer_name.trim() : '';
+            const reviewerDiscordId = typeof payload?.reviewer_discord_id === 'string' ? payload.reviewer_discord_id.trim() : '';
 
             const result = await sendCharacterApprovalDm({
                 client,
@@ -285,6 +287,8 @@ function startHttpServer(client) {
                 characterAvatarUrl,
                 characterReviewNote,
                 externalLink,
+                reviewerName,
+                reviewerDiscordId,
             });
 
             if (!result.ok) {

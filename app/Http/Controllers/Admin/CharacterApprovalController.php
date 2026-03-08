@@ -150,8 +150,53 @@ class CharacterApprovalController extends Controller
             })
             ->values();
 
+        $characterUserIds = $characters
+            ->pluck('user_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $includeEmptyUsers = blank($status) && blank($tier) && blank($legacyFilter);
+        $emptyUsers = collect();
+
+        if ($includeEmptyUsers) {
+            $emptyUsersQuery = User::query()
+                ->select([
+                    'id',
+                    'name',
+                    'discord_id',
+                    'discord_username',
+                    'discord_display_name',
+                    'avatar',
+                    'simplified_tracking',
+                ])
+                ->whereNotIn('id', $characterUserIds);
+
+            if ($search->isNotEmpty()) {
+                $emptyUsersQuery->where(function ($query) use ($search) {
+                    $query->where('name', 'LIKE', "%{$search}%")
+                        ->orWhere('discord_username', 'LIKE', "%{$search}%")
+                        ->orWhere('discord_display_name', 'LIKE', "%{$search}%")
+                        ->orWhere('discord_id', 'LIKE', "%{$search}%");
+                });
+            }
+
+            if ($discordFilter === 'only') {
+                $emptyUsersQuery->whereNotNull('discord_id');
+            } elseif ($discordFilter === 'none' || $noDiscord) {
+                $emptyUsersQuery->whereNull('discord_id');
+            }
+
+            $emptyUsers = $emptyUsersQuery
+                ->orderBy('name')
+                ->get();
+        }
+
         return Inertia::render('character-approvals/list', [
             'characters' => $characters,
+            'emptyUsers' => $emptyUsers,
         ]);
     }
 
@@ -249,7 +294,10 @@ class CharacterApprovalController extends Controller
             }
 
             if (in_array($statusChange, ['approved', 'declined', 'needs_changes'], true)) {
-                $result = $notificationService->notifyStatusChange($character, $statusChange);
+                $result = $notificationService->notifyStatusChange($character, $statusChange, [
+                    'reviewer_name' => $user->name,
+                    'reviewer_discord_id' => $user->discord_id,
+                ]);
                 if (! $result['ok']) {
                     Log::warning('Character approval DM failed.', [
                         'character_id' => $character->id,

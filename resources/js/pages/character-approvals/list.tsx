@@ -12,11 +12,11 @@ import AppLayout from '@/layouts/app-layout'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateLevel } from '@/helper/calculateLevel'
 import { cn } from '@/lib/utils'
-import { Character, PageProps } from '@/types'
+import { Character, PageProps, User } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 interface FilterOption {
   label: string
@@ -67,12 +67,71 @@ type AdminCharacter = Pick<
 
 type CharacterGroup = {
   key: string
+  userId: number | null
   label: string
   discordHandle?: string | null
   discordId?: number | null
   discordAvatar?: string | null
   simplifiedTracking?: boolean
   characters: AdminCharacter[]
+}
+
+type EmptyApprovalUser = Pick<
+  User,
+  | 'id'
+  | 'name'
+  | 'discord_id'
+  | 'discord_username'
+  | 'discord_display_name'
+  | 'avatar'
+  | 'simplified_tracking'
+>
+
+const DebouncedSearchInput = ({
+  initialValue,
+  onSearch,
+}: {
+  initialValue: string
+  onSearch: (value: string) => void
+}) => {
+  const [value, setValue] = useState(initialValue)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    setValue(initialValue)
+  }, [initialValue])
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [])
+
+  const handleChange = ({ target: { value: nextValue } }: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(nextValue)
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(() => {
+      onSearch(nextValue)
+      debounceRef.current = null
+    }, 250)
+  }
+
+  return (
+    <Input
+      type="search"
+      placeholder="Search by character or user..."
+      value={value}
+      onChange={handleChange}
+    >
+      Search
+    </Input>
+  )
 }
 
 const getStatusLabel = (status?: string | null) => {
@@ -747,9 +806,16 @@ const AdminQuickLevelModal = ({
   )
 }
 
-export default function CharacterApprovals({ characters }: { characters: AdminCharacter[] }) {
+export default function CharacterApprovals({
+  characters,
+  emptyUsers = [],
+}: {
+  characters: AdminCharacter[]
+  emptyUsers?: EmptyApprovalUser[]
+}) {
   const currentQueryParams = route().params as Record<string, string | number | undefined>
   const navOptions = { preserveState: true, preserveScroll: true }
+  const searchQuery = String(currentQueryParams.search ?? '')
   const normalizedParams: Record<string, string | number | undefined> = {
     ...currentQueryParams,
     discord:
@@ -761,14 +827,17 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     router.get(href, {}, navOptions)
   }
 
-  const [search, setSearch] = useState(String(currentQueryParams.search ?? ''))
+  const handleSearch = (value: string) => {
+    const nextSearch = value.trim() !== '' ? value : undefined
+    const currentSearch = searchQuery.trim() !== '' ? searchQuery : undefined
+    if (nextSearch === currentSearch) {
+      return
+    }
 
-  const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(value)
     navigateTo(
       route('admin.character-approvals.index', {
         ...normalizedParams,
-        search: value || undefined,
+        search: nextSearch,
         no_discord: undefined,
       }),
     )
@@ -837,18 +906,19 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
     const grouped = new Map<string, CharacterGroup>()
 
     characters.forEach((character) => {
-      const userId = character.user_id
+      const userId = typeof character.user_id === 'number' ? character.user_id : null
       const userName = character.user?.name ?? 'Unknown User'
       const discordUsername = character.user?.discord_username?.trim()
       const discordDisplayName = character.user?.discord_display_name?.trim()
       const discordHandle = discordUsername || discordDisplayName || null
-      const discordId = character.user?.discord_id ?? null
+      const discordId = character.user?.discord_id ? Number(character.user.discord_id) : null
       const discordAvatar = character.user?.avatar ?? null
       const simplifiedTracking = Boolean(character.simplified_tracking)
-      const groupKey = String(userId)
+      const groupKey = userId !== null ? `user-${userId}` : 'unknown-user'
       if (!grouped.has(groupKey)) {
         grouped.set(groupKey, {
           key: groupKey,
+          userId,
           label: userName,
           discordHandle,
           discordId,
@@ -870,8 +940,31 @@ export default function CharacterApprovals({ characters }: { characters: AdminCh
       group.characters.push(character)
     })
 
+    emptyUsers.forEach((user) => {
+      const groupKey = `user-${user.id}`
+      if (grouped.has(groupKey)) {
+        return
+      }
+
+      const discordUsername = user.discord_username?.trim()
+      const discordDisplayName = user.discord_display_name?.trim()
+      const discordHandle = discordUsername || discordDisplayName || null
+      const discordId = user.discord_id ? Number(user.discord_id) : null
+
+      grouped.set(groupKey, {
+        key: groupKey,
+        userId: user.id,
+        label: user.name,
+        discordHandle,
+        discordId,
+        discordAvatar: user.avatar ?? null,
+        simplifiedTracking: Boolean(user.simplified_tracking),
+        characters: [],
+      })
+    })
+
     return Array.from(grouped.values())
-  }, [characters])
+  }, [characters, emptyUsers])
 
   const totalCharacters = characters.length
   const totalUsers = groups.length
@@ -906,7 +999,7 @@ const tierTextClassMap: Record<string, string> = {
     missing: 'No Legacy Match',
   }
   const activeFilters = [
-    search ? `Search: ${search}` : null,
+    searchQuery ? `Search: ${searchQuery}` : null,
     normalizedParams.status
       ? `Status: ${statusLabelMap[String(normalizedParams.status)] ?? normalizedParams.status}`
       : null,
@@ -955,9 +1048,7 @@ const tierTextClassMap: Record<string, string> = {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-3">
-            <Input type="search" placeholder="Search by character or user..." value={search} onChange={handleSearch}>
-              Search
-            </Input>
+            <DebouncedSearchInput initialValue={searchQuery} onSearch={handleSearch} />
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-base-content/60">Status:</span>
@@ -1028,17 +1119,25 @@ const tierTextClassMap: Record<string, string> = {
                         Simplified tracking
                       </span>
                     ) : null}
-                    <AdminCharacterModal userId={Number(group.key)} userName={group.label}>
-                      <Button size="xs" variant="ghost">
-                        <Plus size={14} />
-                        Add character
-                      </Button>
-                    </AdminCharacterModal>
-                    <DeleteUserModal userId={Number(group.key)} userLabel={group.label} />
+                    {group.userId !== null ? (
+                      <>
+                        <AdminCharacterModal userId={group.userId} userName={group.label}>
+                          <Button size="xs" variant="ghost">
+                            <Plus size={14} />
+                            Add character
+                          </Button>
+                        </AdminCharacterModal>
+                        <DeleteUserModal userId={group.userId} userLabel={group.label} />
+                      </>
+                    ) : null}
                   </span>
                 </div>
                 <List>
-                  {group.characters.map((character) => {
+                  {group.characters.length === 0 ? (
+                    <ListRow className="grid-cols-1">
+                      <div className="col-span-full px-1 py-2 text-sm text-base-content/60">No characters yet.</div>
+                    </ListRow>
+                  ) : group.characters.map((character) => {
                     const status = character.guild_status ?? 'pending'
                     const statusLabel = getStatusLabel(status)
                     const isDraft = status === 'draft'
@@ -1164,7 +1263,9 @@ const tierTextClassMap: Record<string, string> = {
                             </AdminNoteModal>
                           </div>
                           <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-base-200/60 pt-3 md:w-auto md:border-t-0 md:pt-0">
-                            <CharacterActionsMenu character={character} userId={Number(group.key)} userName={group.label} />
+                            {group.userId !== null ? (
+                              <CharacterActionsMenu character={character} userId={group.userId} userName={group.label} />
+                            ) : null}
                           </div>
                         </div>
                       </ListRow>

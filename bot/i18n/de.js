@@ -336,6 +336,7 @@ module.exports = {
         notesField: 'Notizen',
         registrationNotesField: 'Registrierungsnotizen',
         reviewNoteField: 'Review-Notiz',
+        reviewedByField: 'Geprüft von',
         approvedDmDescription: 'Dein Charakter ist jetzt genehmigt und spielbereit.',
         needsChangesDmDescription: 'Dein Charakter braucht Änderungen. Bitte passe ihn an und registriere ihn erneut für das Review.',
         declinedDmDescription: 'Dein Charakter wurde abgelehnt. Bitte prüfe die Details und passe ihn bei Bedarf an.',

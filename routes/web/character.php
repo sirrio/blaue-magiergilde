@@ -7,6 +7,7 @@ use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
 use App\Http\Controllers\Character\QuickLevelController;
 use App\Http\Controllers\Character\RestoreDeletedCharacterController;
+use App\Http\Controllers\Character\ShowDeletedCharacterController;
 use App\Http\Controllers\Character\SortCharacterController;
 use App\Http\Controllers\Character\SubmitCharacterForApprovalController;
 use App\Http\Controllers\Character\TrackingModeController;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('characters/deleted', DeletedCharacterController::class)
     ->middleware(['auth'])
     ->name('characters.deleted');
+Route::get('characters/deleted/{character}', ShowDeletedCharacterController::class)
+    ->withTrashed()
+    ->middleware(['auth'])
+    ->name('characters.deleted.show');
 
 Route::patch('characters/{character}/tracking', TrackingModeController::class)
     ->middleware(['auth'])

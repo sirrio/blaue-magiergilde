@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Character;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Character\StoreCharacterRequest;
 use App\Http\Requests\Character\UpdateCharacterRequest;
+use App\Models\AdminAuditLog;
 use App\Models\Character;
+use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +34,7 @@ class CharacterController extends Controller
             ->orderBy('position')
             ->get()
             ->withoutAppends();
+        $this->attachReviewerNamesToCharacters($characters);
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
@@ -87,6 +91,8 @@ class CharacterController extends Controller
     public function show(Character $character): Response
     {
         $this->ensureCharacterOwner($character);
+        $character->load('adventures.allies.linkedCharacter');
+        $this->attachReviewerNamesToCharacters(collect([$character]));
 
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
@@ -97,7 +103,7 @@ class CharacterController extends Controller
             ->withoutAppends();
 
         return Inertia::render('character/show', [
-            'character' => $character->load('adventures.allies.linkedCharacter'),
+            'character' => $character,
             'guildCharacters' => $guildCharacters,
         ]);
     }
@@ -228,5 +234,64 @@ class CharacterController extends Controller
         }
 
         return $statuses;
+    }
+
+    private function attachReviewerNamesToCharacters(Collection $characters): void
+    {
+        $characterIds = $characters
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->values()
+            ->all();
+
+        if ($characterIds === []) {
+            return;
+        }
+
+        $reviewedStatuses = ['approved', 'declined', 'needs_changes'];
+        $actorIdByCharacterId = [];
+
+        $logs = AdminAuditLog::query()
+            ->where('subject_type', Character::class)
+            ->where('action', 'character.guild_status.updated')
+            ->whereIn('subject_id', $characterIds)
+            ->orderByDesc('id')
+            ->get(['subject_id', 'actor_user_id', 'metadata']);
+
+        foreach ($logs as $log) {
+            $subjectId = (int) $log->subject_id;
+            if (isset($actorIdByCharacterId[$subjectId])) {
+                continue;
+            }
+
+            $toStatus = strtolower(trim((string) data_get($log->metadata, 'to', '')));
+            if (! in_array($toStatus, $reviewedStatuses, true)) {
+                continue;
+            }
+
+            $actorUserId = (int) $log->actor_user_id;
+            if ($actorUserId <= 0) {
+                continue;
+            }
+
+            $actorIdByCharacterId[$subjectId] = $actorUserId;
+        }
+
+        $actorIds = collect($actorIdByCharacterId)
+            ->values()
+            ->unique()
+            ->values()
+            ->all();
+
+        $reviewerNames = User::query()
+            ->whereIn('id', $actorIds)
+            ->pluck('name', 'id');
+
+        foreach ($characters as $character) {
+            $actorId = $actorIdByCharacterId[(int) $character->id] ?? null;
+            $reviewedByName = $actorId ? $reviewerNames->get($actorId) : null;
+            $character->setAttribute('reviewed_by_name', $reviewedByName);
+        }
     }
 }

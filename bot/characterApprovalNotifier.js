@@ -240,6 +240,8 @@ async function sendCharacterApprovalDm({
     characterAvatarUrl,
     characterReviewNote,
     externalLink,
+    reviewerName,
+    reviewerDiscordId,
 }) {
     if (!discordUserId || !/^[0-9]{5,}$/.test(String(discordUserId))) {
         return { ok: false, status: 422, error: 'Invalid discord_user_id.' };
@@ -262,6 +264,11 @@ async function sendCharacterApprovalDm({
     const faction = rawFaction.toLowerCase() === 'none' ? '' : rawFaction;
     const classes = formatClasses(characterClasses);
     const reviewNote = trimField(characterReviewNote || '');
+    const reviewerLabel = String(reviewerName || '').trim();
+    const reviewerMention = buildUserMention(reviewerDiscordId);
+    const reviewedBy = reviewerMention
+        ? (reviewerLabel ? `${reviewerLabel} (${reviewerMention})` : reviewerMention)
+        : (reviewerLabel || '');
 
     let description = '';
     if (label.toLowerCase() === 'approved') {
@@ -297,6 +304,9 @@ async function sendCharacterApprovalDm({
 
     if (isMeaningful(reviewNote) && reviewNote !== '—' && (status === 'needs_changes' || status === 'declined')) {
         embed.addFields({ name: t('approvals.reviewNoteField', {}, locale), value: reviewNote, inline: false });
+    }
+    if (isMeaningful(reviewedBy)) {
+        embed.addFields({ name: t('approvals.reviewedByField', {}, locale), value: trimField(reviewedBy), inline: false });
     }
 
     let avatarAttachment = null;

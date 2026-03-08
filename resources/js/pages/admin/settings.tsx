@@ -99,6 +99,7 @@ export default function Settings({
   const [syncingChannelId, setSyncingChannelId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
+  const fetchBackupStatusRef = useRef<(showToast: boolean) => Promise<void>>(async () => {})
   const [editingSource, setEditingSource] = useState<Source | null>(null)
   const [importEntityType, setImportEntityType] = useState<'items' | 'spells'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -129,61 +130,58 @@ export default function Settings({
   const [legacyApplyBusy, setLegacyApplyBusy] = useState(false)
   const [legacyImportPreview, setLegacyImportPreview] = useState<LegacyCharacterApprovalImportPreview | null>(null)
 
-  const fetchBackupStatus = useCallback(
-    async (showToast: boolean) => {
-      const csrfToken = getCsrfToken()
-      if (!csrfToken) {
-        if (showToast) toast.show('Missing CSRF token.', 'error')
+  fetchBackupStatusRef.current = async (showToast: boolean) => {
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) {
+      if (showToast) toast.show('Missing CSRF token.', 'error')
+      return
+    }
+
+    try {
+      const response = await fetch(route('admin.settings.backup.status'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        if (showToast) {
+          toast.show(String(payload?.error ?? 'Status could not be loaded.'), 'error')
+        }
         return
       }
 
-      try {
-        const response = await fetch(route('admin.settings.backup.status'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-          },
-          credentials: 'same-origin',
-          body: JSON.stringify({}),
-        })
-
-        const payload = await response.json()
-        if (!response.ok) {
-          if (showToast) {
-            toast.show(String(payload?.error ?? 'Status could not be loaded.'), 'error')
-          }
-          return
-        }
-
-        const configured = payload?.configured
-        if (configured === false) {
-          setBackupStatus(null)
-          return
-        }
-
-        const status = payload?.status ?? null
-        if (!status || typeof status !== 'object') {
-          setBackupStatus(null)
-          return
-        }
-        setBackupStatus(status as DiscordBackupStatus)
-      } catch {
-        if (showToast) {
-          toast.show('Status could not be loaded.', 'error')
-        }
+      const configured = payload?.configured
+      if (configured === false) {
+        setBackupStatus(null)
+        return
       }
-    },
-    [],
-  )
+
+      const status = payload?.status ?? null
+      if (!status || typeof status !== 'object') {
+        setBackupStatus(null)
+        return
+      }
+      setBackupStatus(status as DiscordBackupStatus)
+    } catch {
+      if (showToast) {
+        toast.show('Status could not be loaded.', 'error')
+      }
+    }
+  }
 
   useEffect(() => {
     setSelectedByGuild(discordBackup.selected_channels ?? {})
   }, [discordBackup.selected_channels])
 
   useEffect(() => {
-    void fetchBackupStatus(false)
+    void fetchBackupStatusRef.current(false)
 
     return () => {
       if (statusIntervalRef.current !== null) {
@@ -191,7 +189,7 @@ export default function Settings({
         statusIntervalRef.current = null
       }
     }
-  }, [fetchBackupStatus])
+  }, [])
 
   useEffect(() => {
     if (!backupStatus?.running) {
@@ -205,7 +203,7 @@ export default function Settings({
     if (statusIntervalRef.current !== null) return
 
     statusIntervalRef.current = window.setInterval(() => {
-      void fetchBackupStatus(false)
+      void fetchBackupStatusRef.current(false)
     }, 5000)
 
     return () => {
@@ -214,7 +212,7 @@ export default function Settings({
         statusIntervalRef.current = null
       }
     }
-  }, [backupStatus?.running, fetchBackupStatus])
+  }, [backupStatus?.running])
 
   const selectedChannelDetails = useMemo(
     () => discordBackup.selected_channels_details ?? {},
@@ -319,18 +317,18 @@ export default function Settings({
       preserveScroll: true,
       onSuccess: () => {
         toast.show('Discord backup started.', 'info')
-        void fetchBackupStatus(false)
+        void fetchBackupStatusRef.current(false)
       },
       onError: (formErrors) => {
         const message = formErrors?.discord_backup ? String(formErrors.discord_backup) : ''
         if (message.toLowerCase().includes('backup already running')) {
           toast.show('Backup already running.', 'info')
-          void fetchBackupStatus(false)
+          void fetchBackupStatusRef.current(false)
           return
         }
 
         toast.show('Discord backup could not be started.', 'error')
-        void fetchBackupStatus(false)
+        void fetchBackupStatusRef.current(false)
       },
     })
   }
@@ -414,7 +412,7 @@ export default function Settings({
         }
 
         toast.show('Channel sync started.', 'info')
-        void fetchBackupStatus(false)
+        void fetchBackupStatusRef.current(false)
         router.reload({ only: ['discordBackup'] })
       } catch {
         toast.show('Channel sync failed.', 'error')
@@ -422,7 +420,7 @@ export default function Settings({
         setSyncingChannelId(null)
       }
     },
-    [fetchBackupStatus, syncingChannelId],
+    [syncingChannelId],
   )
 
   const selectedChannelsFlat = useMemo(() => {

@@ -861,12 +861,15 @@ async function finalizeCharacterCreation(state) {
         return;
     }
 
+    const isRemoteAvatar = Boolean(data.avatar && isHttpUrl(data.avatar));
+    const initialAvatar = isRemoteAvatar ? null : data.avatar;
+
     const result = await createCharacterForDiscord(state.promptInteraction.user, {
         name: data.name,
         startTier: data.startTier,
         externalLink: data.externalLink,
         notes: data.notes,
-        avatar: data.avatar,
+        avatar: initialAvatar,
         faction: data.faction ?? 'none',
         version: data.version ?? '2024',
         isFiller: data.isFiller,
@@ -885,7 +888,7 @@ async function finalizeCharacterCreation(state) {
         return;
     }
 
-    if (result.id && data.avatar && isHttpUrl(data.avatar)) {
+    if (result.id && isRemoteAvatar) {
         const avatarResult = await storeCharacterAvatar(result.id, data.avatar);
         if (avatarResult?.ok && typeof avatarResult.avatarPath === 'string') {
             data.avatar = avatarResult.avatarPath;

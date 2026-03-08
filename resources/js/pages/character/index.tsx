@@ -12,7 +12,7 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, UniqueIdentifie
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { Head, router, usePage } from '@inertiajs/react'
 import { Archive, BookUser, Copy, Plus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const t = useTranslate()
@@ -20,6 +20,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
   const [updatingAvatarMaskIds, setUpdatingAvatarMaskIds] = useState<number[]>([])
+  const [, startNavigationTransition] = useTransition()
   const visibleCharacters = useMemo(() => characters.filter((char) => !char.deleted_at), [characters])
   const [chars, setChars] = useState([...visibleCharacters])
   useEffect(() => {
@@ -35,15 +36,18 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   }
 
   function updateCharacterOrder(activeId: UniqueIdentifier, overId: UniqueIdentifier) {
-    setChars((prevChars) => {
-      const oldIndex = prevChars.findIndex((char) => char.id === activeId)
-      const newIndex = prevChars.findIndex((char) => char.id === overId)
+    const oldIndex = chars.findIndex((char) => char.id === activeId)
+    const newIndex = chars.findIndex((char) => char.id === overId)
 
-      const newOrder = arrayMove(prevChars, oldIndex, newIndex)
+    if (oldIndex < 0 || newIndex < 0) {
+      return
+    }
 
+    const newOrder = arrayMove(chars, oldIndex, newIndex)
+    setChars(newOrder)
+
+    startNavigationTransition(() => {
       router.post(route('characters.sort'), { list: newOrder } as never, { preserveScroll: true })
-
-      return newOrder
     })
   }
 
@@ -97,19 +101,21 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, simplified_tracking: value } : char)))
     setUpdatingTrackingIds((currentIds) => [...currentIds, characterId])
 
-    router.patch(
-      route('characters.tracking', characterId),
-      { simplified_tracking: value } as never,
-      {
-        preserveScroll: true,
-        preserveState: true,
-        onError: () => {
-          const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.simplified_tracking ?? false
-          setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, simplified_tracking: fallbackValue } : char)))
+    startNavigationTransition(() => {
+      router.patch(
+        route('characters.tracking', characterId),
+        { simplified_tracking: value } as never,
+        {
+          preserveScroll: true,
+          preserveState: true,
+          onError: () => {
+            const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.simplified_tracking ?? false
+            setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, simplified_tracking: fallbackValue } : char)))
+          },
+          onFinish: () => setUpdatingTrackingIds((currentIds) => currentIds.filter((id) => id !== characterId)),
         },
-        onFinish: () => setUpdatingTrackingIds((currentIds) => currentIds.filter((id) => id !== characterId)),
-      },
-    )
+      )
+    })
   }
   const updateAvatarMode = (characterId: number, value: boolean) => {
     if (updatingAvatarMaskIds.includes(characterId)) return
@@ -117,19 +123,21 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, avatar_masked: value } : char)))
     setUpdatingAvatarMaskIds((currentIds) => [...currentIds, characterId])
 
-    router.patch(
-      route('characters.avatar-mode', characterId),
-      { avatar_masked: value } as never,
-      {
-        preserveScroll: true,
-        preserveState: true,
-        onError: () => {
-          const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.avatar_masked ?? true
-          setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, avatar_masked: fallbackValue } : char)))
+    startNavigationTransition(() => {
+      router.patch(
+        route('characters.avatar-mode', characterId),
+        { avatar_masked: value } as never,
+        {
+          preserveScroll: true,
+          preserveState: true,
+          onError: () => {
+            const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.avatar_masked ?? true
+            setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, avatar_masked: fallbackValue } : char)))
+          },
+          onFinish: () => setUpdatingAvatarMaskIds((currentIds) => currentIds.filter((id) => id !== characterId)),
         },
-        onFinish: () => setUpdatingAvatarMaskIds((currentIds) => currentIds.filter((id) => id !== characterId)),
-      },
-    )
+      )
+    })
   }
 
   return (

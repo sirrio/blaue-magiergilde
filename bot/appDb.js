@@ -133,7 +133,26 @@ function bubblesForDuration(duration, hasAdditionalBubble) {
 
 function normalizeAvatar(value) {
     const text = String(value || '').trim();
+    if (isDiscordAttachmentUrl(text)) {
+        return null;
+    }
     return text.length > 0 ? text : null;
+}
+
+function isDiscordAttachmentUrl(value) {
+    if (!value || typeof value !== 'string') {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(value);
+        const host = normalizeHost(parsed.hostname);
+
+        return (host === 'cdn.discordapp.com' || host === 'media.discordapp.net')
+            && parsed.pathname.startsWith('/attachments/');
+    } catch {
+        return false;
+    }
 }
 
 function normalizeHost(rawHost) {
