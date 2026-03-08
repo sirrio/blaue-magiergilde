@@ -59,7 +59,10 @@ class CharacterApprovalNotificationService
         return $result;
     }
 
-    public function notifyStatusChange(Character $character, string $status): array
+    /**
+     * @param  array{reviewer_name?: string|null, reviewer_discord_id?: string|null}  $context
+     */
+    public function notifyStatusChange(Character $character, string $status, array $context = []): array
     {
         $character->load(['user', 'characterClasses']);
         $discordId = $character->user?->discord_id;
@@ -88,6 +91,8 @@ class CharacterApprovalNotificationService
             'character_avatar_url' => $payload['character_avatar_url'] ?? null,
             'character_review_note' => $payload['character_review_note'] ?? null,
             'external_link' => $payload['external_link'] ?? null,
+            'reviewer_name' => isset($context['reviewer_name']) ? trim((string) $context['reviewer_name']) : null,
+            'reviewer_discord_id' => isset($context['reviewer_discord_id']) ? trim((string) $context['reviewer_discord_id']) : null,
         ]);
     }
 

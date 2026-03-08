@@ -19,7 +19,10 @@ it('sends a discord DM when a character is approved', function () {
         'http://bot.test/character-approval/notify' => Http::response(['status' => 'sent'], 200),
     ]);
 
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '998877665544332211',
+    ]);
     $owner = User::factory()->create(['discord_id' => '1234567890']);
     $character = Character::factory()->for($owner)->create(['guild_status' => 'pending']);
 
@@ -30,7 +33,9 @@ it('sends a discord DM when a character is approved', function () {
     Http::assertSent(function ($request) {
         return $request->url() === 'http://bot.test/character-approval/notify'
             && $request['discord_user_id'] === '1234567890'
-            && $request['status'] === 'approved';
+            && $request['status'] === 'approved'
+            && $request['reviewer_name'] !== null
+            && $request['reviewer_discord_id'] === '998877665544332211';
     });
 });
 
@@ -42,7 +47,10 @@ it('includes review note when notifying about needs changes', function () {
         'http://bot.test/character-approval/notify' => Http::response(['status' => 'sent'], 200),
     ]);
 
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create([
+        'is_admin' => true,
+        'discord_id' => '112233445566778899',
+    ]);
     $owner = User::factory()->create(['discord_id' => '1234567890']);
     $character = Character::factory()->for($owner)->create(['guild_status' => 'pending']);
 
@@ -55,7 +63,9 @@ it('includes review note when notifying about needs changes', function () {
         return $request->url() === 'http://bot.test/character-approval/notify'
             && $request['discord_user_id'] === '1234567890'
             && $request['status'] === 'needs_changes'
-            && $request['character_review_note'] === 'Please fix class setup and missing details.';
+            && $request['character_review_note'] === 'Please fix class setup and missing details.'
+            && $request['reviewer_name'] !== null
+            && $request['reviewer_discord_id'] === '112233445566778899';
     });
 });
 

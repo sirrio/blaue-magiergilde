@@ -348,6 +348,7 @@ export interface Character {
   guild_status?: 'pending' | 'approved' | 'declined' | 'needs_changes' | 'retired' | 'draft'
   registration_note?: string | null
   review_note?: string | null
+  reviewed_by_name?: string | null
   room_count?: number
   admin_notes?: string | null
   admin_managed?: boolean

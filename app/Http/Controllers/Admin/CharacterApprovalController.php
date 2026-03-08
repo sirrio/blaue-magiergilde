@@ -294,7 +294,10 @@ class CharacterApprovalController extends Controller
             }
 
             if (in_array($statusChange, ['approved', 'declined', 'needs_changes'], true)) {
-                $result = $notificationService->notifyStatusChange($character, $statusChange);
+                $result = $notificationService->notifyStatusChange($character, $statusChange, [
+                    'reviewer_name' => $user->name,
+                    'reviewer_discord_id' => $user->discord_id,
+                ]);
                 if (! $result['ok']) {
                     Log::warning('Character approval DM failed.', [
                         'character_id' => $character->id,

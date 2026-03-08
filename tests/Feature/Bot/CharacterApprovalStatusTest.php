@@ -14,14 +14,24 @@ it('accepts character approval actions from the discord bot', function () {
     expect(config('services.bot.http_url'))->toBe('http://bot.test');
     expect(config('services.bot.http_token'))->toBe('token');
 
-    $notificationService = mock(CharacterApprovalNotificationService::class);
-    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
-    $notificationService->shouldReceive('notifyStatusChange')->once()->andReturn(['ok' => true, 'status' => 200]);
-
     $admin = User::factory()->create([
         'is_admin' => true,
         'discord_id' => '1234567890',
     ]);
+
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
+    $notificationService
+        ->shouldReceive('notifyStatusChange')
+        ->once()
+        ->withArgs(function ($characterArg, $statusArg, $contextArg) use ($admin) {
+            return $characterArg instanceof Character
+                && $statusArg === 'approved'
+                && is_array($contextArg)
+                && ($contextArg['reviewer_name'] ?? null) === $admin->name
+                && (string) ($contextArg['reviewer_discord_id'] ?? '') === (string) $admin->discord_id;
+        })
+        ->andReturn(['ok' => true, 'status' => 200]);
 
     $character = Character::factory()->create([
         'guild_status' => 'pending',
@@ -53,14 +63,24 @@ it('accepts needs changes status from the discord bot', function () {
     Config::set('services.bot.http_url', 'http://bot.test');
     Config::set('services.bot.http_token', 'token');
 
-    $notificationService = mock(CharacterApprovalNotificationService::class);
-    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
-    $notificationService->shouldReceive('notifyStatusChange')->once()->andReturn(['ok' => true, 'status' => 200]);
-
     $admin = User::factory()->create([
         'is_admin' => true,
         'discord_id' => '2234567890',
     ]);
+
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldReceive('syncAnnouncement')->once()->andReturn(['ok' => true, 'status' => 200]);
+    $notificationService
+        ->shouldReceive('notifyStatusChange')
+        ->once()
+        ->withArgs(function ($characterArg, $statusArg, $contextArg) use ($admin) {
+            return $characterArg instanceof Character
+                && $statusArg === 'needs_changes'
+                && is_array($contextArg)
+                && ($contextArg['reviewer_name'] ?? null) === $admin->name
+                && (string) ($contextArg['reviewer_discord_id'] ?? '') === (string) $admin->discord_id;
+        })
+        ->andReturn(['ok' => true, 'status' => 200]);
 
     $character = Character::factory()->create([
         'guild_status' => 'pending',
