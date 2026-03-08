@@ -1,17 +1,48 @@
 import { List, ListRow } from '@/components/ui/list'
 import { Button } from '@/components/ui/button'
+import LogoTier from '@/components/logo-tier'
+import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
 import AppLayout from '@/layouts/app-layout'
 import { useTranslate } from '@/lib/i18n'
+import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
+import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
+import { calculateClassString } from '@/helper/calculateClassString'
+import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
+import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
+import { calculateLevel } from '@/helper/calculateLevel'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
+import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
+import { calculateTier } from '@/helper/calculateTier'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { Progress } from '@/components/ui/progress'
 import { Character, Ally } from '@/types'
 import { Head, Link, router } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, ChevronUp, Heart, LoaderCircle, Pencil, ScrollText, Trash } from 'lucide-react'
+import {
+  Anvil,
+  AlertTriangle,
+  Archive,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Clock,
+  Coins,
+  Crown,
+  Droplets,
+  FlameKindling,
+  Heart,
+  LoaderCircle,
+  Pencil,
+  ScrollText,
+  Swords,
+  Trash,
+  XCircle,
+} from 'lucide-react'
 import { useImage } from 'react-image'
 import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
@@ -73,6 +104,35 @@ const formatParticipantSummary = (names: string[]) => {
   return remaining > 0 ? `${visible} +${remaining} more` : visible
 }
 
+function getCharacterStatusHint(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+  if (guildStatus === 'draft') {
+    return t('characters.statusDraftHint')
+  }
+
+  if (guildStatus === 'pending') {
+    return t('characters.statusPendingHint')
+  }
+
+  if (guildStatus === 'needs_changes') {
+    return t('characters.statusNeedsChangesHint')
+  }
+
+  if (guildStatus === 'declined') {
+    return t('characters.statusDeclinedHint')
+  }
+
+  return ''
+}
+
+const getStatusLabel = (status: string) => {
+  if (status === 'approved') return 'approved'
+  if (status === 'declined') return 'declined'
+  if (status === 'needs_changes') return 'needs changes'
+  if (status === 'retired') return 'retired'
+  if (status === 'draft') return 'draft'
+  return 'pending'
+}
+
 export default function Show({
   character,
   guildCharacters,
@@ -84,6 +144,18 @@ export default function Show({
 }) {
   const t = useTranslate()
   const isReadOnly = readOnly || Boolean(character.deleted_at)
+  const level = calculateLevel(character)
+  const tier = calculateTier(character)
+  const classString = calculateClassString(character)
+  const bubblesToNextLevel = calculateBubblesToNextLevel(character)
+  const progressValue = calculateBubblesInCurrentLevel(character)
+  const progressMax = calculateTotalBubblesToNextLevel(character)
+  const guildStatus = character.guild_status ?? 'pending'
+  const reviewNote = character.review_note?.trim() ?? ''
+  const statusHint = getCharacterStatusHint(guildStatus, t)
+  const statusSummary = reviewNote && (guildStatus === 'needs_changes' || guildStatus === 'declined')
+    ? `${statusHint} ${t('common.note')}: ${reviewNote}`
+    : statusHint
   const avatarMasked = character.avatar_masked ?? true
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
@@ -173,8 +245,29 @@ export default function Show({
     () => character.downtimes.reduce((total, dt) => total + dt.duration, 0),
     [character.downtimes],
   )
+  const factionDowntimeDuration = useMemo(() => calculateFactionDowntime(character), [character])
+  const otherDowntimeDuration = useMemo(() => calculateOtherDowntime(character), [character])
+  const factionLevel = useMemo(() => character.faction_rank ?? calculateFactionLevel(character), [character])
   const remainingDowntimeDuration = useMemo(() => Math.max(0, calculateRemainingDowntime(character)), [character])
   const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
+  const statusIcon = guildStatus === 'approved'
+    ? <CheckCircle2 size={12} />
+    : guildStatus === 'declined'
+      ? <XCircle size={12} />
+      : guildStatus === 'needs_changes'
+        ? <AlertTriangle size={12} />
+        : guildStatus === 'retired'
+          ? <Archive size={12} />
+          : guildStatus === 'draft'
+            ? <Pencil size={12} />
+            : <Clock size={12} />
+  const statusClass = guildStatus === 'approved'
+    ? 'text-success'
+    : guildStatus === 'declined'
+      ? 'text-error'
+      : guildStatus === 'needs_changes' || guildStatus === 'pending'
+        ? 'text-warning'
+        : 'text-base-content/60'
 
   const handleAdventureDelete = (adventureId: number) => {
     if (!window.confirm(t('characters.deleteAdventureConfirm'))) return
@@ -221,8 +314,80 @@ export default function Show({
             <span className="badge badge-ghost badge-sm">{character.allies.length} {t('characters.allies')}</span>
           </div>
         </div>
-        <div className="flex justify-center">
-          <CharacterPortrait character={character} className="h-24 w-24 sm:h-32 sm:w-32" masked={avatarMasked} />
+        <div className="rounded-box border border-base-200 bg-base-100 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className={cn('inline-flex items-center gap-1 rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-xs', statusClass)}>
+                  {statusIcon}
+                  <span>{getStatusLabel(guildStatus)}</span>
+                </span>
+              </div>
+              <p className="truncate text-lg font-semibold leading-tight">{character.name}</p>
+              <div className="flex items-center gap-1 text-sm text-base-content/70">
+                <LogoTier tier={tier} width={12} />
+                <span>{t('characters.levelLabel')} {level} {classString}</span>
+              </div>
+              {statusSummary ? <p className="text-xs text-base-content/70">{statusSummary}</p> : null}
+              <div className="space-y-1">
+                <Progress className="h-2 w-full" value={progressValue} max={progressMax} />
+                <p className="flex items-center justify-end gap-1 text-xs">
+                  <span className="font-semibold">{bubblesToNextLevel}</span>
+                  <Droplets size={13} />
+                  <span>{t('characters.toNextLevel')}</span>
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0">
+              <CharacterPortrait character={character} className="h-20 w-20 sm:h-24 sm:w-24" masked={avatarMasked} />
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            <InfoBox>
+              <InfoBoxTitle>
+                <Swords size={15} /> {t('characters.adventures')}
+              </InfoBoxTitle>
+              <InfoBoxLine>{t('characters.played')}: {character.adventures.length}</InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.startedIn')}: <LogoTier width={13} tier={character.start_tier} />
+              </InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.bubbleShop')}: {character.bubble_shop_spend}
+                <Droplets size={13} />
+              </InfoBoxLine>
+            </InfoBox>
+            <InfoBox>
+              <InfoBoxTitle>
+                <Anvil size={15} /> {t('characters.factions')}
+              </InfoBoxTitle>
+              <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.levelLabel')}: {factionLevel}
+              </InfoBoxLine>
+            </InfoBox>
+            <InfoBox>
+              <InfoBoxTitle>
+                <FlameKindling size={15} /> {t('characters.downtime')}
+              </InfoBoxTitle>
+              <InfoBoxLine>{t('characters.total')}: {secondsToHourMinuteString(totalDowntimeDuration)}</InfoBoxLine>
+              <InfoBoxLine>Faction: {secondsToHourMinuteString(factionDowntimeDuration)}</InfoBoxLine>
+              <InfoBoxLine>{t('characters.other')}: {secondsToHourMinuteString(otherDowntimeDuration)}</InfoBoxLine>
+              <InfoBoxLine className="font-semibold">{t('characters.remaining')}: {secondsToHourMinuteString(remainingDowntimeDuration)}</InfoBoxLine>
+            </InfoBox>
+            <InfoBox>
+              <InfoBoxTitle>
+                <Crown size={15} /> {t('characters.gameMaster')}
+              </InfoBoxTitle>
+              <InfoBoxLine>
+                {t('characters.bubbles')}: {character.dm_bubbles}
+                <Droplets size={13} />
+              </InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.coins')}: {character.dm_coins}
+                <Coins size={13} />
+              </InfoBoxLine>
+            </InfoBox>
+          </div>
         </div>
 
         <div>
