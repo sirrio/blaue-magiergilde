@@ -5,6 +5,7 @@ use App\Http\Controllers\Character\AvatarModeController;
 use App\Http\Controllers\Character\CharacterController;
 use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
+use App\Http\Controllers\Character\ForceDeleteDeletedCharacterController;
 use App\Http\Controllers\Character\QuickLevelController;
 use App\Http\Controllers\Character\RestoreDeletedCharacterController;
 use App\Http\Controllers\Character\ShowDeletedCharacterController;
@@ -51,6 +52,10 @@ Route::post('characters/{character}/restore-deleted', RestoreDeletedCharacterCon
     ->withTrashed()
     ->middleware(['auth'])
     ->name('characters.restore-deleted');
+Route::delete('characters/{character}/force-delete', ForceDeleteDeletedCharacterController::class)
+    ->withTrashed()
+    ->middleware(['auth'])
+    ->name('characters.force-delete');
 Route::get('characters/{character}/download', DownloadCharacterController::class)
     ->middleware(['auth'])
     ->name('characters.download');

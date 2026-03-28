@@ -14,9 +14,11 @@ it('shows deleted character details in read only mode for the owner', function (
     $character = Character::factory()->for($user)->create();
     $adventure = Adventure::factory()->for($character)->create();
     $downtime = Downtime::factory()->for($character)->create();
+    $manuallyDeletedAdventure = Adventure::factory()->for($character)->create();
+    $manuallyDeletedDowntime = Downtime::factory()->for($character)->create();
 
-    $adventure->delete();
-    $downtime->delete();
+    $manuallyDeletedAdventure->delete();
+    $manuallyDeletedDowntime->delete();
     $character->delete();
 
     $this->actingAs($user)
@@ -27,7 +29,9 @@ it('shows deleted character details in read only mode for the owner', function (
             ->where('readOnly', true)
             ->where('character.id', $character->id)
             ->has('character.adventures', 1)
-            ->has('character.downtimes', 1));
+            ->has('character.downtimes', 1)
+            ->where('character.adventures.0.id', $adventure->id)
+            ->where('character.downtimes.0.id', $downtime->id));
 });
 
 it('forbids access to deleted character details for non owners', function () {

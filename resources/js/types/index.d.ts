@@ -392,6 +392,8 @@ export interface Character {
     simplified_tracking?: boolean
     avatar_masked?: boolean
   }
+  can_force_delete?: boolean
+  force_delete_block_reason?: string | null
   character?: Character
 }
 
