@@ -301,6 +301,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.registration_note,
                 c.simplified_tracking,
                 c.avatar_masked,
+                c.private_mode,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -370,6 +371,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.registration_note,
                 c.simplified_tracking,
                 c.avatar_masked,
+                c.private_mode,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
@@ -677,7 +679,7 @@ async function createCharacterForDiscord(
 async function updateCharacterForDiscord(
     discordUser,
     characterId,
-    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus, registrationNote, simplifiedTracking, avatarMasked },
+    { name, startTier, externalLink, notes, faction, version, avatar, dmBubbles, dmCoins, bubbleShopSpend, isFiller, guildStatus, registrationNote, simplifiedTracking, avatarMasked, privateMode },
 ) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
@@ -722,11 +724,17 @@ async function updateCharacterForDiscord(
     const newAvatarMasked = typeof avatarMasked !== 'undefined'
         ? normalizeBoolean(avatarMasked, existingAvatarMasked)
         : existingAvatarMasked;
+    const existingPrivateMode = existing.private_mode === null || existing.private_mode === undefined
+        ? false
+        : Boolean(existing.private_mode);
+    const newPrivateMode = typeof privateMode !== 'undefined'
+        ? normalizeBoolean(privateMode, existingPrivateMode)
+        : existingPrivateMode;
 
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, private_mode = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
         [
@@ -745,6 +753,7 @@ async function updateCharacterForDiscord(
             newRegistrationNote || null,
             newSimplifiedTracking ? 1 : 0,
             newAvatarMasked ? 1 : 0,
+            newPrivateMode ? 1 : 0,
             updatedAt,
             characterId,
             userId,

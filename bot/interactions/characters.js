@@ -2628,6 +2628,29 @@ async function handle(interaction) {
             return true;
         }
 
+        if (action === 'private_mode_toggle') {
+            const currentPrivateMode = character.private_mode === null || character.private_mode === undefined
+                ? false
+                : Boolean(character.private_mode);
+            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { privateMode: !currentPrivateMode });
+            if (!result.ok) {
+                await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+            if (!refreshed) {
+                await updateManageMessage(interaction, { content: 'Character updated.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            await interaction.update({
+                ...buildCharacterManageView(refreshed, { ownerDiscordId, locale: await resolveInteractionLocale(interaction) }),
+                content: '',
+            });
+            return true;
+        }
+
         if (action === 'dm_bubbles') {
             const modal = new ModalBuilder()
                 .setCustomId(`characterDmBubblesModal_${character.id}_${ownerDiscordId}`)
@@ -4894,4 +4917,3 @@ module.exports = {
     handleAvatarUpdateMessage,
     storeCharacterAvatar,
 };
-

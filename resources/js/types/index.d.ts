@@ -379,6 +379,7 @@ export interface Character {
   faction_rank?: number
   simplified_tracking?: boolean
   avatar_masked?: boolean
+  private_mode?: boolean
   external_link: string
   avatar: string
   user_id: number
@@ -391,6 +392,7 @@ export interface Character {
     avatar?: string | null
     simplified_tracking?: boolean
     avatar_masked?: boolean
+    private_mode?: boolean
   }
   can_force_delete?: boolean
   force_delete_block_reason?: string | null

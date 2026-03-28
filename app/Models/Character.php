@@ -43,6 +43,7 @@ class Character extends Model
         'admin_managed' => 'boolean',
         'simplified_tracking' => 'boolean',
         'avatar_masked' => 'boolean',
+        'private_mode' => 'boolean',
     ];
 
     protected $appends = ['faction_rank'];

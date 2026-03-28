@@ -20,6 +20,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
   const [updatingAvatarMaskIds, setUpdatingAvatarMaskIds] = useState<number[]>([])
+  const [updatingPrivateModeIds, setUpdatingPrivateModeIds] = useState<number[]>([])
   const [, startNavigationTransition] = useTransition()
   const visibleCharacters = useMemo(() => characters.filter((char) => !char.deleted_at), [characters])
   const [chars, setChars] = useState([...visibleCharacters])
@@ -139,6 +140,28 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
       )
     })
   }
+  const updatePrivateMode = (characterId: number, value: boolean) => {
+    if (updatingPrivateModeIds.includes(characterId)) return
+
+    setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, private_mode: value } : char)))
+    setUpdatingPrivateModeIds((currentIds) => [...currentIds, characterId])
+
+    startNavigationTransition(() => {
+      router.patch(
+        route('characters.private-mode', characterId),
+        { private_mode: value } as never,
+        {
+          preserveScroll: true,
+          preserveState: true,
+          onError: () => {
+            const fallbackValue = visibleCharacters.find((char) => char.id === characterId)?.private_mode ?? false
+            setChars((currentChars) => currentChars.map((char) => (char.id === characterId ? { ...char, private_mode: fallbackValue } : char)))
+          },
+          onFinish: () => setUpdatingPrivateModeIds((currentIds) => currentIds.filter((id) => id !== characterId)),
+        },
+      )
+    })
+  }
 
   return (
     <AppLayout>
@@ -210,6 +233,8 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                     onTrackingModeChange={(value) => updateTrackingMode(char.id, value)}
                     isAvatarMaskedUpdating={updatingAvatarMaskIds.includes(char.id)}
                     onAvatarMaskedChange={(value) => updateAvatarMode(char.id, value)}
+                    isPrivateModeUpdating={updatingPrivateModeIds.includes(char.id)}
+                    onPrivateModeChange={(value) => updatePrivateMode(char.id, value)}
                   />
                 ))}
               </SortableContext>

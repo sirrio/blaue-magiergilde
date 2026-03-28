@@ -9,6 +9,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\CharacterAvatarPrivacy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -19,9 +20,8 @@ use Inertia\Response;
 
 class CharacterController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    public function __construct(private readonly CharacterAvatarPrivacy $characterAvatarPrivacy) {}
+
     public function index(): Response
     {
         $user = Auth::user();
@@ -35,13 +35,18 @@ class CharacterController extends Controller
             ->get()
             ->withoutAppends();
         $this->attachReviewerNamesToCharacters($characters);
+        $characters->each(fn (Character $character) => $this->characterAvatarPrivacy->maskLinkedCharacterAvatars(
+            $character,
+            $user?->getAuthIdentifier(),
+        ));
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
-            ->get(['id', 'name', 'avatar', 'guild_status'])
+            ->get(['id', 'name', 'avatar', 'guild_status', 'user_id', 'private_mode'])
             ->withoutAppends();
+        $this->characterAvatarPrivacy->maskSelectableCharacters($guildCharacters, $user?->getAuthIdentifier());
 
         return Inertia::render('character/index', [
             'user' => $user,
@@ -93,14 +98,16 @@ class CharacterController extends Controller
         $this->ensureCharacterOwner($character);
         $character->load('adventures.allies.linkedCharacter');
         $this->attachReviewerNamesToCharacters(collect([$character]));
+        $this->characterAvatarPrivacy->maskLinkedCharacterAvatars($character, Auth::id());
 
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
-            ->get(['id', 'name', 'avatar', 'guild_status'])
+            ->get(['id', 'name', 'avatar', 'guild_status', 'user_id', 'private_mode'])
             ->withoutAppends();
+        $this->characterAvatarPrivacy->maskSelectableCharacters($guildCharacters, Auth::id());
 
         return Inertia::render('character/show', [
             'character' => $character,

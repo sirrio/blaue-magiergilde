@@ -63,22 +63,28 @@ function CharacterImage({
 function CharacterSettingsModal({
   simplifiedTracking,
   avatarMasked,
+  privateMode,
   characterId,
   isTrackingModeUpdating = false,
   isAvatarMaskedUpdating = false,
+  isPrivateModeUpdating = false,
   onTrackingModeChange,
   onAvatarMaskedChange,
+  onPrivateModeChange,
   triggerVariant = 'ghost',
   triggerSize = 'xs',
   triggerClassName,
 }: {
   simplifiedTracking: boolean
   avatarMasked: boolean
+  privateMode: boolean
   characterId: number
   isTrackingModeUpdating?: boolean
   isAvatarMaskedUpdating?: boolean
+  isPrivateModeUpdating?: boolean
   onTrackingModeChange?: (value: boolean) => void
   onAvatarMaskedChange?: (value: boolean) => void
+  onPrivateModeChange?: (value: boolean) => void
   triggerVariant?: 'ghost' | 'outline'
   triggerSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   triggerClassName?: string
@@ -119,6 +125,16 @@ function CharacterSettingsModal({
               checked={avatarMasked}
               disabled={isAvatarMaskedUpdating || !onAvatarMaskedChange}
               onChange={(event) => onAvatarMaskedChange?.(event.target.checked)}
+            />
+          </label>
+          <label className={cn('flex items-center justify-between gap-3 text-sm', isPrivateModeUpdating && 'opacity-60')}>
+            <span>{t('characters.privateMode')}</span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm toggle-primary"
+              checked={privateMode}
+              disabled={isPrivateModeUpdating || !onPrivateModeChange}
+              onChange={(event) => onPrivateModeChange?.(event.target.checked)}
             />
           </label>
           <div className="border-t border-base-200 pt-3">
@@ -252,6 +268,8 @@ export function CharacterCard({
   isTrackingModeUpdating = false,
   onAvatarMaskedChange,
   isAvatarMaskedUpdating = false,
+  onPrivateModeChange,
+  isPrivateModeUpdating = false,
 }: {
   character: Character
   guildCharacters?: Character[]
@@ -259,6 +277,8 @@ export function CharacterCard({
   isTrackingModeUpdating?: boolean
   onAvatarMaskedChange?: (value: boolean) => void
   isAvatarMaskedUpdating?: boolean
+  onPrivateModeChange?: (value: boolean) => void
+  isPrivateModeUpdating?: boolean
 }) {
   const t = useTranslate()
   const { features } = usePage<PageProps>().props
@@ -269,6 +289,7 @@ export function CharacterCard({
   const tier = calculateTier(character)
   const simplifiedTracking = character.simplified_tracking ?? false
   const avatarMasked = character.avatar_masked ?? true
+  const privateMode = character.private_mode ?? false
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
@@ -429,11 +450,14 @@ export function CharacterCard({
             <CharacterSettingsModal
               simplifiedTracking={simplifiedTracking}
               avatarMasked={avatarMasked}
+              privateMode={privateMode}
               characterId={character.id}
               isTrackingModeUpdating={isTrackingModeUpdating}
               isAvatarMaskedUpdating={isAvatarMaskedUpdating}
+              isPrivateModeUpdating={isPrivateModeUpdating}
               onTrackingModeChange={onTrackingModeChange}
               onAvatarMaskedChange={onAvatarMaskedChange}
+              onPrivateModeChange={onPrivateModeChange}
             />
             <Button
               className="flex"
@@ -497,11 +521,14 @@ export function CharacterCard({
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}
                 avatarMasked={avatarMasked}
+                privateMode={privateMode}
                 characterId={character.id}
                 isTrackingModeUpdating={isTrackingModeUpdating}
                 isAvatarMaskedUpdating={isAvatarMaskedUpdating}
+                isPrivateModeUpdating={isPrivateModeUpdating}
                 onTrackingModeChange={onTrackingModeChange}
                 onAvatarMaskedChange={onAvatarMaskedChange}
+                onPrivateModeChange={onPrivateModeChange}
                 triggerVariant="outline"
                 triggerSize="sm"
                 triggerClassName="w-full justify-center"

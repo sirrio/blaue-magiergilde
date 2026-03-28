@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AdminAuditLog;
+use App\Models\Ally;
 use App\Models\Character;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,4 +73,45 @@ it('includes reviewed by name for reviewed characters on characters index', func
 
     expect($entry)->toBeArray();
     expect($entry['reviewed_by_name'] ?? null)->toBe('Review Admin');
+});
+
+it('hides private linked character avatars from other users in characters index payload', function () {
+    $viewer = User::factory()->create();
+    $privateOwner = User::factory()->create();
+    $viewerCharacter = Character::factory()->for($viewer)->create();
+    $privateCharacter = Character::factory()->for($privateOwner)->create([
+        'private_mode' => true,
+        'avatar' => 'avatars/private.png',
+        'guild_status' => 'approved',
+    ]);
+    $publicCharacter = Character::factory()->for($privateOwner)->create([
+        'private_mode' => false,
+        'avatar' => 'avatars/public.png',
+        'guild_status' => 'approved',
+    ]);
+
+    Ally::factory()->create([
+        'character_id' => $viewerCharacter->id,
+        'name' => $privateCharacter->name,
+        'rating' => 3,
+        'linked_character_id' => $privateCharacter->id,
+    ]);
+
+    $response = $this->actingAs($viewer)
+        ->get(route('characters.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'] ?? [];
+    $characters = collect($props['characters'] ?? []);
+    $viewerEntry = $characters->first(fn (array $item): bool => (int) ($item['id'] ?? 0) === $viewerCharacter->id);
+    $linkedCharacter = collect($viewerEntry['allies'] ?? [])->first()['linked_character'] ?? null;
+    $guildCharacters = collect($props['guildCharacters'] ?? []);
+    $privateGuildEntry = $guildCharacters->first(fn (array $item): bool => (int) ($item['id'] ?? 0) === $privateCharacter->id);
+    $publicGuildEntry = $guildCharacters->first(fn (array $item): bool => (int) ($item['id'] ?? 0) === $publicCharacter->id);
+
+    expect($linkedCharacter['avatar'] ?? null)->toBe('');
+    expect($privateGuildEntry['avatar'] ?? null)->toBe('');
+    expect($publicGuildEntry['avatar'] ?? null)->toBe('avatars/public.png');
+    expect($privateGuildEntry)->not->toHaveKey('private_mode');
+    expect($privateGuildEntry)->not->toHaveKey('user_id');
 });
