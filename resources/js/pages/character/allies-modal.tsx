@@ -3,7 +3,7 @@ import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
-import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { getAllyDisplayName, getAllyOwnerName, getGuildCharacterOptionLabel } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { useTranslate } from '@/lib/i18n'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
@@ -271,7 +271,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
           <option value="">{t('characters.allyCustomNoLink')}</option>
           {linkedOptions.map((character) => (
             <option key={character.id} value={character.id}>
-              {character.name}
+              {getGuildCharacterOptionLabel(character)}
             </option>
           ))}
         </select>
@@ -661,7 +661,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
 
     return guildCharacters
       .filter((entry) => entry.id !== character.id && !linkedSet.has(entry.id))
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      .sort((a, b) => getGuildCharacterOptionLabel(a).localeCompare(getGuildCharacterOptionLabel(b)))
   }, [allies, character.id, guildCharacters])
 
   const selectedQuickAddGuildMember = useMemo(
@@ -801,7 +801,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                       <option value="">{t('characters.allySelectGuildMember')}</option>
                       {availableGuildMembers.map((guildMember) => (
                         <option key={`quick-add-${guildMember.id}`} value={guildMember.id}>
-                          {guildMember.name}
+                          {getGuildCharacterOptionLabel(guildMember)}
                         </option>
                       ))}
                     </select>

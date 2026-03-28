@@ -112,6 +112,7 @@ it('hides private linked character avatars from other users in characters index 
     expect($linkedCharacter['avatar'] ?? null)->toBe('');
     expect($privateGuildEntry['avatar'] ?? null)->toBe('');
     expect($publicGuildEntry['avatar'] ?? null)->toBe('avatars/public.png');
+    expect($privateGuildEntry['user']['name'] ?? null)->toBe($privateOwner->name);
     expect($privateGuildEntry)->not->toHaveKey('private_mode');
     expect($privateGuildEntry)->not->toHaveKey('user_id');
 });

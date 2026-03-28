@@ -1034,9 +1034,15 @@ async function listAlliesForDiscord(discordUser, characterId) {
 
     const [rows] = await db.execute(
         `
-            SELECT a.id, a.name, a.linked_character_id
+            SELECT
+                a.id,
+                a.name,
+                a.linked_character_id,
+                COALESCE(NULLIF(u.discord_display_name, ''), NULLIF(u.discord_username, ''), u.name, '') AS owner_name
             FROM allies a
             INNER JOIN characters c ON c.id = a.character_id
+            LEFT JOIN characters lc ON lc.id = a.linked_character_id
+            LEFT JOIN users u ON u.id = lc.user_id
             WHERE a.character_id = ? AND c.user_id = ?
             ORDER BY a.name ASC, a.id ASC
         `,
@@ -1054,12 +1060,16 @@ async function listGuildCharactersForDiscord(discordUser, characterId) {
 
     const [rows] = await db.execute(
         `
-            SELECT id, name
-            FROM characters
-            WHERE guild_status IN (${statusPlaceholders})
-              AND deleted_at IS NULL
-              AND id <> ?
-            ORDER BY name ASC, id ASC
+            SELECT
+                c.id,
+                c.name,
+                COALESCE(NULLIF(u.discord_display_name, ''), NULLIF(u.discord_username, ''), u.name, '') AS owner_name
+            FROM characters c
+            LEFT JOIN users u ON u.id = c.user_id
+            WHERE c.guild_status IN (${statusPlaceholders})
+              AND c.deleted_at IS NULL
+              AND c.id <> ?
+            ORDER BY c.name ASC, c.id ASC
         `,
         [...statuses, characterId],
     );

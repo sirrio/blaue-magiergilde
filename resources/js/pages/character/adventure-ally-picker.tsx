@@ -1,5 +1,5 @@
 import { Input } from '@/components/ui/input'
-import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { getAllyDisplayName, getAllyOwnerName, getCharacterOwnerName, getGuildCharacterOptionLabel } from '@/helper/allyDisplay'
 import { cn } from '@/lib/utils'
 import { Ally, Character } from '@/types'
 import { User } from 'lucide-react'
@@ -39,7 +39,7 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
     () =>
       availableGuildCharacters
         .filter((character) => selectedGuildCharacterIds.includes(character.id))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => getGuildCharacterOptionLabel(a).localeCompare(getGuildCharacterOptionLabel(b))),
     [availableGuildCharacters, selectedGuildCharacterIds],
   )
 
@@ -56,13 +56,15 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
         ownerName,
       }
     })
-    const guildOptions = availableGuildCharacters.map((character) => ({
-      key: `guild-${character.id}`,
-      type: 'guild' as const,
-      id: character.id,
-      label: character.name,
-      sublabel: 'Guild member',
-    }))
+    const guildOptions = availableGuildCharacters.map((character) => {
+      return {
+        key: `guild-${character.id}`,
+        type: 'guild' as const,
+        id: character.id,
+        label: getGuildCharacterOptionLabel(character),
+        sublabel: 'Guild member',
+      }
+    })
     const combined = [...allyOptions, ...guildOptions]
     const filtered = query
       ? combined.filter((option) =>
@@ -127,9 +129,10 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
               key={`selected-guild-${character.id}`}
               type="button"
               onClick={() => toggleOption('guild', character.id)}
+              title={getCharacterOwnerName(character) ? `Owner: ${getCharacterOwnerName(character)}` : undefined}
               className="rounded-full border border-secondary/30 bg-secondary/10 px-2 py-1 text-xs text-secondary transition hover:border-secondary/60"
             >
-              {character.name}
+              {getGuildCharacterOptionLabel(character)}
             </button>
           ))}
         </div>

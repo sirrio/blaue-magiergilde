@@ -2012,8 +2012,9 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
         const label = linkedName && linkedName.toLowerCase() !== String(ally.name).toLowerCase()
             ? `${linkedName} (${ally.name})`
             : String(ally.name);
+        const ownerName = String(ally.owner_name || '').trim();
         const description = ally.linked_character_id
-            ? linkedName ? `Linked - ${linkedName}` : t('characters.linkedGuildMember')
+            ? ownerName ? `Linked - ${ownerName}` : linkedName ? `Linked - ${linkedName}` : t('characters.linkedGuildMember')
             : t('characters.customAlly');
         return {
             key: `ally_${ally.id}`,
@@ -2025,14 +2026,17 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
         };
     });
 
-    const guildOptions = availableGuildCharacters.map(character => ({
-        key: `guild_${character.id}`,
-        type: 'guild',
-        id: Number(character.id),
-        label: String(character.name),
-        description: t('characters.guildMember'),
-        selected: selectedGuildCharacterIds.includes(Number(character.id)),
-    }));
+    const guildOptions = availableGuildCharacters.map(character => {
+        const ownerName = String(character.owner_name || '').trim();
+        return {
+            key: `guild_${character.id}`,
+            type: 'guild',
+            id: Number(character.id),
+            label: ownerName ? `${String(character.name)} - ${ownerName}` : String(character.name),
+            description: ownerName ? `${t('characters.guildMember')} - ${ownerName}` : t('characters.guildMember'),
+            selected: selectedGuildCharacterIds.includes(Number(character.id)),
+        };
+    });
 
     const combined = [...allyOptions, ...guildOptions].filter(option => {
         if (!query) return true;

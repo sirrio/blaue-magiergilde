@@ -41,6 +41,7 @@ class CharacterController extends Controller
         ));
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
+            ->with('user:id,name,discord_username,discord_display_name')
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
@@ -102,6 +103,7 @@ class CharacterController extends Controller
 
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
+            ->with('user:id,name,discord_username,discord_display_name')
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
