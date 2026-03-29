@@ -31,7 +31,7 @@ import { PageProps } from '@/types'
 import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
+import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, CircleHelp, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
 import React, { useState, useTransition } from 'react'
 import { useImage } from 'react-image'
 
@@ -90,6 +90,17 @@ function CharacterSettingsModal({
   triggerClassName?: string
 }) {
   const t = useTranslate()
+
+  const SettingHelp = ({ text, label }: { text: string; label: string }) => (
+    <span
+      className="inline-flex cursor-help items-center text-base-content/45"
+      title={text}
+      aria-label={`${label}: ${text}`}
+    >
+      <CircleHelp size={14} />
+    </span>
+  )
+
   return (
     <Modal>
       <ModalTrigger>
@@ -108,7 +119,13 @@ function CharacterSettingsModal({
       <ModalContent>
         <div className="space-y-3">
           <label className={cn('flex items-center justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
-            <span>{t('characters.simplifiedTracking')}</span>
+            <span className="flex items-center gap-1.5">
+              <span>{t('characters.simplifiedTracking')}</span>
+              <SettingHelp
+                label={t('characters.simplifiedTracking')}
+                text={t('characters.simplifiedTrackingHelp')}
+              />
+            </span>
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
@@ -118,7 +135,13 @@ function CharacterSettingsModal({
             />
           </label>
           <label className={cn('flex items-center justify-between gap-3 text-sm', isAvatarMaskedUpdating && 'opacity-60')}>
-            <span>{t('characters.tokenMask')}</span>
+            <span className="flex items-center gap-1.5">
+              <span>{t('characters.tokenMask')}</span>
+              <SettingHelp
+                label={t('characters.tokenMask')}
+                text={t('characters.tokenMaskHelp')}
+              />
+            </span>
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
@@ -128,7 +151,13 @@ function CharacterSettingsModal({
             />
           </label>
           <label className={cn('flex items-center justify-between gap-3 text-sm', isPrivateModeUpdating && 'opacity-60')}>
-            <span>{t('characters.privateMode')}</span>
+            <span className="flex items-center gap-1.5">
+              <span>{t('characters.privateMode')}</span>
+              <SettingHelp
+                label={t('characters.privateMode')}
+                text={t('characters.privateModeHelp')}
+              />
+            </span>
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
