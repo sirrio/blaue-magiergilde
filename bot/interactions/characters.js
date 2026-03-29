@@ -128,6 +128,7 @@ const {
 } = require('../state');
 
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
+const characterCreationTtlMs = 30 * 60 * 1000;
 
 function isOwnerOfInteraction(interaction, ownerDiscordId) {
     return String(interaction.user.id) === String(ownerDiscordId);
@@ -265,12 +266,41 @@ function creationStateKey(userId) {
     return String(userId);
 }
 
-function getCreationState(userId) {
-    return pendingCharacterCreations.get(creationStateKey(userId)) || null;
+function touchCreationState(state) {
+    if (!state) {
+        return state;
+    }
+
+    state.updatedAt = Date.now();
+    return state;
+}
+
+function isCreationStateExpired(state) {
+    const updatedAt = Number(state?.updatedAt || 0);
+    if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
+        return false;
+    }
+
+    return Date.now() - updatedAt > characterCreationTtlMs;
+}
+
+function getCreationState(userId, { allowExpired = false } = {}) {
+    const key = creationStateKey(userId);
+    const state = pendingCharacterCreations.get(key) || null;
+    if (!state) {
+        return null;
+    }
+
+    if (!allowExpired && isCreationStateExpired(state)) {
+        pendingCharacterCreations.delete(key);
+        return null;
+    }
+
+    return state;
 }
 
 function setCreationState(userId, state) {
-    pendingCharacterCreations.set(creationStateKey(userId), state);
+    pendingCharacterCreations.set(creationStateKey(userId), touchCreationState(state));
 }
 
 function clearCreationState(userId) {
@@ -553,6 +583,7 @@ async function updateAdventureMessage(state, payload) {
 
 function ensurePromptMessage(state, interaction) {
     if (!state) return;
+    touchCreationState(state);
     state.activeInteraction = interaction;
     if (!state.promptMessage && interaction?.message) {
         state.promptMessage = interaction.message;
@@ -565,6 +596,7 @@ function ensurePromptMessage(state, interaction) {
 }
 
 async function updateCreationMessage(state, payload) {
+    touchCreationState(state);
     if (state?.promptMessage?.editable) {
         try {
             await state.promptMessage.edit(payload);
@@ -847,6 +879,114 @@ async function showCreationError(interaction, state, ownerDiscordId, message) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await updateCreationMessage(state, payload);
     await interaction.deleteReply().catch(() => undefined);
+}
+
+function setCreationPromptTarget(state, interaction) {
+    if (!state || !interaction) {
+        return;
+    }
+
+    touchCreationState(state);
+    state.promptInteraction = interaction;
+    if (interaction.message) {
+        state.promptMessage = interaction.message;
+        state.promptMessageId = interaction.message.id;
+        state.promptChannelId = interaction.message.channelId;
+    }
+}
+
+async function buildCreationStepPayload(state, ownerDiscordId, message = null) {
+    const locale = state?.locale || null;
+
+    if (state.step === 'basic') {
+        return {
+            embeds: [buildCreationBasicsEmbed(state, message || t('characters.createBasicsDescription', {}, locale))],
+            components: buildCreationBasicsRows(ownerDiscordId, locale),
+            content: '',
+        };
+    }
+
+    if (state.step === 'avatar') {
+        return {
+            embeds: [buildAvatarStepEmbed(state, message || undefined)],
+            components: [
+                buildAvatarUploadRow(ownerDiscordId, locale),
+                ...buildCreationStepActionRows(ownerDiscordId, 'avatar', locale),
+            ],
+            content: '',
+        };
+    }
+
+    if (state.step === 'classes') {
+        const classes = await listCharacterClassesForDiscord();
+
+        return {
+            embeds: [
+                buildCreationEmbed(3, t('characters.createClassesTitle', {}, locale), message || t('characters.createClassesDescription', {}, locale)),
+            ],
+            components: [
+                buildClassesRow({ ownerDiscordId, classes, selectedIds: state.data.classIds || [] }),
+                ...buildCreationStepActionRows(ownerDiscordId, 'classes', locale),
+            ],
+            content: '',
+        };
+    }
+
+    if (state.step === 'tier') {
+        return {
+            embeds: [
+                buildCreationEmbed(4, t('characters.createTierTitle', {}, locale), message || t('characters.createTierDescription', {}, locale)),
+            ],
+            components: [
+                buildStartTierRow(ownerDiscordId, getStartTierSelection(state)),
+                ...buildCreationStepActionRows(ownerDiscordId, 'tier', locale),
+            ],
+            content: '',
+        };
+    }
+
+    if (state.step === 'faction') {
+        return {
+            embeds: [
+                buildCreationEmbed(5, t('characters.createFactionTitle', {}, locale), message || t('characters.createFactionDescription', {}, locale)),
+            ],
+            components: [
+                buildFactionRow(ownerDiscordId, state.data.faction),
+                ...buildCreationStepActionRows(ownerDiscordId, 'faction', locale),
+            ],
+            content: '',
+        };
+    }
+
+    if (state.step === 'version') {
+        return {
+            embeds: [
+                buildCreationEmbed(6, t('characters.createVersionTitle', {}, locale), message || t('characters.createVersionDescription', {}, locale)),
+            ],
+            components: [
+                buildVersionRow(ownerDiscordId, state.data.version),
+                ...buildCreationStepActionRows(ownerDiscordId, 'version', locale),
+            ],
+            content: '',
+        };
+    }
+
+    if (state.step === 'finalize') {
+        return {
+            embeds: [
+                buildCreationEmbed(7, t('characters.createFinalizeTitle', {}, locale), message || t('characters.createFinalizeDescription', {}, locale)),
+                await buildCreationSummaryEmbed(state),
+            ],
+            components: buildCreationConfirmRows(ownerDiscordId, locale),
+            content: '',
+        };
+    }
+
+    return {
+        embeds: [buildCreationEmbed(1, t('characters.createTitle', {}, locale), message || t('characters.createUnknownStep', {}, locale))],
+        components: [buildCreationCancelRow(ownerDiscordId)],
+        content: '',
+    };
 }
 
 async function finalizeCharacterCreation(state) {
@@ -1167,24 +1307,27 @@ async function handle(interaction) {
             return true;
         }
 
-        const existingState = getCreationState(ownerDiscordId);
+        const existingState = getCreationState(ownerDiscordId, { allowExpired: true });
         if (existingState) {
-            if (existingState.step === 'basic' && !existingState.promptInteraction) {
-                await interaction.showModal(buildCreationBasicModal(ownerDiscordId, existingState));
-                return true;
-            }
+            if (!isCreationStateExpired(existingState)) {
+                if (existingState.step === 'basic') {
+                    setCreationPromptTarget(existingState, interaction);
+                    await interaction.showModal(buildCreationBasicModal(ownerDiscordId, existingState));
+                    return true;
+                }
 
-            if (existingState.promptInteraction) {
+                setCreationPromptTarget(existingState, interaction);
+                const payload = await buildCreationStepPayload(
+                    existingState,
+                    ownerDiscordId,
+                    t('characters.createExistingOpen', {}, existingState.locale),
+                );
                 await interaction.deferUpdate();
+                await updateCreationMessage(existingState, payload);
                 return true;
             }
 
-            await updateManageMessage(interaction, {
-                embeds: [buildCreationEmbed(1, t('characters.createTitle', {}, existingState.locale), t('characters.createExistingOpen', {}, existingState.locale))],
-                components: [buildCreationCancelRow(ownerDiscordId)],
-                flags: MessageFlags.Ephemeral,
-            });
-            return true;
+            clearCreationState(ownerDiscordId);
         }
 
         const state = {
@@ -1211,7 +1354,10 @@ async function handle(interaction) {
         setCreationState(ownerDiscordId, state);
 
         await interaction.update({
-            embeds: [buildCreationBasicsEmbed(state, t('characters.createBasicsStart', {}, state.locale))],
+            embeds: [buildCreationBasicsEmbed(
+                state,
+                existingState ? t('characters.createExpired', {}, state.locale) : t('characters.createBasicsStart', {}, state.locale),
+            )],
             components: buildCreationBasicsRows(ownerDiscordId, state.locale),
             content: '',
         });
@@ -1993,19 +2139,34 @@ async function handle(interaction) {
             return true;
         }
 
-        const dm = await interaction.user.createDM();
-        const sourceLink = state?.promptMessage?.url ? `\nBack to character dialog: ${state.promptMessage.url}` : '';
-        await dm.send(`Please send your avatar image here (JPG, PNG, GIF, WEBP, max 5 MB). I only store it for this character.${sourceLink}`);
+        setCreationPromptTarget(state, interaction);
 
-        await interaction.deferUpdate();
-        await updateCreationMessage(state, {
-            embeds: [buildAvatarStepEmbed(state, 'I sent you a DM. Upload your avatar image there.')],
-            components: [
-                buildAvatarUploadRow(ownerDiscordId),
-                ...buildCreationStepActionRows(ownerDiscordId, 'avatar'),
-            ],
-            content: '',
-        });
+        try {
+            const dm = await interaction.user.createDM();
+            const sourceLink = state?.promptMessage?.url ? `\n${state.promptMessage.url}` : '';
+            await dm.send(t('characters.createDmPrompt', { sourceLink }, state.locale));
+
+            await interaction.deferUpdate();
+            await updateCreationMessage(state, {
+                embeds: [buildAvatarStepEmbed(state, t('characters.createDmSent', {}, state.locale))],
+                components: [
+                    buildAvatarUploadRow(ownerDiscordId, state.locale),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'avatar', state.locale),
+                ],
+                content: '',
+            });
+        } catch (error) {
+            console.warn('[bot] Avatar DM could not be sent.', error);
+            await interaction.deferUpdate();
+            await updateCreationMessage(state, {
+                embeds: [buildAvatarStepEmbed(state, t('characters.createDmFailed', {}, state.locale))],
+                components: [
+                    buildAvatarUploadRow(ownerDiscordId, state.locale),
+                    ...buildCreationStepActionRows(ownerDiscordId, 'avatar', state.locale),
+                ],
+                content: '',
+            });
+        }
         return true;
     }
 
@@ -4916,4 +5077,5 @@ module.exports = {
     handleCreationAvatarMessage,
     handleAvatarUpdateMessage,
     storeCharacterAvatar,
+    buildCreationStepPayload,
 };
