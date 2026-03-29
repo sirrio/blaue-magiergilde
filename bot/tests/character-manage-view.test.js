@@ -25,7 +25,7 @@ const payload = buildCharacterManageView({
 }, { ownerDiscordId: '123', locale: 'de' });
 
 assert.equal(payload.embeds[0].data.title, 'Charakter verwalten');
-assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Aktuelle Tier'), true);
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Aktuelles Tier'), true);
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'DnDBeyond-Link'), true);
 assert.equal(payload.components[0].components[0].data.label, 'Name/Link/Notizen');
 assert.equal(payload.components[1].components[0].data.label, 'DM Bubbles');
