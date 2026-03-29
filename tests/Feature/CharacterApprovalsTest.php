@@ -69,6 +69,22 @@ it('marks first submitted characters in character approvals', function () {
             ->where('characters.1.is_first_submission', false));
 });
 
+it('includes spent dm bubbles and coins in character approvals payload', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $user = User::factory()->create();
+
+    Character::factory()->for($user)->create([
+        'dm_bubbles' => 3,
+        'dm_coins' => 2,
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('characters.0.dm_bubbles', 3)
+            ->where('characters.0.dm_coins', 2));
+});
+
 it('includes users without characters in empty users list', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     Character::factory()->for($admin)->create();
