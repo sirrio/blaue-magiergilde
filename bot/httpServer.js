@@ -10,6 +10,7 @@ const { guildIds: configuredGuildIds } = require('./config');
 const { resolveChannelId } = require('./channelOverride');
 const {
     postCharacterApprovalAnnouncement,
+    postNewAccountAnnouncement,
     sendCharacterApprovalDm,
     updateCharacterApprovalAnnouncement,
     deleteCharacterApprovalAnnouncement,
@@ -124,6 +125,7 @@ function startHttpServer(client) {
         const isDiscordMemberLookup = path === '/discord-member-lookup';
         const isCharacterApprovalNotify = path === '/character-approval/notify';
         const isCharacterApprovalPending = path === '/character-approval/pending';
+        const isCharacterApprovalAccountCreated = path === '/character-approval/account-created';
         const isCharacterApprovalUpdate = path === '/character-approval/update';
         const isCharacterApprovalDelete = path === '/character-approval/delete';
         const isShopPost = path === '/shop-post';
@@ -147,6 +149,7 @@ function startHttpServer(client) {
             isDiscordMemberLookup ||
             isCharacterApprovalNotify ||
             isCharacterApprovalPending ||
+            isCharacterApprovalAccountCreated ||
             isCharacterApprovalUpdate ||
             isCharacterApprovalDelete ||
             isShopPost ||
@@ -312,6 +315,29 @@ function startHttpServer(client) {
 
             if (!result.ok) {
                 logReject(req, result.error || 'character approval announcement failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Announcement failed.' });
+                return;
+            }
+
+            respondJson(res, 200, {
+                status: 'posted',
+                channel_id: result.channel_id,
+                message_id: result.message_id,
+            });
+            return;
+        }
+
+        if (isCharacterApprovalAccountCreated) {
+            const channelId = readChannelId(payload);
+
+            const result = await postNewAccountAnnouncement({
+                client,
+                channelId,
+                payload,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'new account announcement failed');
                 respondJson(res, result.status || 500, { error: result.error || 'Announcement failed.' });
                 return;
             }

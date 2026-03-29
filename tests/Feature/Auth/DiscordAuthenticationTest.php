@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\CharacterApprovalNotificationService;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Psr7\Request as PsrRequest;
 use GuzzleHttp\Psr7\Response as PsrResponse;
@@ -8,6 +9,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
+
+use function Pest\Laravel\mock;
 
 uses(RefreshDatabase::class);
 
@@ -22,6 +25,14 @@ function fakeDiscordUser(string $id, string $name = 'Discord User', ?string $ava
 }
 
 test('discord callback redirects users without accepted privacy policy to consent page', function () {
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldReceive('notifyNewAccount')
+        ->once()
+        ->withArgs(function (User $user, string $source): bool {
+            return (string) $user->discord_id === '123456789012345678' && $source === 'discord';
+        })
+        ->andReturn(['ok' => true, 'status' => 200]);
+
     Socialite::shouldReceive('driver->user')
         ->once()
         ->andReturn(fakeDiscordUser('123456789012345678'));
@@ -64,6 +75,9 @@ test('discord redirect only requests the identify scope', function () {
 });
 
 test('discord callback redirects users with current privacy policy to characters page', function () {
+    $notificationService = mock(CharacterApprovalNotificationService::class);
+    $notificationService->shouldNotReceive('notifyNewAccount');
+
     $requiredVersion = (int) config('legal.privacy_policy.version', 0);
 
     $user = User::factory()->create([

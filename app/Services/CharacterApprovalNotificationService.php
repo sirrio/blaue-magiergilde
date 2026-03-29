@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Character;
 use App\Models\DiscordBotSetting;
+use App\Models\User;
 use App\Support\BotRequestFailure;
 use Illuminate\Support\Facades\Http;
 
@@ -111,6 +112,31 @@ class CharacterApprovalNotificationService
         return $this->request('/character-approval/delete', [
             'channel_id' => $channelId,
             'message_id' => $messageId,
+        ]);
+    }
+
+    public function notifyNewAccount(User $user, string $source): array
+    {
+        $settings = DiscordBotSetting::current();
+        $channelId = $settings->character_approval_channel_id;
+
+        if (! $channelId) {
+            return [
+                'ok' => false,
+                'status' => 422,
+                'error' => 'Character approval channel not configured.',
+            ];
+        }
+
+        return $this->request('/character-approval/account-created', [
+            'channel_id' => $channelId,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_discord_id' => $user->discord_id,
+            'user_discord_username' => $user->discord_username,
+            'user_discord_display_name' => $user->discord_display_name,
+            'source' => trim($source) !== '' ? trim($source) : 'website',
+            'approval_url' => route('admin.character-approvals.index'),
         ]);
     }
 

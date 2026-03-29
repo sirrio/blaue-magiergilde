@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { buildCharacterApprovalMessage } = require('../characterApprovalNotifier');
+const { buildCharacterApprovalMessage, buildNewAccountMessage } = require('../characterApprovalNotifier');
 
 const payload = {
     character_status: 'pending',
@@ -56,5 +56,29 @@ const approvedMessage = buildCharacterApprovalMessage({
     character_status: 'approved',
 });
 assert.equal(approvedMessage.components[0].toJSON().components[3].disabled, false);
+
+const newAccountMessage = buildNewAccountMessage({
+    user_id: 5,
+    user_name: 'Test User',
+    user_discord_id: '123456789012345678',
+    user_discord_username: 'testuser',
+    user_discord_display_name: 'Test Display',
+    source: 'discord',
+    approval_url: 'https://blaue-magiergilde.test/admin/character-approvals',
+});
+
+const newAccountEmbed = newAccountMessage.embeds[0].toJSON();
+assert.equal(newAccountEmbed.title, 'Neuer Account');
+assert.equal(newAccountEmbed.description, 'Ein neuer App-Account wurde erstellt.');
+
+const sourceField = newAccountEmbed.fields.find((field) => field.name === 'Quelle');
+assert.equal(sourceField?.value, 'Discord');
+
+const statusField = newAccountEmbed.fields.find((field) => field.name === 'Charakterstatus');
+assert.equal(statusField?.value, 'Noch kein Charakter eingereicht');
+
+const newAccountButton = newAccountMessage.components[0].toJSON().components[0];
+assert.equal(newAccountButton.label, 'Freigaben öffnen');
+assert.equal(newAccountButton.url, 'https://blaue-magiergilde.test/admin/character-approvals');
 
 console.log('character-approval-embed.test.js passed');
