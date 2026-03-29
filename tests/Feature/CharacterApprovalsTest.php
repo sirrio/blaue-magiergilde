@@ -53,6 +53,22 @@ it('includes simplified tracking flag for character approvals', function () {
             ->where('characters.0.simplified_tracking', true));
 });
 
+it('marks first submitted characters in character approvals', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $firstUser = User::factory()->create();
+    $secondUser = User::factory()->create();
+
+    Character::factory()->for($firstUser)->create(['guild_status' => 'pending']);
+    Character::factory()->for($secondUser)->create(['guild_status' => 'pending']);
+    Character::factory()->for($secondUser)->create(['guild_status' => 'approved']);
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('characters.0.is_first_submission', true)
+            ->where('characters.1.is_first_submission', false));
+});
+
 it('includes users without characters in empty users list', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     Character::factory()->for($admin)->create();

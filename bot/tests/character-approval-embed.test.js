@@ -17,6 +17,7 @@ const payload = {
     character_avatar_url: 'https://example.test/avatars/character.png',
     user_name: 'User',
     user_discord_id: '123456789012345678',
+    is_first_submission: true,
     character_id: 12,
 };
 
@@ -36,6 +37,9 @@ assert.equal(dmField?.value, '0 bubbles · 0 coins');
 
 const userField = embedData.fields.find((field) => field.name === 'Nutzer');
 assert.ok(userField?.value.includes('<@123456789012345678>'));
+
+const firstSubmissionField = embedData.fields.find((field) => field.name === 'Erstanmeldung');
+assert.equal(firstSubmissionField?.value, 'Ja');
 
 const registrationField = embedData.fields.find((field) => field.name === 'Registrierungsnotizen');
 assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');

@@ -114,7 +114,8 @@ it('posts a discord announcement when a newly created draft character is submitt
         return $request->url() === 'http://bot.test/character-approval/pending'
             && $request['channel_id'] === '9876543210'
             && $request['character_name'] === 'New Character'
-            && $request['character_registration_note'] === 'New register details from owner.';
+            && $request['character_registration_note'] === 'New register details from owner.'
+            && $request['is_first_submission'] === true;
     });
 });
 

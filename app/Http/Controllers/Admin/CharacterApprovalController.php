@@ -35,7 +35,12 @@ class CharacterApprovalController extends Controller
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->withCount('room')
             ->with([
-                'user:id,name,discord_id,discord_username,discord_display_name,avatar',
+                'user' => fn ($query) => $query
+                    ->select(['id', 'name', 'discord_id', 'discord_username', 'discord_display_name', 'avatar'])
+                    ->withCount([
+                        'characters as submitted_characters_count' => fn ($characterQuery) => $characterQuery
+                            ->where('guild_status', '!=', 'draft'),
+                    ]),
                 'adventures:id,character_id,duration,has_additional_bubble',
                 'characterClasses:id,name',
             ]);
@@ -122,6 +127,11 @@ class CharacterApprovalController extends Controller
 
                 $character->setAttribute('dndbeyond_character_id', $dndBeyondCharacterId);
                 $character->setAttribute('has_legacy_approval', $legacyMatch !== null);
+                $character->setAttribute(
+                    'is_first_submission',
+                    (int) ($character->user?->submitted_characters_count ?? 0) === 1
+                        && $character->guild_status !== 'draft'
+                );
                 $character->setAttribute('legacy_approval_match', $legacyMatch?->only([
                     'id',
                     'discord_name',
@@ -190,6 +200,10 @@ class CharacterApprovalController extends Controller
             }
 
             $emptyUsers = $emptyUsersQuery
+                ->withCount([
+                    'characters as submitted_characters_count' => fn ($characterQuery) => $characterQuery
+                        ->where('guild_status', '!=', 'draft'),
+                ])
                 ->orderBy('name')
                 ->get();
         }

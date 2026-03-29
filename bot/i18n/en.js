@@ -339,6 +339,8 @@ module.exports = {
         openExternalLink: 'Open external link',
         yourCharacters: 'Your characters',
         userField: 'User',
+        firstSubmissionField: 'First submission',
+        firstSubmissionValue: 'Yes',
         shopSpendField: 'Shop spend',
         notesField: 'Notes',
         registrationNotesField: 'Registration notes',

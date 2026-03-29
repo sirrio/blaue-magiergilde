@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { Character, PageProps, User } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
+import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, Sparkles, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 interface FilterOption {
@@ -51,6 +51,7 @@ type AdminCharacter = Pick<
 > & {
   dndbeyond_character_id?: number | null
   has_legacy_approval?: boolean
+  is_first_submission?: boolean
   legacy_approval_match?: {
     id: number
     discord_name?: string | null
@@ -1150,6 +1151,7 @@ const tierTextClassMap: Record<string, string> = {
                     const hasRoom = (character.room_count ?? 0) > 0
                     const legacyMatch = character.legacy_approval_match
                     const hasLegacyApproval = Boolean(character.has_legacy_approval && legacyMatch)
+                    const isFirstSubmission = Boolean(character.is_first_submission)
                     const legacyTitle = hasLegacyApproval
                       ? [
                         `Legacy approved as ${legacyMatch?.character_name}`,
@@ -1245,6 +1247,15 @@ const tierTextClassMap: Record<string, string> = {
                               >
                                 <CheckCircle2 size={12} />
                                 <span>Legacy approved</span>
+                              </span>
+                            ) : null}
+                            {isFirstSubmission ? (
+                              <span
+                                className="flex items-center gap-1 rounded-full border border-info/30 bg-info/10 px-2 py-0.5 text-info"
+                                title="First submitted character for this user in the new system."
+                              >
+                                <Sparkles size={12} />
+                                <span>First submission</span>
                               </span>
                             ) : null}
                             <AdminNoteModal character={character}>

@@ -124,6 +124,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     const avatarUrl = options.avatarUrlOverride || payload?.character_avatar_url || '';
     const userName = payload?.user_name || 'Unknown';
     const userMention = buildUserMention(payload?.user_discord_id);
+    const isFirstSubmission = Boolean(payload?.is_first_submission);
     const userLine = userMention ? `${userName} (${userMention})` : userName;
     const dmSummary = `${dmBubbles} bubbles · ${dmCoins} coins`;
 
@@ -140,6 +141,9 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
     fields.push({ name: 'Classes', value: trimField(classes), inline: false });
     fields.push({ name: t('approvals.userField'), value: trimField(userLine, 1024), inline: false });
+    if (isFirstSubmission) {
+        fields.push({ name: t('approvals.firstSubmissionField'), value: t('approvals.firstSubmissionValue'), inline: true });
+    }
     fields.push({ name: 'DM', value: dmSummary, inline: true });
     fields.push({ name: 'Filler', value: filler, inline: true });
     if (shopSpend !== null && shopSpend > 0) {

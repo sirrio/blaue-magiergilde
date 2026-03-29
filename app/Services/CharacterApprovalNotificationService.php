@@ -150,6 +150,9 @@ class CharacterApprovalNotificationService
             ->filter()
             ->values()
             ->all();
+        $submittedCharacterCount = $character->user
+            ? $character->user->characters()->where('guild_status', '!=', 'draft')->count()
+            : 0;
 
         return array_merge([
             'character_id' => $character->id,
@@ -171,6 +174,7 @@ class CharacterApprovalNotificationService
             'user_id' => $character->user?->id,
             'user_name' => $character->user?->name,
             'user_discord_id' => $character->user?->discord_id,
+            'is_first_submission' => $submittedCharacterCount === 1 && $character->guild_status !== 'draft',
             'approval_url' => route('admin.character-approvals.index'),
             'character_url' => route('characters.show', $character),
         ], $overrides);

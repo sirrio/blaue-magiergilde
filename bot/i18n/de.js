@@ -339,6 +339,8 @@ module.exports = {
         openExternalLink: 'Externen Link öffnen',
         yourCharacters: 'Deine Charaktere',
         userField: 'Nutzer',
+        firstSubmissionField: 'Erstanmeldung',
+        firstSubmissionValue: 'Ja',
         shopSpendField: 'Shop-Ausgaben',
         notesField: 'Notizen',
         registrationNotesField: 'Registrierungsnotizen',

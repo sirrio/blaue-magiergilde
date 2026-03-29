@@ -349,6 +349,7 @@ export interface Character {
   registration_note?: string | null
   review_note?: string | null
   reviewed_by_name?: string | null
+  is_first_submission?: boolean
   room_count?: number
   admin_notes?: string | null
   admin_managed?: boolean
