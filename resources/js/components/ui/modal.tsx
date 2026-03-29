@@ -115,7 +115,14 @@ export const Modal = ({
                   </button>
                 ) : null}
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">{contentElement}</div>
+              <div
+                className={cn(
+                  'flex-1 px-4 py-3 text-sm',
+                  overflowVisible ? 'overflow-visible' : 'overflow-y-auto',
+                )}
+              >
+                {contentElement}
+              </div>
               {actionElement ? (
                 <div className="sticky bottom-0 border-t border-base-200 bg-base-100 px-4 py-3">
                   <div className="flex justify-end">{actionElement}</div>
