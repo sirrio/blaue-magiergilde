@@ -13,7 +13,7 @@ import { Auction, AuctionBid, AuctionHiddenBid, AuctionItem, AuctionSettings, Au
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import { CheckCircle2, ChevronsRight, EyeOff, FlaskRound, History, Mic, Package, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Shield, Sword, Trash, XCircle } from 'lucide-react'
-import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { type ReactElement, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 const rarityLabels: Record<string, string> = {
   common: 'Common',
@@ -71,6 +71,10 @@ const getRarityTextColor = (rarity: string): string => {
 
 const renderIcon = (type: string): ReactElement | null => {
   return typeIcons[type] || null
+}
+
+const buildAuctionAddItemLabel = (item: Item): string => {
+  return `${item.name} (${rarityLabels[item.rarity]})`
 }
 
 const getAuctionItemSnapshot = (auctionItem: AuctionItem): Item => {
@@ -1003,7 +1007,12 @@ const AuctionItemRow = ({
 }
 
 const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item[] }) => {
+  const maxVisibleAuctionItemResults = 60
   const [isOpen, setIsOpen] = useState(false)
+  const [itemSearch, setItemSearch] = useState('')
+  const [isItemMenuOpen, setIsItemMenuOpen] = useState(false)
+  const [activeItemIndex, setActiveItemIndex] = useState(0)
+  const itemInputRef = useRef<HTMLInputElement | null>(null)
   const initialItemId = items[0]?.id ?? 0
   const hasItems = items.length > 0
   const defaultRepairCurrent = getDefaultRepairCurrent(initialItemId, items)
@@ -1018,6 +1027,37 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   const repairLabel = repairMax
     ? `Repair: ${repairDefaultCurrent}/${repairMax} ${auction.currency}`
     : `Repair (${auction.currency})`
+  const deferredItemSearch = useDeferredValue(itemSearch)
+  const indexedItems = useMemo(
+    () => items.map((item) => ({
+      item,
+      label: buildAuctionAddItemLabel(item),
+      searchText: [
+        item.name,
+        rarityLabels[item.rarity],
+        item.type,
+      ].filter(Boolean).join(' ').toLowerCase(),
+    })),
+    [items],
+  )
+  const selectedItem = useMemo(
+    () => items.find((item) => item.id === data.item_id) ?? null,
+    [items, data.item_id],
+  )
+  const selectedItemLabel = useMemo(
+    () => selectedItem ? buildAuctionAddItemLabel(selectedItem) : '',
+    [selectedItem],
+  )
+  const hasPendingItemSelection = itemSearch.trim().length > 0 && itemSearch.trim() !== selectedItemLabel
+  const filteredItems = useMemo(() => {
+    const query = deferredItemSearch.trim().toLowerCase()
+    if (!query) return indexedItems
+    return indexedItems.filter(({ searchText }) => searchText.includes(query))
+  }, [indexedItems, deferredItemSearch])
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, maxVisibleAuctionItemResults),
+    [filteredItems],
+  )
 
   useEffect(() => {
     if (!isOpen) return
@@ -1027,10 +1067,35 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
     setData('repair_current', repairCurrent)
     setData('notes', '')
     setData('remaining_auctions', 3)
+    const nextItem = items.find((item) => item.id === nextItemId) ?? null
+    setItemSearch(nextItem ? buildAuctionAddItemLabel(nextItem) : '')
+    setIsItemMenuOpen(false)
+    setActiveItemIndex(0)
   }, [isOpen, items, setData])
+
+  useEffect(() => {
+    if (!isItemMenuOpen) return
+    setActiveItemIndex(0)
+  }, [itemSearch, isItemMenuOpen])
+
+  const applyItemSelection = (item: Item) => {
+    const repairCurrent = getDefaultRepairCurrent(item.id, items)
+    setData('item_id', item.id)
+    setData('repair_current', repairCurrent)
+    setData('notes', '')
+    setItemSearch(buildAuctionAddItemLabel(item))
+    setIsItemMenuOpen(false)
+    setActiveItemIndex(0)
+  }
 
   const handleSubmit = () => {
     if (!hasItems) return
+    if (!selectedItem || hasPendingItemSelection) {
+      toast.show('Please select an item from the list before saving.', 'error')
+      setIsItemMenuOpen(true)
+      window.setTimeout(() => itemInputRef.current?.focus(), 0)
+      return
+    }
     post(route('admin.auction-items.store', { auction: auction.id }), {
       preserveScroll: true,
       onSuccess: () => {
@@ -1047,7 +1112,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} overflowVisible>
       <ModalTrigger>
         <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} disabled={!hasItems} className="gap-2">
           <Plus size={16} />
@@ -1056,29 +1121,88 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
       </ModalTrigger>
       <ModalTitle>Add item to auction</ModalTitle>
       <ModalContent>
-        <Select
-          value={data.item_id}
-          onChange={(e) => {
-            const nextId = Number(e.target.value)
-            const repairCurrent = getDefaultRepairCurrent(nextId, items)
-            setData('item_id', nextId)
-            setData('repair_current', repairCurrent)
-            setData('notes', '')
-          }}
-        >
-          <SelectLabel>Item</SelectLabel>
-          <SelectOptions>
-            {hasItems ? (
-              items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} ({rarityLabels[item.rarity]})
-                </option>
-              ))
-            ) : (
-              <option value={0}>No items available</option>
-            )}
-          </SelectOptions>
-        </Select>
+        <div className="relative w-full">
+          <label className="label" htmlFor="auction-item-search">
+            Item
+          </label>
+          <input
+            id="auction-item-search"
+            ref={itemInputRef}
+            className="input w-full"
+            placeholder={selectedItem ? buildAuctionAddItemLabel(selectedItem) : 'Search item...'}
+            value={itemSearch}
+            onChange={(event) => {
+              setItemSearch(event.target.value)
+              setIsItemMenuOpen(true)
+            }}
+            onFocus={() => setIsItemMenuOpen(true)}
+            onBlur={() => {
+              window.setTimeout(() => {
+                setIsItemMenuOpen(false)
+                if (!itemSearch.trim() && selectedItem) {
+                  setItemSearch(buildAuctionAddItemLabel(selectedItem))
+                }
+              }, 100)
+            }}
+            onKeyDown={(event) => {
+              if (!isItemMenuOpen) return
+              if (event.key === 'ArrowDown') {
+                event.preventDefault()
+                setActiveItemIndex((current) => Math.min(current + 1, Math.max(visibleItems.length - 1, 0)))
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault()
+                setActiveItemIndex((current) => Math.max(current - 1, 0))
+              } else if (event.key === 'Enter') {
+                event.preventDefault()
+                const nextItem = visibleItems[activeItemIndex]?.item
+                if (nextItem) {
+                  applyItemSelection(nextItem)
+                }
+              } else if (event.key === 'Escape') {
+                event.preventDefault()
+                setIsItemMenuOpen(false)
+              }
+            }}
+          />
+          {hasPendingItemSelection ? (
+            <div className="mt-2 text-xs text-error">
+              Select one of the matching items before saving.
+            </div>
+          ) : null}
+          {isItemMenuOpen ? (
+            <div className="absolute left-0 right-0 z-20 mt-2 max-h-56 overflow-auto rounded-lg border border-base-200 bg-base-100 shadow-lg">
+              {visibleItems.map(({ item }, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={cn(
+                    'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                    index === activeItemIndex ? 'bg-base-200/70' : 'hover:bg-base-200/50',
+                  )}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => applyItemSelection(item)}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 text-base-content/70">{renderIcon(item.type)}</span>
+                    <div className="min-w-0">
+                      <div className="truncate">{item.name}</div>
+                      <div className={cn('text-xs', getRarityTextColor(item.rarity))}>{rarityLabels[item.rarity]}</div>
+                    </div>
+                  </div>
+                  {item.id === data.item_id ? <CheckCircle2 size={14} className="text-primary/70" /> : null}
+                </button>
+              ))}
+              {itemSearch.trim() && filteredItems.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-base-content/50">No matching items found.</div>
+              ) : null}
+              {filteredItems.length > visibleItems.length ? (
+                <div className="border-t border-base-200 px-3 py-2 text-xs text-base-content/50">
+                  Showing {visibleItems.length} of {filteredItems.length} items. Keep typing to narrow the list.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         <Input
           value={data.notes}
           onChange={(e) => setData('notes', e.target.value)}
