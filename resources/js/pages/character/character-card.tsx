@@ -31,7 +31,7 @@ import { PageProps } from '@/types'
 import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
+import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, CircleHelp, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
 import React, { useState, useTransition } from 'react'
 import { useImage } from 'react-image'
 
@@ -63,27 +63,44 @@ function CharacterImage({
 function CharacterSettingsModal({
   simplifiedTracking,
   avatarMasked,
+  privateMode,
   characterId,
   isTrackingModeUpdating = false,
   isAvatarMaskedUpdating = false,
+  isPrivateModeUpdating = false,
   onTrackingModeChange,
   onAvatarMaskedChange,
+  onPrivateModeChange,
   triggerVariant = 'ghost',
   triggerSize = 'xs',
   triggerClassName,
 }: {
   simplifiedTracking: boolean
   avatarMasked: boolean
+  privateMode: boolean
   characterId: number
   isTrackingModeUpdating?: boolean
   isAvatarMaskedUpdating?: boolean
+  isPrivateModeUpdating?: boolean
   onTrackingModeChange?: (value: boolean) => void
   onAvatarMaskedChange?: (value: boolean) => void
+  onPrivateModeChange?: (value: boolean) => void
   triggerVariant?: 'ghost' | 'outline'
   triggerSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   triggerClassName?: string
 }) {
   const t = useTranslate()
+
+  const SettingHelp = ({ text, label }: { text: string; label: string }) => (
+    <span
+      className="inline-flex cursor-help items-center text-base-content/45"
+      title={text}
+      aria-label={`${label}: ${text}`}
+    >
+      <CircleHelp size={14} />
+    </span>
+  )
+
   return (
     <Modal>
       <ModalTrigger>
@@ -101,24 +118,69 @@ function CharacterSettingsModal({
       <ModalTitle>{t('characters.characterSettings')}</ModalTitle>
       <ModalContent>
         <div className="space-y-3">
-          <label className={cn('flex items-center justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
-            <span>{t('characters.simplifiedTracking')}</span>
-            <input
-              type="checkbox"
-              className="toggle toggle-sm toggle-primary"
-              checked={simplifiedTracking}
-              disabled={isTrackingModeUpdating || !onTrackingModeChange}
-              onChange={(event) => onTrackingModeChange?.(event.target.checked)}
-            />
-          </label>
+          <div className={cn('flex items-start justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
+            <span className="flex items-center gap-1.5 pt-1">
+              <span>{t('characters.trackingMode')}</span>
+              <SettingHelp
+                label={t('characters.trackingMode')}
+                text={t('characters.trackingModeHelp')}
+              />
+            </span>
+            <div className="join">
+              <Button
+                type="button"
+                size="xs"
+                variant={simplifiedTracking ? 'ghost' : 'soft'}
+                color={simplifiedTracking ? undefined : 'primary'}
+                className="join-item"
+                disabled={isTrackingModeUpdating || !onTrackingModeChange || !simplifiedTracking}
+                onClick={() => onTrackingModeChange?.(false)}
+              >
+                {t('characters.adventureTracking')}
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={simplifiedTracking ? 'soft' : 'ghost'}
+                color={simplifiedTracking ? 'primary' : undefined}
+                className="join-item"
+                disabled={isTrackingModeUpdating || !onTrackingModeChange || simplifiedTracking}
+                onClick={() => onTrackingModeChange?.(true)}
+              >
+                {t('characters.levelTracking')}
+              </Button>
+            </div>
+          </div>
           <label className={cn('flex items-center justify-between gap-3 text-sm', isAvatarMaskedUpdating && 'opacity-60')}>
-            <span>{t('characters.tokenMask')}</span>
+            <span className="flex items-center gap-1.5">
+              <span>{t('characters.tokenMask')}</span>
+              <SettingHelp
+                label={t('characters.tokenMask')}
+                text={t('characters.tokenMaskHelp')}
+              />
+            </span>
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
               checked={avatarMasked}
               disabled={isAvatarMaskedUpdating || !onAvatarMaskedChange}
               onChange={(event) => onAvatarMaskedChange?.(event.target.checked)}
+            />
+          </label>
+          <label className={cn('flex items-center justify-between gap-3 text-sm', isPrivateModeUpdating && 'opacity-60')}>
+            <span className="flex items-center gap-1.5">
+              <span>{t('characters.privateMode')}</span>
+              <SettingHelp
+                label={t('characters.privateMode')}
+                text={t('characters.privateModeHelp')}
+              />
+            </span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm toggle-primary"
+              checked={privateMode}
+              disabled={isPrivateModeUpdating || !onPrivateModeChange}
+              onChange={(event) => onPrivateModeChange?.(event.target.checked)}
             />
           </label>
           <div className="border-t border-base-200 pt-3">
@@ -252,6 +314,8 @@ export function CharacterCard({
   isTrackingModeUpdating = false,
   onAvatarMaskedChange,
   isAvatarMaskedUpdating = false,
+  onPrivateModeChange,
+  isPrivateModeUpdating = false,
 }: {
   character: Character
   guildCharacters?: Character[]
@@ -259,6 +323,8 @@ export function CharacterCard({
   isTrackingModeUpdating?: boolean
   onAvatarMaskedChange?: (value: boolean) => void
   isAvatarMaskedUpdating?: boolean
+  onPrivateModeChange?: (value: boolean) => void
+  isPrivateModeUpdating?: boolean
 }) {
   const t = useTranslate()
   const { features } = usePage<PageProps>().props
@@ -269,6 +335,7 @@ export function CharacterCard({
   const tier = calculateTier(character)
   const simplifiedTracking = character.simplified_tracking ?? false
   const avatarMasked = character.avatar_masked ?? true
+  const privateMode = character.private_mode ?? false
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const bubblesToNextLevel = calculateBubblesToNextLevel(character)
@@ -429,11 +496,14 @@ export function CharacterCard({
             <CharacterSettingsModal
               simplifiedTracking={simplifiedTracking}
               avatarMasked={avatarMasked}
+              privateMode={privateMode}
               characterId={character.id}
               isTrackingModeUpdating={isTrackingModeUpdating}
               isAvatarMaskedUpdating={isAvatarMaskedUpdating}
+              isPrivateModeUpdating={isPrivateModeUpdating}
               onTrackingModeChange={onTrackingModeChange}
               onAvatarMaskedChange={onAvatarMaskedChange}
+              onPrivateModeChange={onPrivateModeChange}
             />
             <Button
               className="flex"
@@ -470,7 +540,7 @@ export function CharacterCard({
               </Button>
             </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:pr-28')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:transition-[padding] md:duration-150 md:group-hover:pr-28')}>
             <span
               className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
               data-tip={statusTooltip}
@@ -479,11 +549,6 @@ export function CharacterCard({
               {statusIcon}
             </span>
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
-            {hasRoom ? (
-              <span className="shrink-0 text-primary/70" title={t('characters.roomAssigned')}>
-                <MapPin size={14} />
-              </span>
-            ) : null}
           </CardTitle>
           <CardContent>
             <div className={cn('flex items-center gap-1 text-xs')}>
@@ -491,17 +556,29 @@ export function CharacterCard({
               <span>
                 Level {level} {calculateClassString(character)}
               </span>
+              {hasRoom ? (
+                <span
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] text-primary/75"
+                  title={t('characters.roomAssigned')}
+                  aria-label={t('characters.roomAssigned')}
+                >
+                  <MapPin size={11} />
+                </span>
+              ) : null}
             </div>
             {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}
                 avatarMasked={avatarMasked}
+                privateMode={privateMode}
                 characterId={character.id}
                 isTrackingModeUpdating={isTrackingModeUpdating}
                 isAvatarMaskedUpdating={isAvatarMaskedUpdating}
+                isPrivateModeUpdating={isPrivateModeUpdating}
                 onTrackingModeChange={onTrackingModeChange}
                 onAvatarMaskedChange={onAvatarMaskedChange}
+                onPrivateModeChange={onPrivateModeChange}
                 triggerVariant="outline"
                 triggerSize="sm"
                 triggerClassName="w-full justify-center"

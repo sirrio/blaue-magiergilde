@@ -5,6 +5,8 @@ use App\Http\Controllers\Character\AvatarModeController;
 use App\Http\Controllers\Character\CharacterController;
 use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
+use App\Http\Controllers\Character\ForceDeleteDeletedCharacterController;
+use App\Http\Controllers\Character\PrivateModeController;
 use App\Http\Controllers\Character\QuickLevelController;
 use App\Http\Controllers\Character\RestoreDeletedCharacterController;
 use App\Http\Controllers\Character\ShowDeletedCharacterController;
@@ -27,6 +29,9 @@ Route::patch('characters/{character}/tracking', TrackingModeController::class)
 Route::patch('characters/{character}/avatar-mode', AvatarModeController::class)
     ->middleware(['auth'])
     ->name('characters.avatar-mode');
+Route::patch('characters/{character}/private-mode', PrivateModeController::class)
+    ->middleware(['auth'])
+    ->name('characters.private-mode');
 Route::get('avatars/masked', AvatarMaskController::class)
     ->name('avatars.masked');
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
@@ -51,6 +56,10 @@ Route::post('characters/{character}/restore-deleted', RestoreDeletedCharacterCon
     ->withTrashed()
     ->middleware(['auth'])
     ->name('characters.restore-deleted');
+Route::delete('characters/{character}/force-delete', ForceDeleteDeletedCharacterController::class)
+    ->withTrashed()
+    ->middleware(['auth'])
+    ->name('characters.force-delete');
 Route::get('characters/{character}/download', DownloadCharacterController::class)
     ->middleware(['auth'])
     ->name('characters.download');

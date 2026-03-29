@@ -165,7 +165,7 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked, locale = null }) {
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked, privateMode, locale = null }) {
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -218,6 +218,14 @@ function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTrack
                 locale,
             ))
             .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_private_mode_toggle_${characterId}_${ownerDiscordId}`)
+            .setLabel(t(
+                privateMode ? 'characters.managePrivateModeOn' : 'characters.managePrivateModeOff',
+                {},
+                locale,
+            ))
+            .setStyle(ButtonStyle.Secondary),
     ));
 
     rows.push(new ActionRowBuilder().addComponents(
@@ -257,6 +265,9 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
     const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
         ? true
         : Boolean(character.avatar_masked);
+    const privateMode = character.private_mode === null || character.private_mode === undefined
+        ? false
+        : Boolean(character.private_mode);
 
     const descriptionParts = [name];
     if (currentTier !== '-') {
@@ -278,6 +289,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
             { name: t('characters.startingTier', {}, locale), value: startTier, inline: true },
             { name: t('characters.avatarField', {}, locale), value: avatar, inline: true },
             { name: t('characters.tokenMaskField', {}, locale), value: t(avatarMasked ? 'characters.tokenMaskValueOn' : 'characters.tokenMaskValueOff', {}, locale), inline: true },
+            { name: t('characters.privateModeField', {}, locale), value: t(privateMode ? 'characters.privateModeValueOn' : 'characters.privateModeValueOff', {}, locale), inline: true },
             { name: t('characters.dndBeyondLinkField', {}, locale), value: linkValue, inline: false },
             { name: t('characters.notesField', {}, locale), value: notes, inline: false },
             { name: t('characters.manageDmBubbles', {}, locale), value: dmBubbles, inline: true },
@@ -292,6 +304,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
             ownerDiscordId,
             simplifiedTracking,
             avatarMasked,
+            privateMode,
             locale,
         }),
     };
@@ -1999,8 +2012,9 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
         const label = linkedName && linkedName.toLowerCase() !== String(ally.name).toLowerCase()
             ? `${linkedName} (${ally.name})`
             : String(ally.name);
+        const ownerName = String(ally.owner_name || '').trim();
         const description = ally.linked_character_id
-            ? linkedName ? `Linked - ${linkedName}` : t('characters.linkedGuildMember')
+            ? ownerName ? `Linked - ${ownerName}` : linkedName ? `Linked - ${linkedName}` : t('characters.linkedGuildMember')
             : t('characters.customAlly');
         return {
             key: `ally_${ally.id}`,
@@ -2012,14 +2026,17 @@ function buildParticipantOptions({ allies, guildCharacters, selectedAllyIds, sel
         };
     });
 
-    const guildOptions = availableGuildCharacters.map(character => ({
-        key: `guild_${character.id}`,
-        type: 'guild',
-        id: Number(character.id),
-        label: String(character.name),
-        description: t('characters.guildMember'),
-        selected: selectedGuildCharacterIds.includes(Number(character.id)),
-    }));
+    const guildOptions = availableGuildCharacters.map(character => {
+        const ownerName = String(character.owner_name || '').trim();
+        return {
+            key: `guild_${character.id}`,
+            type: 'guild',
+            id: Number(character.id),
+            label: ownerName ? `${String(character.name)} - ${ownerName}` : String(character.name),
+            description: ownerName ? `${t('characters.guildMember')} - ${ownerName}` : t('characters.guildMember'),
+            selected: selectedGuildCharacterIds.includes(Number(character.id)),
+        };
+    });
 
     const combined = [...allyOptions, ...guildOptions].filter(option => {
         if (!query) return true;

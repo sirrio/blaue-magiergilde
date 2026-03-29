@@ -2,6 +2,8 @@ import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
 import { Link, router, usePage } from '@inertiajs/react'
+import { Button } from '@/components/ui/button'
+import { Modal, ModalAction, ModalContent, ModalTitle } from '@/components/ui/modal'
 import {
   Archive,
   BookOpen,
@@ -33,7 +35,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
     usePage<PageProps>().props
   const t = useTranslate()
   const [localeUpdating, setLocaleUpdating] = useState(false)
+  const [trackingDefaultSaving, setTrackingDefaultSaving] = useState(false)
   const needsPasswordFallback = Boolean(auth.user?.needs_password_fallback)
+  const needsTrackingDefaultSelection = auth.user?.simplified_tracking === null
   const getInitials = useInitials()
   const adminDetailsRef = useRef<HTMLDetailsElement>(null)
   const compendiumDesktopRef = useRef<HTMLDetailsElement>(null)
@@ -150,6 +154,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
       preserveScroll: true,
       preserveState: true,
       onFinish: () => setLocaleUpdating(false),
+    })
+  }
+
+  const handleTrackingDefaultChange = (nextValue: boolean) => {
+    if (trackingDefaultSaving) {
+      return
+    }
+
+    setTrackingDefaultSaving(true)
+    router.patch(route('profile.update'), {
+      name: auth.user.name,
+      email: auth.user.email ?? '',
+      simplified_tracking: nextValue,
+    }, {
+      preserveScroll: true,
+      preserveState: true,
+      onFinish: () => setTrackingDefaultSaving(false),
     })
   }
 
@@ -492,6 +513,47 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </nav>
       <main>
+        <Modal isOpen={needsTrackingDefaultSelection} onClose={() => undefined} showCloseButton={false}>
+          <ModalTitle>{t('profile.trackingRequiredTitle')}</ModalTitle>
+          <ModalContent>
+            <div className="space-y-4">
+              <p className="text-sm text-base-content/80">{t('profile.trackingRequiredBody')}</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="soft"
+                  color="primary"
+                  className="h-auto min-h-0 flex-col items-start justify-start gap-1 px-3 py-3 text-left"
+                  disabled={trackingDefaultSaving}
+                  onClick={() => handleTrackingDefaultChange(false)}
+                >
+                  <span className="font-semibold">{t('profile.adventureTracking')}</span>
+                  <span className="text-xs font-normal text-current/75">{t('auth.adventureTrackingDescription')}</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="soft"
+                  color="warning"
+                  className="h-auto min-h-0 flex-col items-start justify-start gap-1 px-3 py-3 text-left"
+                  disabled={trackingDefaultSaving}
+                  onClick={() => handleTrackingDefaultChange(true)}
+                >
+                  <span className="font-semibold">{t('profile.levelTracking')}</span>
+                  <span className="text-xs font-normal text-current/75">{t('auth.levelTrackingDescription')}</span>
+                </Button>
+              </div>
+                <div className="space-y-1 text-xs text-base-content/60">
+                  <p>{t('profile.trackingRequiredHint')}</p>
+                  <p className="text-[11px] italic text-base-content/45">{t('profile.trackingRequiredTip')}</p>
+                </div>
+            </div>
+          </ModalContent>
+          <ModalAction disabled>
+            {t('profile.saveTrackingDefault')}
+          </ModalAction>
+        </Modal>
         {!discordConnected && (
           <div className="container mx-auto max-w-5xl px-4 pt-4">
             <div className="alert alert-warning">

@@ -16,6 +16,7 @@ const payload = buildCharacterManageView({
     guild_status: 'pending',
     simplified_tracking: false,
     avatar_masked: true,
+    private_mode: true,
     level: 5,
     start_tier: 'bt',
     version: '2024',
@@ -24,11 +25,13 @@ const payload = buildCharacterManageView({
 }, { ownerDiscordId: '123', locale: 'de' });
 
 assert.equal(payload.embeds[0].data.title, 'Charakter verwalten');
-assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Aktuelle Tier'), true);
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Aktuelles Tier'), true);
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'DnDBeyond-Link'), true);
 assert.equal(payload.components[0].components[0].data.label, 'Name/Link/Notizen');
 assert.equal(payload.components[1].components[0].data.label, 'DM Bubbles');
-assert.equal(payload.components[2].components[0].data.label, 'Tracking: Adventure');
+assert.equal(payload.components[2].components[0].data.label, 'Tracking: Adventure tracking');
+assert.equal(payload.components[2].components[2].data.label, 'Privatmodus: An');
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Privatmodus' && field.value === 'An'), true);
 assert.equal(payload.components[3].components[0].data.label, 'Zurück');
 
 console.log('character-manage-view.test.js passed');

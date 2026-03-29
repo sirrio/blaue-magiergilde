@@ -30,7 +30,7 @@ class Ally extends Model
     {
         return $this->belongsTo(Character::class, 'linked_character_id')
             ->without(['allies', 'downtimes', 'characterClasses'])
-            ->select(['id', 'name', 'avatar', 'user_id'])
+            ->select(['id', 'name', 'avatar', 'user_id', 'private_mode'])
             ->with('user:id,name');
     }
 }

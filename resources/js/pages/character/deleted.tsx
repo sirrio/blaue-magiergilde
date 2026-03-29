@@ -5,11 +5,19 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import AppLayout from '@/layouts/app-layout'
 import { Character } from '@/types'
 import { Head, router, Link } from '@inertiajs/react'
-import { Eye, RotateCcw } from 'lucide-react'
+import { Eye, RotateCcw, Trash } from 'lucide-react'
 
 export default function Deleted({ characters }: { characters: Character[] }) {
   const restore = (id: number) => {
     router.post(route('characters.restore-deleted', id))
+  }
+
+  const forceDelete = (id: number) => {
+    if (!window.confirm('Diesen gelöschten Charakter endgültig löschen? Dies kann nicht rückgängig gemacht werden.')) {
+      return
+    }
+
+    router.delete(route('characters.force-delete', id))
   }
 
   return (
@@ -42,6 +50,31 @@ export default function Deleted({ characters }: { characters: Character[] }) {
                   <Button size="xs" variant="ghost" modifier="square" onClick={() => restore(char.id)} title="Restore">
                     <RotateCcw size={14} />
                   </Button>
+                  {char.can_force_delete ? (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      modifier="square"
+                      color="error"
+                      onClick={() => forceDelete(char.id)}
+                      title="Endgültig löschen"
+                    >
+                      <Trash size={14} />
+                    </Button>
+                  ) : (
+                    <span title={char.force_delete_block_reason ?? 'Nicht möglich'}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        modifier="square"
+                        color="error"
+                        disabled
+                        title={char.force_delete_block_reason ?? 'Nicht möglich'}
+                      >
+                        <Trash size={14} />
+                      </Button>
+                    </span>
+                  )}
                 </div>
               </ListRow>
             ))}

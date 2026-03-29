@@ -124,6 +124,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     const avatarUrl = options.avatarUrlOverride || payload?.character_avatar_url || '';
     const userName = payload?.user_name || 'Unknown';
     const userMention = buildUserMention(payload?.user_discord_id);
+    const isFirstSubmission = Boolean(payload?.is_first_submission);
     const userLine = userMention ? `${userName} (${userMention})` : userName;
     const dmSummary = `${dmBubbles} bubbles · ${dmCoins} coins`;
 
@@ -140,6 +141,9 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
     fields.push({ name: 'Classes', value: trimField(classes), inline: false });
     fields.push({ name: t('approvals.userField'), value: trimField(userLine, 1024), inline: false });
+    if (isFirstSubmission) {
+        fields.push({ name: t('approvals.firstSubmissionField'), value: t('approvals.firstSubmissionValue'), inline: true });
+    }
     fields.push({ name: 'DM', value: dmSummary, inline: true });
     fields.push({ name: 'Filler', value: filler, inline: true });
     if (shopSpend !== null && shopSpend > 0) {
@@ -217,6 +221,66 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     }
 
     if (linkButtons.components.length > 0) {
+        components.push(linkButtons);
+    }
+
+    return {
+        embeds: [embed],
+        components,
+    };
+}
+
+function buildNewAccountMessage(payload) {
+    const userName = String(payload?.user_name || '').trim() || 'Unknown user';
+    const discordUserId = String(payload?.user_discord_id || '').trim();
+    const discordUsername = String(payload?.user_discord_username || '').trim();
+    const discordDisplayName = String(payload?.user_discord_display_name || '').trim();
+    const approvalUrl = String(payload?.approval_url || '').trim();
+    const source = String(payload?.source || 'website').trim().toLowerCase();
+    const userMention = buildUserMention(discordUserId);
+    const discordLabel = [discordDisplayName, discordUsername]
+        .filter(Boolean)
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .join(' · ');
+
+    const embed = new EmbedBuilder()
+        .setColor(0x0ea5e9)
+        .setTitle(t('approvals.newAccountTitle'))
+        .setDescription(t('approvals.newAccountDescription'));
+
+    embed.addFields(
+        { name: t('approvals.userField'), value: trimField(userMention ? `${userName} (${userMention})` : userName), inline: false },
+        {
+            name: t('approvals.newAccountDiscordField'),
+            value: trimField(discordLabel !== '' ? discordLabel : '—'),
+            inline: true,
+        },
+        {
+            name: t('approvals.newAccountSourceField'),
+            value: source === 'discord'
+                ? t('approvals.newAccountSourceDiscord')
+                : t('approvals.newAccountSourceWebsite'),
+            inline: true,
+        },
+        {
+            name: t('approvals.newAccountSubmissionField'),
+            value: t('approvals.newAccountSubmissionValue'),
+            inline: true,
+        },
+    );
+
+    if (payload?.user_id) {
+        embed.setFooter({ text: `User #${payload.user_id}` });
+    }
+
+    const components = [];
+    if (approvalUrl) {
+        const linkButtons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(t('approvals.openApprovals'))
+                .setStyle(ButtonStyle.Link)
+                .setURL(approvalUrl),
+        );
         components.push(linkButtons);
     }
 
@@ -405,6 +469,32 @@ async function postCharacterApprovalAnnouncement({ client, channelId, payload })
     }
 }
 
+async function postNewAccountAnnouncement({ client, channelId, payload }) {
+    channelId = resolveChannelId(channelId);
+
+    if (!channelId || !/^[0-9]{5,}$/.test(String(channelId))) {
+        return { ok: false, status: 422, error: 'Invalid channel_id.' };
+    }
+
+    let channel;
+    try {
+        channel = await client.channels.fetch(String(channelId));
+    } catch {
+        return { ok: false, status: 404, error: 'Channel not found.' };
+    }
+
+    if (!channel?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Channel must be text-based.' };
+    }
+
+    try {
+        const message = await channel.send(buildNewAccountMessage(payload));
+        return { ok: true, status: 200, message_id: message.id, channel_id: channel.id };
+    } catch {
+        return { ok: false, status: 500, error: 'Failed to post account announcement.' };
+    }
+}
+
 async function updateCharacterApprovalAnnouncement({ client, channelId, messageId, payload }) {
     channelId = resolveChannelId(channelId);
 
@@ -493,8 +583,10 @@ async function deleteCharacterApprovalAnnouncement({ client, channelId, messageI
 
 module.exports = {
     buildCharacterApprovalMessage,
+    buildNewAccountMessage,
     sendCharacterApprovalDm,
     postCharacterApprovalAnnouncement,
+    postNewAccountAnnouncement,
     updateCharacterApprovalAnnouncement,
     deleteCharacterApprovalAnnouncement,
 };

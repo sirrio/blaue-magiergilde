@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Character;
 use App\Models\DiscordBotSetting;
+use App\Models\User;
 use App\Support\BotRequestFailure;
 use Illuminate\Support\Facades\Http;
 
@@ -114,6 +115,31 @@ class CharacterApprovalNotificationService
         ]);
     }
 
+    public function notifyNewAccount(User $user, string $source): array
+    {
+        $settings = DiscordBotSetting::current();
+        $channelId = $settings->character_approval_channel_id;
+
+        if (! $channelId) {
+            return [
+                'ok' => false,
+                'status' => 422,
+                'error' => 'Character approval channel not configured.',
+            ];
+        }
+
+        return $this->request('/character-approval/account-created', [
+            'channel_id' => $channelId,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_discord_id' => $user->discord_id,
+            'user_discord_username' => $user->discord_username,
+            'user_discord_display_name' => $user->discord_display_name,
+            'source' => trim($source) !== '' ? trim($source) : 'website',
+            'approval_url' => route('admin.character-approvals.index'),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -150,6 +176,9 @@ class CharacterApprovalNotificationService
             ->filter()
             ->values()
             ->all();
+        $submittedCharacterCount = $character->user
+            ? $character->user->characters()->where('guild_status', '!=', 'draft')->count()
+            : 0;
 
         return array_merge([
             'character_id' => $character->id,
@@ -171,6 +200,7 @@ class CharacterApprovalNotificationService
             'user_id' => $character->user?->id,
             'user_name' => $character->user?->name,
             'user_discord_id' => $character->user?->discord_id,
+            'is_first_submission' => $submittedCharacterCount === 1 && $character->guild_status !== 'draft',
             'approval_url' => route('admin.character-approvals.index'),
             'character_url' => route('characters.show', $character),
         ], $overrides);

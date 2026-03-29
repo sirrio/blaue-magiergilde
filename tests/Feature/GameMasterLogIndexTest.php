@@ -29,3 +29,102 @@ it('returns a slimmed character payload for game master log index', function () 
     expect($payloadCharacter)->not->toHaveKey('character_classes');
     expect($payloadCharacter)->not->toHaveKey('faction_rank');
 });
+
+it('does not include deleted adventures in the game master log character payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'is_filler' => true,
+        'dm_bubbles' => 0,
+    ]);
+
+    $activeAdventure = Adventure::factory()->for($character)->create([
+        'duration' => 10800,
+        'has_additional_bubble' => false,
+    ]);
+    $deletedAdventure = Adventure::factory()->for($character)->create([
+        'duration' => 10800,
+        'has_additional_bubble' => false,
+    ]);
+    $deletedAdventure->delete();
+
+    $response = $this->actingAs($user)
+        ->get(route('game-master-log.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'] ?? [];
+    $characters = $props['characters'] ?? [];
+    $payloadCharacter = collect($characters)->firstWhere('id', $character->id);
+
+    expect($payloadCharacter)->toBeArray();
+    expect($payloadCharacter['adventures'])->toHaveCount(1);
+    expect(collect($payloadCharacter['adventures'])->pluck('id')->all())->toBe([$activeAdventure->id]);
+});
+
+it('keeps deleted characters in the game master log payload for existing spends', function () {
+    $user = User::factory()->create();
+    $activeCharacter = Character::factory()->for($user)->create();
+    $deletedCharacter = Character::factory()->for($user)->create([
+        'dm_bubbles' => 3,
+        'dm_coins' => 2,
+    ]);
+    $deletedCharacter->delete();
+
+    $response = $this->actingAs($user)
+        ->get(route('game-master-log.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'] ?? [];
+    $characters = collect($props['characters'] ?? []);
+
+    expect($characters->pluck('id')->all())
+        ->toContain($activeCharacter->id)
+        ->toContain($deletedCharacter->id);
+
+    $payloadCharacter = $characters->firstWhere('id', $deletedCharacter->id);
+
+    expect($payloadCharacter)->toBeArray();
+    expect($payloadCharacter['dm_bubbles'])->toBe(3);
+    expect($payloadCharacter['dm_coins'])->toBe(2);
+});
+
+it('keeps only character-deletion adventures for deleted characters in the game master log payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'is_filler' => true,
+        'dm_bubbles' => 1,
+    ]);
+
+    $stillActiveAdventure = Adventure::factory()->for($character)->create([
+        'duration' => 10800,
+        'has_additional_bubble' => false,
+    ]);
+    $deletedByCharacterAdventure = Adventure::factory()->for($character)->create([
+        'duration' => 21600,
+        'has_additional_bubble' => true,
+    ]);
+    $deletedByCharacterAdventure->deleted_by_character = true;
+    $deletedByCharacterAdventure->save();
+    $deletedByCharacterAdventure->delete();
+
+    $manuallyDeletedAdventure = Adventure::factory()->for($character)->create([
+        'duration' => 10800,
+        'has_additional_bubble' => false,
+    ]);
+    $manuallyDeletedAdventure->delete();
+
+    $character->delete();
+
+    $response = $this->actingAs($user)
+        ->get(route('game-master-log.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'] ?? [];
+    $characters = collect($props['characters'] ?? []);
+    $payloadCharacter = $characters->firstWhere('id', $character->id);
+
+    expect($payloadCharacter)->toBeArray();
+    expect(collect($payloadCharacter['adventures'])->pluck('id')->all())
+        ->toContain($stillActiveAdventure->id)
+        ->toContain($deletedByCharacterAdventure->id)
+        ->not->toContain($manuallyDeletedAdventure->id);
+});

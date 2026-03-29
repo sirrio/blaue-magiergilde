@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Character;
 
 use App\Http\Controllers\Controller;
 use App\Models\Character;
+use App\Support\CharacterTrackingHistory;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,6 +13,8 @@ class DeletedCharacterController extends Controller
 {
     public function __invoke(): Response
     {
+        $history = new CharacterTrackingHistory;
+
         $characters = Character::onlyTrashed()
             ->with([
                 'adventures' => fn ($q) => $q->withTrashed(),
@@ -20,7 +23,12 @@ class DeletedCharacterController extends Controller
             ])
             ->where('user_id', Auth::id())
             ->orderBy('deleted_at', 'desc')
-            ->get();
+            ->get()
+            ->each(function (Character $character) use ($history): void {
+                $history->filterTrackedRelations($character);
+                $character->setAttribute('can_force_delete', $history->canPermanentlyDelete($character));
+                $character->setAttribute('force_delete_block_reason', $history->permanentDeleteBlockReason($character));
+            });
 
         return Inertia::render('character/deleted', [
             'characters' => $characters,

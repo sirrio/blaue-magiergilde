@@ -53,7 +53,7 @@ const simpleModeDowntime = simpleModeEmbed.fields.find((field) => field.name ===
 
 assert.equal(simpleModeAdventures?.value.includes('Played: **?**'), true);
 assert.equal(simpleModeFactions?.value.includes('Level: **?**'), true);
-assert.equal(simpleModeDowntime?.value, 'Cannot calculate downtime while simple mode entries exist.');
+assert.equal(simpleModeDowntime?.value, 'Cannot calculate downtime while level tracking entries exist.');
 
 if (originalBaseUrl === undefined) {
     delete process.env.BOT_PUBLIC_APP_URL;

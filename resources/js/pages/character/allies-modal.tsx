@@ -3,11 +3,11 @@ import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
-import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { getAllyDisplayName, getAllyOwnerName, getGuildCharacterOptionLabel } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { useTranslate } from '@/lib/i18n'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
-import { BookHeart, ChevronDown, ChevronUp, Heart, Link2, PlusCircle, User, UserPlus } from 'lucide-react'
+import { BookHeart, ChevronDown, ChevronUp, Handshake, Heart, Link2, PlusCircle, User, UserPlus } from 'lucide-react'
 import React, { useEffect, useMemo, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import type { FormDataConvertible } from '@inertiajs/core'
@@ -27,6 +27,38 @@ const getAllyAvatarSrc = (ally: Ally) => {
     return avatar.startsWith('http') ? avatar : `/storage/${avatar}`
   }
   return ''
+}
+
+const buildSharedAdventureCountMap = (character: Character): Map<number, number> => {
+  const counts = new Map<number, number>()
+
+  for (const adventure of character.adventures ?? []) {
+    const seenAllyIds = new Set<number>()
+
+    for (const ally of adventure.allies ?? []) {
+      if (!ally?.id || seenAllyIds.has(ally.id)) {
+        continue
+      }
+
+      seenAllyIds.add(ally.id)
+      counts.set(ally.id, (counts.get(ally.id) ?? 0) + 1)
+    }
+  }
+
+  return counts
+}
+
+const SharedAdventureSummary = ({ count }: { count: number }) => {
+  if (count <= 0) {
+    return null
+  }
+
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5 self-center whitespace-nowrap text-[10px] leading-none text-base-content/50">
+      <span>{count}</span>
+      <Handshake size={11} className="text-base-content/60" />
+    </span>
+  )
 }
 
 const RatingHearts = ({
@@ -206,9 +238,12 @@ const AllyCard: React.FC<AllyCardProps> = ({
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h4 className="truncate font-bold">
-                {displayName}
-              </h4>
+              <div className="flex min-w-0 items-center gap-1">
+                <h4 className="truncate font-bold leading-tight">
+                  {displayName}
+                </h4>
+                <SharedAdventureSummary count={ally.shared_adventure_count ?? 0} />
+              </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
                 {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
                 {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
@@ -271,7 +306,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
           <option value="">{t('characters.allyCustomNoLink')}</option>
           {linkedOptions.map((character) => (
             <option key={character.id} value={character.id}>
-              {character.name}
+              {getGuildCharacterOptionLabel(character)}
             </option>
           ))}
         </select>
@@ -386,9 +421,14 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">
-            {displayName}
-          </p>
+          <div className="flex min-w-0 items-center gap-1">
+            <p className="truncate text-sm font-semibold leading-tight">
+              {displayName}
+            </p>
+            <span className="shrink-0">
+              <SharedAdventureSummary count={ally.shared_adventure_count ?? 0} />
+            </span>
+          </div>
           <p className="truncate text-xs text-base-content/60">
             {ally.classes && ally.classes.trim() !== '' ? ally.classes : t('characters.allyNoClasses')} •{' '}
             {ally.species && ally.species.trim() !== '' ? ally.species : t('characters.allyNoSpecies')}
@@ -573,7 +613,15 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
 
 export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharacters = [] }) => {
   const t = useTranslate()
-  const [allies, setAllies] = useState<Ally[]>(character.allies)
+  const sharedAdventureCountMap = useMemo(() => buildSharedAdventureCountMap(character), [character])
+  const alliesWithSharedCounts = useMemo(
+    () => character.allies.map((ally) => ({
+      ...ally,
+      shared_adventure_count: sharedAdventureCountMap.get(ally.id) ?? 0,
+    })),
+    [character.allies, sharedAdventureCountMap],
+  )
+  const [allies, setAllies] = useState<Ally[]>(alliesWithSharedCounts)
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [search, setSearch] = useState('')
   const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
@@ -584,8 +632,8 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
     [allies],
   )
   useEffect(() => {
-    setAllies(character.allies)
-  }, [character.allies])
+    setAllies(alliesWithSharedCounts)
+  }, [alliesWithSharedCounts])
 
   const showFirstError = (errors: Record<string, string>) => {
     const firstError = Object.values(errors)[0]
@@ -661,7 +709,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
 
     return guildCharacters
       .filter((entry) => entry.id !== character.id && !linkedSet.has(entry.id))
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      .sort((a, b) => getGuildCharacterOptionLabel(a).localeCompare(getGuildCharacterOptionLabel(b)))
   }, [allies, character.id, guildCharacters])
 
   const selectedQuickAddGuildMember = useMemo(
@@ -801,7 +849,7 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
                       <option value="">{t('characters.allySelectGuildMember')}</option>
                       {availableGuildMembers.map((guildMember) => (
                         <option key={`quick-add-${guildMember.id}`} value={guildMember.id}>
-                          {guildMember.name}
+                          {getGuildCharacterOptionLabel(guildMember)}
                         </option>
                       ))}
                     </select>

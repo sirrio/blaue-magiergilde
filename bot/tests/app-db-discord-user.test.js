@@ -7,18 +7,20 @@ const originalDbModule = require.cache[dbPath];
 const originalAppDbModule = require.cache[appDbPath];
 
 let step = 0;
+let insertParams = null;
 
 const fakeDb = {
-    async execute(sql) {
+    async execute(sql, params) {
         step += 1;
 
         if (step === 1) {
-            assert.equal(sql.includes('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1'), true);
+            assert.equal(sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1'), true);
             return [[]];
         }
 
         if (step === 2) {
             assert.equal(sql.startsWith('INSERT INTO users'), true);
+            insertParams = params;
             const error = new Error('Duplicate entry');
             error.code = 'ER_DUP_ENTRY';
             error.errno = 1062;
@@ -26,8 +28,8 @@ const fakeDb = {
         }
 
         if (step === 3) {
-            assert.equal(sql.includes('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1'), true);
-            return [[{ id: 42, deleted_at: null, locale: 'de' }]];
+            assert.equal(sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1'), true);
+            return [[{ id: 42, deleted_at: null, locale: 'de', simplified_tracking: null }]];
         }
 
         if (step === 4) {
@@ -64,6 +66,7 @@ Promise.resolve()
             created: false,
             userId: 42,
         });
+        assert.equal(insertParams[3], null);
 
         console.log('app-db-discord-user.test.js passed');
     })

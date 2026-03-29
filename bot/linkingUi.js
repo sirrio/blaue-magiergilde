@@ -55,7 +55,7 @@ function buildJoinConfirmButtons(discordUserId) {
         new ButtonBuilder()
             .setCustomId(`appJoinConfirm_${discordUserId}`)
             .setLabel(t('linking.confirmCreateAccount'))
-            .setStyle(ButtonStyle.Danger),
+            .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`appJoinCancel_${discordUserId}`)
             .setLabel(t('common.cancel'))

@@ -7,6 +7,7 @@ use App\Http\Requests\Game\StoreGameRequest;
 use App\Http\Requests\Game\UpdateGameRequest;
 use App\Models\Character;
 use App\Models\Game;
+use App\Support\CharacterTrackingHistory;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -17,16 +18,19 @@ class GameController extends Controller
      */
     public function index()
     {
+        $history = new CharacterTrackingHistory;
+
         $characters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->with(['adventures' => fn ($q) => $q
                 ->withTrashed()
-                ->select(['id', 'character_id', 'duration', 'has_additional_bubble'])])
+                ->select(['id', 'character_id', 'duration', 'has_additional_bubble', 'deleted_at', 'deleted_by_character'])])
             ->withTrashed()
             ->orderBy('position')
-            ->get(['id', 'is_filler', 'dm_bubbles', 'dm_coins'])
-            ->withoutAppends();
+            ->get(['id', 'is_filler', 'dm_bubbles', 'dm_coins', 'deleted_at'])
+            ->withoutAppends()
+            ->each(fn (Character $character) => $history->filterTrackedRelations($character));
         $games = Game::query()
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->orderby('start_date', 'desc')

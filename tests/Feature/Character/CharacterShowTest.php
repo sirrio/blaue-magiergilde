@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\AdminAuditLog;
+use App\Models\Adventure;
+use App\Models\Ally;
 use App\Models\Character;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,4 +50,57 @@ it('includes reviewed by name on character detail payload', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('character/show')
             ->where('character.reviewed_by_name', 'Approval Reviewer'));
+});
+
+it('hides private linked character avatars from other users on character detail page', function () {
+    $viewer = User::factory()->create();
+    $privateOwner = User::factory()->create();
+    $viewerCharacter = Character::factory()->for($viewer)->create();
+    $privateCharacter = Character::factory()->for($privateOwner)->create([
+        'private_mode' => true,
+        'avatar' => 'avatars/private.png',
+    ]);
+
+    Ally::factory()->create([
+        'character_id' => $viewerCharacter->id,
+        'name' => $privateCharacter->name,
+        'rating' => 3,
+        'linked_character_id' => $privateCharacter->id,
+    ]);
+
+    $this->actingAs($viewer)
+        ->get(route('characters.show', $viewerCharacter))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('character.allies.0.linked_character.avatar', '')
+            ->missing('character.allies.0.linked_character.private_mode')
+            ->missing('character.allies.0.linked_character.user_id'));
+});
+
+it('includes adventure participants on the character detail payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create();
+    $linkedCharacter = Character::factory()->create([
+        'name' => 'Temptation',
+    ]);
+    $ally = Ally::factory()->create([
+        'character_id' => $character->id,
+        'name' => $linkedCharacter->name,
+        'linked_character_id' => $linkedCharacter->id,
+    ]);
+    $adventure = Adventure::factory()->for($character)->create([
+        'title' => 'Into the Blue',
+    ]);
+
+    $adventure->allies()->attach($ally->id);
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('character.adventures.0.title', 'Into the Blue')
+            ->where('character.adventures.0.allies.0.id', $ally->id)
+            ->where('character.adventures.0.allies.0.name', $linkedCharacter->name));
 });

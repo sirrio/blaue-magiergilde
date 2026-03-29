@@ -9,6 +9,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\CharacterAvatarPrivacy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -19,9 +20,8 @@ use Inertia\Response;
 
 class CharacterController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    public function __construct(private readonly CharacterAvatarPrivacy $characterAvatarPrivacy) {}
+
     public function index(): Response
     {
         $user = Auth::user();
@@ -30,18 +30,24 @@ class CharacterController extends Controller
             ->where('user_id', $user?->getAuthIdentifier())
             ->withTrashed()
             ->withCount('room')
-            ->with('adventures')
+            ->with(['adventures', 'adventures.allies:id'])
             ->orderBy('position')
             ->get()
             ->withoutAppends();
         $this->attachReviewerNamesToCharacters($characters);
+        $characters->each(fn (Character $character) => $this->characterAvatarPrivacy->maskLinkedCharacterAvatars(
+            $character,
+            $user?->getAuthIdentifier(),
+        ));
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
+            ->with('user:id,name,discord_username,discord_display_name')
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
-            ->get(['id', 'name', 'avatar', 'guild_status'])
+            ->get(['id', 'name', 'avatar', 'guild_status', 'user_id', 'private_mode'])
             ->withoutAppends();
+        $this->characterAvatarPrivacy->maskSelectableCharacters($guildCharacters, $user?->getAuthIdentifier());
 
         return Inertia::render('character/index', [
             'user' => $user,
@@ -71,6 +77,7 @@ class CharacterController extends Controller
         $character->dm_coins = $request->dm_coins;
         $character->bubble_shop_spend = $request->bubble_shop_spend;
         $character->user_id = Auth::user()->getAuthIdentifier();
+        $character->simplified_tracking = (bool) (Auth::user()?->simplified_tracking ?? false);
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
         $character->guild_status = 'draft';
@@ -93,14 +100,17 @@ class CharacterController extends Controller
         $this->ensureCharacterOwner($character);
         $character->load('adventures.allies.linkedCharacter');
         $this->attachReviewerNamesToCharacters(collect([$character]));
+        $this->characterAvatarPrivacy->maskLinkedCharacterAvatars($character, Auth::id());
 
         $guildCharacters = Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
+            ->with('user:id,name,discord_username,discord_display_name')
             ->whereNull('deleted_at')
             ->whereIn('guild_status', $this->guildCharacterStatusesForAllies())
             ->orderBy('name')
-            ->get(['id', 'name', 'avatar', 'guild_status'])
+            ->get(['id', 'name', 'avatar', 'guild_status', 'user_id', 'private_mode'])
             ->withoutAppends();
+        $this->characterAvatarPrivacy->maskSelectableCharacters($guildCharacters, Auth::id());
 
         return Inertia::render('character/show', [
             'character' => $character,

@@ -23,6 +23,10 @@ const fakeConnection = {
         return undefined;
     },
     async execute(sql, params = []) {
+        if (sql.startsWith('SELECT simplified_tracking FROM users WHERE id = ? LIMIT 1')) {
+            return [[{ simplified_tracking: 0 }]];
+        }
+
         if (sql.includes('INSERT INTO characters')) {
             insertedAvatarParam = params[6];
             return [{ insertId: 777 }];
@@ -45,8 +49,8 @@ const fakeDb = {
         userQueryStep += 1;
 
         if (userQueryStep === 1) {
-            assert.equal(sql.includes('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1'), true);
-            return [[{ id: 42, deleted_at: null, locale: 'de' }]];
+            assert.equal(sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1'), true);
+            return [[{ id: 42, deleted_at: null, locale: 'de', simplified_tracking: null }]];
         }
 
         if (userQueryStep === 2) {

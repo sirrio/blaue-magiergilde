@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
 
@@ -17,7 +19,7 @@ class SocialAuthController extends Controller
     /**
      * Leitet den Benutzer zur Discord-Authentifizierung weiter.
      */
-    public function redirectToProvider(): RedirectResponse
+    public function redirectToProvider(Request $request): RedirectResponse
     {
         return Socialite::driver('discord')
             ->setScopes(['identify'])
@@ -28,7 +30,7 @@ class SocialAuthController extends Controller
     /**
      * Verarbeitet den Callback von Discord.
      */
-    public function handleProviderCallback(Request $request): RedirectResponse
+    public function handleProviderCallback(Request $request, CharacterApprovalNotificationService $notifications): RedirectResponse
     {
         $isLinkingDiscord = Auth::check();
 
@@ -81,6 +83,7 @@ class SocialAuthController extends Controller
             ->withTrashed()
             ->where('discord_id', $discordId)
             ->first();
+        $createdNewAccount = ! $user;
 
         if ($user) {
             if ($user->trashed()) {
@@ -108,6 +111,7 @@ class SocialAuthController extends Controller
                 'name' => $fallbackName !== '' ? $fallbackName : 'Discord User',
                 'avatar' => $discordUser->getAvatar(),
                 'password' => null,
+                'simplified_tracking' => null,
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
             ]);
@@ -132,6 +136,18 @@ class SocialAuthController extends Controller
             $user->discord_username = $discordProfile['username'];
             $user->discord_display_name = $discordProfile['display_name'];
             $user->save();
+        }
+
+        if ($createdNewAccount) {
+            $result = $notifications->notifyNewAccount($user, 'discord');
+            if (! ($result['ok'] ?? false)) {
+                Log::warning('New account approval notification failed.', [
+                    'user_id' => $user->id,
+                    'source' => 'discord',
+                    'status' => $result['status'] ?? null,
+                    'error' => $result['error'] ?? null,
+                ]);
+            }
         }
 
         Auth::login($user, true);

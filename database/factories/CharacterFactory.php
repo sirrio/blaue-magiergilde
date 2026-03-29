@@ -34,6 +34,7 @@ class CharacterFactory extends Factory
             'position' => $this->faker->numberBetween(0, 10),
             'simplified_tracking' => false,
             'avatar_masked' => true,
+            'private_mode' => false,
         ];
     }
 }

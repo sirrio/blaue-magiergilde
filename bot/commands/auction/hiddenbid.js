@@ -11,7 +11,8 @@ module.exports = {
     async execute(interaction) {
         try {
             await hiddenBid.showCommandPicker(interaction);
-        } catch {
+        } catch (error) {
+            console.error('[bot] Hidden bid command failed.', error);
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             }

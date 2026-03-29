@@ -77,9 +77,9 @@ class SetQuickLevel
                 $adventure->has_additional_bubble = false;
                 $adventure->is_pseudo = true;
                 $adventure->character_id = $character->id;
-                $adventure->title = 'Simplified tracking adjustment';
-                $adventure->game_master = 'Simplified tracking';
-                $adventure->notes = 'Auto-generated to align simplified tracking level.';
+                $adventure->title = 'Level tracking adjustment';
+                $adventure->game_master = 'Level tracking';
+                $adventure->notes = 'Auto-generated to align the level tracking value.';
                 $adventure->save();
             }
 

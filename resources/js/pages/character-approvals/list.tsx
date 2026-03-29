@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { Character, PageProps, User } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
-import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, Gauge, MapPin, MapPinOff, Pencil, Plus, Shield, StickyNote, UserX, XCircle } from 'lucide-react'
+import { AlertTriangle, Archive, CheckCircle2, Clock, Coins, Droplets, ExternalLink, Gauge, MapPin, Pencil, Plus, Shield, Sparkles, StickyNote, UserX, XCircle } from 'lucide-react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 interface FilterOption {
@@ -51,6 +51,7 @@ type AdminCharacter = Pick<
 > & {
   dndbeyond_character_id?: number | null
   has_legacy_approval?: boolean
+  is_first_submission?: boolean
   legacy_approval_match?: {
     id: number
     discord_name?: string | null
@@ -1116,7 +1117,7 @@ const tierTextClassMap: Record<string, string> = {
                     )}
                     {group.simplifiedTracking ? (
                       <span className="rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
-                        Simplified tracking
+                        Level tracking
                       </span>
                     ) : null}
                     {group.userId !== null ? (
@@ -1150,6 +1151,9 @@ const tierTextClassMap: Record<string, string> = {
                     const hasRoom = (character.room_count ?? 0) > 0
                     const legacyMatch = character.legacy_approval_match
                     const hasLegacyApproval = Boolean(character.has_legacy_approval && legacyMatch)
+                    const isFirstSubmission = Boolean(character.is_first_submission)
+                    const dmBubblesSpent = Number(character.dm_bubbles ?? 0)
+                    const dmCoinsSpent = Number(character.dm_coins ?? 0)
                     const legacyTitle = hasLegacyApproval
                       ? [
                         `Legacy approved as ${legacyMatch?.character_name}`,
@@ -1197,14 +1201,12 @@ const tierTextClassMap: Record<string, string> = {
                             </div>
                           </div>
                           <div className="flex w-full flex-wrap items-center gap-2 text-xs text-base-content/70 md:w-auto">
-                            <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
-                              {hasRoom ? (
+                            {hasRoom ? (
+                              <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
                                 <MapPin size={12} className="text-primary/70" />
-                              ) : (
-                                <MapPinOff size={12} className="text-base-content/40" />
-                              )}
-                              <span>{hasRoom ? 'Room' : 'No room'}</span>
-                            </span>
+                                <span>Room</span>
+                              </span>
+                            ) : null}
                             <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/80">
                               <LogoTier tier={character.start_tier} width={12} />
                               <span>Start</span>
@@ -1238,13 +1240,40 @@ const tierTextClassMap: Record<string, string> = {
                                 <span>Admin</span>
                               </span>
                             ) : null}
+                            {dmBubblesSpent > 0 ? (
+                              <span
+                                className="flex items-center gap-1 rounded-full border border-secondary/30 bg-secondary/10 px-2 py-0.5 text-secondary"
+                                title={`Spent DM bubbles: ${dmBubblesSpent}`}
+                              >
+                                <span>{dmBubblesSpent}</span>
+                                <Droplets size={12} />
+                              </span>
+                            ) : null}
+                            {dmCoinsSpent > 0 ? (
+                              <span
+                                className="flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-accent"
+                                title={`Spent DM coins: ${dmCoinsSpent}`}
+                              >
+                                <span>{dmCoinsSpent}</span>
+                                <Coins size={12} />
+                              </span>
+                            ) : null}
                             {hasLegacyApproval ? (
                               <span
                                 className="flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-success"
                                 title={legacyTitle ?? undefined}
                               >
                                 <CheckCircle2 size={12} />
-                                <span>Legacy approved</span>
+                                <span>Legacy</span>
+                              </span>
+                            ) : null}
+                            {isFirstSubmission ? (
+                              <span
+                                className="flex items-center gap-1 rounded-full border border-info/30 bg-info/10 px-2 py-0.5 text-info"
+                                title="First submitted character for this user in the new system."
+                              >
+                                <Sparkles size={12} />
+                                <span>First submission</span>
                               </span>
                             ) : null}
                             <AdminNoteModal character={character}>

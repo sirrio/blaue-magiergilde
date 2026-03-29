@@ -22,10 +22,30 @@ test('profile information can be updated', function () {
         ->patch('/settings/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'simplified_tracking' => true,
         ]);
 
     $response->assertRedirect(route('profile.edit', absolute: false));
     expect($user->refresh()->email)->toBe('test@example.com');
+    expect($user->refresh()->simplified_tracking)->toBeTrue();
+});
+
+test('profile tracking default can be changed without affecting email handling', function () {
+    $user = User::factory()->create([
+        'email' => 'test@example.com',
+        'simplified_tracking' => false,
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->patch('/settings/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'simplified_tracking' => true,
+        ]);
+
+    $response->assertRedirect(route('profile.edit', absolute: false));
+    expect($user->fresh()->simplified_tracking)->toBeTrue();
 });
 
 test('profile locale can be updated through dedicated locale route', function () {

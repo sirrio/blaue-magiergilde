@@ -37,7 +37,7 @@ export interface User {
   created_at: string
   updated_at: string
   is_admin: boolean
-  simplified_tracking?: boolean
+  simplified_tracking?: boolean | null
   avatar_masked?: boolean
   has_password?: boolean
   needs_password_fallback?: boolean
@@ -349,6 +349,7 @@ export interface Character {
   registration_note?: string | null
   review_note?: string | null
   reviewed_by_name?: string | null
+  is_first_submission?: boolean
   room_count?: number
   admin_notes?: string | null
   admin_managed?: boolean
@@ -379,6 +380,7 @@ export interface Character {
   faction_rank?: number
   simplified_tracking?: boolean
   avatar_masked?: boolean
+  private_mode?: boolean
   external_link: string
   avatar: string
   user_id: number
@@ -389,9 +391,12 @@ export interface Character {
     discord_username?: string | null
     discord_display_name?: string | null
     avatar?: string | null
-    simplified_tracking?: boolean
+    simplified_tracking?: boolean | null
     avatar_masked?: boolean
+    private_mode?: boolean
   }
+  can_force_delete?: boolean
+  force_delete_block_reason?: string | null
   character?: Character
 }
 
@@ -457,6 +462,7 @@ export interface Ally {
   notes: string
   classes: string
   species: string
+  shared_adventure_count?: number
 }
 
 export interface Adventure {

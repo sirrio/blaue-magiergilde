@@ -23,12 +23,42 @@ const { setManageMessageTarget } = require('../utils/manageMessageTarget');
 
 const SELECT_ID_PREFIX = 'hiddenBidSelect_';
 const REFRESH_ID_PREFIX = 'hiddenBidRefresh_';
+const PAGE_NAV_ID_PREFIX = 'hiddenBidPageNav_';
+const PAGE_STATUS_ID_PREFIX = 'hiddenBidPageStatus_';
 const SET_ID_PREFIX = 'hiddenBidSet_';
 const REMOVE_ASK_ID_PREFIX = 'hiddenBidRemoveAsk_';
 const REMOVE_CONFIRM_ID_PREFIX = 'hiddenBidRemoveConfirm_';
 const REMOVE_CANCEL_ID_PREFIX = 'hiddenBidRemoveCancel_';
 const MODAL_ID_PREFIX = 'hiddenBidModal_';
 const MAX_OPTIONS = 25;
+const RARITY_ORDER = new Map([
+    ['common', 0],
+    ['uncommon', 1],
+    ['rare', 2],
+    ['very_rare', 3],
+    ['legendary', 4],
+    ['artifact', 5],
+    ['unknown_rarity', 6],
+]);
+const TYPE_ORDER = new Map([
+    ['weapon', 0],
+    ['armor', 1],
+    ['item', 2],
+    ['consumable', 3],
+    ['spellscroll', 4],
+]);
+
+function buildRefreshCustomId(ownerId, selectedItemId, page) {
+    return `${REFRESH_ID_PREFIX}${ownerId}_${selectedItemId}_${page}`;
+}
+
+function buildPageNavCustomId(ownerId, selectedItemId, page) {
+    return `${PAGE_NAV_ID_PREFIX}${ownerId}_${selectedItemId}_${page}`;
+}
+
+function buildPageStatusCustomId(ownerId, page) {
+    return `${PAGE_STATUS_ID_PREFIX}${ownerId}_${page}`;
+}
 
 function truncateText(value, maxLength) {
     const text = String(value || '').trim();
@@ -45,6 +75,34 @@ function formatRarityLabel(rarity) {
     if (clean === 'rare') return 'Rare';
     if (clean === 'uncommon') return 'Uncommon';
     return 'Common';
+}
+
+function sortItemsLikeAuctionPage(items) {
+    return [...items].sort((left, right) => {
+        const auctionDateDelta = new Date(right.auction_created_at || 0).getTime() - new Date(left.auction_created_at || 0).getTime();
+        if (auctionDateDelta !== 0) {
+            return auctionDateDelta;
+        }
+
+        const rarityDelta = (RARITY_ORDER.get(String(left.item_rarity || '').trim().toLowerCase()) ?? 999)
+            - (RARITY_ORDER.get(String(right.item_rarity || '').trim().toLowerCase()) ?? 999);
+        if (rarityDelta !== 0) {
+            return rarityDelta;
+        }
+
+        const typeDelta = (TYPE_ORDER.get(String(left.item_type || '').trim().toLowerCase()) ?? 999)
+            - (TYPE_ORDER.get(String(right.item_type || '').trim().toLowerCase()) ?? 999);
+        if (typeDelta !== 0) {
+            return typeDelta;
+        }
+
+        const nameDelta = String(left.item_name || '').localeCompare(String(right.item_name || ''), 'de', { sensitivity: 'base' });
+        if (nameDelta !== 0) {
+            return nameDelta;
+        }
+
+        return Number(left.auction_item_id || 0) - Number(right.auction_item_id || 0);
+    });
 }
 
 function summarizeAuctionItem(item) {
@@ -75,19 +133,32 @@ async function resolveInteractionLocale(interaction) {
     return await getUserLocaleByDiscordId(interaction?.user?.id);
 }
 
-function parseOwnerIdFromCustomId(customId, prefix) {
-    if (!customId || !customId.startsWith(prefix)) return null;
-    const ownerId = customId.slice(prefix.length).trim();
-    if (!/^[0-9]{5,}$/.test(ownerId)) return null;
-    return ownerId;
+function parseSelectCustomId(customId) {
+    const match = String(customId || '').match(/^hiddenBidSelect_([0-9]{5,})(?:_(\d+))?$/);
+    if (!match) return null;
+    return {
+        ownerId: match[1],
+        page: match[2] ? Number(match[2]) : null,
+    };
 }
 
 function parseRefreshCustomId(customId) {
-    const match = String(customId || '').match(/^hiddenBidRefresh_([0-9]{5,})(?:_(\d+))?$/);
+    const match = String(customId || '').match(/^hiddenBidRefresh_([0-9]{5,})(?:_(\d+))?(?:_(\d+))?$/);
     if (!match) return null;
     return {
         ownerId: match[1],
         selectedItemId: match[2] ? Number(match[2]) : null,
+        page: match[3] ? Number(match[3]) : null,
+    };
+}
+
+function parsePageNavCustomId(customId) {
+    const match = String(customId || '').match(/^hiddenBidPageNav_([0-9]{5,})_(\d+)_(\d+)$/);
+    if (!match) return null;
+    return {
+        ownerId: match[1],
+        selectedItemId: Number(match[2]),
+        page: Number(match[3]),
     };
 }
 
@@ -171,7 +242,43 @@ function buildHiddenBidLine(item, duplicateLabelSet, locale = null) {
     }, locale);
 }
 
-function buildDashboardEmbeds({ items, ownConfiguredCount, locale = null }) {
+function getPickerPageMeta(items, requestedPage = null, selectedItemId = null) {
+    const totalItems = items.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / MAX_OPTIONS));
+    let currentPage = Number(requestedPage);
+
+    if (!Number.isFinite(currentPage) || currentPage < 1) {
+        const selectedId = Number(selectedItemId);
+        if (Number.isFinite(selectedId) && selectedId > 0) {
+            const selectedIndex = items.findIndex(item => Number(item.auction_item_id) === selectedId);
+            if (selectedIndex >= 0) {
+                currentPage = Math.floor(selectedIndex / MAX_OPTIONS) + 1;
+            }
+        }
+    }
+
+    if (!Number.isFinite(currentPage) || currentPage < 1) {
+        currentPage = 1;
+    }
+
+    currentPage = Math.min(totalPages, currentPage);
+
+    const startIndex = (currentPage - 1) * MAX_OPTIONS;
+    const endIndex = Math.min(startIndex + MAX_OPTIONS, totalItems);
+
+    return {
+        currentPage,
+        totalPages,
+        startIndex,
+        endIndex,
+        visibleItems: items.slice(startIndex, endIndex),
+        from: totalItems === 0 ? 0 : startIndex + 1,
+        to: endIndex,
+        totalItems,
+    };
+}
+
+function buildDashboardEmbeds({ items, ownConfiguredCount, locale = null, pageMeta = null }) {
     const configuredItems = items
         .filter(item => item.user_hidden_max != null)
         .sort((a, b) => {
@@ -206,8 +313,14 @@ function buildDashboardEmbeds({ items, ownConfiguredCount, locale = null }) {
         t('hiddenBid.openItems', { count: items.length }, locale),
         t('hiddenBid.ownBids', { count: ownConfiguredCount }, locale),
     ];
-    if (items.length > MAX_OPTIONS) {
-        summaryLines.push(t('hiddenBid.showingFirst', { count: MAX_OPTIONS }, locale));
+    if (pageMeta && pageMeta.totalItems > 0) {
+        summaryLines.push(t('hiddenBid.showingRange', {
+            from: pageMeta.from,
+            to: pageMeta.to,
+            total: pageMeta.totalItems,
+            page: pageMeta.currentPage,
+            totalPages: pageMeta.totalPages,
+        }, locale));
     }
 
     const summarySection = summaryLines.join('\n');
@@ -267,11 +380,13 @@ async function buildPickerPayload({
     noticeEmbed = null,
     selectedItemId = null,
     removeConfirmItemId = null,
+    page = null,
     locale = null,
 }) {
-    const items = await listOpenAuctionItemsForHiddenBids({ id: ownerId }, 250);
+    const items = sortItemsLikeAuctionPage(await listOpenAuctionItemsForHiddenBids({ id: ownerId }, 250));
     const ownConfiguredCount = items.filter(item => item.user_hidden_max != null).length;
-    const visibleItems = items.slice(0, MAX_OPTIONS);
+    const pageMeta = getPickerPageMeta(items, page, selectedItemId);
+    const visibleItems = pageMeta.visibleItems;
 
     const itemById = new Map(items.map(item => [Number(item.auction_item_id), item]));
     const selectedId = Number(selectedItemId);
@@ -289,7 +404,7 @@ async function buildPickerPayload({
         embeds.push(buildErrorEmbed(t('hiddenBid.itemUnavailableTitle', {}, locale), t('hiddenBid.itemUnavailableBody', {}, locale)));
     }
 
-    embeds.push(...buildDashboardEmbeds({ items, ownConfiguredCount, locale }));
+    embeds.push(...buildDashboardEmbeds({ items, ownConfiguredCount, locale, pageMeta }));
 
     if (selectedItem) {
         embeds.push(buildSelectedItemEmbed(selectedItem, locale));
@@ -319,7 +434,7 @@ async function buildPickerPayload({
         });
 
         const select = new StringSelectMenuBuilder()
-            .setCustomId(`${SELECT_ID_PREFIX}${ownerId}`)
+            .setCustomId(`${SELECT_ID_PREFIX}${ownerId}_${pageMeta.currentPage}`)
             .setPlaceholder(t('hiddenBid.selectPlaceholder', {}, locale))
             .addOptions(options);
 
@@ -363,13 +478,38 @@ async function buildPickerPayload({
 
     const refreshSelectedId = selectedItem ? selectedItem.auction_item_id : 0;
     components.push(
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`${REFRESH_ID_PREFIX}${ownerId}_${refreshSelectedId}`)
-                .setLabel(t('hiddenBid.refresh', {}, locale))
-                .setStyle(ButtonStyle.Secondary),
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(buildRefreshCustomId(ownerId, refreshSelectedId, pageMeta.currentPage))
+                    .setLabel(t('hiddenBid.refresh', {}, locale))
+                    .setStyle(ButtonStyle.Secondary),
         ),
     );
+
+    if (pageMeta.totalPages > 1) {
+        components.push(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(buildPageNavCustomId(ownerId, refreshSelectedId, Math.max(1, pageMeta.currentPage - 1)))
+                    .setLabel(t('hiddenBid.previousPage', {}, locale))
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(pageMeta.currentPage <= 1),
+                new ButtonBuilder()
+                    .setCustomId(buildPageStatusCustomId(ownerId, pageMeta.currentPage))
+                    .setLabel(t('hiddenBid.pageIndicator', {
+                        page: pageMeta.currentPage,
+                        totalPages: pageMeta.totalPages,
+                    }, locale))
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(true),
+                new ButtonBuilder()
+                    .setCustomId(buildPageNavCustomId(ownerId, refreshSelectedId, Math.min(pageMeta.totalPages, pageMeta.currentPage + 1)))
+                    .setLabel(t('hiddenBid.nextPage', {}, locale))
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(pageMeta.currentPage >= pageMeta.totalPages),
+            ),
+        );
+    }
 
     return {
         content: '',
@@ -392,11 +532,11 @@ async function showCommandPicker(interaction) {
 }
 
 async function handleSelect(interaction) {
-    const ownerId = parseOwnerIdFromCustomId(interaction.customId, SELECT_ID_PREFIX);
-    if (!ownerId) return false;
+    const parsed = parseSelectCustomId(interaction.customId);
+    if (!parsed) return false;
     const locale = await resolveInteractionLocale(interaction);
 
-    if (!ensureOwner(interaction, ownerId)) {
+    if (!ensureOwner(interaction, parsed.ownerId)) {
         await replyOwnerMismatch(interaction, locale);
         return true;
     }
@@ -405,7 +545,8 @@ async function handleSelect(interaction) {
     const auctionItemId = Number(selectedValue);
     if (!Number.isFinite(auctionItemId) || auctionItemId <= 0) {
         const payload = await buildPickerPayload({
-            ownerId,
+            ownerId: parsed.ownerId,
+            page: parsed.page,
             locale,
             noticeEmbed: buildErrorEmbed(t('hiddenBid.invalidItemTitle', {}, locale), t('hiddenBid.invalidItemBody', {}, locale)),
         });
@@ -416,7 +557,8 @@ async function handleSelect(interaction) {
     const item = await findOpenAuctionItemForHiddenBid(buildIdentityFromInteraction(interaction), auctionItemId);
     if (!item || item.auction_status !== 'open' || item.sold_at) {
         const payload = await buildPickerPayload({
-            ownerId,
+            ownerId: parsed.ownerId,
+            page: parsed.page,
             locale,
             noticeEmbed: buildErrorEmbed(t('hiddenBid.itemUnavailableTitle', {}, locale), t('hiddenBid.itemUnavailableBody', {}, locale)),
         });
@@ -425,8 +567,9 @@ async function handleSelect(interaction) {
     }
 
     const payload = await buildPickerPayload({
-        ownerId,
+        ownerId: parsed.ownerId,
         selectedItemId: item.auction_item_id,
+        page: parsed.page,
         locale,
     });
     await interaction.update(payload);
@@ -446,6 +589,27 @@ async function handleRefresh(interaction) {
     const payload = await buildPickerPayload({
         ownerId: parsed.ownerId,
         selectedItemId: parsed.selectedItemId && parsed.selectedItemId > 0 ? parsed.selectedItemId : null,
+        page: parsed.page,
+        locale,
+    });
+    await interaction.update(payload);
+    return true;
+}
+
+async function handlePageNav(interaction) {
+    const parsed = parsePageNavCustomId(interaction.customId);
+    if (!parsed) return false;
+    const locale = await resolveInteractionLocale(interaction);
+
+    if (!ensureOwner(interaction, parsed.ownerId)) {
+        await replyOwnerMismatch(interaction, locale);
+        return true;
+    }
+
+    const payload = await buildPickerPayload({
+        ownerId: parsed.ownerId,
+        selectedItemId: parsed.selectedItemId > 0 ? parsed.selectedItemId : null,
+        page: parsed.page,
         locale,
     });
     await interaction.update(payload);
@@ -652,6 +816,7 @@ async function handle(interaction) {
 
     if (interaction.isButton()) {
         if (await handleRefresh(interaction)) return true;
+        if (await handlePageNav(interaction)) return true;
         if (await handleSetAction(interaction)) return true;
         if (await handleRemoveAsk(interaction)) return true;
         if (await handleRemoveConfirm(interaction)) return true;
@@ -677,4 +842,9 @@ module.exports = {
     showCommandPicker,
     buildDashboardEmbeds,
     buildSelectedItemEmbed,
+    getPickerPageMeta,
+    buildRefreshCustomId,
+    buildPageNavCustomId,
+    buildPageStatusCustomId,
+    sortItemsLikeAuctionPage,
 };

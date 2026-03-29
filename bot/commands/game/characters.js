@@ -15,6 +15,7 @@ const { t } = require('../../i18n');
 const {
     DiscordNotLinkedError,
     getLinkedUserLocaleForDiscord,
+    getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
 } = require('../../appDb');
 const { replyNotLinked } = require('../../linkingUi');
@@ -267,7 +268,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
         ? `${factionName}\nLevel: **?**`
         : `${factionName}\nLevel: **${factionLevel}**`;
     const downtimeValue = downtimeDisabledInSimpleMode
-        ? 'Cannot calculate downtime while simple mode entries exist.'
+        ? 'Cannot calculate downtime while level tracking entries exist.'
         : `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`;
 
     const titleParts = [
@@ -314,14 +315,6 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
 }
 
 function buildCharacterListView({ ownerDiscordId, characters, locale }) {
-    const simplifiedCount = characters.filter(character => Boolean(character.simplified_tracking)).length;
-    const unmaskedCount = characters.filter(character => {
-        const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
-            ? true
-            : Boolean(character.avatar_masked);
-        return !avatarMasked;
-    }).length;
-
     const summary = new EmbedBuilder()
         .setTitle(t('characters.dashboardTitle', {}, locale))
         .setColor(0x4f46e5)
@@ -330,15 +323,6 @@ function buildCharacterListView({ ownerDiscordId, characters, locale }) {
                 ? t('characters.dashboardDescription', { count: characters.length }, locale)
                 : t('characters.dashboardDescriptionEmpty', {}, locale),
         );
-    summary.addFields({
-        name: t('characters.perCharacterSettingsTitle', {}, locale),
-        value: [
-            t('characters.perCharacterSimplifiedTracking', { count: simplifiedCount, total: characters.length || 0 }, locale),
-            t('characters.perCharacterUnmaskedToken', { count: unmaskedCount, total: characters.length || 0 }, locale),
-            t('characters.perCharacterManageHint', {}, locale),
-        ].join('\n'),
-        inline: false,
-    });
 
     const components = [];
     const selection = characters.slice(0, 25);
@@ -383,7 +367,12 @@ function buildCharacterListView({ ownerDiscordId, characters, locale }) {
     return { embeds: [summary], components };
 }
 
-function buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale }) {
+function buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale, trackingDefault = null }) {
+    const trackingLabel = trackingDefault === null
+        ? '-'
+        : trackingDefault
+            ? t('characters.trackingSimplifiedBased', {}, locale)
+            : t('characters.trackingAdventureBased', {}, locale);
     const settings = new EmbedBuilder()
         .setTitle(t('characters.settingsTitle', {}, locale))
         .setColor(0x4f46e5)
@@ -402,18 +391,31 @@ function buildCharactersSettingsView({ ownerDiscordId, characters, locale, selec
                 t('characters.settingsLanguageHint', {}, locale),
             ].join('\n'),
             inline: false,
+        }, {
+            name: t('characters.settingsTrackingTitle', {}, locale),
+            value: [
+                t('characters.settingsTrackingCurrent', { mode: trackingLabel }, locale),
+                t('characters.settingsTrackingHint', {}, locale),
+            ].join('\n'),
+            inline: false,
         });
 
     const components = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
+                .setCustomId(`charactersAction_tracking-default-settings_${ownerDiscordId}`)
+                .setLabel(t('characters.tracking', {}, locale))
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
                 .setCustomId(`charactersAction_language_${ownerDiscordId}`)
                 .setLabel(t('characters.language', {}, locale))
-                .setStyle(ButtonStyle.Primary),
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`charactersAction_delete-account_${ownerDiscordId}`)
                 .setLabel(t('characters.deleteAccount', {}, locale))
                 .setStyle(ButtonStyle.Danger),
+        ),
+        new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`charactersAction_back_${ownerDiscordId}`)
                 .setLabel(t('common.back', {}, locale))
@@ -451,6 +453,47 @@ function buildCharacterLanguageView({ ownerDiscordId, locale, selectedLocale }) 
                 .setStyle(ButtonStyle.Secondary),
         ),
     ];
+
+    return { embeds: [embed], components };
+}
+
+function buildTrackingDefaultSelectionView({ ownerDiscordId, locale, source = 'setup' }) {
+    const embed = new EmbedBuilder()
+        .setTitle(t('characters.trackingDefaultRequiredTitle', {}, locale))
+        .setColor(0xf59e0b)
+        .setDescription([
+            t('characters.trackingDefaultRequiredBody', {}, locale),
+            '',
+            `• **${t('characters.trackingAdventureBased', {}, locale)}** - ${t('characters.trackingDefaultAdventureDescription', {}, locale)}`,
+            `• **${t('characters.trackingSimplifiedBased', {}, locale)}** - ${t('characters.trackingDefaultLevelDescription', {}, locale)}`,
+            '',
+            t('characters.trackingDefaultRequiredHint', {}, locale),
+            t('characters.trackingDefaultRequiredTip', {}, locale),
+        ].join('\n'));
+
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_tracking-default-adventure_${source}_${ownerDiscordId}`)
+                .setLabel(t('characters.trackingAdventureBased', {}, locale))
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`charactersAction_tracking-default-level_${source}_${ownerDiscordId}`)
+                .setLabel(t('characters.trackingSimplifiedBased', {}, locale))
+                .setStyle(ButtonStyle.Secondary),
+        ),
+    ];
+
+    if (source === 'settings') {
+        components.push(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`charactersAction_settings_${ownerDiscordId}`)
+                    .setLabel(t('common.back', {}, locale))
+                    .setStyle(ButtonStyle.Secondary),
+            ),
+        );
+    }
 
     return { embeds: [embed], components };
 }
@@ -507,15 +550,30 @@ module.exports = {
 
         let characters;
         let locale = null;
+        let trackingDefault = null;
         try {
             characters = await listCharactersForDiscord(interaction.user);
             locale = interaction.user ? await getLinkedUserLocaleForDiscord(interaction.user) : null;
+            trackingDefault = interaction.user ? await getLinkedUserTrackingDefaultForDiscord(interaction.user) : null;
         } catch (error) {
             if (error instanceof DiscordNotLinkedError) {
                 await replyNotLinked(interaction);
                 return;
             }
             throw error;
+        }
+
+        if (trackingDefault === null) {
+            const trackingView = buildTrackingDefaultSelectionView({
+                ownerDiscordId: interaction.user.id,
+                locale,
+                source: 'setup',
+            });
+
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(trackingView);
+            }
+            return;
         }
 
         const listView = buildCharacterListView({
@@ -534,5 +592,6 @@ module.exports = {
     buildCharacterListView,
     buildCharactersSettingsView,
     buildCharacterLanguageView,
+    buildTrackingDefaultSelectionView,
     buildDeleteAccountConfirmView,
 };

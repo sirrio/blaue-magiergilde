@@ -17,6 +17,7 @@ export default function Profile() {
   const profileForm = useForm({
     name: auth.user.name,
     email: auth.user.email ?? '',
+    simplified_tracking: Boolean(auth.user.simplified_tracking),
   })
 
   const passwordForm = useForm({
@@ -145,6 +146,34 @@ export default function Profile() {
                 <Input type="email" autoComplete="email" value={profileForm.data.email} onChange={(e) => profileForm.setData('email', e.target.value)} errors={profileForm.errors.email}>
                   {t('common.email')}
                 </Input>
+                <div className="space-y-2 rounded-lg border border-base-200 bg-base-200/30 p-3">
+                  <div>
+                    <p className="text-sm font-semibold">{t('profile.trackingModeTitle')}</p>
+                    <p className="mt-1 text-xs text-base-content/70">{t('profile.trackingModeHelp')}</p>
+                  </div>
+                  <div className="join">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={profileForm.data.simplified_tracking ? 'ghost' : 'soft'}
+                      color={profileForm.data.simplified_tracking ? undefined : 'primary'}
+                      className="join-item"
+                      onClick={() => profileForm.setData('simplified_tracking', false)}
+                    >
+                      {t('profile.adventureTracking')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={profileForm.data.simplified_tracking ? 'soft' : 'ghost'}
+                      color={profileForm.data.simplified_tracking ? 'primary' : undefined}
+                      className="join-item"
+                      onClick={() => profileForm.setData('simplified_tracking', true)}
+                    >
+                      {t('profile.levelTracking')}
+                    </Button>
+                  </div>
+                </div>
                 {discordConnected ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-base-200 bg-base-200/40 px-3 py-2 text-xs text-base-content/70">
                     <span>{t('profile.removeEmailAllowed')}</span>
