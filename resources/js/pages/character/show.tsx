@@ -526,7 +526,7 @@ export default function Show({
                               </div>
                               {adv.is_pseudo ? (
                                     <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                      Simplified tracking
+                                      {t('characters.levelTracking')}
                                     </span>
                                   ) : null}
                               <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
@@ -628,7 +628,7 @@ export default function Show({
                                     </div>
                                     {adv.is_pseudo ? (
                                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                        Simplified tracking
+                                        {t('characters.levelTracking')}
                                       </span>
                                     ) : null}
                                   </div>

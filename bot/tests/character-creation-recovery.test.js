@@ -153,7 +153,7 @@ async function testExpiredCreationStartsFreshFlow() {
 
     assert.equal(handled, true);
     assert.ok(updatePayload);
-    assert.equal(updatePayload.embeds[0].data.description, t('characters.createExpired'));
+    assert.equal(updatePayload.embeds[0].data.description, t('characters.createExpired', {}, 'en'));
     assert.equal(state.step, 'basic');
     assert.deepEqual(state.data.classIds, []);
 }

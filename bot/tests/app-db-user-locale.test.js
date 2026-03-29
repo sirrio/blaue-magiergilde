@@ -12,8 +12,8 @@ const fakeDb = {
     async execute(sql, bindings = []) {
         executedStatements.push({ sql, bindings });
 
-        if (sql.includes('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1')) {
-            return [[{ id: 7, deleted_at: null, locale: 'en' }]];
+        if (sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1')) {
+            return [[{ id: 7, deleted_at: null, locale: 'en', simplified_tracking: null }]];
         }
 
         if (sql.startsWith('UPDATE users SET name = ?, avatar = ?, updated_at = ? WHERE id = ?')) {

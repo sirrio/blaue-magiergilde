@@ -35,6 +35,35 @@ it('allows owners to create draft characters', function () {
     ]);
 });
 
+it('applies the account tracking default to newly created characters', function () {
+    $user = User::factory()->create([
+        'simplified_tracking' => true,
+    ]);
+    $class = CharacterClass::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('characters.store'), [
+            'name' => 'Level Default Mage',
+            'class' => [$class->id],
+            'external_link' => 'https://www.dndbeyond.com/characters/100099',
+            'start_tier' => 'bt',
+            'version' => '2024',
+            'dm_bubbles' => 0,
+            'dm_coins' => 0,
+            'bubble_shop_spend' => 0,
+            'is_filler' => false,
+            'faction' => 'none',
+            'notes' => null,
+        ])
+        ->assertRedirect(route('characters.index'));
+
+    $this->assertDatabaseHas('characters', [
+        'user_id' => $user->id,
+        'name' => 'Level Default Mage',
+        'simplified_tracking' => true,
+    ]);
+});
+
 it('rejects epic tier as start tier', function () {
     $user = User::factory()->create();
     $class = CharacterClass::factory()->create();

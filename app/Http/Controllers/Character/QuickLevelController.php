@@ -19,7 +19,7 @@ class QuickLevelController extends Controller
 
         if (! ($character->simplified_tracking ?? false)) {
             return redirect()->back()->withErrors([
-                'level' => 'Simplified tracking must be enabled to set a level.',
+                'level' => 'Level tracking must be enabled to set a level.',
             ]);
         }
 

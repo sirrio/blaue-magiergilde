@@ -10,6 +10,7 @@ type ModalProps = {
   onClose?: () => void;
   wide?: boolean;
   overflowVisible?: boolean;
+  showCloseButton?: boolean;
 };
 type ModalTriggerProps = { children: ReactNode };
 type ModalContentProps = { children: ReactNode };
@@ -21,7 +22,14 @@ type ModalActionProps = {
   disabled?: boolean;
 };
 
-export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false, overflowVisible = false }: ModalProps) => {
+export const Modal = ({
+  children,
+  isOpen: controlledOpen,
+  onClose,
+  wide = false,
+  overflowVisible = false,
+  showCloseButton = true,
+}: ModalProps) => {
   const triggerElement = findChildByType(children, ModalTrigger);
   const titleElement = findChildByType(children, ModalTitle);
   const contentElement = findChildByType(children, ModalContent);
@@ -95,15 +103,17 @@ export const Modal = ({ children, isOpen: controlledOpen, onClose, wide = false,
                 <h3 id="modal-title" className="text-sm font-semibold">
                   {titleElement}
                 </h3>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-circle btn-ghost"
-                  onClick={closeModal}
-                  aria-label="Close modal"
-                  title="Close"
-                >
-                  <XIcon size={18} />
-                </button>
+                {showCloseButton ? (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-circle btn-ghost"
+                    onClick={closeModal}
+                    aria-label="Close modal"
+                    title="Close"
+                  >
+                    <XIcon size={18} />
+                  </button>
+                ) : null}
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">{contentElement}</div>
               {actionElement ? (

@@ -29,7 +29,7 @@ assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Aktuell
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'DnDBeyond-Link'), true);
 assert.equal(payload.components[0].components[0].data.label, 'Name/Link/Notizen');
 assert.equal(payload.components[1].components[0].data.label, 'DM Bubbles');
-assert.equal(payload.components[2].components[0].data.label, 'Tracking: Adventure');
+assert.equal(payload.components[2].components[0].data.label, 'Tracking: Adventure tracking');
 assert.equal(payload.components[2].components[2].data.label, 'Privatmodus: An');
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Privatmodus' && field.value === 'An'), true);
 assert.equal(payload.components[3].components[0].data.label, 'Zurück');

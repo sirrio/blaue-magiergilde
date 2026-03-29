@@ -39,6 +39,7 @@ test('new users can register', function () {
 
     $this->assertDatabaseHas('users', [
         'email' => 'test@example.com',
+        'simplified_tracking' => null,
         'privacy_policy_accepted_version' => (int) config('legal.privacy_policy.version'),
     ]);
 
@@ -58,6 +59,6 @@ test('new users must accept the privacy policy to register', function () {
         'password_confirmation' => 'password',
     ]);
 
-    $response->assertSessionHasErrors('privacy_policy_accepted');
+    $response->assertSessionHasErrors(['privacy_policy_accepted']);
     $this->assertGuest();
 });

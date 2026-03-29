@@ -19,7 +19,7 @@ class SocialAuthController extends Controller
     /**
      * Leitet den Benutzer zur Discord-Authentifizierung weiter.
      */
-    public function redirectToProvider(): RedirectResponse
+    public function redirectToProvider(Request $request): RedirectResponse
     {
         return Socialite::driver('discord')
             ->setScopes(['identify'])
@@ -111,6 +111,7 @@ class SocialAuthController extends Controller
                 'name' => $fallbackName !== '' ? $fallbackName : 'Discord User',
                 'avatar' => $discordUser->getAvatar(),
                 'password' => null,
+                'simplified_tracking' => null,
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
             ]);

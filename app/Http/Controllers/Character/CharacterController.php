@@ -77,6 +77,7 @@ class CharacterController extends Controller
         $character->dm_coins = $request->dm_coins;
         $character->bubble_shop_spend = $request->bubble_shop_spend;
         $character->user_id = Auth::user()->getAuthIdentifier();
+        $character->simplified_tracking = (bool) (Auth::user()?->simplified_tracking ?? false);
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
         $character->guild_status = 'draft';

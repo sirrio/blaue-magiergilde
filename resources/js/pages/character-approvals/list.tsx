@@ -1117,7 +1117,7 @@ const tierTextClassMap: Record<string, string> = {
                     )}
                     {group.simplifiedTracking ? (
                       <span className="rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-[11px] font-semibold text-base-content/70">
-                        Simplified tracking
+                        Level tracking
                       </span>
                     ) : null}
                     {group.userId !== null ? (

@@ -30,6 +30,7 @@ class RegisteredUserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
+            'simplified_tracking' => null,
             'privacy_policy_accepted_at' => now(),
             'privacy_policy_accepted_version' => (int) Config::get('legal.privacy_policy.version', 0),
         ]);

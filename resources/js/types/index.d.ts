@@ -37,7 +37,7 @@ export interface User {
   created_at: string
   updated_at: string
   is_admin: boolean
-  simplified_tracking?: boolean
+  simplified_tracking?: boolean | null
   avatar_masked?: boolean
   has_password?: boolean
   needs_password_fallback?: boolean
@@ -391,7 +391,7 @@ export interface Character {
     discord_username?: string | null
     discord_display_name?: string | null
     avatar?: string | null
-    simplified_tracking?: boolean
+    simplified_tracking?: boolean | null
     avatar_masked?: boolean
     private_mode?: boolean
   }

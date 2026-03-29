@@ -19,9 +19,11 @@ const {
     DiscordNotLinkedError,
     createCharacterForDiscord,
     getLinkedUserLocaleForDiscord,
+    getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
     updateCharacterManualLevelForDiscord,
     updateLinkedUserLocaleForDiscord,
+    updateLinkedUserTrackingDefaultForDiscord,
     findCharacterForDiscord,
     updateCharacterForDiscord,
     listCharacterClassesForDiscord,
@@ -43,7 +45,7 @@ const {
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
 
-const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
+const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateLevel } = require('../utils/characterTier');
 
@@ -1400,8 +1402,28 @@ async function handle(interaction) {
 
         const characters = await listCharactersForDiscord(interaction.user);
         const locale = await resolveInteractionLocale(interaction);
-        const settingsView = buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale: locale });
+        const trackingDefault = await getLinkedUserTrackingDefaultForDiscord(interaction.user);
+        const settingsView = buildCharactersSettingsView({ ownerDiscordId, characters, locale, selectedLocale: locale, trackingDefault });
         await interaction.update({ ...settingsView, content: '' });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('charactersAction_tracking-default-settings_')) {
+        const ownerDiscordId = interaction.customId.replace('charactersAction_tracking-default-settings_', '');
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const trackingView = buildTrackingDefaultSelectionView({ ownerDiscordId, locale, source: 'settings' });
+        await interaction.update({ ...trackingView, content: '' });
         return true;
     }
 
@@ -1453,6 +1475,43 @@ async function handle(interaction) {
         await interaction.update({
             ...settingsView,
             content: t('characters.languageUpdated', { language: persistedLocale === 'en' ? 'English' : 'Deutsch' }, persistedLocale),
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && /^charactersAction_tracking-default-(adventure|level)_(setup|settings)_/.test(interaction.customId)) {
+        const match = interaction.customId.match(/^charactersAction_tracking-default-(adventure|level)_(setup|settings)_(.+)$/);
+        if (!match) {
+            return false;
+        }
+
+        const [, selectedMode, source, ownerDiscordId] = match;
+
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { embeds: [], components: [] });
+            return true;
+        }
+
+        if (!interaction.inGuild()) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        await updateLinkedUserTrackingDefaultForDiscord(interaction.user, selectedMode === 'level');
+        const characters = await listCharactersForDiscord(interaction.user);
+        const nextView = source === 'settings'
+            ? buildCharactersSettingsView({
+                ownerDiscordId,
+                characters,
+                locale,
+                selectedLocale: locale,
+                trackingDefault: selectedMode === 'level',
+            })
+            : buildCharacterListView({ ownerDiscordId, characters, locale });
+        await interaction.update({
+            ...nextView,
+            content: t('characters.trackingDefaultSaved', {}, locale),
         });
         return true;
     }

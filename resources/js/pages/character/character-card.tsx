@@ -118,22 +118,39 @@ function CharacterSettingsModal({
       <ModalTitle>{t('characters.characterSettings')}</ModalTitle>
       <ModalContent>
         <div className="space-y-3">
-          <label className={cn('flex items-center justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
-            <span className="flex items-center gap-1.5">
-              <span>{t('characters.simplifiedTracking')}</span>
+          <div className={cn('flex items-start justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
+            <span className="flex items-center gap-1.5 pt-1">
+              <span>{t('characters.trackingMode')}</span>
               <SettingHelp
-                label={t('characters.simplifiedTracking')}
-                text={t('characters.simplifiedTrackingHelp')}
+                label={t('characters.trackingMode')}
+                text={t('characters.trackingModeHelp')}
               />
             </span>
-            <input
-              type="checkbox"
-              className="toggle toggle-sm toggle-primary"
-              checked={simplifiedTracking}
-              disabled={isTrackingModeUpdating || !onTrackingModeChange}
-              onChange={(event) => onTrackingModeChange?.(event.target.checked)}
-            />
-          </label>
+            <div className="join">
+              <Button
+                type="button"
+                size="xs"
+                variant={simplifiedTracking ? 'ghost' : 'soft'}
+                color={simplifiedTracking ? undefined : 'primary'}
+                className="join-item"
+                disabled={isTrackingModeUpdating || !onTrackingModeChange || !simplifiedTracking}
+                onClick={() => onTrackingModeChange?.(false)}
+              >
+                {t('characters.adventureTracking')}
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={simplifiedTracking ? 'soft' : 'ghost'}
+                color={simplifiedTracking ? 'primary' : undefined}
+                className="join-item"
+                disabled={isTrackingModeUpdating || !onTrackingModeChange || simplifiedTracking}
+                onClick={() => onTrackingModeChange?.(true)}
+              >
+                {t('characters.levelTracking')}
+              </Button>
+            </div>
+          </div>
           <label className={cn('flex items-center justify-between gap-3 text-sm', isAvatarMaskedUpdating && 'opacity-60')}>
             <span className="flex items-center gap-1.5">
               <span>{t('characters.tokenMask')}</span>

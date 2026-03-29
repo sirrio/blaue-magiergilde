@@ -45,6 +45,7 @@ test('discord callback redirects users without accepted privacy policy to consen
     $user = User::query()->where('discord_id', 123456789012345678)->first();
 
     expect($user)->not->toBeNull()
+        ->and($user?->simplified_tracking)->toBeNull()
         ->and($user?->privacy_policy_accepted_at)->toBeNull()
         ->and((int) ($user?->privacy_policy_accepted_version ?? 0))->toBe(0);
 });

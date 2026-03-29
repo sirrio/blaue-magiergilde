@@ -101,7 +101,7 @@ export default function Register() {
 
               <Button
                 as="a"
-                href={route('discord.login')}
+                href={route('discord.login', { flow: 'register' })}
                 onClick={handleDiscordRegisterClick}
                 variant="outline"
                 modifier="block"

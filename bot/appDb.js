@@ -202,7 +202,7 @@ async function getLinkedUserForDiscord(discordUser) {
     const name = pickDiscordDisplayName(discordUser);
     const avatar = pickDiscordAvatarUrl(discordUser);
 
-    const [existing] = await db.execute('SELECT id, deleted_at, locale FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
+    const [existing] = await db.execute('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
     if (existing.length > 0) {
         const userId = existing[0].id;
         const deletedAt = existing[0].deleted_at;
@@ -214,6 +214,9 @@ async function getLinkedUserForDiscord(discordUser) {
         return {
             id: userId,
             locale: normalizeBotLocale(existing[0].locale),
+            simplifiedTracking: existing[0].simplified_tracking === null || existing[0].simplified_tracking === undefined
+                ? null
+                : Boolean(existing[0].simplified_tracking),
         };
     }
 
@@ -223,6 +226,11 @@ async function getLinkedUserForDiscord(discordUser) {
 async function getLinkedUserLocaleForDiscord(discordUser) {
     const linkedUser = await getLinkedUserForDiscord(discordUser);
     return linkedUser?.locale ?? null;
+}
+
+async function getLinkedUserTrackingDefaultForDiscord(discordUser) {
+    const linkedUser = await getLinkedUserForDiscord(discordUser);
+    return linkedUser?.simplifiedTracking ?? null;
 }
 
 async function getUserLocaleByDiscordId(discordUserId) {
@@ -245,6 +253,21 @@ async function updateLinkedUserLocaleForDiscord(discordUser, locale) {
     return normalizedLocale;
 }
 
+async function updateLinkedUserTrackingDefaultForDiscord(discordUser, simplifiedTracking) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) {
+        throw new DiscordNotLinkedError();
+    }
+
+    const normalizedValue = simplifiedTracking === null || simplifiedTracking === undefined
+        ? null
+        : (normalizeBoolean(simplifiedTracking, false) ? 1 : 0);
+
+    await db.execute('UPDATE users SET simplified_tracking = ?, updated_at = ? WHERE id = ?', [normalizedValue, nowSql(), userId]);
+
+    return normalizedValue === null ? null : Boolean(normalizedValue);
+}
+
 async function createUserForDiscord(discordUser) {
     const discordId = String(discordUser.id);
     const name = pickDiscordDisplayName(discordUser);
@@ -256,8 +279,8 @@ async function createUserForDiscord(discordUser) {
     const createdAt = nowSql();
     try {
         const [result] = await db.execute(
-            'INSERT INTO users (discord_id, name, avatar, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-            [discordId, name, avatar, createdAt, createdAt],
+            'INSERT INTO users (discord_id, name, avatar, simplified_tracking, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [discordId, name, avatar, null, createdAt, createdAt],
         );
 
         return { created: true, userId: result.insertId };
@@ -544,9 +567,9 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                     0,
                     1,
                     characterId,
-                    'Simplified tracking adjustment',
-                    'Simplified tracking',
-                    'Auto-generated to align simplified tracking level.',
+                    'Level tracking adjustment',
+                    'Level tracking',
+                    'Auto-generated to align the level tracking value.',
                     now,
                     now,
                 ],
@@ -605,13 +628,18 @@ async function createCharacterForDiscord(
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
+        const [userRows] = await connection.execute(
+            'SELECT simplified_tracking FROM users WHERE id = ? LIMIT 1',
+            [userId],
+        );
+        const accountSimplifiedTracking = Boolean(userRows[0]?.simplified_tracking);
 
         const [insertCharacter] = await connection.execute(
             `
             INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, created_at, updated_at)
             VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 safeName,
@@ -627,6 +655,7 @@ async function createCharacterForDiscord(
                 userId,
                 safeGuildStatus,
                 null,
+                accountSimplifiedTracking ? 1 : 0,
                 createdAt,
                 createdAt,
             ],
@@ -1689,8 +1718,10 @@ module.exports = {
     getLinkedUserForDiscord,
     getLinkedUserIdForDiscord,
     getLinkedUserLocaleForDiscord,
+    getLinkedUserTrackingDefaultForDiscord,
     getUserLocaleByDiscordId,
     updateLinkedUserLocaleForDiscord,
+    updateLinkedUserTrackingDefaultForDiscord,
     createUserForDiscord,
     listCharactersForDiscord,
     findCharacterForDiscord,
