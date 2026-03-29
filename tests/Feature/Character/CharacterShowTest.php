@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AdminAuditLog;
+use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
 use App\Models\User;
@@ -75,4 +76,31 @@ it('hides private linked character avatars from other users on character detail 
             ->where('character.allies.0.linked_character.avatar', '')
             ->missing('character.allies.0.linked_character.private_mode')
             ->missing('character.allies.0.linked_character.user_id'));
+});
+
+it('includes adventure participants on the character detail payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create();
+    $linkedCharacter = Character::factory()->create([
+        'name' => 'Temptation',
+    ]);
+    $ally = Ally::factory()->create([
+        'character_id' => $character->id,
+        'name' => $linkedCharacter->name,
+        'linked_character_id' => $linkedCharacter->id,
+    ]);
+    $adventure = Adventure::factory()->for($character)->create([
+        'title' => 'Into the Blue',
+    ]);
+
+    $adventure->allies()->attach($ally->id);
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('character.adventures.0.title', 'Into the Blue')
+            ->where('character.adventures.0.allies.0.id', $ally->id)
+            ->where('character.adventures.0.allies.0.name', $linkedCharacter->name));
 });

@@ -30,7 +30,7 @@ class CharacterController extends Controller
             ->where('user_id', $user?->getAuthIdentifier())
             ->withTrashed()
             ->withCount('room')
-            ->with('adventures')
+            ->with(['adventures', 'adventures.allies:id'])
             ->orderBy('position')
             ->get()
             ->withoutAppends();

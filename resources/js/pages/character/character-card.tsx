@@ -494,7 +494,7 @@ export function CharacterCard({
               </Button>
             </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:pr-28')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:transition-[padding] md:duration-150 md:group-hover:pr-28')}>
             <span
               className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
               data-tip={statusTooltip}
@@ -503,11 +503,6 @@ export function CharacterCard({
               {statusIcon}
             </span>
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
-            {hasRoom ? (
-              <span className="shrink-0 text-primary/70" title={t('characters.roomAssigned')}>
-                <MapPin size={14} />
-              </span>
-            ) : null}
           </CardTitle>
           <CardContent>
             <div className={cn('flex items-center gap-1 text-xs')}>
@@ -515,6 +510,15 @@ export function CharacterCard({
               <span>
                 Level {level} {calculateClassString(character)}
               </span>
+              {hasRoom ? (
+                <span
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] text-primary/75"
+                  title={t('characters.roomAssigned')}
+                  aria-label={t('characters.roomAssigned')}
+                >
+                  <MapPin size={11} />
+                </span>
+              ) : null}
             </div>
             {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">

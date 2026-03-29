@@ -462,6 +462,7 @@ export interface Ally {
   notes: string
   classes: string
   species: string
+  shared_adventure_count?: number
 }
 
 export interface Adventure {

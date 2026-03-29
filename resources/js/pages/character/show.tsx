@@ -35,6 +35,7 @@ import {
   Crown,
   Droplets,
   FlameKindling,
+  Handshake,
   Heart,
   LoaderCircle,
   Pencil,
@@ -160,8 +161,10 @@ export default function Show({
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
   const [activeNotes, setActiveNotes] = useState<{ title: string; notes: string } | null>(null)
+  const [activeAllyMeetings, setActiveAllyMeetings] = useState<{ allyName: string; entries: { title: string; date: string }[] } | null>(null)
   const [adventureSortDir, setAdventureSortDir] = useState<'desc' | 'asc'>('desc')
   const [downtimeSortDir, setDowntimeSortDir] = useState<'desc' | 'asc'>('desc')
+  const [allySortBy, setAllySortBy] = useState<'standing' | 'shared_adventures'>('standing')
   const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
   const [isAdventuresPending, startAdventuresTransition] = useTransition()
   const [isDowntimesPending, startDowntimesTransition] = useTransition()
@@ -169,9 +172,7 @@ export default function Show({
   const [adventuresOpen, setAdventuresOpen] = useState(
     character.adventures.length > 0 && character.adventures.length <= 6,
   )
-  const [downtimesOpen, setDowntimesOpen] = useState(
-    character.downtimes.length > 0 && character.downtimes.length <= 6,
-  )
+  const [downtimesOpen, setDowntimesOpen] = useState(false)
   const [alliesOpen, setAlliesOpen] = useState(character.allies.length > 0 && character.allies.length <= 12)
 
   const adventureNotesMap = useMemo(() => {
@@ -212,18 +213,6 @@ export default function Show({
     })
   }, [character.downtimes, downtimeSortDir])
 
-  const sortedAllies = useMemo(() => {
-    const direction = allySortDir === 'desc' ? -1 : 1
-    return [...character.allies].sort((a, b) => {
-      const ratingDiff = (a.rating ?? 3) - (b.rating ?? 3)
-      if (ratingDiff !== 0) {
-        return ratingDiff * direction
-      }
-
-      return getAllyDisplayName(a).localeCompare(getAllyDisplayName(b))
-    })
-  }, [allySortDir, character.allies])
-
   const adventureParticipantMap = useMemo(() => {
     const map = new Map<number, string>()
     sortedAdventures.forEach((adv) => {
@@ -236,6 +225,71 @@ export default function Show({
     })
     return map
   }, [sortedAdventures])
+
+  const allyAdventureCountMap = useMemo(() => {
+    const map = new Map<number, number>()
+
+    character.adventures.forEach((adventure) => {
+      const uniqueAllyIds = new Set((adventure.allies ?? []).map((ally) => ally.id))
+
+      uniqueAllyIds.forEach((allyId) => {
+        map.set(allyId, (map.get(allyId) ?? 0) + 1)
+      })
+    })
+
+    return map
+  }, [character.adventures])
+
+  const allyAdventureEntriesMap = useMemo(() => {
+    const map = new Map<number, { title: string; date: string }[]>()
+
+    sortedAdventures.forEach((adventure) => {
+      const uniqueAllies = new Set((adventure.allies ?? []).map((ally) => ally.id))
+      const adventureTitle = adventure.title?.trim() || 'Adventure'
+      const adventureDate = format(new Date(adventure.start_date), 'dd.MM.yyyy')
+
+      uniqueAllies.forEach((allyId) => {
+        const entries = map.get(allyId) ?? []
+        entries.push({
+          title: adventureTitle,
+          date: adventureDate,
+        })
+        map.set(allyId, entries)
+      })
+    })
+
+    return map
+  }, [sortedAdventures])
+
+  const sortedAllies = useMemo(() => {
+    const direction = allySortDir === 'desc' ? -1 : 1
+
+    return [...character.allies].sort((a, b) => {
+      if (allySortBy === 'shared_adventures') {
+        const sharedAdventureDiff = (allyAdventureCountMap.get(a.id) ?? 0) - (allyAdventureCountMap.get(b.id) ?? 0)
+        if (sharedAdventureDiff !== 0) {
+          return sharedAdventureDiff * direction
+        }
+      } else {
+        const ratingDiff = (a.rating ?? 3) - (b.rating ?? 3)
+        if (ratingDiff !== 0) {
+          return ratingDiff * direction
+        }
+      }
+
+      return getAllyDisplayName(a).localeCompare(getAllyDisplayName(b))
+    })
+  }, [allyAdventureCountMap, allySortBy, allySortDir, character.allies])
+
+  const setAllySort = (sortBy: 'standing' | 'shared_adventures') => {
+    if (allySortBy === sortBy) {
+      setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+      return
+    }
+
+    setAllySortBy(sortBy)
+    setAllySortDir('desc')
+  }
 
   const adventureTotalDuration = useMemo(
     () => character.adventures.reduce((total, adv) => total + adv.duration, 0),
@@ -421,11 +475,12 @@ export default function Show({
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.adventures.length > 0 ? (
                   <>
-                    <div className="flex justify-end pb-2">
+                    <div className="flex justify-end pb-2 md:hidden">
                       <Button
                         type="button"
                         size="xs"
                         variant="ghost"
+                        className="cursor-pointer transition-colors hover:text-base-content"
                         onClick={() =>
                           setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
                         }
@@ -524,10 +579,21 @@ export default function Show({
                     </List>
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold text-base-content/50">
                           <span>{t('characters.adventure')}</span>
                           <span className="text-right">{t('characters.time')}</span>
-                          <span className="text-right">{t('characters.date')}</span>
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
+                            onClick={() =>
+                              setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                            }
+                          >
+                            {t('characters.date')}
+                            {adventureSortDir === 'desc'
+                              ? <ChevronDown size={12} />
+                              : <ChevronUp size={12} />}
+                          </button>
                           <span className="text-right">{t('characters.actions')}</span>
                         </div>
                         <List className="shadow-none">
@@ -663,11 +729,12 @@ export default function Show({
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.downtimes.length > 0 ? (
                   <>
-                    <div className="flex justify-end pb-2">
+                    <div className="flex justify-end pb-2 md:hidden">
                       <Button
                         type="button"
                         size="xs"
                         variant="ghost"
+                        className="cursor-pointer transition-colors hover:text-base-content"
                         onClick={() =>
                           setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
                         }
@@ -747,10 +814,21 @@ export default function Show({
                     </List>
                     <div className="hidden md:block overflow-x-auto">
                       <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
+                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold text-base-content/50">
                           <span>{t('characters.type')}</span>
                           <span className="text-right">{t('characters.time')}</span>
-                          <span className="text-right">{t('characters.date')}</span>
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
+                            onClick={() =>
+                              setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+                            }
+                          >
+                            {t('characters.date')}
+                            {downtimeSortDir === 'desc'
+                              ? <ChevronDown size={12} />
+                              : <ChevronUp size={12} />}
+                          </button>
                           <span className="text-right">{t('characters.actions')}</span>
                         </div>
                         <List className="shadow-none">
@@ -860,67 +938,47 @@ export default function Show({
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.allies.length > 0 ? (
                   <>
-                    <div className="flex justify-end pb-2">
+                    <div className="flex justify-end gap-1 pb-2 md:hidden">
                       <Button
                         type="button"
                         size="xs"
-                        variant="ghost"
-                        onClick={() =>
-                          setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                        }
+                        variant={allySortBy === 'standing' ? 'outline' : 'ghost'}
+                        onClick={() => setAllySort('standing')}
                       >
                         {t('characters.standing')}
-                        {allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                        {allySortBy === 'standing'
+                          ? allySortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                          : null}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant={allySortBy === 'shared_adventures' ? 'outline' : 'ghost'}
+                        onClick={() => setAllySort('shared_adventures')}
+                      >
+                        {t('characters.sharedAdventuresShort')}
+                        {allySortBy === 'shared_adventures'
+                          ? allySortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                          : null}
                       </Button>
                     </div>
                     <List className="md:hidden shadow-none">
-                      {sortedAllies.map((ally) => (
-                        <ListRow key={ally.id} className="block">
-                          <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <AllyPortrait ally={ally} className="h-10 w-10" />
-                              <div className="flex min-w-0 flex-col gap-0.5">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
-                                  <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                      {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
-                                    </span>
-                                  </div>
-                                  {getAllyOwnerName(ally) ? (
-                                    <span className="truncate text-xs text-base-content/50">
-                                    {t('characters.owner')}: {getAllyOwnerName(ally)}
-                                    </span>
-                                  ) : null}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-2">
-                              <RatingHearts rating={ally.rating} />
-                              <span className="truncate text-xs text-base-content/70">{ally.classes || '-'}</span>
-                            </div>
-                          </div>
-                        </ListRow>
-                      ))}
-                    </List>
-                    <div className="hidden md:block overflow-x-auto">
-                      <div className="min-w-[560px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_140px_200px] gap-4 px-2 pb-2 text-xs font-semibold uppercase text-base-content/50">
-                          <span>{t('characters.allies')}</span>
-                          <span>{t('characters.standing')}</span>
-                          <span>Classes</span>
-                        </div>
-                        <List className="shadow-none">
-                          {sortedAllies.map((ally) => (
-                            <ListRow
-                              key={ally.id}
-                              className="grid w-full grid-cols-[minmax(0,1fr)_140px_200px] items-center gap-4"
-                            >
+                      {sortedAllies.map((ally) => {
+                        const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
+                        const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
+
+                        return (
+                          <ListRow key={ally.id} className="block">
+                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
                               <div className="flex min-w-0 items-center gap-3">
-                                <AllyPortrait ally={ally} className="h-9 w-9" />
+                                <AllyPortrait ally={ally} className="h-10 w-10" />
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                   <div className="flex min-w-0 items-center gap-2">
-                                    <span className="truncate text-sm font-medium">
-                                      {getAllyDisplayName(ally)}
-                                    </span>
+                                    <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
                                     <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
                                       {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                     </span>
@@ -930,12 +988,107 @@ export default function Show({
                                       {t('characters.owner')}: {getAllyOwnerName(ally)}
                                     </span>
                                   ) : null}
+                                  <button
+                                    type="button"
+                                    className="inline-flex w-fit cursor-pointer items-center gap-1 text-xs text-base-content/60 transition-colors hover:text-base-content"
+                                    onClick={() =>
+                                      setActiveAllyMeetings({
+                                        allyName: getAllyDisplayName(ally),
+                                        entries: sharedAdventureEntries,
+                                      })
+                                    }
+                                  >
+                                    <Handshake size={12} className="text-base-content/45" />
+                                    {t('characters.allySharedAdventures', { count: sharedAdventureCount })}
+                                  </button>
                                 </div>
                               </div>
-                              <RatingHearts rating={ally.rating} />
-                              <span className="truncate text-sm text-base-content/70">{ally.classes || '-'}</span>
-                            </ListRow>
-                          ))}
+                              <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-2">
+                                <RatingHearts rating={ally.rating} />
+                                <span className="truncate text-xs text-base-content/70">{ally.classes || '-'}</span>
+                              </div>
+                            </div>
+                          </ListRow>
+                        )
+                      })}
+                    </List>
+                    <div className="hidden md:block overflow-x-auto">
+                      <div className="min-w-[620px]">
+                        <div className="grid grid-cols-[minmax(0,1.7fr)_104px_52px_132px] gap-3 px-2 pb-2 text-xs font-semibold text-base-content/50">
+                          <span>{t('characters.allies')}</span>
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                            onClick={() => setAllySort('standing')}
+                          >
+                            {t('characters.standing')}
+                            {allySortBy === 'standing'
+                              ? allySortDir === 'desc'
+                                ? <ChevronDown size={12} />
+                                : <ChevronUp size={12} />
+                              : null}
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center justify-center gap-1 text-center transition-colors hover:text-base-content"
+                            onClick={() => setAllySort('shared_adventures')}
+                          >
+                            {t('characters.sharedAdventuresShort')}
+                            {allySortBy === 'shared_adventures'
+                              ? allySortDir === 'desc'
+                                ? <ChevronDown size={12} />
+                                : <ChevronUp size={12} />
+                              : null}
+                          </button>
+                          <span className="text-right">Classes</span>
+                        </div>
+                        <List className="shadow-none">
+                          {sortedAllies.map((ally) => {
+                            const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
+                            const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
+
+                            return (
+                              <ListRow
+                                key={ally.id}
+                                className="grid w-full grid-cols-[minmax(0,1.7fr)_104px_52px_132px] items-center gap-3"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <AllyPortrait ally={ally} className="h-9 w-9" />
+                                  <div className="flex min-w-0 flex-col gap-0.5">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <span className="truncate text-sm font-medium">
+                                        {getAllyDisplayName(ally)}
+                                      </span>
+                                      <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
+                                        {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                      </span>
+                                    </div>
+                                    {getAllyOwnerName(ally) ? (
+                                      <span className="truncate text-xs text-base-content/50">
+                                        {t('characters.owner')}: {getAllyOwnerName(ally)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <RatingHearts rating={ally.rating} />
+                                <button
+                                  type="button"
+                                  className="inline-flex cursor-pointer items-center justify-center gap-1 text-sm text-base-content/70 transition-colors hover:text-base-content"
+                                  aria-label={t('characters.openAllyMeetings', { name: getAllyDisplayName(ally) })}
+                                  onClick={() =>
+                                    setActiveAllyMeetings({
+                                      allyName: getAllyDisplayName(ally),
+                                      entries: sharedAdventureEntries,
+                                    })
+                                  }
+                                >
+                                  <span>{sharedAdventureCount}</span>
+                                  <Handshake size={12} className="text-base-content/45" />
+                                </button>
+                                <span className="truncate text-right text-sm text-base-content/70">{ally.classes || '-'}</span>
+                              </ListRow>
+                            )
+                          })}
                         </List>
                       </div>
                     </div>
@@ -948,6 +1101,31 @@ export default function Show({
           </div>
         </div>
       </div>
+
+      <Modal isOpen={activeAllyMeetings !== null} onClose={() => setActiveAllyMeetings(null)}>
+        <ModalTitle>
+          {activeAllyMeetings
+            ? t('characters.allyMeetingsTitle', { name: activeAllyMeetings.allyName })
+            : t('characters.sharedAdventuresShort')}
+        </ModalTitle>
+        <ModalContent>
+          {activeAllyMeetings && activeAllyMeetings.entries.length > 0 ? (
+            <List className="shadow-none">
+              {activeAllyMeetings.entries.map((entry, index) => (
+                <ListRow
+                  key={`${entry.date}-${entry.title}-${index}`}
+                  className="grid w-full grid-cols-[96px_minmax(0,1fr)] items-start gap-3"
+                >
+                  <span className="text-xs text-base-content/60">{entry.date}</span>
+                  <span className="min-w-0 text-sm">{entry.title}</span>
+                </ListRow>
+              ))}
+            </List>
+          ) : (
+            <p className="text-sm text-base-content/70">{t('characters.noSharedAdventuresRecorded')}</p>
+          )}
+        </ModalContent>
+      </Modal>
     </AppLayout>
   )
 }

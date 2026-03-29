@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AdminAuditLog;
+use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
 use App\Models\User;
@@ -115,4 +116,26 @@ it('hides private linked character avatars from other users in characters index 
     expect($privateGuildEntry['user']['name'] ?? null)->toBe($privateOwner->name);
     expect($privateGuildEntry)->not->toHaveKey('private_mode');
     expect($privateGuildEntry)->not->toHaveKey('user_id');
+});
+
+it('includes adventure ally ids on characters index payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create();
+    $ally = Ally::factory()->create([
+        'character_id' => $character->id,
+        'name' => 'Shared Ally',
+        'rating' => 3,
+    ]);
+    $adventure = Adventure::factory()->for($character)->create();
+    $adventure->allies()->sync([$ally->id]);
+
+    $response = $this->actingAs($user)
+        ->get(route('characters.index'))
+        ->assertOk();
+
+    $props = $response->viewData('page')['props'] ?? [];
+    $entry = collect($props['characters'] ?? [])->first(fn (array $item): bool => (int) ($item['id'] ?? 0) === $character->id);
+
+    expect($entry)->toBeArray();
+    expect($entry['adventures'][0]['allies'][0]['id'] ?? null)->toBe($ally->id);
 });
