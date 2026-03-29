@@ -34,7 +34,7 @@ assert.equal(isTicketReopenCommand('/reopen'), true);
 assert.equal(isTicketReopenCommand('re-open'), false);
 
 const threadName = buildTicketThreadName(sampleMessage.author);
-assert.equal(threadName.startsWith('ticket-'), true);
+assert.equal(threadName.startsWith('inbox-'), true);
 assert.equal(threadName.includes('#'), false);
 
 const userRelay = buildUserRelayContent(sampleMessage, 'de');
@@ -63,9 +63,10 @@ const summary = buildTicketSummaryContent({
     assigned_to_discord_id: '98765',
     updated_at: new Date().toISOString(),
 }, 'sirrio#0001', 'de');
-assert.equal(summary.includes('Support-Ticket #42'), true);
+assert.equal(summary.includes('Support-Ticket #42'), false);
 assert.equal(summary.includes('pending_user'), false);
 assert.equal(summary.includes('Pending user'), true);
 assert.equal(summary.includes('Zuständig: <@98765>'), true);
+assert.equal(summary.includes('Briefkasten #42'), true);
 
 console.log('support-tickets.test.js passed');

@@ -1260,7 +1260,7 @@ export default function Settings({
           </div>
           {botChannelOverride?.active && botChannelOverride.channel_id ? (
             <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-              Local channel override active. The bot uses Discord channel <span className="font-semibold">{botChannelOverride.channel_id}</span> for character approvals and support tickets instead of the saved channel settings while developing locally.
+              Local channel override active. The bot uses Discord channel <span className="font-semibold">{botChannelOverride.channel_id}</span> for character approvals and inbox threads instead of the saved channel settings while developing locally.
             </div>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
@@ -1274,15 +1274,15 @@ export default function Settings({
           <div className="mt-4 border-t border-base-200 pt-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Support tickets</h3>
+                <h3 className="text-sm font-semibold">Inbox</h3>
                 <p className="text-xs text-base-content/60">
-                  User DMs to the bot create ticket threads in this channel.
+                  User DMs to the bot create inbox threads in this channel.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <DiscordChannelPickerModal
-                  title="Support ticket channel"
-                  description="Select a text channel where support ticket threads should be created."
+                  title="Inbox channel"
+                  description="Select a text channel where inbox threads should be created."
                   confirmLabel="Use channel"
                   channelsRouteName="admin.settings.backup.channels.refresh"
                   mode="single"

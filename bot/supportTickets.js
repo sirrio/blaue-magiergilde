@@ -183,7 +183,7 @@ function parseTicketControlCustomId(customId) {
 function buildTicketThreadName(user) {
     const label = normalizeWhitespace(formatUserLabel(user)).replace(/[^a-zA-Z0-9 _-]/g, '');
     const base = label !== '' ? label : `user-${String(user?.id || 'unknown')}`;
-    return `ticket-${base}`.slice(0, 90);
+    return `inbox-${base}`.slice(0, 90);
 }
 
 function buildUserRelayContent(message, locale = null) {
@@ -339,7 +339,7 @@ function detectNoticeKind(details) {
 }
 
 function withErrorPrefix(title) {
-    const cleanTitle = normalizeWhitespace(title) || 'Support Ticket';
+    const cleanTitle = normalizeWhitespace(title) || 'Inbox';
     if (cleanTitle.startsWith('⚠') || cleanTitle.startsWith('❌') || cleanTitle.startsWith('⛔')) {
         return cleanTitle;
     }
