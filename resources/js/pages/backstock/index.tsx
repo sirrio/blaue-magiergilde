@@ -10,8 +10,8 @@ import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
 import { BackstockItem, BackstockSettings, BotOperation, DiscordBackupChannel, Item } from '@/types'
 import { Head, router, useForm } from '@inertiajs/react'
-import { FlaskRound, Package, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Shield, Sword, Trash } from 'lucide-react'
-import React, { useCallback, useEffect, useMemo, useState, JSX } from 'react'
+import { CheckCircle2, FlaskRound, Package, Pencil, Plus, RotateCcw, ScrollText, Send, Settings, Shield, Sword, Trash } from 'lucide-react'
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, JSX } from 'react'
 
 const rarityLabels: Record<string, string> = {
   common: 'Common',
@@ -50,6 +50,10 @@ const getRarityTextColor = (rarity: string): string => {
 
 const renderIcon = (type: string): JSX.Element | null => {
   return typeIcons[type] || null
+}
+
+const buildBackstockAddItemLabel = (item: Item): string => {
+  return `${item.name} (${rarityLabels[item.rarity]})`
 }
 
 const getBackstockItemSnapshot = (entry: BackstockItem): Item => {
@@ -208,13 +212,71 @@ export default function BackstockIndex({
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
   const [updatingLineId, setUpdatingLineId] = useState<number | null>(null)
+  const [itemSearch, setItemSearch] = useState('')
+  const [isItemMenuOpen, setIsItemMenuOpen] = useState(false)
+  const [activeItemIndex, setActiveItemIndex] = useState(0)
+  const itemInputRef = useRef<HTMLInputElement | null>(null)
+  const maxVisibleBackstockItemResults = 60
 
   const { data, setData, post, processing } = useForm({
     item_id: items[0]?.id ?? 0,
     notes: '',
   })
+  const deferredItemSearch = useDeferredValue(itemSearch)
+  const indexedItems = useMemo(
+    () => items.map((item) => ({
+      item,
+      label: buildBackstockAddItemLabel(item),
+      searchText: [
+        item.name,
+        rarityLabels[item.rarity],
+        item.type,
+      ].filter(Boolean).join(' ').toLowerCase(),
+    })),
+    [items],
+  )
+  const selectedItem = useMemo(
+    () => items.find((item) => item.id === data.item_id) ?? null,
+    [items, data.item_id],
+  )
+  const selectedItemLabel = useMemo(
+    () => selectedItem ? buildBackstockAddItemLabel(selectedItem) : '',
+    [selectedItem],
+  )
+  const hasPendingItemSelection = itemSearch.trim().length > 0 && itemSearch.trim() !== selectedItemLabel
+  const filteredItems = useMemo(() => {
+    const query = deferredItemSearch.trim().toLowerCase()
+    if (!query) return indexedItems
+    return indexedItems.filter(({ searchText }) => searchText.includes(query))
+  }, [indexedItems, deferredItemSearch])
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, maxVisibleBackstockItemResults),
+    [filteredItems],
+  )
 
   const groups = useMemo(() => buildGroups(backstockItems), [backstockItems])
+
+  useEffect(() => {
+    if (!isAddOpen) return
+    const nextItem = items[0] ?? null
+    setData('item_id', nextItem?.id ?? 0)
+    setData('notes', '')
+    setItemSearch(nextItem ? buildBackstockAddItemLabel(nextItem) : '')
+    setIsItemMenuOpen(false)
+    setActiveItemIndex(0)
+  }, [isAddOpen, items, setData])
+
+  useEffect(() => {
+    if (!isItemMenuOpen) return
+    setActiveItemIndex(0)
+  }, [itemSearch, isItemMenuOpen])
+
+  const applyItemSelection = (item: Item) => {
+    setData('item_id', item.id)
+    setItemSearch(buildBackstockAddItemLabel(item))
+    setIsItemMenuOpen(false)
+    setActiveItemIndex(0)
+  }
 
   const getCsrfToken = useCallback(() => {
     if (typeof document === 'undefined') return ''
@@ -334,8 +396,11 @@ export default function BackstockIndex({
   }, [getCsrfToken, isPosting, settings.post_channel_id])
 
   const handleAddItem = () => {
-    if (!hasItems || !data.item_id) {
-      toast.show('Select an item first.', 'error')
+    if (!hasItems || processing) return
+    if (!selectedItem || hasPendingItemSelection) {
+      toast.show('Please select an item from the list before saving.', 'error')
+      setIsItemMenuOpen(true)
+      window.setTimeout(() => itemInputRef.current?.focus(), 0)
       return
     }
     post(route('admin.backstock-items.store'), {
@@ -343,7 +408,14 @@ export default function BackstockIndex({
       onSuccess: () => {
         setIsAddOpen(false)
         setData('notes', '')
+        setItemSearch('')
         router.reload()
+      },
+      onError: (errors) => {
+        const message = errors.notes || errors.item_id
+        if (message) {
+          toast.show(String(message), 'error')
+        }
       },
     })
   }
@@ -448,7 +520,7 @@ export default function BackstockIndex({
             onFailed={handleOperationFailed}
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)}>
+            <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} overflowVisible>
               <ModalTrigger>
                 <Button size="sm" variant="outline" onClick={() => setIsAddOpen(true)} disabled={!hasItems} className="gap-2">
                   <Plus size={16} />
@@ -457,20 +529,88 @@ export default function BackstockIndex({
               </ModalTrigger>
               <ModalTitle>Add item to backstock</ModalTitle>
               <ModalContent>
-                <Select value={String(data.item_id)} onChange={(event) => setData('item_id', Number(event.target.value))}>
-                  <SelectLabel>Item</SelectLabel>
-                  <SelectOptions>
-                    {hasItems ? (
-                      items.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))
-                    ) : (
-                      <option value={0}>No items available</option>
-                    )}
-                  </SelectOptions>
-                </Select>
+                <div className="relative w-full">
+                  <label className="label" htmlFor="backstock-item-search">
+                    Item
+                  </label>
+                  <input
+                    id="backstock-item-search"
+                    ref={itemInputRef}
+                    className="input w-full"
+                    placeholder={selectedItem ? buildBackstockAddItemLabel(selectedItem) : 'Search item...'}
+                    value={itemSearch}
+                    onChange={(event) => {
+                      setItemSearch(event.target.value)
+                      setIsItemMenuOpen(true)
+                    }}
+                    onFocus={() => setIsItemMenuOpen(true)}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        setIsItemMenuOpen(false)
+                        if (!itemSearch.trim() && selectedItem) {
+                          setItemSearch(buildBackstockAddItemLabel(selectedItem))
+                        }
+                      }, 100)
+                    }}
+                    onKeyDown={(event) => {
+                      if (!isItemMenuOpen) return
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault()
+                        setActiveItemIndex((current) => Math.min(current + 1, Math.max(visibleItems.length - 1, 0)))
+                      } else if (event.key === 'ArrowUp') {
+                        event.preventDefault()
+                        setActiveItemIndex((current) => Math.max(current - 1, 0))
+                      } else if (event.key === 'Enter') {
+                        event.preventDefault()
+                        const nextItem = visibleItems[activeItemIndex]?.item
+                        if (nextItem) {
+                          applyItemSelection(nextItem)
+                        }
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault()
+                        setIsItemMenuOpen(false)
+                      }
+                    }}
+                  />
+                  {hasPendingItemSelection ? (
+                    <div className="mt-2 text-xs text-error">
+                      Select one of the matching items before saving.
+                    </div>
+                  ) : null}
+                  {isItemMenuOpen ? (
+                    <div className="absolute left-0 right-0 z-20 mt-2 max-h-56 overflow-auto rounded-lg border border-base-200 bg-base-100 shadow-lg">
+                      {visibleItems.map(({ item }, index) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={cn(
+                            'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                            index === activeItemIndex ? 'bg-base-200/70' : 'hover:bg-base-200/50',
+                          )}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => applyItemSelection(item)}
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0 text-base-content/70">{renderIcon(item.type)}</span>
+                            <div className="min-w-0">
+                              <div className="truncate">{item.name}</div>
+                              <div className={cn('text-xs', getRarityTextColor(item.rarity))}>{rarityLabels[item.rarity]}</div>
+                            </div>
+                          </div>
+                          {item.id === data.item_id ? <CheckCircle2 size={14} className="text-primary/70" /> : null}
+                        </button>
+                      ))}
+                      {itemSearch.trim() && filteredItems.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-base-content/50">No matching items found.</div>
+                      ) : null}
+                      {filteredItems.length > visibleItems.length ? (
+                        <div className="border-t border-base-200 px-3 py-2 text-xs text-base-content/50">
+                          Showing {visibleItems.length} of {filteredItems.length} items. Keep typing to narrow the list.
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
                 <Input value={data.notes} onChange={(event) => setData('notes', event.target.value)}>
                   Notes (optional)
                 </Input>

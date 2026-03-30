@@ -1016,7 +1016,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   const initialItemId = items[0]?.id ?? 0
   const hasItems = items.length > 0
   const defaultRepairCurrent = getDefaultRepairCurrent(initialItemId, items)
-  const { data, setData, post } = useForm({
+  const { data, setData, post, processing } = useForm({
     item_id: initialItemId,
     notes: '',
     remaining_auctions: 3,
@@ -1089,7 +1089,7 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
   }
 
   const handleSubmit = () => {
-    if (!hasItems) return
+    if (!hasItems || processing) return
     if (!selectedItem || hasPendingItemSelection) {
       toast.show('Please select an item from the list before saving.', 'error')
       setIsItemMenuOpen(true)
@@ -1227,7 +1227,9 @@ const AddAuctionItemModal = ({ auction, items }: { auction: Auction; items: Item
           {repairLabel}
         </Input>
       </ModalContent>
-      <ModalAction onClick={handleSubmit}>Save</ModalAction>
+      <ModalAction onClick={handleSubmit} disabled={processing}>
+        {processing ? 'Saving...' : 'Save'}
+      </ModalAction>
     </Modal>
   )
 }
