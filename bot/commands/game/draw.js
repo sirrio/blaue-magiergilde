@@ -20,12 +20,12 @@ module.exports = {
             .setMaxValue(25)),
     async execute(interaction) {
         try {
-            await reactionDraw.showPreview(interaction);
-        } catch (error) {
-            console.error('[bot] Reaction draw command failed.', error);
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             }
+            await reactionDraw.showPreview(interaction);
+        } catch (error) {
+            console.error('[bot] Reaction draw command failed.', error);
             if (interaction.deferred || interaction.replied) {
                 await interaction.editReply({
                     content: '',

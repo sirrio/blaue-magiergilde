@@ -162,7 +162,13 @@ function parseFixedCustomId(customId) {
 }
 
 function formatPreviewUserLines(users, locale) {
-    const visible = users.slice(0, 25).map((user, index) => `${index + 1}. ${user.label}`);
+    const visible = users.slice(0, 25).map((user, index) => {
+        const extraReactions = Array.isArray(user.reactionDisplays) && user.reactionDisplays.length
+            ? ` ${user.reactionDisplays.join(' ')}`
+            : '';
+
+        return `${index + 1}. ${user.label}${extraReactions}`;
+    });
 
     if (users.length > 25) {
         visible.push(t('reactionDraw.previewMoreUsers', { count: users.length - 25 }, locale));
@@ -171,12 +177,198 @@ function formatPreviewUserLines(users, locale) {
     return visible.join('\n');
 }
 
-function formatMentionList(users, locale) {
+async function attachParticipantReactionDisplays(message, participants, selectedEmojiInput, guild = null, client = null) {
+    const reactions = Array.from(message?.reactions?.cache?.values?.() ?? []);
+    if (!reactions.length || !participants.length) {
+        return participants;
+    }
+
+    const participantReactionDisplays = new Map(
+        participants.map(user => [String(user.id), []]),
+    );
+
+    const extractReactionSortNumber = (name) => {
+        const normalizedName = String(name || '').trim();
+        const classMatch = normalizedName.match(/^C_([^_]+)(?:_(\d+))?$/i);
+        if (classMatch) {
+            return null;
+        }
+
+        if (normalizedName === '🔟') {
+            return 10;
+        }
+
+        const keycapDigitMatch = normalizedName.match(/^(\d)\uFE0F?\u20E3$/u);
+        if (keycapDigitMatch) {
+            return Number(keycapDigitMatch[1]);
+        }
+
+        if (/^\d+$/.test(normalizedName)) {
+            return Number(normalizedName);
+        }
+
+        const wordNumbers = {
+            one: 1,
+            two: 2,
+            three: 3,
+            four: 4,
+            five: 5,
+            six: 6,
+            seven: 7,
+            eight: 8,
+            nine: 9,
+            ten: 10,
+            keycap_ten: 10,
+        };
+
+        const normalizedLower = normalizedName.toLowerCase();
+        if (Object.hasOwn(wordNumbers, normalizedLower)) {
+            return wordNumbers[normalizedLower];
+        }
+
+        const wordTokenMatch = normalizedLower.match(/(?:^|[_-])(one|two|three|four|five|six|seven|eight|nine|ten)(?:$|[_-])/);
+        if (wordTokenMatch && Object.hasOwn(wordNumbers, wordTokenMatch[1])) {
+            return wordNumbers[wordTokenMatch[1]];
+        }
+
+        const nMatch = normalizedLower.match(/^n_(\d{1,3})$/);
+        if (nMatch) {
+            return Number(nMatch[1]);
+        }
+
+        const numericMatch = normalizedLower.match(/(?:^|[_-])(\d{1,3})(?:$|[_-])/);
+        if (numericMatch) {
+            return Number(numericMatch[1]);
+        }
+
+        const anyDigitMatch = normalizedLower.match(/(\d{1,3})/);
+        if (anyDigitMatch) {
+            return Number(anyDigitMatch[1]);
+        }
+
+        return null;
+    };
+
+    const getReactionSortMeta = (name, index) => {
+        const normalizedName = String(name || '').trim();
+        const classMatch = normalizedName.match(/^C_([^_]+)(?:_(\d+))?$/i);
+        const numericValue = extractReactionSortNumber(normalizedName);
+
+        if (numericValue !== null) {
+            return {
+                group: 0,
+                numericValue,
+                label: normalizedName,
+                index,
+            };
+        }
+
+        if (classMatch) {
+            return {
+                group: 1,
+                numericValue: classMatch[2] ? Number(classMatch[2]) : Number.POSITIVE_INFINITY,
+                label: String(classMatch[1] || '').toLowerCase(),
+                index,
+            };
+        }
+
+        return {
+            group: 2,
+            numericValue: Number.POSITIVE_INFINITY,
+            label: normalizedName.toLowerCase(),
+            index,
+        };
+    };
+
+    const sortReactionDisplays = (entries) => {
+        return [...entries].sort((left, right) => {
+            const leftMeta = getReactionSortMeta(left.name, left.index);
+            const rightMeta = getReactionSortMeta(right.name, right.index);
+
+            if (leftMeta.group !== rightMeta.group) {
+                return leftMeta.group - rightMeta.group;
+            }
+
+            if (leftMeta.numericValue !== rightMeta.numericValue) {
+                return leftMeta.numericValue - rightMeta.numericValue;
+            }
+
+            if (leftMeta.label !== rightMeta.label) {
+                return leftMeta.label.localeCompare(rightMeta.label);
+            }
+
+            return leftMeta.index - rightMeta.index;
+        });
+    };
+
+    for (const [reactionIndex, reaction] of reactions.entries()) {
+        if (reactionMatchesInput(reaction, selectedEmojiInput)) {
+            continue;
+        }
+
+        const users = await reaction.users.fetch().catch(() => null);
+        if (!users?.values) {
+            continue;
+        }
+
+        const reactionDisplay = await resolveReactionDisplay(reaction, null, guild, client, {
+            preferCustomNameFallback: true,
+        });
+        if (!reactionDisplay) {
+            continue;
+        }
+
+        for (const user of users.values()) {
+            if (!user || user.bot) {
+                continue;
+            }
+
+            const entry = participantReactionDisplays.get(String(user.id));
+            if (!entry || entry.some(item => item.display === reactionDisplay)) {
+                continue;
+            }
+
+            entry.push({
+                display: reactionDisplay,
+                name: getReactionSortName(reaction),
+                index: reactionIndex,
+            });
+        }
+    }
+
+    return participants.map(user => ({
+        ...user,
+        reactionDisplays: sortReactionDisplays(participantReactionDisplays.get(String(user.id)) ?? [])
+            .map(item => item.display),
+    }));
+}
+
+function formatReactionDisplays(displays, compact = false) {
+    if (!Array.isArray(displays) || !displays.length) {
+        return '';
+    }
+
+    if (!compact) {
+        return ` ${displays.join(' ')}`;
+    }
+
+    const visibleDisplays = displays.slice(0, 4);
+    const hiddenCount = Math.max(0, displays.length - visibleDisplays.length);
+    const hiddenLabel = hiddenCount > 0 ? ` +${hiddenCount}` : '';
+
+    return ` · ${visibleDisplays.join('')}${hiddenLabel}`;
+}
+
+function formatMentionList(users, locale, { compactReactions = false } = {}) {
     if (!users.length) {
         return t('reactionDraw.none', {}, locale);
     }
 
-    return users.map((user, index) => `${index + 1}. <@${user.id}>`).join('\n');
+    return users.map((user, index) => {
+        const extraReactions = formatReactionDisplays(user.reactionDisplays, compactReactions);
+
+        return `${index + 1}. <@${user.id}>${extraReactions}`;
+    }).join('\n');
 }
 
 function buildPublicMentionContent(users) {
@@ -215,13 +407,17 @@ function buildPublicResultEmbed(session) {
             ...(session.fixedParticipants?.length
                 ? [{
                     name: t('reactionDraw.fixedParticipants', {}, session.locale),
-                    value: formatMentionList(session.fixedParticipants, session.locale),
+                    value: formatMentionList(session.fixedParticipants, session.locale, { compactReactions: true }),
                 }]
                 : []),
             ...((session.drawnParticipants?.length && session.fixedParticipants?.length) || (!session.fixedParticipants?.length)
                 ? [{
                     name: t('reactionDraw.drawnParticipants', {}, session.locale),
-                    value: formatMentionList(session.drawnParticipants?.length ? session.drawnParticipants : session.winners, session.locale),
+                    value: formatMentionList(
+                        session.drawnParticipants?.length ? session.drawnParticipants : session.winners,
+                        session.locale,
+                        { compactReactions: true },
+                    ),
                 }]
                 : []),
             {
@@ -240,32 +436,62 @@ function findEmojiByName(cache, name) {
     return cache.find(emoji => String(emoji.name || '').toLowerCase() === String(name).toLowerCase()) ?? null;
 }
 
-async function resolveReactionDisplay(reaction, fallbackEmojiInput, guild = null, client = null) {
-    if (fallbackEmojiInput?.id && client?.emojis?.cache?.get) {
-        const resolvedById = client.emojis.cache.get(String(fallbackEmojiInput.id));
+function decodeEmojiIdentifier(identifier) {
+    if (!identifier) {
+        return '';
+    }
+
+    try {
+        return decodeURIComponent(String(identifier));
+    } catch {
+        return '';
+    }
+}
+
+function getReactionSortName(reaction) {
+    return String(reaction?.emoji?.name || decodeEmojiIdentifier(reaction?.emoji?.identifier) || '').trim();
+}
+
+function formatReactionFallbackDisplay(name) {
+    const normalized = String(name || '').trim();
+    if (!normalized) {
+        return '?';
+    }
+
+    return `[${normalized}]`;
+}
+
+async function resolveReactionDisplay(reaction, fallbackEmojiInput, guild = null, client = null, options = {}) {
+    const preferCustomNameFallback = Boolean(options?.preferCustomNameFallback);
+    const decodedIdentifier = decodeEmojiIdentifier(reaction?.emoji?.identifier);
+    const emojiName = fallbackEmojiInput?.name || reaction?.emoji?.name || decodedIdentifier || null;
+    const emojiId = fallbackEmojiInput?.id || reaction?.emoji?.id || null;
+    const isCustomEmoji = Boolean(emojiId && reaction?.emoji?.name);
+
+    if (emojiId && client?.emojis?.cache?.get) {
+        const resolvedById = client.emojis.cache.get(String(emojiId));
         if (resolvedById) {
             return resolvedById.toString();
         }
     }
 
-    if (fallbackEmojiInput?.name && guild?.emojis?.fetch) {
+    if (emojiName && guild?.emojis?.fetch) {
         const guildEmojiCache = await guild.emojis.fetch().catch(() => guild.emojis.cache ?? null);
-        const resolvedGuildEmoji = findEmojiByName(guildEmojiCache, fallbackEmojiInput.name);
+        const resolvedGuildEmoji = findEmojiByName(guildEmojiCache, emojiName);
         if (resolvedGuildEmoji) {
             return resolvedGuildEmoji.toString();
         }
     }
 
-    if (fallbackEmojiInput?.name && client?.emojis?.cache) {
-        const resolvedClientEmoji = findEmojiByName(client.emojis.cache, fallbackEmojiInput.name);
+    if (emojiName && client?.emojis?.cache) {
+        const resolvedClientEmoji = findEmojiByName(client.emojis.cache, emojiName);
         if (resolvedClientEmoji) {
             return resolvedClientEmoji.toString();
         }
     }
 
-    if (reaction?.emoji?.id && reaction?.emoji?.name) {
-        const prefix = reaction.emoji.animated ? '<a:' : '<:';
-        return `${prefix}${reaction.emoji.name}:${reaction.emoji.id}>`;
+    if (preferCustomNameFallback && isCustomEmoji && reaction?.emoji?.name) {
+        return formatReactionFallbackDisplay(reaction.emoji.name);
     }
 
     if (reaction?.emoji?.identifier && reaction.emoji.identifier.includes(':')) {
@@ -276,13 +502,6 @@ async function resolveReactionDisplay(reaction, fallbackEmojiInput, guild = null
         }
     }
 
-    if (reaction?.emoji?.name && client?.emojis?.cache) {
-        const resolvedEmoji = client.emojis.cache.find(emoji => String(emoji.name || '').toLowerCase() === String(reaction.emoji.name).toLowerCase());
-        if (resolvedEmoji) {
-            return resolvedEmoji.toString();
-        }
-    }
-
     if (reaction?.emoji && typeof reaction.emoji.toString === 'function') {
         const rendered = String(reaction.emoji.toString()).trim();
         if (rendered && rendered !== `:${reaction?.emoji?.name || ''}:`) {
@@ -290,11 +509,15 @@ async function resolveReactionDisplay(reaction, fallbackEmojiInput, guild = null
         }
     }
 
-    if (reaction?.emoji?.name) {
-        return String(reaction.emoji.name);
+    if (decodedIdentifier) {
+        return decodedIdentifier;
     }
 
-    return fallbackEmojiInput?.display || fallbackEmojiInput?.raw || '?';
+    if (reaction?.emoji?.name) {
+        return formatReactionFallbackDisplay(reaction.emoji.name);
+    }
+
+    return formatReactionFallbackDisplay(fallbackEmojiInput?.display || fallbackEmojiInput?.raw || emojiName || '?');
 }
 
 function buildPreviewEmbed(session) {
@@ -315,19 +538,19 @@ function buildPreviewEmbed(session) {
             ...(session.fixedParticipants?.length
                 ? [{
                     name: t('reactionDraw.fixedParticipants', {}, session.locale),
-                    value: formatMentionList(session.fixedParticipants, session.locale),
+                    value: formatMentionList(session.fixedParticipants, session.locale, { compactReactions: true }),
                     inline: true,
                 }]
                 : []),
             ...(session.drawnParticipants?.length && session.fixedParticipants?.length
                 ? [{
                     name: t('reactionDraw.drawnParticipants', {}, session.locale),
-                    value: formatMentionList(session.drawnParticipants, session.locale),
+                    value: formatMentionList(session.drawnParticipants, session.locale, { compactReactions: true }),
                     inline: true,
                 }]
                 : (!session.fixedParticipants?.length ? [{
                     name: t('reactionDraw.previewCurrentSelection', {}, session.locale),
-                    value: formatMentionList(session.winners, session.locale),
+                    value: formatMentionList(session.winners, session.locale, { compactReactions: true }),
                     inline: true,
                 }] : [])),
         )
@@ -500,12 +723,20 @@ async function buildSessionFromInteraction(interaction) {
     const targetMessage = target.message;
     const reaction = target.reaction;
     const users = await reaction.users.fetch().catch(() => null);
-    const participants = Array.from(users?.values?.() ?? [])
+    let participants = Array.from(users?.values?.() ?? [])
         .filter(user => user && !user.bot)
         .map(user => ({
             id: String(user.id),
             label: user.globalName || user.username || String(user.id),
         }));
+
+    participants = await attachParticipantReactionDisplays(
+        targetMessage,
+        participants,
+        emoji,
+        interaction.guild,
+        interaction.client,
+    );
 
     if (!participants.length) {
         return {
@@ -546,10 +777,6 @@ async function buildSessionFromInteraction(interaction) {
 async function showPreview(interaction) {
     cleanupExpiredSessions();
     const result = await buildSessionFromInteraction(interaction);
-
-    if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    }
 
     if (!result.ok) {
         await interaction.editReply({

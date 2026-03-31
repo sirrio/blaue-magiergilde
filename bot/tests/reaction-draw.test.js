@@ -154,6 +154,72 @@ async function run() {
             }),
         },
     }), '<:MG_LT:123123123>');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: 'C_Wizard_24',
+            toString: () => ':C_Wizard_24:',
+        },
+    }, null), '[C_Wizard_24]');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: '977141248970342400',
+            name: 'n_19',
+            identifier: 'n_19:977141248970342400',
+            toString: () => '<:n_19:977141248970342400>',
+        },
+    }, null, null, null, { preferCustomNameFallback: true }), '[n_19]');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: 'C_Wizard_24',
+            toString: () => ':C_Wizard_24:',
+        },
+    }, null, {
+        emojis: {
+            fetch: async () => ({
+                find: (predicate) => {
+                    const emoji = {
+                        name: 'C_Wizard_24',
+                        toString: () => '<:C_Wizard_24:777777777>',
+                    };
+                    return predicate(emoji) ? emoji : null;
+                },
+            }),
+        },
+    }), '<:C_Wizard_24:777777777>');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: '',
+            identifier: '%F0%9F%94%9F',
+            toString: () => '',
+        },
+    }, null), '🔟');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: '',
+            identifier: '%F0%9F%8F%B9',
+            toString: () => '',
+        },
+    }, null), '🏹');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: '',
+            identifier: '%F0%9F%AA%93',
+            toString: () => '',
+        },
+    }, null), '🪓');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: '',
+            identifier: '%F0%9F%A4%9D',
+            toString: () => '',
+        },
+    }, null), '🤝');
 
     const drawn = drawParticipants(
         [
@@ -180,8 +246,8 @@ async function run() {
         reactionDisplay: '✅',
         requestedWinnerCount: 2,
         participants: [
-            { id: '1', label: 'Alpha' },
-            { id: '2', label: 'Beta' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '<:rank10blue:10>', '<:one:1>', '<:keycap_ten:10>', '<:n_12:12>', '<:C_Wizard_24:2>', '<:mg_bt:1>', '✅'] },
+            { id: '2', label: 'Beta', reactionDisplays: [] },
             { id: '3', label: 'Gamma' },
         ],
         winners: [
@@ -191,7 +257,7 @@ async function run() {
     });
 
     assert.equal(previewEmbed.data.title, 'Auswahl prüfen');
-    assert.equal(previewEmbed.data.fields[0].value.includes('Alpha'), true);
+    assert.equal(previewEmbed.data.fields[0].value.includes('Alpha 🔟 7️⃣ <:rank10blue:10> <:one:1> <:keycap_ten:10> <:n_12:12> <:C_Wizard_24:2> <:mg_bt:1> ✅'), true);
     assert.equal(previewEmbed.data.description.includes('Anmeldungen: **3**'), true);
     assert.equal(previewEmbed.data.fields[0].name, 'Anmeldeliste');
     assert.equal(previewEmbed.data.fields[1].name, 'Aktuell ausgewählt');
@@ -214,22 +280,24 @@ async function run() {
         ],
         fixedParticipantIds: ['1'],
         fixedParticipants: [
-            { id: '1', label: 'Alpha' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
         ],
         drawnParticipants: [
-            { id: '2', label: 'Beta' },
-            { id: '3', label: 'Gamma' },
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣', '🤝', '❤️'] },
+            { id: '3', label: 'Gamma', reactionDisplays: ['✊'] },
         ],
         winners: [
-            { id: '1', label: 'Alpha' },
-            { id: '2', label: 'Beta' },
-            { id: '3', label: 'Gamma' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣', '🤝', '❤️'] },
+            { id: '3', label: 'Gamma', reactionDisplays: ['✊'] },
         ],
     });
 
     assert.equal(previewWithFixedEmbed.data.fields[0].name, 'Anmeldeliste');
     assert.equal(previewWithFixedEmbed.data.fields[1].name, 'Fest gesetzt');
     assert.equal(previewWithFixedEmbed.data.fields[2].name, 'Zufällig gewählt');
+    assert.equal(previewWithFixedEmbed.data.fields[1].value.includes('<@1> · 🔟7️⃣✊🏹 +1'), true);
+    assert.equal(previewWithFixedEmbed.data.fields[2].value.includes('<@2> · 7️⃣🤝❤️'), true);
     assert.equal(previewWithFixedEmbed.data.fields.length, 3);
 
     const previewWithOnlyFixedEmbed = buildPreviewEmbed({
@@ -249,18 +317,19 @@ async function run() {
         ],
         fixedParticipantIds: ['1', '2'],
         fixedParticipants: [
-            { id: '1', label: 'Alpha' },
-            { id: '2', label: 'Beta' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣'] },
         ],
         drawnParticipants: [],
         winners: [
-            { id: '1', label: 'Alpha' },
-            { id: '2', label: 'Beta' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣'] },
         ],
     });
 
     assert.equal(previewWithOnlyFixedEmbed.data.fields[0].name, 'Anmeldeliste');
     assert.equal(previewWithOnlyFixedEmbed.data.fields[1].name, 'Fest gesetzt');
+    assert.equal(previewWithOnlyFixedEmbed.data.fields[1].value.includes('<@1> · 🔟7️⃣✊🏹 +1'), true);
     assert.equal(previewWithOnlyFixedEmbed.data.fields.length, 2);
 
     const previewComponents = buildPreviewComponents({
@@ -294,15 +363,15 @@ async function run() {
             { id: '3', label: 'Gamma' },
         ],
         winners: [
-            { id: '1', label: 'Alpha' },
-            { id: '2', label: 'Beta' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['7️⃣', '🤝', '❤️'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['✊'] },
         ],
         fixedParticipants: [
-            { id: '3', label: 'Gamma' },
+            { id: '3', label: 'Gamma', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
         ],
         drawnParticipants: [
-            { id: '1', label: 'Alpha' },
-            { id: '2', label: 'Beta' },
+            { id: '1', label: 'Alpha', reactionDisplays: ['7️⃣', '🤝', '❤️'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['✊'] },
         ],
     });
 
@@ -312,6 +381,8 @@ async function run() {
     assert.equal(publicEmbed.data.description.toLowerCase().includes('ins abenteuer kommen mit'), true);
     assert.equal(publicEmbed.data.fields[0].name, 'Fest gesetzt');
     assert.equal(publicEmbed.data.fields[1].name, 'Zufällig gewählt');
+    assert.equal(publicEmbed.data.fields[0].value.includes('<@3> · 🔟7️⃣✊🏹 +1'), true);
+    assert.equal(publicEmbed.data.fields[1].value.includes('<@1> · 7️⃣🤝❤️'), true);
     assert.equal(publicEmbed.data.fields[2].name, 'Charakterbögen');
     assert.equal(publicEmbed.data.fields[2].value.includes('Bitte schickt eure Charakterbögen an <@137565166001848320>.'), true);
 
