@@ -19,7 +19,8 @@ it('shows the character detail page for the owner', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('character/show')
-            ->where('character.id', $character->id));
+            ->where('character.id', $character->id)
+            ->has('guildCharacters'));
 });
 
 it('includes reviewed by name on character detail payload', function () {

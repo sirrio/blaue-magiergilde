@@ -32,7 +32,17 @@ const additionalBubblesForStartTier = (startTier?: Character['start_tier']): num
   return 0
 }
 
-const SetCharacterLevelModal = ({ character }: { character: Character }) => {
+const SetCharacterLevelModal = ({
+  character,
+  triggerClassName,
+  showLabel = false,
+  labelClassName,
+}: {
+  character: Character
+  triggerClassName?: string
+  showLabel?: boolean
+  labelClassName?: string
+}) => {
   const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const initialLevel = clampLevel(calculateLevel(character))
@@ -99,9 +109,15 @@ const SetCharacterLevelModal = ({ character }: { character: Character }) => {
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="sm" className="w-full justify-center gap-1" aria-label={t('characters.setLevel')} title={t('characters.setLevel')} onClick={() => setIsOpen(true)}>
+        <Button
+          size="sm"
+          className={triggerClassName ?? 'w-full justify-center gap-1'}
+          aria-label={t('characters.setLevel')}
+          title={t('characters.setLevel')}
+          onClick={() => setIsOpen(true)}
+        >
           <Gauge size={14} />
-          <span className="md:hidden">{t('characters.setLevel')}</span>
+          {showLabel ? <span className={labelClassName}>{t('characters.setLevel')}</span> : <span className="md:hidden">{t('characters.setLevel')}</span>}
         </Button>
       </ModalTrigger>
       <ModalTitle>

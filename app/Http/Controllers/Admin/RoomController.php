@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Room\CopyRoomMapRequest;
 use App\Http\Requests\Room\StoreRoomMapRequest;
 use App\Http\Requests\Room\StoreRoomRequest;
 use App\Http\Requests\Room\UpdateRoomMapRequest;
@@ -116,6 +117,33 @@ class RoomController extends Controller
         $roomMap->update($updates);
 
         return redirect()->route('admin.rooms.index', ['map' => $roomMap->id]);
+    }
+
+    public function copyMap(CopyRoomMapRequest $request, RoomMap $roomMap): RedirectResponse
+    {
+        $payload = $request->validated();
+
+        $copiedMap = RoomMap::query()->create([
+            'name' => $payload['name'],
+            'grid_columns' => $payload['grid_columns'],
+            'grid_rows' => $payload['grid_rows'],
+            'image_path' => $roomMap->image_path,
+        ]);
+
+        $roomMap->load('rooms');
+
+        $copiedMap->rooms()->createMany(
+            $roomMap->rooms->map(static fn (Room $room) => [
+                'name' => $room->name,
+                'grid_x' => $room->grid_x,
+                'grid_y' => $room->grid_y,
+                'grid_w' => $room->grid_w,
+                'grid_h' => $room->grid_h,
+                'character_id' => null,
+            ])->all(),
+        );
+
+        return redirect()->route('admin.rooms.index', ['map' => $copiedMap->id]);
     }
 
     public function update(UpdateRoomRequest $request, Room $room): RedirectResponse

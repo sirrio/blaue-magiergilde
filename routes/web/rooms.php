@@ -24,6 +24,7 @@ Route::middleware(['auth', 'admin'])
         Route::get('manage-rooms', [AdminRoomController::class, 'index'])->name('rooms.index');
         Route::post('manage-rooms/maps', [AdminRoomController::class, 'storeMap'])->name('rooms.maps.store');
         Route::patch('manage-rooms/maps/{roomMap}', [AdminRoomController::class, 'updateMap'])->name('rooms.maps.update');
+        Route::post('manage-rooms/maps/{roomMap}/copy', [AdminRoomController::class, 'copyMap'])->name('rooms.maps.copy');
         Route::post('manage-rooms', [AdminRoomController::class, 'store'])->name('rooms.store');
         Route::patch('manage-rooms/{room}', [AdminRoomController::class, 'update'])->name('rooms.update');
         Route::delete('manage-rooms/{room}', [AdminRoomController::class, 'destroy'])->name('rooms.destroy');

@@ -8,6 +8,10 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
+Route::get('/rote', function () {
+    return Inertia::render('welcome-red');
+})->name('home.red');
+
 Route::get('/impressum', fn () => Inertia::render('impressum'))->name('impressum');
 Route::get('/datenschutz', fn () => Inertia::render('datenschutz'))->name('datenschutz');
 
