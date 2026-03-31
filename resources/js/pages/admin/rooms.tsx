@@ -13,6 +13,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Eye,
   EyeOff,
   ImagePlus,
@@ -83,6 +84,16 @@ type RoomMapFormData = {
   grid_columns: number
   grid_rows: number
   image: File | null
+}
+
+const buildCopiedMapName = (name: string | null | undefined, suffix: string) => {
+  const trimmed = name?.trim()
+
+  if (!trimmed) {
+    return suffix
+  }
+
+  return `${trimmed} ${suffix}`
 }
 
 type LibraryCategory = {
@@ -170,8 +181,8 @@ const RoomFormModal = ({
       id: character.id,
       label: buildCharacterLabel(character),
     }))
-    return [{ id: null, label: 'Unassigned' }, ...base]
-  }, [filteredCharacters])
+    return [{ id: null, label: t('admin.unassigned') }, ...base]
+  }, [filteredCharacters, t])
 
   useEffect(() => {
     if (!isCharacterMenuOpen) return
@@ -199,7 +210,7 @@ const RoomFormModal = ({
           value={data.name}
           onChange={(e) => setData('name', e.target.value)}
         >
-          Name
+          {t('common.nickName')}
         </Input>
         <div className="relative w-full">
           <label className="label" htmlFor="room-character-search">
@@ -280,7 +291,7 @@ const RoomFormModal = ({
                 value={data.grid_x}
                 onChange={(e) => setData('grid_x', Number(e.target.value))}
               >
-                Grid X
+                {t('admin.gridX')}
               </Input>
               <Input
                 errors={errors.grid_y}
@@ -290,7 +301,7 @@ const RoomFormModal = ({
                 value={data.grid_y}
                 onChange={(e) => setData('grid_y', Number(e.target.value))}
               >
-                Grid Y
+                {t('admin.gridY')}
               </Input>
               <Input
                 errors={errors.grid_w}
@@ -300,7 +311,7 @@ const RoomFormModal = ({
                 value={data.grid_w}
                 onChange={(e) => setData('grid_w', Number(e.target.value))}
               >
-                Grid W
+                {t('admin.gridW')}
               </Input>
               <Input
                 errors={errors.grid_h}
@@ -310,7 +321,7 @@ const RoomFormModal = ({
                 value={data.grid_h}
                 onChange={(e) => setData('grid_h', Number(e.target.value))}
               >
-                Grid H
+                {t('admin.gridH')}
               </Input>
             </div>
             <p className="text-xs text-base-content/60">{t('admin.gridSize', { columns: map.grid_columns, rows: map.grid_rows })}</p>
@@ -338,7 +349,7 @@ const RoomMapFormModal = ({
   onClose,
 }: {
   open: boolean
-  mode: 'create' | 'edit'
+  mode: 'create' | 'edit' | 'copy'
   map?: RoomMap | null
   onClose: () => void
 }) => {
@@ -355,12 +366,12 @@ const RoomMapFormModal = ({
     if (!open) return
     reset()
     setData({
-      name: map?.name ?? '',
+      name: mode === 'copy' ? buildCopiedMapName(map?.name, t('admin.copySuffix')) : (map?.name ?? ''),
       grid_columns: map?.grid_columns ?? 38,
       grid_rows: map?.grid_rows ?? 38,
       image: null,
     })
-  }, [map, open, reset, setData])
+  }, [map, mode, open, reset, setData, t])
 
   const handleSubmit = () => {
     if (mode === 'create') {
@@ -372,6 +383,14 @@ const RoomMapFormModal = ({
     }
 
     if (!map) return
+
+    if (mode === 'copy') {
+      post(route('admin.rooms.maps.copy', { roomMap: map.id }), {
+        onSuccess: () => onClose(),
+      })
+      return
+    }
+
     patch(route('admin.rooms.maps.update', { roomMap: map.id }), {
       forceFormData: true,
       onSuccess: () => onClose(),
@@ -380,7 +399,13 @@ const RoomMapFormModal = ({
 
   return (
     <Modal isOpen={open} onClose={onClose}>
-      <ModalTitle>{mode === 'create' ? t('admin.addFloor') : t('admin.editFloor')}</ModalTitle>
+      <ModalTitle>
+        {mode === 'create'
+          ? t('admin.addFloor')
+          : mode === 'copy'
+            ? t('admin.copyFloor')
+            : t('admin.editFloor')}
+      </ModalTitle>
       <ModalContent>
         <Input
           errors={errors.name}
@@ -412,20 +437,24 @@ const RoomMapFormModal = ({
             {t('admin.gridRows')}
           </Input>
         </div>
-        <FileInput
-          errors={errors.image ? `${errors.image} The file might be too large.` : ''}
-          onChange={(e) => setData('image', e.target?.files?.[0] ?? null)}
-        >
-          {mode === 'create' ? t('admin.mapImage') : t('admin.replaceImageOptional')}
-        </FileInput>
+        {mode !== 'copy' ? (
+          <FileInput
+            errors={errors.image ? `${errors.image} The file might be too large.` : ''}
+            onChange={(e) => setData('image', e.target?.files?.[0] ?? null)}
+          >
+            {mode === 'create' ? t('admin.mapImage') : t('admin.replaceImageOptional')}
+          </FileInput>
+        ) : null}
         <p className="text-xs text-base-content/60">
           {mode === 'create'
             ? t('admin.mapCreateHint')
-            : t('admin.mapEditHint')}
+            : mode === 'copy'
+              ? t('admin.mapCopyHint')
+              : t('admin.mapEditHint')}
         </p>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing}>
-        {mode === 'create' ? t('common.save') : t('admin.update')}
+        {mode === 'create' ? t('common.save') : mode === 'copy' ? t('admin.copyFloor') : t('admin.update')}
       </ModalAction>
     </Modal>
   )
@@ -471,7 +500,7 @@ export default function Rooms({
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false)
   const [isMoveMode, setIsMoveMode] = useState(false)
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
-  const [mapModalMode, setMapModalMode] = useState<'create' | 'edit'>('create')
+  const [mapModalMode, setMapModalMode] = useState<'create' | 'edit' | 'copy'>('create')
   const [mapModalTarget, setMapModalTarget] = useState<RoomMap | null>(null)
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
@@ -667,7 +696,7 @@ export default function Rooms({
 
   const handleAdminDeleteRoom = (room: Room | null) => {
     if (!room) return
-    if (!window.confirm('Delete this room assignment?')) return
+    if (!window.confirm(t('admin.deleteRoomConfirm'))) return
     router.delete(route('admin.rooms.destroy', { room: room.id }), {
       preserveScroll: true,
       onSuccess: () => {
@@ -692,18 +721,25 @@ export default function Rooms({
     setIsMapModalOpen(true)
   }
 
+  const openCopyMapModal = () => {
+    if (!activeMap) return
+    setMapModalMode('copy')
+    setMapModalTarget(activeMap)
+    setIsMapModalOpen(true)
+  }
+
   const noMapView = (
     <AppLayout>
-      <Head title="Rooms" />
+      <Head title={canManageRooms ? t('nav.manageRooms') : t('nav.rooms')} />
       <div className="container mx-auto max-w-5xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Rooms</h1>
-            <p className="text-sm text-base-content/70">No room maps configured yet.</p>
+            <h1 className="text-2xl font-bold">{canManageRooms ? t('nav.manageRooms') : t('nav.rooms')}</h1>
+            <p className="text-sm text-base-content/70">{t('admin.noRoomMapsConfigured')}</p>
           </div>
           {canManageRooms ? (
             <Button size="sm" variant="outline" onClick={openCreateMapModal}>
-              Add floor
+              {t('admin.addFloor')}
             </Button>
           ) : null}
         </div>
@@ -1690,21 +1726,21 @@ export default function Rooms({
       })
 
       if (!response.ok) {
-        toast.show('Asset could not be added.', 'error')
+        toast.show(t('admin.assetAddFailed'), 'error')
         return
       }
 
-      toast.show('Asset added.', 'info')
+      toast.show(t('admin.assetAdded'), 'info')
       router.reload()
     } catch {
-      toast.show('Asset could not be added.', 'error')
+      toast.show(t('admin.assetAddFailed'), 'error')
     }
   }
 
   const handleAdminClearAssets = () => {
     if (!canManageRooms || !selectedRoom) return
     if (!selectedRoom.assets || selectedRoom.assets.length === 0) return
-    if (!window.confirm('Delete all assets for this room?')) return
+    if (!window.confirm(t('admin.deleteAllAssetsConfirm'))) return
 
     router.delete(route('admin.rooms.assets.destroy', { room: selectedRoom.id }), {
       preserveScroll: true,
@@ -1713,9 +1749,9 @@ export default function Rooms({
         router.reload()
       },
       onError: () => {
-      toast.show('Assets could not be removed.', 'error')
-    },
-  })
+        toast.show(t('admin.assetsRemoveFailed'), 'error')
+      },
+    })
   }
 
   if (!activeMap) {
@@ -1724,15 +1760,15 @@ export default function Rooms({
 
   return (
     <AppLayout>
-      <Head title="Rooms" />
+      <Head title={canManageRooms ? t('nav.manageRooms') : t('nav.rooms')} />
       <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">Rooms</h1>
+            <h1 className="text-2xl font-bold">{canManageRooms ? t('nav.manageRooms') : t('nav.rooms')}</h1>
             <p className="text-sm text-base-content/70">
               {canManageRooms
-                ? 'Assign characters to rooms on the castle map. Drag a grid area to add a room.'
-                : 'Place your room assets on the map.'}
+                ? t('admin.roomsAdminSubtitle')
+                : t('admin.roomsUserSubtitle')}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1744,7 +1780,7 @@ export default function Rooms({
                 }
                 className="select-sm"
               >
-                <SelectLabel className="sr-only">Floor</SelectLabel>
+                <SelectLabel className="sr-only">{t('admin.floor')}</SelectLabel>
                 <SelectOptions>
                   {roomMaps.map((map) => (
                     <option key={map.id} value={map.id}>
@@ -1757,14 +1793,17 @@ export default function Rooms({
             {canManageRooms ? (
               <>
                 <Button size="sm" variant="outline" onClick={openCreateMapModal}>
-                  <Plus size={14} /> Add floor
+                  <Plus size={14} /> {t('admin.addFloor')}
                 </Button>
                 <Button size="sm" variant="outline" onClick={openEditMapModal}>
-                  <Pencil size={14} /> Edit floor
+                  <Pencil size={14} /> {t('admin.editFloor')}
+                </Button>
+                <Button size="sm" variant="outline" onClick={openCopyMapModal}>
+                  <Copy size={14} /> {t('admin.copyFloor')}
                 </Button>
                 {selection ? (
                   <Button size="sm" variant="outline" onClick={resetSelection}>
-                    Clear selection
+                    {t('admin.clearSelection')}
                   </Button>
                 ) : null}
               </>
@@ -1775,12 +1814,12 @@ export default function Rooms({
         <div className="rounded-box border border-base-200 bg-base-100 p-4">
           <div className="text-xs text-base-content/60 flex items-center gap-2">
             <MapPin size={14} />
-            Grid: {gridColumns} x {gridRows} | Rooms: {roomList.length}
+            {t('admin.gridRoomsSummary', { columns: gridColumns, rows: gridRows, rooms: roomList.length })}
           </div>
           {showTopPanel ? (
             <div className="mt-4 grid w-full gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-base-200 bg-base-100 px-3 py-2 text-xs">
-                <p className="text-[11px] uppercase text-base-content/50">Your room</p>
+                <p className="text-[11px] uppercase text-base-content/50">{t('admin.yourRoom')}</p>
                 <div className="mt-2 flex items-center gap-2">
                   {selectedRoom ? (
                     <>
@@ -1800,27 +1839,27 @@ export default function Rooms({
                       </span>
                     </>
                   ) : (
-                    <span className="text-xs text-base-content/50">No room selected.</span>
+                    <span className="text-xs text-base-content/50">{t('admin.noRoomSelected')}</span>
                   )}
                 </div>
               </div>
               <div className="rounded-xl border border-base-200 bg-base-100 px-3 py-2 text-xs">
-                <p className="text-[11px] uppercase text-base-content/50">Asset library</p>
+                <p className="text-[11px] uppercase text-base-content/50">{t('admin.assetLibrary')}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-base-content/60">
-                    {libraryTotal > 0 ? `${libraryTotal} assets` : 'Browse assets'}
+                    {libraryTotal > 0 ? t('admin.assetCount', { count: libraryTotal }) : t('admin.browseAssets')}
                   </span>
                   <Button size="xs" variant="outline" onClick={() => setIsLibraryOpen(true)} className="gap-2">
                     <Search size={14} />
-                    Browse
+                    {t('admin.browse')}
                   </Button>
                 </div>
               </div>
               <div className="rounded-xl border border-base-200 bg-base-100 px-3 py-2 text-xs">
-                <p className="text-[11px] uppercase text-base-content/50">Room assets</p>
+                <p className="text-[11px] uppercase text-base-content/50">{t('admin.roomAssets')}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-base-content/60">
-                    {selectedRoom ? `${selectedRoomAssets.length} assets` : 'No room selected'}
+                    {selectedRoom ? t('admin.assetCount', { count: selectedRoomAssets.length }) : t('admin.noRoomSelected')}
                   </span>
                   <Button
                     size="xs"
@@ -1830,7 +1869,7 @@ export default function Rooms({
                     className="gap-2"
                   >
                     <ImagePlus size={14} />
-                    Upload
+                    {t('admin.upload')}
                   </Button>
                 </div>
               </div>
@@ -1881,7 +1920,7 @@ export default function Rooms({
                     aria-pressed={showOverlays}
                   >
                     {showOverlays ? <EyeOff size={12} /> : <Eye size={12} />}
-                    {showOverlays ? 'Hide label' : 'Show label'}
+                    {showOverlays ? t('admin.hideLabels') : t('admin.showLabels')}
                   </Button>
                   <span className="h-4 w-px bg-base-200/80" />
                   <Button size="xs" variant="ghost" onClick={handleZoomOut}>
@@ -1892,7 +1931,7 @@ export default function Rooms({
                     <Plus size={12} />
                   </Button>
                   <Button size="xs" variant="ghost" onClick={handleResetView}>
-                    Reset
+                    {t('admin.resetView')}
                   </Button>
                   {!canManageRooms ? (
                     <>
@@ -1903,7 +1942,7 @@ export default function Rooms({
                         onClick={() => setIsCanvasExpanded((value) => !value)}
                       >
                         {isCanvasExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-                        {isCanvasExpanded ? 'Collapse' : 'Expand'}
+                        {isCanvasExpanded ? t('admin.collapse') : t('admin.expand')}
                       </Button>
                     </>
                   ) : null}
@@ -1966,8 +2005,9 @@ export default function Rooms({
                                     onPointerDown={(event) => handleRotatePointerDown(event, asset, room)}
                                     onPointerMove={(event) => handleRotatePointerMove(event, asset, room)}
                                     onPointerUp={(event) => handleRotatePointerUp(event, asset)}
-                                    aria-label="Rotate asset"
-                                  />
+                            aria-label="Rotate asset"
+                            title={t('admin.rotateAsset')}
+                          />
                                   {resizeHandlePositions.map((handle) => (
                                     <button
                                       key={`${asset.id}-${handle.key}`}
@@ -1981,6 +2021,7 @@ export default function Rooms({
                                       onPointerMove={(event) => handleResizePointerMove(event, asset, room)}
                                       onPointerUp={(event) => handleResizePointerUp(event, asset)}
                                       aria-label="Resize asset"
+                                      title={t('admin.resizeAsset')}
                                     />
                                   ))}
                                 </>
@@ -1998,7 +2039,8 @@ export default function Rooms({
                                 event.stopPropagation()
                                 handleAssetDelete(asset.id, room)
                               }}
-                              aria-label="Remove asset"
+                              aria-label={t('admin.removeAsset')}
+                              title={t('admin.removeAsset')}
                             >
                               <Trash2 size={12} />
                             </button>
@@ -2013,7 +2055,8 @@ export default function Rooms({
                                 event.stopPropagation()
                                 handleAssetLockToggle(asset)
                               }}
-                              aria-label={isLocked ? 'Unlock asset' : 'Lock asset'}
+                              aria-label={isLocked ? t('admin.unlockAsset') : t('admin.lockAsset')}
+                              title={isLocked ? t('admin.unlockAsset') : t('admin.lockAsset')}
                             >
                               {isLocked ? <Lock size={12} /> : <Unlock size={12} />}
                             </button>
@@ -2029,7 +2072,8 @@ export default function Rooms({
                                 if (isLocked) return
                                 handleAssetReset(asset)
                               }}
-                              aria-label="Reset asset"
+                              aria-label={t('admin.resetAsset')}
+                              title={t('admin.resetAsset')}
                             >
                               <RotateCcw size={12} />
                             </button>
@@ -2158,23 +2202,23 @@ export default function Rooms({
               <div className="w-80 shrink-0 space-y-3" style={{ gridColumn: '2 / 3' }}>
               {canManageRooms ? (
                 <div className="rounded-xl border border-base-200 p-4">
-                  <h2 className="text-sm font-semibold">Selected room</h2>
+                  <h2 className="text-sm font-semibold">{t('admin.selectedRoom')}</h2>
                   <p className="mt-1 text-xs text-base-content/60">
-                    {selectedRoom ? 'Manage the current room assignment.' : 'Select a room to manage it.'}
+                    {selectedRoom ? t('admin.selectedRoomSubtitle') : t('admin.selectRoomToManage')}
                   </p>
                   {isMoveMode && selectedRoom ? (
                     <p className="mt-2 text-xs text-base-content/60">
-                      Drag a new area on the map to reposition this room.
+                      {t('admin.dragToRepositionRoom')}
                     </p>
                   ) : null}
                   <div className="mt-3 space-y-2 text-xs text-base-content/70">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-base-content/50">Room</span>
-                      <span className="truncate">{selectedRoom?.name ?? 'None selected'}</span>
+                      <span className="text-base-content/50">{t('admin.room')}</span>
+                      <span className="truncate">{selectedRoom?.name ?? t('admin.noneSelected')}</span>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-base-content/50">Assigned</span>
-                      <span className="truncate">{selectedRoom?.character?.name ?? 'Unassigned'}</span>
+                      <span className="text-base-content/50">{t('admin.assigned')}</span>
+                      <span className="truncate">{selectedRoom?.character?.name ?? t('admin.unassigned')}</span>
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -2190,7 +2234,7 @@ export default function Rooms({
                       }}
                     >
                       <MapPin size={14} />
-                      {isMoveMode ? 'Cancel move' : 'Move room'}
+                      {isMoveMode ? t('admin.cancelMove') : t('admin.moveRoom')}
                     </Button>
                     <Button
                       size="xs"
@@ -2204,7 +2248,7 @@ export default function Rooms({
                         }
                       }}
                     >
-                      Edit room
+                      {t('admin.editRoom')}
                     </Button>
                     <Button
                       size="xs"
@@ -2213,7 +2257,7 @@ export default function Rooms({
                       disabled={!selectedRoom}
                       onClick={() => handleAdminDeleteRoom(selectedRoom)}
                     >
-                      Delete room
+                      {t('admin.deleteRoom')}
                     </Button>
                     <Button
                       size="xs"
@@ -2222,22 +2266,27 @@ export default function Rooms({
                       disabled={!selectedRoom || !selectedRoom.assets || selectedRoom.assets.length === 0}
                       onClick={handleAdminClearAssets}
                     >
-                      Clear assets
+                      {t('admin.clearAssets')}
                     </Button>
                   </div>
                   {selection ? (
                     <div className="mt-3 flex items-center gap-2 text-[11px] text-base-content/60">
                       <Check size={12} />
-                      Selected area: X{selection.grid_x} Y{selection.grid_y} x {selection.grid_w}x{selection.grid_h}
+                      {t('admin.selectedArea', {
+                        x: selection.grid_x,
+                        y: selection.grid_y,
+                        w: selection.grid_w,
+                        h: selection.grid_h,
+                      })}
                     </div>
                   ) : null}
                 </div>
               ) : (
                 <div className="rounded-xl border border-base-200 p-4 h-[120px] flex flex-col">
                   <div>
-                    <h2 className="text-sm font-semibold">Your room</h2>
+                    <h2 className="text-sm font-semibold">{t('admin.yourRoom')}</h2>
                     <p className="mt-1 text-xs text-base-content/60">
-                      Select your room on the map to manage your assets.
+                      {t('admin.selectYourRoomToManageAssets')}
                     </p>
                   </div>
                   <div className="mt-auto flex items-center gap-2">
@@ -2259,7 +2308,7 @@ export default function Rooms({
                         </span>
                       </>
                     ) : (
-                      <span className="min-h-[18px] truncate text-xs text-base-content/50">No room selected.</span>
+                      <span className="min-h-[18px] truncate text-xs text-base-content/50">{t('admin.noRoomSelected')}</span>
                     )}
                   </div>
                 </div>
@@ -2268,22 +2317,22 @@ export default function Rooms({
                 <div className="rounded-xl border border-base-200 p-4 h-[140px] flex flex-col">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-semibold">Asset library</h3>
-                      <p className="mt-1 text-xs text-base-content/60">Browse furniture and add it to your room.</p>
+                      <h3 className="text-sm font-semibold">{t('admin.assetLibrary')}</h3>
+                      <p className="mt-1 text-xs text-base-content/60">{t('admin.assetLibrarySubtitle')}</p>
                     </div>
                     <Button size="xs" variant="outline" onClick={() => setIsLibraryOpen(true)} className="gap-2">
                       <Search size={14} />
-                      Browse
+                      {t('admin.browse')}
                     </Button>
                   </div>
                   <div className="mt-auto space-y-2">
                     <div className="text-xs text-base-content/50">
                       {libraryTotal > 0
-                        ? `${libraryTotal} assets | ${libraryCategories.length} categories`
-                        : 'Open the library to load available assets.'}
+                        ? t('admin.assetCategorySummary', { assets: libraryTotal, categories: libraryCategories.length })
+                        : t('admin.openLibraryHint')}
                     </div>
                     <p className="text-[11px] text-base-content/45">
-                      Assets by{' '}
+                      {t('admin.assetsBy')}{' '}
                       <a
                         href="https://2minutetabletop.com/"
                         target="_blank"
@@ -2300,24 +2349,24 @@ export default function Rooms({
               {canManageRooms ? (
                 <div className="rounded-xl border border-base-200 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold">Room assets</h3>
+                    <h3 className="text-sm font-semibold">{t('admin.roomAssets')}</h3>
                     <span className="text-xs text-base-content/50">
-                      {selectedRoom ? `${selectedRoom.assets?.length ?? 0} assets` : 'No room selected'}
+                      {selectedRoom ? t('admin.assetCount', { count: selectedRoom.assets?.length ?? 0 }) : t('admin.noRoomSelected')}
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-base-content/60">
                     {selectedRoom
-                      ? 'Assets are read-only here. Manage them in /rooms.'
-                      : 'Select a room to view its asset summary.'}
+                      ? t('admin.roomAssetsReadOnly')
+                      : t('admin.selectRoomForAssetSummary')}
                   </p>
                 </div>
               ) : (
                 <div className="rounded-xl border border-base-200 p-4 h-[420px] flex flex-col">
                   <div className="flex min-h-[32px] items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-semibold">Room assets</h3>
+                      <h3 className="text-sm font-semibold">{t('admin.roomAssets')}</h3>
                       <p className="mt-1 text-xs text-base-content/60 line-clamp-1">
-                        {selectedRoom ? `Assets for ${selectedRoom.name}.` : 'Select a room to view assets.'}
+                        {selectedRoom ? t('admin.assetsForRoom', { name: selectedRoom.name }) : t('admin.selectRoomToViewAssets')}
                       </p>
                     </div>
                     <div className="flex min-h-[28px] items-center gap-2">
@@ -2330,7 +2379,7 @@ export default function Rooms({
                             className="w-24 justify-center gap-2"
                           >
                             <ImagePlus size={14} />
-                            Upload
+                            {t('admin.upload')}
                           </Button>
                         ) : (
                           <span className="inline-block h-7 w-24" />
@@ -2343,11 +2392,11 @@ export default function Rooms({
                     style={{ scrollbarGutter: 'stable' }}
                   >
                     {!selectedRoom ? (
-                      <p className="text-base-content/50">Select a room to view assets.</p>
+                      <p className="text-base-content/50">{t('admin.selectRoomToViewAssets')}</p>
                     ) : !canViewRoomAssets(selectedRoom) ? (
-                      <p className="text-base-content/50">Assets are private to the room owner.</p>
+                      <p className="text-base-content/50">{t('admin.assetsPrivate')}</p>
                     ) : selectedRoomAssets.length === 0 ? (
-                      <p className="text-base-content/50">No assets yet.</p>
+                      <p className="text-base-content/50">{t('admin.noAssetsYet')}</p>
                     ) : (
                       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                         {selectedRoomAssets.map((asset) => (
@@ -2375,23 +2424,26 @@ export default function Rooms({
                   <div className="mt-4 h-[18px] overflow-hidden border-t border-base-200 pt-3 text-xs text-base-content/60">
                     {selectedAsset && selectedAssetRoom?.id === selectedRoom?.id ? (
                       <span className="line-clamp-1">
-                        Use the on-map handles to rotate, resize, or delete the selected asset.
+                        {t('admin.assetControlsHint')}
                       </span>
                     ) : (
-                      <span className="line-clamp-1 text-base-content/40">Select an asset to see controls.</span>
+                      <span className="line-clamp-1 text-base-content/40">{t('admin.selectAssetHint')}</span>
                     )}
                   </div>
                 </div>
               )}
               {canManageRooms ? (
                 <div className="rounded-xl border border-base-200 p-4">
-                  <h3 className="text-sm font-semibold">Assigned characters</h3>
+                  <h3 className="text-sm font-semibold">{t('admin.assignedCharacters')}</h3>
                   <p className="mt-1 text-xs text-base-content/60">
-                    {roomList.filter((room) => room.character_id).length} of {roomList.length} rooms occupied.
+                    {t('admin.occupiedRooms', {
+                      occupied: roomList.filter((room) => room.character_id).length,
+                      total: roomList.length,
+                    })}
                   </p>
                   <div className="mt-3 space-y-1 text-xs text-base-content/70 max-h-64 overflow-y-auto">
                     {roomList.length === 0 ? (
-                      <p className="text-base-content/50">No rooms created yet.</p>
+                      <p className="text-base-content/50">{t('admin.noRoomsCreated')}</p>
                     ) : (
                       roomList.map((room) => {
                         const isSelected = selectedRoomId === room.id
@@ -2410,7 +2462,7 @@ export default function Rooms({
                           >
                             <span className="truncate">{room.name}</span>
                             <span className="truncate text-base-content/50">
-                              {room.character?.name ?? 'Unassigned'}
+                              {room.character?.name ?? t('admin.unassigned')}
                             </span>
                           </button>
                         )
@@ -2428,8 +2480,8 @@ export default function Rooms({
       {canManageRooms && draftSelection ? (
         <RoomFormModal
           open
-          title="Add room"
-          submitLabel="Save"
+          title={t('admin.addRoom')}
+          submitLabel={t('common.save')}
           map={activeMap}
           characters={sortedCharacters}
           initialValues={mapSelectionToForm(draftSelection, activeMap.id)}
@@ -2445,8 +2497,8 @@ export default function Rooms({
       {canManageRooms && editingRoom ? (
         <RoomFormModal
           open
-          title="Edit room"
-          submitLabel="Save"
+          title={t('admin.editRoom')}
+          submitLabel={t('common.save')}
           map={activeMap}
           characters={sortedCharacters}
           initialValues={{
@@ -2471,7 +2523,7 @@ export default function Rooms({
             errors={errors?.image ? String(errors.image) : ''}
             onChange={(event) => setAssetForm('image', event.target?.files?.[0] ?? null)}
           >
-            Asset image
+            {t('admin.assetImage')}
           </FileInput>
           <p className="text-xs text-base-content/60">{t('admin.imagesOnlyHint')}</p>
         </ModalContent>
@@ -2488,7 +2540,7 @@ export default function Rooms({
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
                 <label className="label sr-only" htmlFor="asset-library-search">
-                  Search
+                  {t('common.search')}
                 </label>
                 <input
                   id="asset-library-search"
@@ -2500,9 +2552,9 @@ export default function Rooms({
                 />
               </div>
               <Select value={libraryCategory} onChange={(event) => setLibraryCategory(event.target.value)}>
-                <SelectLabel>Category</SelectLabel>
+                <SelectLabel>{t('admin.category')}</SelectLabel>
                 <SelectOptions>
-                  <option value="">All categories</option>
+                  <option value="">{t('admin.allCategories')}</option>
                   {libraryCategories.map((category) => (
                     <option key={category.key} value={category.key}>
                       {category.label}
@@ -2520,7 +2572,7 @@ export default function Rooms({
               ) : libraryError ? (
                 <p className="text-xs text-error">{libraryError}</p>
               ) : libraryItems.length === 0 ? (
-                <p className="text-xs text-base-content/50">No assets found.</p>
+                <p className="text-xs text-base-content/50">{t('admin.noAssetsFound')}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {libraryItems.map((item) => (
@@ -2546,7 +2598,7 @@ export default function Rooms({
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-base-content/60">
               <span>
-                Page {libraryPage} / {libraryTotalPages}
+                {t('admin.pageSummary', { page: libraryPage, total: libraryTotalPages })}
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -2568,7 +2620,7 @@ export default function Rooms({
               </div>
             </div>
             <p className="mt-3 text-xs text-base-content/60">
-              Assets by{' '}
+              {t('admin.assetsBy')}{' '}
               <a
                 href="https://2minutetabletop.com/"
                 target="_blank"
