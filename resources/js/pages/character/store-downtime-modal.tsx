@@ -9,7 +9,17 @@ import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { FlameKindling } from 'lucide-react'
 
-const StoreDowntimeModal = ({ character }: { character: Character }) => {
+const StoreDowntimeModal = ({
+  character,
+  triggerClassName,
+  showLabel = false,
+  labelClassName,
+}: {
+  character: Character
+  triggerClassName?: string
+  showLabel?: boolean
+  labelClassName?: string
+}) => {
   const t = useTranslate()
   const initialFormData = {
     duration: 0,
@@ -34,13 +44,13 @@ const StoreDowntimeModal = ({ character }: { character: Character }) => {
       <ModalTrigger>
         <Button
           size="sm"
-          className="w-full justify-center gap-1"
+          className={triggerClassName ?? 'w-full justify-center gap-1'}
           disabled={character.is_filler}
           aria-label={t('characters.addDowntime')}
           title={t('characters.addDowntime')}
         >
           <FlameKindling size={14} />
-          <span className="md:hidden">{t('characters.downtime')}</span>
+          {showLabel ? <span className={labelClassName}>{t('characters.addDowntime')}</span> : <span className="md:hidden">{t('characters.downtime')}</span>}
         </Button>
       </ModalTrigger>
       <ModalTitle>{t('characters.addDowntimeTitle')}</ModalTitle>

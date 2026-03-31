@@ -15,6 +15,9 @@ import type { FormDataConvertible } from '@inertiajs/core'
 interface AlliesModalProps {
   character: Character
   guildCharacters?: Character[]
+  triggerClassName?: string
+  showLabel?: boolean
+  labelClassName?: string
 }
 
 const getAllyAvatarSrc = (ally: Ally) => {
@@ -611,7 +614,13 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
   )
 }
 
-export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharacters = [] }) => {
+export const AlliesModal: React.FC<AlliesModalProps> = ({
+  character,
+  guildCharacters = [],
+  triggerClassName,
+  showLabel = false,
+  labelClassName,
+}) => {
   const t = useTranslate()
   const sharedAdventureCountMap = useMemo(() => buildSharedAdventureCountMap(character), [character])
   const alliesWithSharedCounts = useMemo(
@@ -783,9 +792,14 @@ export const AlliesModal: React.FC<AlliesModalProps> = ({ character, guildCharac
   return (
     <Modal wide>
       <ModalTrigger>
-        <Button size="sm" className="w-full justify-center gap-1" aria-label={t('characters.manageAllies')} title={t('characters.manageAllies')}>
+        <Button
+          size="sm"
+          className={triggerClassName ?? 'w-full justify-center gap-1'}
+          aria-label={t('characters.manageAllies')}
+          title={t('characters.manageAllies')}
+        >
           <BookHeart size={14} />
-          <span className="md:hidden">{t('characters.allies')}</span>
+          {showLabel ? <span className={labelClassName}>{t('characters.manageAllies')}</span> : <span className="md:hidden">{t('characters.allies')}</span>}
         </Button>
       </ModalTrigger>
       <ModalTitle>{t('characters.manageAlliesTitle')}</ModalTitle>

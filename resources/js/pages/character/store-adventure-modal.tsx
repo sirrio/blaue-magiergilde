@@ -11,7 +11,19 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Swords } from 'lucide-react'
 import React, { useState } from 'react'
 
-const StoreAdventureModal = ({ character, guildCharacters = [] }: { character: Character; guildCharacters?: Character[] }) => {
+const StoreAdventureModal = ({
+  character,
+  guildCharacters = [],
+  triggerClassName,
+  showLabel = false,
+  labelClassName,
+}: {
+  character: Character
+  guildCharacters?: Character[]
+  triggerClassName?: string
+  showLabel?: boolean
+  labelClassName?: string
+}) => {
   const t = useTranslate()
   const initialFormData = {
     duration: 10800,
@@ -41,9 +53,14 @@ const StoreAdventureModal = ({ character, guildCharacters = [] }: { character: C
   return (
     <Modal>
       <ModalTrigger>
-        <Button size="sm" className="w-full justify-center gap-1" aria-label={t('characters.addAdventure')} title={t('characters.addAdventure')}>
+        <Button
+          size="sm"
+          className={triggerClassName ?? 'w-full justify-center gap-1'}
+          aria-label={t('characters.addAdventure')}
+          title={t('characters.addAdventure')}
+        >
           <Swords size={14} />
-          <span className="md:hidden">{t('characters.adventure')}</span>
+          {showLabel ? <span className={labelClassName}>{t('characters.addAdventure')}</span> : <span className="md:hidden">{t('characters.adventure')}</span>}
         </Button>
       </ModalTrigger>
       <ModalTitle>{t('characters.addAdventureTitle')}</ModalTitle>

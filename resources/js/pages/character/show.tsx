@@ -5,6 +5,10 @@ import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
+import { AlliesModal } from '@/pages/character/allies-modal'
+import StoreAdventureModal from '@/pages/character/store-adventure-modal'
+import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
+import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import AppLayout from '@/layouts/app-layout'
 import { useTranslate } from '@/lib/i18n'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
@@ -19,8 +23,8 @@ import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubbles
 import { calculateTier } from '@/helper/calculateTier'
 import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
 import { Progress } from '@/components/ui/progress'
-import { Character, Ally } from '@/types'
-import { Head, Link, router } from '@inertiajs/react'
+import { Character, Ally, PageProps } from '@/types'
+import { Head, Link, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import {
   Anvil,
@@ -35,6 +39,7 @@ import {
   Crown,
   Droplets,
   FlameKindling,
+  Gauge,
   Handshake,
   Heart,
   LoaderCircle,
@@ -144,6 +149,7 @@ export default function Show({
   readOnly?: boolean
 }) {
   const t = useTranslate()
+  const { features } = usePage<PageProps>().props
   const isReadOnly = readOnly || Boolean(character.deleted_at)
   const level = calculateLevel(character)
   const tier = calculateTier(character)
@@ -158,6 +164,11 @@ export default function Show({
     ? `${statusHint} ${t('common.note')}: ${reviewNote}`
     : statusHint
   const avatarMasked = character.avatar_masked ?? true
+  const simplifiedTracking = character.simplified_tracking ?? false
+  const draftOnlyMode = !(features?.character_status_switch ?? true)
+  const requiresRegistration = guildStatus === 'draft' || guildStatus === 'needs_changes'
+  const canLogActivity = draftOnlyMode || !requiresRegistration
+  const requiresSubmissionBeforeDowntime = !draftOnlyMode && requiresRegistration
   const [activeAdventureModalId, setActiveAdventureModalId] = useState<number | null>(null)
   const [activeDowntimeModalId, setActiveDowntimeModalId] = useState<number | null>(null)
   const [activeNotes, setActiveNotes] = useState<{ title: string; notes: string } | null>(null)
@@ -314,6 +325,10 @@ export default function Show({
   const factionLevel = useMemo(() => character.faction_rank ?? calculateFactionLevel(character), [character])
   const remainingDowntimeDuration = useMemo(() => Math.max(0, calculateRemainingDowntime(character)), [character])
   const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
+  const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
+  const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
+  const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
+  const submissionRequiredReason = t('characters.submissionRequired')
   const statusIcon = guildStatus === 'approved'
     ? <CheckCircle2 size={12} />
     : guildStatus === 'declined'
@@ -456,31 +471,67 @@ export default function Show({
 
         <div>
           <div className="rounded-box border border-base-200 bg-base-100">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() =>
-                startAdventuresTransition(() => setAdventuresOpen((current) => !current))
-              }
-              aria-expanded={adventuresOpen}
-              disabled={character.adventures.length === 0}
-            >
-              <div className="flex items-center gap-2">
-                {adventuresOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                {isAdventuresPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
-                <div>
-                  <h2 className="text-base font-semibold">Adventures</h2>
-                  <p className="text-xs text-base-content/60">
-                    {character.adventures.length === 0
-                      ? t('characters.noAdventuresRecorded')
-                      : t('characters.entriesTotal', {
-                          count: character.adventures.length,
-                          duration: secondsToHourMinuteString(adventureTotalDuration),
-                        })}
-                  </p>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
+                onClick={() =>
+                  startAdventuresTransition(() => setAdventuresOpen((current) => !current))
+                }
+                aria-expanded={adventuresOpen}
+                disabled={character.adventures.length === 0}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  {adventuresOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {isAdventuresPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold">Adventures</h2>
+                    <p className="text-xs text-base-content/60">
+                      {character.adventures.length === 0
+                        ? t('characters.noAdventuresRecorded')
+                        : t('characters.entriesTotal', {
+                            count: character.adventures.length,
+                            duration: secondsToHourMinuteString(adventureTotalDuration),
+                          })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+              {!isReadOnly ? (
+                requiresSubmissionBeforeDowntime ? (
+                  <div
+                    className="tooltip tooltip-left shrink-0"
+                    data-tip={submissionRequiredReason}
+                    aria-label={submissionRequiredReason}
+                  >
+                    <Button
+                      size="sm"
+                      className="shrink-0 gap-1"
+                      disabled
+                      aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
+                    >
+                      {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
+                      <span className="hidden sm:inline">{simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventure')}</span>
+                    </Button>
+                  </div>
+                ) : simplifiedTracking ? (
+                  <SetCharacterLevelModal
+                    character={character}
+                    triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                    showLabel
+                    labelClassName="hidden sm:inline"
+                  />
+                ) : (
+                  <StoreAdventureModal
+                    character={character}
+                    guildCharacters={guildCharacters}
+                    triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                    showLabel
+                    labelClassName="hidden sm:inline"
+                  />
+                )
+              ) : null}
+            </div>
             {adventuresOpen ? (
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.adventures.length > 0 ? (
@@ -708,33 +759,79 @@ export default function Show({
 
         <div>
           <div className="rounded-box border border-base-200 bg-base-100">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() =>
-                startDowntimesTransition(() => setDowntimesOpen((current) => !current))
-              }
-              aria-expanded={downtimesOpen}
-              disabled={character.downtimes.length === 0}
-            >
-              <div className="flex items-center gap-2">
-                {downtimesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                {isDowntimesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
-                <div>
-                  <h2 className="text-base font-semibold">Downtimes</h2>
-                  <p className="text-xs text-base-content/60">
-                    {character.downtimes.length === 0
-                      ? t('characters.noDowntimesRecorded')
-                      : t('characters.downtimeEntriesTotal', {
-                          count: character.downtimes.length,
-                          total: secondsToHourMinuteString(totalDowntimeDuration),
-                          used: secondsToHourMinuteString(downtimeTotalDuration),
-                          remaining: secondsToHourMinuteString(remainingDowntimeDuration),
-                        })}
-                  </p>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
+                onClick={() =>
+                  startDowntimesTransition(() => setDowntimesOpen((current) => !current))
+                }
+                aria-expanded={downtimesOpen}
+                disabled={character.downtimes.length === 0}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  {downtimesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {isDowntimesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold">Downtimes</h2>
+                    <p className="text-xs text-base-content/60">
+                      {character.downtimes.length === 0
+                        ? t('characters.noDowntimesRecorded')
+                        : t('characters.downtimeEntriesTotal', {
+                            count: character.downtimes.length,
+                            total: secondsToHourMinuteString(totalDowntimeDuration),
+                            used: secondsToHourMinuteString(downtimeTotalDuration),
+                            remaining: secondsToHourMinuteString(remainingDowntimeDuration),
+                          })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+              {!isReadOnly ? (
+                requiresSubmissionBeforeDowntime ? (
+                  <div
+                    className="tooltip tooltip-left shrink-0"
+                    data-tip={submissionRequiredReason}
+                    aria-label={submissionRequiredReason}
+                  >
+                    <Button
+                      size="sm"
+                      className="shrink-0 gap-1"
+                      disabled
+                      aria-label={t('characters.addDowntimeDisabled')}
+                    >
+                      <FlameKindling size={14} />
+                      <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
+                    </Button>
+                  </div>
+                ) : canLogActivity ? (
+                  downtimeDisabledInSimpleMode ? (
+                    <div
+                      className="tooltip tooltip-left shrink-0"
+                      data-tip={downtimeDisabledReason}
+                      aria-label={downtimeDisabledReason}
+                    >
+                      <Button
+                        size="sm"
+                        className="shrink-0 gap-1"
+                        disabled
+                        aria-label={t('characters.addDowntimeDisabled')}
+                      >
+                        <FlameKindling size={14} />
+                        <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <StoreDowntimeModal
+                      character={character}
+                      triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                      showLabel
+                      labelClassName="hidden sm:inline"
+                    />
+                  )
+                ) : null
+              ) : null}
+            </div>
             {downtimesOpen ? (
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.downtimes.length > 0 ? (
@@ -922,28 +1019,39 @@ export default function Show({
 
         <div>
           <div className="rounded-box border border-base-200 bg-base-100">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              onClick={() =>
-                startAlliesTransition(() => setAlliesOpen((current) => !current))
-              }
-              aria-expanded={alliesOpen}
-              disabled={character.allies.length === 0}
-            >
-              <div className="flex items-center gap-2">
-                {alliesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                {isAlliesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
-                <div>
-                  <h2 className="text-base font-semibold">{t('characters.allies')}</h2>
-                  <p className="text-xs text-base-content/60">
-                    {character.allies.length === 0
-                      ? t('characters.noAlliesRecorded')
-                      : t('characters.alliesCount', { count: character.allies.length })}
-                  </p>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
+                onClick={() =>
+                  startAlliesTransition(() => setAlliesOpen((current) => !current))
+                }
+                aria-expanded={alliesOpen}
+                disabled={character.allies.length === 0}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  {alliesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {isAlliesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold">{t('characters.allies')}</h2>
+                    <p className="text-xs text-base-content/60">
+                      {character.allies.length === 0
+                        ? t('characters.noAlliesRecorded')
+                        : t('characters.alliesCount', { count: character.allies.length })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+              {!isReadOnly ? (
+                <AlliesModal
+                  character={character}
+                  guildCharacters={guildCharacters}
+                  triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                  showLabel
+                  labelClassName="hidden sm:inline"
+                />
+              ) : null}
+            </div>
             {alliesOpen ? (
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.allies.length > 0 ? (
