@@ -5,6 +5,7 @@ const {
     ButtonStyle,
     EmbedBuilder,
     MessageFlags,
+    StringSelectMenuBuilder,
 } = require('discord.js');
 const { getLinkedUserLocaleForDiscord } = require('../appDb');
 const { t } = require('../i18n');
@@ -119,6 +120,10 @@ function drawParticipants(participants, winnerCount) {
     return { winners };
 }
 
+function buildFixedCustomId(sessionId, ownerId) {
+    return `reaction-draw:fixed:${sessionId}:${ownerId}`;
+}
+
 function buildConfirmCustomId(sessionId, ownerId) {
     return `reaction-draw:confirm:${sessionId}:${ownerId}`;
 }
@@ -143,6 +148,17 @@ function parseActionCustomId(customId) {
     }
 
     return { action, sessionId, ownerId };
+}
+
+function parseFixedCustomId(customId) {
+    const parts = String(customId || '').split(':');
+    if (parts.length !== 4 || parts[0] !== 'reaction-draw' || parts[1] !== 'fixed') {
+        return null;
+    }
+
+    const [, , sessionId, ownerId] = parts;
+
+    return { action: 'fixed', sessionId, ownerId };
 }
 
 function formatPreviewUserLines(users, locale) {
@@ -171,6 +187,20 @@ function buildPublicMentionContent(users) {
     return users.map(user => `<@${user.id}>`).join(' ');
 }
 
+function recomputeSessionWinners(session) {
+    const fixedIds = new Set(session.fixedParticipantIds || []);
+    const fixedParticipants = session.participants.filter(user => fixedIds.has(user.id));
+    const remainingParticipants = session.participants.filter(user => !fixedIds.has(user.id));
+    const remainingSlots = Math.max(0, session.requestedWinnerCount - fixedParticipants.length);
+    const { winners: drawnParticipants } = drawParticipants(remainingParticipants, remainingSlots);
+
+    session.fixedParticipants = fixedParticipants;
+    session.drawnParticipants = drawnParticipants;
+    session.winners = [...fixedParticipants, ...drawnParticipants];
+
+    return session;
+}
+
 function buildPublicResultEmbed(session) {
     return new EmbedBuilder()
         .setColor(0x22c55e)
@@ -179,12 +209,24 @@ function buildPublicResultEmbed(session) {
             t('reactionDraw.previewEmoji', { emoji: session.reactionDisplay }, session.locale),
             t('reactionDraw.previewParticipantCount', { count: session.participants.length }, session.locale),
             '',
-            t('reactionDraw.publicSheetsNotice', { creator: `<@${session.ownerId}>` }, session.locale),
+            t('reactionDraw.publicSelectedIntro', {}, session.locale),
         ].join('\n'))
         .addFields(
+            ...(session.fixedParticipants?.length
+                ? [{
+                    name: t('reactionDraw.fixedParticipants', {}, session.locale),
+                    value: formatMentionList(session.fixedParticipants, session.locale),
+                }]
+                : []),
+            ...((session.drawnParticipants?.length && session.fixedParticipants?.length) || (!session.fixedParticipants?.length)
+                ? [{
+                    name: t('reactionDraw.drawnParticipants', {}, session.locale),
+                    value: formatMentionList(session.drawnParticipants?.length ? session.drawnParticipants : session.winners, session.locale),
+                }]
+                : []),
             {
-                name: t('reactionDraw.publicWinners', {}, session.locale),
-                value: formatMentionList(session.winners, session.locale),
+                name: t('reactionDraw.publicSheetsField', {}, session.locale),
+                value: t('reactionDraw.publicSheetsNotice', { creator: `<@${session.ownerId}>` }, session.locale),
             },
         )
         .setTimestamp(new Date());
@@ -270,11 +312,24 @@ function buildPreviewEmbed(session) {
                 name: t('reactionDraw.previewParticipants', {}, session.locale),
                 value: formatPreviewUserLines(session.participants, session.locale),
             },
-            {
-                name: t('reactionDraw.publicWinners', {}, session.locale),
-                value: formatMentionList(session.winners, session.locale),
-                inline: true,
-            },
+            ...(session.fixedParticipants?.length
+                ? [{
+                    name: t('reactionDraw.fixedParticipants', {}, session.locale),
+                    value: formatMentionList(session.fixedParticipants, session.locale),
+                    inline: true,
+                }]
+                : []),
+            ...(session.drawnParticipants?.length && session.fixedParticipants?.length
+                ? [{
+                    name: t('reactionDraw.drawnParticipants', {}, session.locale),
+                    value: formatMentionList(session.drawnParticipants, session.locale),
+                    inline: true,
+                }]
+                : (!session.fixedParticipants?.length ? [{
+                    name: t('reactionDraw.previewCurrentSelection', {}, session.locale),
+                    value: formatMentionList(session.winners, session.locale),
+                    inline: true,
+                }] : [])),
         )
         .setTimestamp(new Date());
 
@@ -296,7 +351,7 @@ function buildPreviewEmbed(session) {
 }
 
 function buildPreviewComponents(session) {
-    return [
+    const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(buildConfirmCustomId(session.id, session.ownerId))
@@ -312,6 +367,27 @@ function buildPreviewComponents(session) {
                 .setStyle(ButtonStyle.Danger),
         ),
     ];
+
+    const selectOptions = session.participants.slice(0, 25).map(user => ({
+        label: user.label.slice(0, 100),
+        value: user.id,
+        default: (session.fixedParticipantIds || []).includes(user.id),
+    }));
+
+    if (selectOptions.length) {
+        rows.push(
+            new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(buildFixedCustomId(session.id, session.ownerId))
+                    .setPlaceholder(t('reactionDraw.fixedSelectPlaceholder', {}, session.locale))
+                    .setMinValues(0)
+                    .setMaxValues(Math.min(session.requestedWinnerCount, selectOptions.length))
+                    .addOptions(selectOptions),
+            ),
+        );
+    }
+
+    return rows;
 }
 
 async function collectCandidateMessages(thread) {
@@ -459,6 +535,9 @@ async function buildSessionFromInteraction(interaction) {
             reactionDisplay: await resolveReactionDisplay(reaction, emoji, interaction.guild, interaction.client),
             requestedWinnerCount,
             participants,
+            fixedParticipantIds: [],
+            fixedParticipants: [],
+            drawnParticipants: winners,
             winners,
         },
     };
@@ -512,11 +591,14 @@ async function postConfirmedResult(interaction, session) {
 }
 
 async function handle(interaction) {
-    if (!interaction.isButton()) {
+    const isButton = typeof interaction.isButton === 'function' && interaction.isButton();
+    const isStringSelectMenu = typeof interaction.isStringSelectMenu === 'function' && interaction.isStringSelectMenu();
+
+    if (!isButton && !isStringSelectMenu) {
         return false;
     }
 
-    const parsed = parseActionCustomId(interaction.customId);
+    const parsed = parseActionCustomId(interaction.customId) || parseFixedCustomId(interaction.customId);
     if (!parsed) {
         return false;
     }
@@ -537,6 +619,20 @@ async function handle(interaction) {
         return true;
     }
 
+    if (parsed.action === 'fixed') {
+        session.fixedParticipantIds = (interaction.values || []).slice(0, session.requestedWinnerCount);
+        recomputeSessionWinners(session);
+        session.createdAt = Date.now();
+        drawSessions.set(parsed.sessionId, session);
+
+        await interaction.update({
+            content: '',
+            embeds: [buildPreviewEmbed(session)],
+            components: buildPreviewComponents(session),
+        });
+        return true;
+    }
+
     if (parsed.action === 'cancel') {
         drawSessions.delete(parsed.sessionId);
         await interaction.update({
@@ -551,10 +647,7 @@ async function handle(interaction) {
     }
 
     if (parsed.action === 'reroll') {
-        const winnerCount = Math.min(session.requestedWinnerCount, session.participants.length);
-        const { winners } = drawParticipants(session.participants, winnerCount);
-
-        session.winners = winners;
+        recomputeSessionWinners(session);
         session.createdAt = Date.now();
         drawSessions.set(parsed.sessionId, session);
 
@@ -606,9 +699,12 @@ module.exports = {
     resolveReactionDisplay,
     buildPublicMentionContent,
     buildPreviewEmbed,
+    buildPreviewComponents,
     buildPublicResultEmbed,
+    buildFixedCustomId,
     buildConfirmCustomId,
     buildRerollCustomId,
     buildCancelCustomId,
     parseActionCustomId,
+    parseFixedCustomId,
 };

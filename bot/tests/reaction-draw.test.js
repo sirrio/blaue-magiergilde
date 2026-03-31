@@ -9,10 +9,13 @@ const {
     buildPublicResultEmbed,
     buildPreviewEmbed,
     resolveReactionTarget,
+    buildPreviewComponents,
+    buildFixedCustomId,
     buildConfirmCustomId,
     buildRerollCustomId,
     buildCancelCustomId,
     parseActionCustomId,
+    parseFixedCustomId,
 } = require('../interactions/reactionDraw');
 
 async function run() {
@@ -191,8 +194,91 @@ async function run() {
     assert.equal(previewEmbed.data.fields[0].value.includes('Alpha'), true);
     assert.equal(previewEmbed.data.description.includes('Anmeldungen: **3**'), true);
     assert.equal(previewEmbed.data.fields[0].name, 'Anmeldeliste');
+    assert.equal(previewEmbed.data.fields[1].name, 'Aktuell ausgewählt');
     assert.equal(previewEmbed.data.fields.length, 2);
-    assert.equal(previewEmbed.data.fields[1].name, 'Ins Abenteuer begleiten');
+
+    const previewWithFixedEmbed = buildPreviewEmbed({
+        id: 'abc',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        createdAt: Date.now(),
+        threadId: '123',
+        messageId: '456',
+        messageUrl: 'https://discord.com/channels/1/2/3',
+        reactionDisplay: '✅',
+        requestedWinnerCount: 3,
+        participants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        fixedParticipantIds: ['1'],
+        fixedParticipants: [
+            { id: '1', label: 'Alpha' },
+        ],
+        drawnParticipants: [
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        winners: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+    });
+
+    assert.equal(previewWithFixedEmbed.data.fields[0].name, 'Anmeldeliste');
+    assert.equal(previewWithFixedEmbed.data.fields[1].name, 'Fest gesetzt');
+    assert.equal(previewWithFixedEmbed.data.fields[2].name, 'Zufällig gewählt');
+    assert.equal(previewWithFixedEmbed.data.fields.length, 3);
+
+    const previewWithOnlyFixedEmbed = buildPreviewEmbed({
+        id: 'abc',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        createdAt: Date.now(),
+        threadId: '123',
+        messageId: '456',
+        messageUrl: 'https://discord.com/channels/1/2/3',
+        reactionDisplay: '✅',
+        requestedWinnerCount: 2,
+        participants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        fixedParticipantIds: ['1', '2'],
+        fixedParticipants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+        ],
+        drawnParticipants: [],
+        winners: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+        ],
+    });
+
+    assert.equal(previewWithOnlyFixedEmbed.data.fields[0].name, 'Anmeldeliste');
+    assert.equal(previewWithOnlyFixedEmbed.data.fields[1].name, 'Fest gesetzt');
+    assert.equal(previewWithOnlyFixedEmbed.data.fields.length, 2);
+
+    const previewComponents = buildPreviewComponents({
+        id: 'abc',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        requestedWinnerCount: 3,
+        participants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        fixedParticipantIds: ['2'],
+    });
+
+    assert.equal(previewComponents.length, 2);
+    assert.equal(previewComponents[1].components[0].data.custom_id, buildFixedCustomId('abc', '137565166001848320'));
+
     assert.equal(buildPublicMentionContent(previewEmbed.data.fields ? [
         { id: '1' },
         { id: '2' },
@@ -211,13 +297,23 @@ async function run() {
             { id: '1', label: 'Alpha' },
             { id: '2', label: 'Beta' },
         ],
+        fixedParticipants: [
+            { id: '3', label: 'Gamma' },
+        ],
+        drawnParticipants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+        ],
     });
 
     assert.equal(publicEmbed.data.title, 'Die Spieler wurden ausgewählt');
     assert.equal(publicEmbed.data.description.includes('Reaktion: <:mg_lt:987654321>'), true);
     assert.equal(publicEmbed.data.description.includes('Anmeldungen: **3**'), true);
-    assert.equal(publicEmbed.data.description.includes('Bitte schickt eure Charakterbögen an <@137565166001848320>.'), true);
-    assert.equal(publicEmbed.data.fields[0].name, 'Ins Abenteuer begleiten');
+    assert.equal(publicEmbed.data.description.toLowerCase().includes('ins abenteuer kommen mit'), true);
+    assert.equal(publicEmbed.data.fields[0].name, 'Fest gesetzt');
+    assert.equal(publicEmbed.data.fields[1].name, 'Zufällig gewählt');
+    assert.equal(publicEmbed.data.fields[2].name, 'Charakterbögen');
+    assert.equal(publicEmbed.data.fields[2].value.includes('Bitte schickt eure Charakterbögen an <@137565166001848320>.'), true);
 
     const confirmId = buildConfirmCustomId('session42', '137565166001848320');
     const rerollId = buildRerollCustomId('session42', '137565166001848320');
@@ -235,6 +331,11 @@ async function run() {
     });
     assert.deepEqual(parseActionCustomId(cancelId), {
         action: 'cancel',
+        sessionId: 'session42',
+        ownerId: '137565166001848320',
+    });
+    assert.deepEqual(parseFixedCustomId(buildFixedCustomId('session42', '137565166001848320')), {
+        action: 'fixed',
         sessionId: 'session42',
         ownerId: '137565166001848320',
     });
