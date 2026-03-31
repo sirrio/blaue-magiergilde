@@ -1,0 +1,253 @@
+const assert = require('node:assert/strict');
+const command = require('../commands/game/draw');
+const {
+    parseEmojiInput,
+    reactionMatchesInput,
+    drawParticipants,
+    resolveReactionDisplay,
+    buildPublicMentionContent,
+    buildPublicResultEmbed,
+    buildPreviewEmbed,
+    resolveReactionTarget,
+    buildConfirmCustomId,
+    buildRerollCustomId,
+    buildCancelCustomId,
+    parseActionCustomId,
+} = require('../interactions/reactionDraw');
+
+async function run() {
+    const unicodeEmoji = parseEmojiInput('✅');
+    assert.equal(unicodeEmoji.name, '✅');
+    assert.equal(unicodeEmoji.id, null);
+
+    const customEmoji = parseEmojiInput('<:signup:1234567890>');
+    assert.equal(customEmoji.name, 'signup');
+    assert.equal(customEmoji.id, '1234567890');
+
+    const shortcodeEmoji = parseEmojiInput(':MG_LT:');
+    assert.equal(shortcodeEmoji.name, 'MG_LT');
+    assert.equal(shortcodeEmoji.id, null);
+
+    assert.equal(reactionMatchesInput({
+        emoji: {
+            id: null,
+            name: '✅',
+            toString: () => '✅',
+        },
+    }, unicodeEmoji), true);
+
+    assert.equal(reactionMatchesInput({
+        emoji: {
+            id: '1234567890',
+            name: 'signup',
+            toString: () => '<:signup:1234567890>',
+        },
+    }, customEmoji), true);
+
+    assert.equal(reactionMatchesInput({
+        emoji: {
+            id: '987654321',
+            name: 'mg_lt',
+            toString: () => '<:mg_lt:987654321>',
+        },
+    }, shortcodeEmoji), true);
+
+    const laterMessageReaction = {
+        emoji: {
+            id: '987654321',
+            name: 'mg_lt',
+            toString: () => '<:mg_lt:987654321>',
+        },
+    };
+    const unrelatedReaction = {
+        emoji: {
+            id: null,
+            name: 'other',
+            toString: () => '<:other:111>',
+        },
+    };
+    const thread = {
+        id: 'thread-1',
+        fetchStarterMessage: async () => ({
+            id: 'starter',
+            url: 'https://discord.com/channels/1/2/starter',
+            content: 'starter',
+            reactions: { cache: [] },
+        }),
+        parent: {
+            messages: {
+                fetch: async () => ({
+                    id: 'parent-root',
+                    url: 'https://discord.com/channels/1/2/parent-root',
+                    content: 'parent root',
+                    reactions: { cache: [laterMessageReaction] },
+                }),
+            },
+        },
+        messages: {
+            fetch: async () => new Map([
+                ['later', {
+                    id: 'later',
+                    url: 'https://discord.com/channels/1/2/later',
+                    content: 'signup post',
+                    reactions: { cache: [unrelatedReaction] },
+                }],
+            ]),
+        },
+    };
+
+    thread.parent.messages.fetch = async () => ({
+        id: 'parent-root',
+        url: 'https://discord.com/channels/1/2/parent-root',
+        content: 'parent root',
+        author: { id: '42' },
+        reactions: { cache: [laterMessageReaction] },
+    });
+    thread.fetchStarterMessage = async () => ({
+        id: 'starter',
+        url: 'https://discord.com/channels/1/2/starter',
+        content: 'starter',
+        author: { id: '999' },
+        reactions: { cache: [] },
+    });
+    thread.messages.fetch = async () => new Map([
+        ['later', {
+            id: 'later',
+            url: 'https://discord.com/channels/1/2/later',
+            content: 'signup post',
+            author: { id: '999' },
+            reactions: { cache: [laterMessageReaction] },
+        }],
+    ]);
+
+    const target = await resolveReactionTarget(thread, shortcodeEmoji, '42');
+    assert.equal(target.kind, 'ok');
+    assert.equal(target.message.id, 'parent-root');
+    assert.equal(await resolveReactionDisplay(target.reaction, shortcodeEmoji), '<:mg_lt:987654321>');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: 'MG_LT',
+            identifier: 'MG_LT:987654321',
+            toString: () => ':MG_LT:',
+        },
+    }, shortcodeEmoji), '<:MG_LT:987654321>');
+    assert.equal(await resolveReactionDisplay({
+        emoji: {
+            id: null,
+            name: 'MG_LT',
+            toString: () => ':MG_LT:',
+        },
+    }, shortcodeEmoji, {
+        emojis: {
+            fetch: async () => ({
+                find: (predicate) => {
+                    const emoji = {
+                        name: 'MG_LT',
+                        toString: () => '<:MG_LT:123123123>',
+                    };
+                    return predicate(emoji) ? emoji : null;
+                },
+            }),
+        },
+    }), '<:MG_LT:123123123>');
+
+    const drawn = drawParticipants(
+        [
+            { id: '1', label: 'A' },
+            { id: '2', label: 'B' },
+            { id: '3', label: 'C' },
+            { id: '4', label: 'D' },
+        ],
+        2,
+    );
+
+    assert.equal(drawn.winners.length, 2);
+    assert.equal(new Set([...drawn.winners].map(user => user.id)).size, 2);
+
+    const previewEmbed = buildPreviewEmbed({
+        id: 'abc',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        createdAt: Date.now(),
+        threadId: '123',
+        messageId: '456',
+        messageUrl: 'https://discord.com/channels/1/2/3',
+        emoji: unicodeEmoji,
+        reactionDisplay: '✅',
+        requestedWinnerCount: 2,
+        participants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        winners: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+        ],
+    });
+
+    assert.equal(previewEmbed.data.title, 'Auswahl prüfen');
+    assert.equal(previewEmbed.data.fields[0].value.includes('Alpha'), true);
+    assert.equal(previewEmbed.data.description.includes('Anmeldungen: **3**'), true);
+    assert.equal(previewEmbed.data.fields[0].name, 'Anmeldeliste');
+    assert.equal(previewEmbed.data.fields.length, 2);
+    assert.equal(previewEmbed.data.fields[1].name, 'Ins Abenteuer begleiten');
+    assert.equal(buildPublicMentionContent(previewEmbed.data.fields ? [
+        { id: '1' },
+        { id: '2' },
+    ] : []), '<@1> <@2>');
+
+    const publicEmbed = buildPublicResultEmbed({
+        ownerId: '137565166001848320',
+        locale: 'de',
+        reactionDisplay: '<:mg_lt:987654321>',
+        participants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        winners: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+        ],
+    });
+
+    assert.equal(publicEmbed.data.title, 'Die Spieler wurden ausgewählt');
+    assert.equal(publicEmbed.data.description.includes('Reaktion: <:mg_lt:987654321>'), true);
+    assert.equal(publicEmbed.data.description.includes('Anmeldungen: **3**'), true);
+    assert.equal(publicEmbed.data.description.includes('Bitte schickt eure Charakterbögen an <@137565166001848320>.'), true);
+    assert.equal(publicEmbed.data.fields[0].name, 'Ins Abenteuer begleiten');
+
+    const confirmId = buildConfirmCustomId('session42', '137565166001848320');
+    const rerollId = buildRerollCustomId('session42', '137565166001848320');
+    const cancelId = buildCancelCustomId('session42', '137565166001848320');
+
+    assert.deepEqual(parseActionCustomId(confirmId), {
+        action: 'confirm',
+        sessionId: 'session42',
+        ownerId: '137565166001848320',
+    });
+    assert.deepEqual(parseActionCustomId(rerollId), {
+        action: 'reroll',
+        sessionId: 'session42',
+        ownerId: '137565166001848320',
+    });
+    assert.deepEqual(parseActionCustomId(cancelId), {
+        action: 'cancel',
+        sessionId: 'session42',
+        ownerId: '137565166001848320',
+    });
+
+    const commandJson = command.data.toJSON();
+    assert.equal(commandJson.name.endsWith('-draw'), true);
+    assert.equal(commandJson.description, 'Lost unter den Reaktionen einer Thread-Nachricht aus.');
+    assert.equal(commandJson.options.length, 2);
+
+    console.log('reaction-draw.test.js passed');
+}
+
+run().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

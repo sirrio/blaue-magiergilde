@@ -5,8 +5,13 @@ const characterApproval = require('../interactions/characterApproval');
 const characters = require('../interactions/characters');
 const hiddenBid = require('../interactions/hiddenBid');
 const newGame = require('../interactions/newGame');
+const reactionDraw = require('../interactions/reactionDraw');
 const { handleSupportTicketInteraction } = require('../supportTickets');
 const { buildErrorEmbed } = require('../utils/noticeEmbeds');
+
+function isUnknownInteractionError(error) {
+    return error?.code === 10062 || error?.rawError?.code === 10062;
+}
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -18,6 +23,7 @@ module.exports = {
             if (await characters.handle(interaction)) return;
             if (await hiddenBid.handle(interaction)) return;
             if (await newGame.handle(interaction)) return;
+            if (await reactionDraw.handle(interaction)) return;
 
             if (!interaction.isChatInputCommand()) return;
 
@@ -29,15 +35,21 @@ module.exports = {
              
             console.error(error);
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.deferReply({ flags: 64 });
-            }
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({
-                    content: '',
-                    embeds: [buildErrorEmbed('Unexpected error', 'An error occurred.')],
-                    components: [],
-                });
+            try {
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.deferReply({ flags: 64 });
+                }
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({
+                        content: '',
+                        embeds: [buildErrorEmbed('Unexpected error', 'An error occurred.')],
+                        components: [],
+                    });
+                }
+            } catch (replyError) {
+                if (!isUnknownInteractionError(replyError)) {
+                    throw replyError;
+                }
             }
         }
     },
