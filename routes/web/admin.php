@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\CompendiumImportController;
 use App\Http\Controllers\Admin\DiscordBackupController;
 use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use App\Http\Controllers\Admin\DiscordBotSettingsController;
+use App\Http\Controllers\Admin\DiscordLinePostController;
 use App\Http\Controllers\Admin\GameSettingsController;
 use App\Http\Controllers\Admin\LegacyCharacterApprovalImportController;
 use App\Http\Controllers\Admin\SourceController;
@@ -37,6 +38,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     Route::patch('/admin/settings/discord/bot', [DiscordBotSettingsController::class, 'update'])
         ->name('admin.settings.bot.update');
+
+    Route::post('/admin/settings/discord/line-post', DiscordLinePostController::class)
+        ->name('admin.settings.discord.line-post');
 
     Route::post('/admin/settings/sources', [SourceController::class, 'store'])
         ->name('admin.settings.sources.store');
