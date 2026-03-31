@@ -514,6 +514,7 @@ module.exports = {
         previewNote: 'Hinweis',
         previewNotEnoughParticipants: 'Es wurden weniger passende Reaktionen gefunden als angefordert ({actual}/{requested}).',
         previewMoreUsers: '… und {count} weitere',
+        previewTruncated: '… und {count} weitere Zeilen',
         confirm: 'Bestätigen',
         reroll: 'Neu würfeln',
         cancel: 'Abbrechen',

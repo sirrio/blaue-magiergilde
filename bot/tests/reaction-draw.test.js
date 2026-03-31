@@ -8,6 +8,8 @@ const {
     buildPublicMentionContent,
     buildPublicResultEmbed,
     buildPreviewEmbed,
+    buildPreviewParticipantsEmbed,
+    buildPreviewEmbeds,
     resolveReactionTarget,
     buildPreviewComponents,
     buildFixedCustomId,
@@ -255,13 +257,59 @@ async function run() {
             { id: '2', label: 'Beta' },
         ],
     });
+    const previewParticipantsEmbed = buildPreviewParticipantsEmbed({
+        id: 'abc',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        createdAt: Date.now(),
+        threadId: '123',
+        messageId: '456',
+        messageUrl: 'https://discord.com/channels/1/2/3',
+        emoji: unicodeEmoji,
+        reactionDisplay: '✅',
+        requestedWinnerCount: 2,
+        participants: [
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '<:rank10blue:10>', '<:one:1>', '<:keycap_ten:10>', '<:n_12:12>', '<:C_Wizard_24:2>', '<:mg_bt:1>', '✅'] },
+            { id: '2', label: 'Beta', reactionDisplays: [] },
+            { id: '3', label: 'Gamma' },
+        ],
+        winners: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+        ],
+    });
 
     assert.equal(previewEmbed.data.title, 'Auswahl prüfen');
-    assert.equal(previewEmbed.data.fields[0].value.includes('Alpha 🔟 7️⃣ <:rank10blue:10> <:one:1> <:keycap_ten:10> <:n_12:12> <:C_Wizard_24:2> <:mg_bt:1> ✅'), true);
     assert.equal(previewEmbed.data.description.includes('Anmeldungen: **3**'), true);
-    assert.equal(previewEmbed.data.fields[0].name, 'Anmeldeliste');
-    assert.equal(previewEmbed.data.fields[1].name, 'Aktuell ausgewählt');
-    assert.equal(previewEmbed.data.fields.length, 2);
+    assert.equal(previewEmbed.data.fields[0].name, 'Aktuell ausgewählt');
+    assert.equal(previewEmbed.data.fields.length, 1);
+    assert.equal(previewParticipantsEmbed.data.title, 'Anmeldeliste');
+    assert.equal(previewParticipantsEmbed.data.description.includes('Alpha 🔟 7️⃣ <:rank10blue:10> <:one:1> <:keycap_ten:10> <:n_12:12> <:C_Wizard_24:2> <:mg_bt:1> ✅'), true);
+
+    const longPreviewParticipantsEmbed = buildPreviewParticipantsEmbed({
+        id: 'overflow',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        createdAt: Date.now(),
+        threadId: '123',
+        messageId: '456',
+        messageUrl: 'https://discord.com/channels/1/2/3',
+        reactionDisplay: '✅',
+        requestedWinnerCount: 3,
+        participants: Array.from({ length: 20 }, (_, index) => ({
+            id: String(index + 1),
+            label: `Teilnehmer mit sehr langem Namen ${index + 1}`,
+            reactionDisplays: ['9️⃣', '<:C_Sorcerer_24:1410544686132760657>', '<:C_Wizard_24:1410544693439234188>', '🤝'],
+        })),
+        winners: [
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣'] },
+            { id: '3', label: 'Gamma', reactionDisplays: ['✊'] },
+        ],
+    });
+
+    assert.equal(longPreviewParticipantsEmbed.data.description.length <= 4096, true);
+    assert.equal(longPreviewParticipantsEmbed.data.description.includes('… und'), true);
 
     const previewWithFixedEmbed = buildPreviewEmbed({
         id: 'abc',
@@ -292,13 +340,43 @@ async function run() {
             { id: '3', label: 'Gamma', reactionDisplays: ['✊'] },
         ],
     });
+    const previewWithFixedEmbeds = buildPreviewEmbeds({
+        id: 'abc',
+        ownerId: '137565166001848320',
+        locale: 'de',
+        createdAt: Date.now(),
+        threadId: '123',
+        messageId: '456',
+        messageUrl: 'https://discord.com/channels/1/2/3',
+        reactionDisplay: '✅',
+        requestedWinnerCount: 3,
+        participants: [
+            { id: '1', label: 'Alpha' },
+            { id: '2', label: 'Beta' },
+            { id: '3', label: 'Gamma' },
+        ],
+        fixedParticipantIds: ['1'],
+        fixedParticipants: [
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
+        ],
+        drawnParticipants: [
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣', '🤝', '❤️'] },
+            { id: '3', label: 'Gamma', reactionDisplays: ['✊'] },
+        ],
+        winners: [
+            { id: '1', label: 'Alpha', reactionDisplays: ['🔟', '7️⃣', '✊', '🏹', '🪓'] },
+            { id: '2', label: 'Beta', reactionDisplays: ['7️⃣', '🤝', '❤️'] },
+            { id: '3', label: 'Gamma', reactionDisplays: ['✊'] },
+        ],
+    });
 
-    assert.equal(previewWithFixedEmbed.data.fields[0].name, 'Anmeldeliste');
-    assert.equal(previewWithFixedEmbed.data.fields[1].name, 'Fest gesetzt');
-    assert.equal(previewWithFixedEmbed.data.fields[2].name, 'Zufällig gewählt');
-    assert.equal(previewWithFixedEmbed.data.fields[1].value.includes('<@1> · 🔟7️⃣✊🏹 +1'), true);
-    assert.equal(previewWithFixedEmbed.data.fields[2].value.includes('<@2> · 7️⃣🤝❤️'), true);
-    assert.equal(previewWithFixedEmbed.data.fields.length, 3);
+    assert.equal(previewWithFixedEmbed.data.fields[0].name, 'Fest gesetzt');
+    assert.equal(previewWithFixedEmbed.data.fields[1].name, 'Zufällig gewählt');
+    assert.equal(previewWithFixedEmbed.data.fields[0].value.includes('<@1> · 🔟7️⃣✊🏹 +1'), true);
+    assert.equal(previewWithFixedEmbed.data.fields[1].value.includes('<@2> · 7️⃣🤝❤️'), true);
+    assert.equal(previewWithFixedEmbed.data.fields.length, 2);
+    assert.equal(previewWithFixedEmbeds.length, 2);
+    assert.equal(previewWithFixedEmbeds[1].data.title, 'Anmeldeliste');
 
     const previewWithOnlyFixedEmbed = buildPreviewEmbed({
         id: 'abc',
@@ -327,10 +405,9 @@ async function run() {
         ],
     });
 
-    assert.equal(previewWithOnlyFixedEmbed.data.fields[0].name, 'Anmeldeliste');
-    assert.equal(previewWithOnlyFixedEmbed.data.fields[1].name, 'Fest gesetzt');
-    assert.equal(previewWithOnlyFixedEmbed.data.fields[1].value.includes('<@1> · 🔟7️⃣✊🏹 +1'), true);
-    assert.equal(previewWithOnlyFixedEmbed.data.fields.length, 2);
+    assert.equal(previewWithOnlyFixedEmbed.data.fields[0].name, 'Fest gesetzt');
+    assert.equal(previewWithOnlyFixedEmbed.data.fields[0].value.includes('<@1> · 🔟7️⃣✊🏹 +1'), true);
+    assert.equal(previewWithOnlyFixedEmbed.data.fields.length, 1);
 
     const previewComponents = buildPreviewComponents({
         id: 'abc',

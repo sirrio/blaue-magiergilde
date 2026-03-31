@@ -177,6 +177,44 @@ function formatPreviewUserLines(users, locale) {
     return visible.join('\n');
 }
 
+function trimFieldValue(value, locale) {
+    const maxLength = 1024;
+    const normalized = String(value || '').trim();
+
+    if (normalized.length <= maxLength) {
+        return normalized || t('reactionDraw.none', {}, locale);
+    }
+
+    const lines = normalized.split('\n');
+    const visibleLines = [];
+
+    for (const line of lines) {
+        const remainingCount = lines.length - visibleLines.length - 1;
+        const suffix = remainingCount > 0
+            ? `\n${t('reactionDraw.previewTruncated', { count: remainingCount }, locale)}`
+            : '';
+        const candidate = [...visibleLines, line].join('\n');
+
+        if ((candidate + suffix).length > maxLength) {
+            break;
+        }
+
+        visibleLines.push(line);
+    }
+
+    const remainingCount = Math.max(0, lines.length - visibleLines.length);
+    const suffix = remainingCount > 0
+        ? `\n${t('reactionDraw.previewTruncated', { count: remainingCount }, locale)}`
+        : '';
+    const fallbackBase = visibleLines.join('\n').trim();
+    const availableLength = maxLength - suffix.length;
+    const truncatedBase = fallbackBase.length > availableLength
+        ? fallbackBase.slice(0, Math.max(0, availableLength - 1)).trimEnd()
+        : fallbackBase;
+
+    return `${truncatedBase}${suffix}`.trim() || t('reactionDraw.none', {}, locale);
+}
+
 async function attachParticipantReactionDisplays(message, participants, selectedEmojiInput, guild = null, client = null) {
     const reactions = Array.from(message?.reactions?.cache?.values?.() ?? []);
     if (!reactions.length || !participants.length) {
@@ -364,11 +402,13 @@ function formatMentionList(users, locale, { compactReactions = false } = {}) {
         return t('reactionDraw.none', {}, locale);
     }
 
-    return users.map((user, index) => {
+    const formatted = users.map((user, index) => {
         const extraReactions = formatReactionDisplays(user.reactionDisplays, compactReactions);
 
         return `${index + 1}. <@${user.id}>${extraReactions}`;
     }).join('\n');
+
+    return trimFieldValue(formatted, locale);
 }
 
 function buildPublicMentionContent(users) {
@@ -531,10 +571,6 @@ function buildPreviewEmbed(session) {
             t('reactionDraw.previewParticipantCount', { count: session.participants.length }, session.locale),
         ].join('\n'))
         .addFields(
-            {
-                name: t('reactionDraw.previewParticipants', {}, session.locale),
-                value: formatPreviewUserLines(session.participants, session.locale),
-            },
             ...(session.fixedParticipants?.length
                 ? [{
                     name: t('reactionDraw.fixedParticipants', {}, session.locale),
@@ -571,6 +607,20 @@ function buildPreviewEmbed(session) {
     }
 
     return embed;
+}
+
+function buildPreviewParticipantsEmbed(session) {
+    return new EmbedBuilder()
+        .setColor(0x4f46e5)
+        .setTitle(t('reactionDraw.previewParticipants', {}, session.locale))
+        .setDescription(trimFieldValue(formatPreviewUserLines(session.participants, session.locale), session.locale));
+}
+
+function buildPreviewEmbeds(session) {
+    return [
+        buildPreviewEmbed(session),
+        buildPreviewParticipantsEmbed(session),
+    ];
 }
 
 function buildPreviewComponents(session) {
@@ -791,7 +841,7 @@ async function showPreview(interaction) {
 
     await interaction.editReply({
         content: '',
-        embeds: [buildPreviewEmbed(result.session)],
+        embeds: buildPreviewEmbeds(result.session),
         components: buildPreviewComponents(result.session),
     });
 }
@@ -854,7 +904,7 @@ async function handle(interaction) {
 
         await interaction.update({
             content: '',
-            embeds: [buildPreviewEmbed(session)],
+            embeds: buildPreviewEmbeds(session),
             components: buildPreviewComponents(session),
         });
         return true;
@@ -880,7 +930,7 @@ async function handle(interaction) {
 
         await interaction.update({
             content: '',
-            embeds: [buildPreviewEmbed(session)],
+            embeds: buildPreviewEmbeds(session),
             components: buildPreviewComponents(session),
         });
         return true;
@@ -926,6 +976,8 @@ module.exports = {
     resolveReactionDisplay,
     buildPublicMentionContent,
     buildPreviewEmbed,
+    buildPreviewParticipantsEmbed,
+    buildPreviewEmbeds,
     buildPreviewComponents,
     buildPublicResultEmbed,
     buildFixedCustomId,
