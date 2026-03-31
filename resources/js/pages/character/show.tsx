@@ -164,7 +164,7 @@ export default function Show({
   const [activeAllyMeetings, setActiveAllyMeetings] = useState<{ allyName: string; entries: { title: string; date: string }[] } | null>(null)
   const [adventureSortDir, setAdventureSortDir] = useState<'desc' | 'asc'>('desc')
   const [downtimeSortDir, setDowntimeSortDir] = useState<'desc' | 'asc'>('desc')
-  const [allySortBy, setAllySortBy] = useState<'standing' | 'shared_adventures'>('standing')
+  const [allySortBy, setAllySortBy] = useState<'standing' | 'shared_adventures' | 'name' | 'owner'>('standing')
   const [allySortDir, setAllySortDir] = useState<'desc' | 'asc'>('desc')
   const [isAdventuresPending, startAdventuresTransition] = useTransition()
   const [isDowntimesPending, startDowntimesTransition] = useTransition()
@@ -265,7 +265,17 @@ export default function Show({
     const direction = allySortDir === 'desc' ? -1 : 1
 
     return [...character.allies].sort((a, b) => {
-      if (allySortBy === 'shared_adventures') {
+      if (allySortBy === 'name') {
+        const nameDiff = getAllyDisplayName(a).localeCompare(getAllyDisplayName(b))
+        if (nameDiff !== 0) {
+          return nameDiff * direction
+        }
+      } else if (allySortBy === 'owner') {
+        const ownerDiff = getAllyOwnerName(a).localeCompare(getAllyOwnerName(b))
+        if (ownerDiff !== 0) {
+          return ownerDiff * direction
+        }
+      } else if (allySortBy === 'shared_adventures') {
         const sharedAdventureDiff = (allyAdventureCountMap.get(a.id) ?? 0) - (allyAdventureCountMap.get(b.id) ?? 0)
         if (sharedAdventureDiff !== 0) {
           return sharedAdventureDiff * direction
@@ -281,14 +291,14 @@ export default function Show({
     })
   }, [allyAdventureCountMap, allySortBy, allySortDir, character.allies])
 
-  const setAllySort = (sortBy: 'standing' | 'shared_adventures') => {
+  const setAllySort = (sortBy: 'standing' | 'shared_adventures' | 'name' | 'owner') => {
     if (allySortBy === sortBy) {
       setAllySortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
       return
     }
 
     setAllySortBy(sortBy)
-    setAllySortDir('desc')
+    setAllySortDir(sortBy === 'name' || sortBy === 'owner' ? 'asc' : 'desc')
   }
 
   const adventureTotalDuration = useMemo(
@@ -938,7 +948,33 @@ export default function Show({
               <div className="border-t border-base-200 px-4 pb-4 pt-2">
                 {character.allies.length > 0 ? (
                   <>
-                    <div className="flex justify-end gap-1 pb-2 md:hidden">
+                    <div className="flex flex-wrap justify-end gap-1 pb-2 md:hidden">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant={allySortBy === 'name' ? 'outline' : 'ghost'}
+                        onClick={() => setAllySort('name')}
+                      >
+                        {t('characters.name')}
+                        {allySortBy === 'name'
+                          ? allySortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                          : null}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant={allySortBy === 'owner' ? 'outline' : 'ghost'}
+                        onClick={() => setAllySort('owner')}
+                      >
+                        {t('characters.owner')}
+                        {allySortBy === 'owner'
+                          ? allySortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                          : null}
+                      </Button>
                       <Button
                         type="button"
                         size="xs"
@@ -1005,7 +1041,9 @@ export default function Show({
                               </div>
                               <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-2">
                                 <RatingHearts rating={ally.rating} />
-                                <span className="truncate text-xs text-base-content/70">{ally.classes || '-'}</span>
+                                <span className="truncate text-xs text-base-content/70">
+                                  {t('characters.classesLabel')}: {ally.classes || '-'}
+                                </span>
                               </div>
                             </div>
                           </ListRow>
@@ -1013,9 +1051,32 @@ export default function Show({
                       })}
                     </List>
                     <div className="hidden md:block overflow-x-auto">
-                      <div className="min-w-[620px]">
-                        <div className="grid grid-cols-[minmax(0,1.7fr)_104px_52px_132px] gap-3 px-2 pb-2 text-xs font-semibold text-base-content/50">
-                          <span>{t('characters.allies')}</span>
+                      <div className="min-w-[680px]">
+                        <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1.1fr)_104px_60px] gap-3 px-2 pb-2 text-xs font-semibold text-base-content/50">
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                            onClick={() => setAllySort('name')}
+                          >
+                            {t('characters.name')}
+                            {allySortBy === 'name'
+                              ? allySortDir === 'desc'
+                                ? <ChevronDown size={12} />
+                                : <ChevronUp size={12} />
+                              : null}
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                            onClick={() => setAllySort('owner')}
+                          >
+                            {t('characters.owner')}
+                            {allySortBy === 'owner'
+                              ? allySortDir === 'desc'
+                                ? <ChevronDown size={12} />
+                                : <ChevronUp size={12} />
+                              : null}
+                          </button>
                           <button
                             type="button"
                             className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
@@ -1040,7 +1101,6 @@ export default function Show({
                                 : <ChevronUp size={12} />
                               : null}
                           </button>
-                          <span className="text-right">Classes</span>
                         </div>
                         <List className="shadow-none">
                           {sortedAllies.map((ally) => {
@@ -1050,7 +1110,7 @@ export default function Show({
                             return (
                               <ListRow
                                 key={ally.id}
-                                className="grid w-full grid-cols-[minmax(0,1.7fr)_104px_52px_132px] items-center gap-3"
+                                className="grid w-full grid-cols-[minmax(0,1.45fr)_minmax(0,1.1fr)_104px_60px] items-center gap-3"
                               >
                                 <div className="flex min-w-0 items-center gap-3">
                                   <AllyPortrait ally={ally} className="h-9 w-9" />
@@ -1063,12 +1123,15 @@ export default function Show({
                                         {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                       </span>
                                     </div>
-                                    {getAllyOwnerName(ally) ? (
-                                      <span className="truncate text-xs text-base-content/50">
-                                        {t('characters.owner')}: {getAllyOwnerName(ally)}
-                                      </span>
-                                    ) : null}
+                                    <span className="truncate text-xs text-base-content/50">
+                                      {t('characters.classesLabel')}: {ally.classes || '-'}
+                                    </span>
                                   </div>
+                                </div>
+                                <div className="min-w-0 space-y-0.5">
+                                  <span className="block truncate text-sm text-base-content/70">
+                                    {getAllyOwnerName(ally) || '-'}
+                                  </span>
                                 </div>
                                 <RatingHearts rating={ally.rating} />
                                 <button
@@ -1085,7 +1148,6 @@ export default function Show({
                                   <span>{sharedAdventureCount}</span>
                                   <Handshake size={12} className="text-base-content/45" />
                                 </button>
-                                <span className="truncate text-right text-sm text-base-content/70">{ally.classes || '-'}</span>
                               </ListRow>
                             )
                           })}
