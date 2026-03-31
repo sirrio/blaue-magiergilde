@@ -3,6 +3,7 @@ const { getBackupStatus, listChannelThreads, listDiscordChannels, startDiscordBa
 const { postAuctionToChannel, updateAuctionItemPost, fetchAuctionItemById } = require('./auctionPoster');
 const { postVoiceHighestBid } = require('./auctionVoiceBidPoster');
 const { postBackstockToChannel, updateBackstockItemPost } = require('./backstockPoster');
+const { postLinesToChannel } = require('./discordLinePoster');
 const { postShopToChannel, updateShopPost, updateShopItemPost } = require('./shopPoster');
 const { getSnapshot } = require('./voiceStateCache');
 const { runGameAnnouncementSync } = require('./discordGameSync');
@@ -128,6 +129,7 @@ function startHttpServer(client) {
         const isCharacterApprovalAccountCreated = path === '/character-approval/account-created';
         const isCharacterApprovalUpdate = path === '/character-approval/update';
         const isCharacterApprovalDelete = path === '/character-approval/delete';
+        const isDiscordLinePost = path === '/discord-line-post';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
         const isShopLineUpdate = path === '/shop-line-update';
@@ -152,6 +154,7 @@ function startHttpServer(client) {
             isCharacterApprovalAccountCreated ||
             isCharacterApprovalUpdate ||
             isCharacterApprovalDelete ||
+            isDiscordLinePost ||
             isShopPost ||
             isShopUpdate ||
             isShopLineUpdate ||
@@ -257,6 +260,38 @@ function startHttpServer(client) {
 
             logReject(req, 'discord member not found in configured guilds');
             respondJson(res, 404, { error: 'Discord member not found in configured guilds.' });
+            return;
+        }
+
+        if (isDiscordLinePost) {
+            const channelId = readChannelId(payload);
+            const lines = Array.isArray(payload?.lines) ? payload.lines : null;
+
+            if (!channelId) {
+                respondJson(res, 422, { error: 'Invalid channel_id.' });
+                return;
+            }
+
+            if (!lines) {
+                respondJson(res, 422, { error: 'Invalid lines payload.' });
+                return;
+            }
+
+            const result = await postLinesToChannel({
+                client,
+                channelId,
+                lines,
+            });
+
+            if (!result.ok) {
+                respondJson(res, result.status || 500, { error: result.error || 'Posting lines failed.' });
+                return;
+            }
+
+            respondJson(res, 200, {
+                status: 'posted',
+                posted_lines: result.posted_lines ?? 0,
+            });
             return;
         }
 

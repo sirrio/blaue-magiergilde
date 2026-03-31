@@ -84,6 +84,12 @@ export default function Settings({
     support_ticket_channel_name: discordBotSettings.support_ticket_channel_name ?? '',
     support_ticket_channel_guild_id: discordBotSettings.support_ticket_channel_guild_id ?? '',
   })
+  const discordLinePostForm = useForm({
+    channel_id: '',
+    channel_name: '',
+    channel_guild_id: '',
+    lines: '',
+  })
   const createSourceForm = useForm({
     name: '',
     shortcode: '',
@@ -719,6 +725,26 @@ export default function Settings({
     botSettingsForm.data.support_ticket_channel_name,
   ])
 
+  const discordLinePostTargetLabel = useMemo(() => {
+    if (discordLinePostForm.data.channel_name) {
+      return discordLinePostForm.data.channel_name
+    }
+    if (discordLinePostForm.data.channel_id) {
+      return discordLinePostForm.data.channel_id
+    }
+    return 'Not selected'
+  }, [discordLinePostForm.data.channel_id, discordLinePostForm.data.channel_name])
+
+  const discordLinePostCount = useMemo(() => {
+    return discordLinePostForm.data.lines
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .length
+  }, [discordLinePostForm.data.lines])
+
+  const discordLinePostRequestError = discordLinePostForm.errors['discord_line_post' as keyof typeof discordLinePostForm.errors]
+
   type BotChannelSelection =
     | DiscordBackupChannel
     | null
@@ -755,6 +781,41 @@ export default function Settings({
     botSettingsForm.setData('support_ticket_channel_name', '')
     botSettingsForm.setData('support_ticket_channel_guild_id', '')
   }, [botSettingsForm])
+
+  const handleDiscordLinePostTargetSelect = useCallback(
+    (selection: BotChannelSelection) => {
+      if (!selection || Array.isArray(selection)) return
+      discordLinePostForm.setData('channel_id', selection.id)
+      discordLinePostForm.setData('channel_name', selection.name)
+      discordLinePostForm.setData('channel_guild_id', selection.guild_id)
+    },
+    [discordLinePostForm],
+  )
+
+  const handleDiscordLinePostTargetClear = useCallback(() => {
+    discordLinePostForm.setData('channel_id', '')
+    discordLinePostForm.setData('channel_name', '')
+    discordLinePostForm.setData('channel_guild_id', '')
+  }, [discordLinePostForm])
+
+  const handleDiscordLinePost = useCallback(() => {
+    discordLinePostForm.post(route('admin.settings.discord.line-post'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show(
+          `${discordLinePostCount} ${discordLinePostCount === 1 ? 'line' : 'lines'} posted to Discord.`,
+          'info'
+        )
+        discordLinePostForm.setData('lines', '')
+        discordLinePostForm.clearErrors()
+      },
+      onError: (errors) => {
+        const requestError = errors['discord_line_post' as keyof typeof errors]
+        const message = String(requestError ?? errors.lines ?? errors.channel_id ?? 'Lines could not be posted.')
+        toast.show(message, 'error')
+      },
+    })
+  }, [discordLinePostCount, discordLinePostForm])
 
   return (
     <AppLayout>
@@ -1310,6 +1371,77 @@ export default function Settings({
           <div className="mt-3 flex justify-end">
             <Button size="sm" variant="outline" onClick={handleBotSettingsSave} disabled={botSettingsForm.processing}>
               Save bot settings
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-box bg-base-100 p-3 shadow-md">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold">Discord line poster</h2>
+              <p className="text-xs text-base-content/60">
+                Paste one line per message. The bot posts every non-empty line separately to the selected channel or thread.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <DiscordChannelPickerModal
+                title="Discord target"
+                description="Select a text channel directly or load threads from a selected channel."
+                confirmLabel="Use target"
+                channelsRouteName="admin.settings.backup.channels.refresh"
+                threadsRouteName="admin.settings.backup.threads.refresh"
+                mode="single"
+                allowedChannelTypes={['GuildText', 'GuildAnnouncement', 'PublicThread', 'PrivateThread', 'AnnouncementThread']}
+                enableThreadLoader
+                onConfirm={handleDiscordLinePostTargetSelect}
+              >
+                Select target
+              </DiscordChannelPickerModal>
+              {discordLinePostForm.data.channel_id ? (
+                <Button size="sm" variant="ghost" onClick={handleDiscordLinePostTargetClear}>
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
+            <span>
+              Target: <span className="font-semibold text-base-content">{discordLinePostTargetLabel}</span>
+            </span>
+            <span>
+              Prepared lines: <span className="font-semibold text-base-content">{discordLinePostCount}</span>
+            </span>
+          </div>
+          <div className="mt-3 space-y-2">
+            <label className="form-control">
+              <span className="label text-xs">Lines</span>
+              <textarea
+                className="textarea textarea-bordered min-h-40 w-full font-mono text-sm"
+                value={discordLinePostForm.data.lines}
+                onChange={(event) => discordLinePostForm.setData('lines', event.target.value)}
+                placeholder={'First line\nSecond line\nThird line'}
+              />
+            </label>
+            <p className="text-xs text-base-content/60">
+              Empty lines are ignored. Maximum 100 messages per run. Each line becomes one Discord message.
+            </p>
+            {discordLinePostForm.errors.lines ? (
+              <p className="text-xs text-error">{discordLinePostForm.errors.lines}</p>
+            ) : null}
+            {discordLinePostForm.errors.channel_id ? (
+              <p className="text-xs text-error">{discordLinePostForm.errors.channel_id}</p>
+            ) : null}
+            {discordLinePostRequestError ? (
+              <p className="text-xs text-error">{String(discordLinePostRequestError)}</p>
+            ) : null}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDiscordLinePost}
+              disabled={discordLinePostForm.processing}
+            >
+              {discordLinePostForm.processing ? 'Posting...' : 'Post lines'}
             </Button>
           </div>
         </div>
