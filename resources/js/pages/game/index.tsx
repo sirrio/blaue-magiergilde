@@ -72,10 +72,13 @@ type BreakdownModalConfig = {
   fromGames?: number
 }
 
+type GameSortBy = 'date' | 'title' | 'bubbles' | 'coins'
+
 export default function MasteredGames({ games, user, characters }: Props) {
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<'all' | 'bt' | 'lt' | 'ht' | 'et'>('all')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
+  const [sortBy, setSortBy] = useState<GameSortBy>('date')
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
   const [expandedNotes, setExpandedNotes] = useState<Set<number>>(() => new Set())
   const [breakdownModalKey, setBreakdownModalKey] = useState<BreakdownModalKey | null>(null)
   const [isSortPending, startSortTransition] = useTransition()
@@ -112,12 +115,42 @@ export default function MasteredGames({ games, user, characters }: Props) {
       return [game.title, game.notes].filter(Boolean).join(' ').toLowerCase().includes(query)
     })
     const sorted = [...filtered].sort((a, b) => {
-      const aTime = new Date(a.start_date).getTime()
-      const bTime = new Date(b.start_date).getTime()
-      return sortOrder === 'newest' ? bTime - aTime : aTime - bTime
+      const tierRewardA = a.tier_of_month_reward
+      const tierRewardB = b.tier_of_month_reward
+      const aBubbles = calculateBubbleByGames([a]) + (tierRewardA === 'bubble' ? 1 : 0)
+      const bBubbles = calculateBubbleByGames([b]) + (tierRewardB === 'bubble' ? 1 : 0)
+      const aCoins = calculateCoins([a]) + (tierRewardA === 'coin' ? 1 : 0)
+      const bCoins = calculateCoins([b]) + (tierRewardB === 'coin' ? 1 : 0)
+      const direction = sortDir === 'desc' ? -1 : 1
+
+      if (sortBy === 'title') {
+        const titleDiff = String(a.title ?? '').localeCompare(String(b.title ?? ''))
+        if (titleDiff !== 0) {
+          return titleDiff * direction
+        }
+      } else if (sortBy === 'bubbles') {
+        const bubbleDiff = aBubbles - bBubbles
+        if (bubbleDiff !== 0) {
+          return bubbleDiff * direction
+        }
+      } else if (sortBy === 'coins') {
+        const coinDiff = aCoins - bCoins
+        if (coinDiff !== 0) {
+          return coinDiff * direction
+        }
+      } else {
+        const aTime = new Date(a.start_date).getTime()
+        const bTime = new Date(b.start_date).getTime()
+        const dateDiff = aTime - bTime
+        if (dateDiff !== 0) {
+          return dateDiff * direction
+        }
+      }
+
+      return String(a.title ?? '').localeCompare(String(b.title ?? ''))
     })
     return sorted
-  }, [games, search, tierFilter, sortOrder])
+  }, [games, search, tierFilter, sortBy, sortDir])
 
   const headerColumns = 'grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_80px_80px_110px_56px] items-center gap-4'
   const hasFilters = search.trim() !== '' || tierFilter !== 'all'
@@ -132,10 +165,17 @@ export default function MasteredGames({ games, user, characters }: Props) {
     { label: 'HT', value: 'ht' as const },
     { label: 'ET', value: 'et' as const },
   ]
+  const isReverseNumbering = sortBy === 'date' && sortDir === 'desc'
 
-  const toggleSortOrder = () => {
+  const setGameSort = (nextSortBy: GameSortBy) => {
     startSortTransition(() => {
-      setSortOrder((current) => (current === 'newest' ? 'oldest' : 'newest'))
+      if (sortBy === nextSortBy) {
+        setSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
+        return
+      }
+
+      setSortBy(nextSortBy)
+      setSortDir(nextSortBy === 'title' ? 'asc' : 'desc')
     })
   }
 
@@ -707,12 +747,25 @@ export default function MasteredGames({ games, user, characters }: Props) {
                   ) : null}
                 </div>
               </div>
-              <div className="flex justify-end">
-                <Button type="button" size="xs" variant="ghost" onClick={toggleSortOrder}>
-                  Date
-                  {isSortPending ? <LoaderCircle size={12} className="animate-spin" /> : null}
-                  {sortOrder === 'newest' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-                </Button>
+              <div className="flex flex-wrap justify-end gap-1 md:hidden">
+                {(['title', 'bubbles', 'coins', 'date'] as const).map((column) => (
+                  <Button
+                    key={column}
+                    type="button"
+                    size="xs"
+                    variant={sortBy === column ? 'outline' : 'ghost'}
+                    onClick={() => setGameSort(column)}
+                  >
+                    {column === 'title' ? 'Game' : column === 'bubbles' ? 'Bubbles' : column === 'coins' ? 'Coins' : 'Date'}
+                    {sortBy === column
+                      ? isSortPending
+                        ? <LoaderCircle size={12} className="animate-spin" />
+                        : sortDir === 'desc'
+                          ? <ChevronDown size={12} />
+                          : <ChevronUp size={12} />
+                      : null}
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
@@ -723,7 +776,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                   const notes = game.notes ?? ''
                   const isExpanded = expandedNotes.has(game.id)
                   const showToggle = notes.length > 140
-                  const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
+                  const gameNumber = isReverseNumbering ? filteredGames.length - index : index + 1
                   const tierReward = game.tier_of_month_reward
                   const gameBubbles =
                     calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
@@ -791,12 +844,64 @@ export default function MasteredGames({ games, user, characters }: Props) {
               </List>
               <div className="mt-4 hidden md:block overflow-x-auto">
                 <div className="min-w-[760px]">
-                  <div className={`${headerColumns} px-4 pb-2 text-xs font-semibold uppercase text-base-content/50`}>
-                    <span>Game</span>
+                  <div className={`${headerColumns} px-4 pb-2 text-xs font-semibold text-base-content/50`}>
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                      onClick={() => setGameSort('title')}
+                    >
+                      Game
+                      {sortBy === 'title'
+                        ? isSortPending
+                          ? <LoaderCircle size={12} className="animate-spin" />
+                          : sortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                        : null}
+                    </button>
                     <span>Notes</span>
-                    <span className="text-right">Bubbles</span>
-                    <span className="text-right">Coins</span>
-                    <span className="text-right">Date</span>
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
+                      onClick={() => setGameSort('bubbles')}
+                    >
+                      Bubbles
+                      {sortBy === 'bubbles'
+                        ? isSortPending
+                          ? <LoaderCircle size={12} className="animate-spin" />
+                          : sortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                        : null}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
+                      onClick={() => setGameSort('coins')}
+                    >
+                      Coins
+                      {sortBy === 'coins'
+                        ? isSortPending
+                          ? <LoaderCircle size={12} className="animate-spin" />
+                          : sortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                        : null}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
+                      onClick={() => setGameSort('date')}
+                    >
+                      Date
+                      {sortBy === 'date'
+                        ? isSortPending
+                          ? <LoaderCircle size={12} className="animate-spin" />
+                          : sortDir === 'desc'
+                            ? <ChevronDown size={12} />
+                            : <ChevronUp size={12} />
+                        : null}
+                    </button>
                     <span className="text-right">Actions</span>
                   </div>
                   <List>
@@ -804,7 +909,7 @@ export default function MasteredGames({ games, user, characters }: Props) {
                       const notes = game.notes ?? ''
                       const isExpanded = expandedNotes.has(game.id)
                       const showToggle = notes.length > 140
-                      const gameNumber = sortOrder === 'newest' ? filteredGames.length - index : index + 1
+                      const gameNumber = isReverseNumbering ? filteredGames.length - index : index + 1
                       const tierReward = game.tier_of_month_reward
                       const gameBubbles =
                         calculateBubbleByGames([game]) + (tierReward === 'bubble' ? 1 : 0)
