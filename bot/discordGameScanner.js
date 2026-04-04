@@ -15,9 +15,13 @@ function extractTier(rawContent) {
 
 function extractTitle(rawContent) {
     const content = String(rawContent || '');
-    const quoteMatch = content.match(/["„“”']([^"„“”']{2,})["„“”']/);
+    const quoteMatch = content.match(/[“„””']([^”„””']{2,})[“„””']/);
     if (quoteMatch) {
         return quoteMatch[1].trim();
+    }
+    const boldMatch = content.match(/\*\*([^*]{2,})\*\*/);
+    if (boldMatch) {
+        return boldMatch[1].trim();
     }
     return null;
 }
@@ -196,7 +200,7 @@ function extractDate(content, fallbackDate) {
         }
     }
 
-    const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.-]\s*(\d{1,2})(?:\s*[.-]\s*(\d{2,4}))?/g);
+    const dateMatches = sanitized.matchAll(/(\d{1,2})\s*[.-]\s*(\d{1,2})(?:[.-](\d{2,4}))?/g);
     for (const dateMatch of dateMatches) {
         const day = Number(dateMatch[1]);
         const month = Number(dateMatch[2]);
@@ -280,7 +284,8 @@ function extractTime(content, fallbackDate) {
         .replace(/:MG_[A-Z]+~?\d*:/gi, ' ');
     const timeSource = sanitized
         .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
-        .replace(/\b\d{1,2}\s*[.-]\s*\d{1,2}(?:\s*[.-]\s*\d{2,4})?\b/g, ' ');
+        .replace(/\b\d{1,2}[.-]\d{1,2}[.-]\d{2,}\b/g, ' ')
+        .replace(/(?<!:)\b(?:0?[1-9]|[12]\d|3[01])[.-](?:0?[1-9]|1[0-2])\b(?![.-]\d)(?!\s*uhr\b)/gi, ' ');
 
     const slashRangeMatch = timeSource.match(/\b(\d{1,2})(?::(\d{2}))?\s*\/\s*(\d{1,2})(?::(\d{2}))?\s*(?:uhr|Uhr)?\b/);
     if (slashRangeMatch) {
@@ -413,7 +418,7 @@ function calculateConfidence({ hasTier, dateExplicit, timeExplicit }) {
     return Math.min(1, Number(confidence.toFixed(2)));
 }
 
-const CANCELLED_REGEX = /\b(abgesagt|abgesage|entfällt|faellt\s+aus|fällt\s+aus|cancel(?:led|ed))\b/ui;
+const CANCELLED_REGEX = /\b(abgesagt|abgesage|absagen|absage|entfällt|faellt\s+aus|fällt\s+aus|cancel(?:led|ed)|findet\s+(?:leider\s+)?nicht\s+statt|nicht\s+stattfinden)\b/ui;
 
 function hasCancelReaction(message) {
     const cache = message?.reactions?.cache;
@@ -458,6 +463,10 @@ function parseAnnouncement(message) {
             : null;
 
     if (!tier || !startsAt) {
+        return null;
+    }
+
+    if (!dateParts?.explicit && !timeParts?.explicit) {
         return null;
     }
 

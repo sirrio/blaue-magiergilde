@@ -36,3 +36,5 @@ node_modules/
 /playwright/.auth/
 
 *.log
+
+.claude/
