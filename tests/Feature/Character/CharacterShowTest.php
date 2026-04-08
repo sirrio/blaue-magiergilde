@@ -105,3 +105,32 @@ it('includes adventure participants on the character detail payload', function (
             ->where('character.adventures.0.allies.0.id', $ally->id)
             ->where('character.adventures.0.allies.0.name', $linkedCharacter->name));
 });
+
+it('keeps deleted linked allies as snapshots on the character detail payload', function () {
+    $user = User::factory()->create();
+    $linkedOwner = User::factory()->create([
+        'name' => 'Linked Owner',
+    ]);
+    $character = Character::factory()->for($user)->create();
+    $linkedCharacter = Character::factory()->for($linkedOwner)->create([
+        'name' => 'Archived Ally',
+    ]);
+
+    $ally = Ally::factory()->create([
+        'character_id' => $character->id,
+        'name' => $linkedCharacter->name,
+        'linked_character_id' => $linkedCharacter->id,
+    ]);
+
+    $linkedCharacter->delete();
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('character.allies.0.id', $ally->id)
+            ->where('character.allies.0.name', 'Archived Ally')
+            ->where('character.allies.0.linked_character_id', $linkedCharacter->id)
+            ->where('character.allies.0.linked_character', null));
+});

@@ -21,7 +21,7 @@ import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { calculateTier } from '@/helper/calculateTier'
-import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { Progress } from '@/components/ui/progress'
 import { Character, Ally, PageProps } from '@/types'
 import { Head, Link, router, usePage } from '@inertiajs/react'
@@ -1114,6 +1114,7 @@ export default function Show({
                       {sortedAllies.map((ally) => {
                         const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
                         const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
+                        const deletedLinked = isDeletedLinkedAlly(ally)
 
                         return (
                           <ListRow key={ally.id} className="block">
@@ -1124,12 +1125,16 @@ export default function Show({
                                   <div className="flex min-w-0 items-center gap-2">
                                     <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
                                     <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                      {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                      {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                     </span>
                                   </div>
                                   {getAllyOwnerName(ally) ? (
                                     <span className="truncate text-xs text-base-content/50">
                                       {t('characters.owner')}: {getAllyOwnerName(ally)}
+                                    </span>
+                                  ) : deletedLinked ? (
+                                    <span className="truncate text-xs text-base-content/50">
+                                      {t('characters.allyDeletedLinkedCharacter')}
                                     </span>
                                   ) : null}
                                   <button
@@ -1214,6 +1219,7 @@ export default function Show({
                           {sortedAllies.map((ally) => {
                             const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
                             const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
+                            const deletedLinked = isDeletedLinkedAlly(ally)
 
                             return (
                               <ListRow
@@ -1228,7 +1234,7 @@ export default function Show({
                                         {getAllyDisplayName(ally)}
                                       </span>
                                       <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                        {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                        {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                       </span>
                                     </div>
                                     <span className="truncate text-xs text-base-content/50">
@@ -1238,7 +1244,7 @@ export default function Show({
                                 </div>
                                 <div className="min-w-0 space-y-0.5">
                                   <span className="block truncate text-sm text-base-content/70">
-                                    {getAllyOwnerName(ally) || '-'}
+                                    {getAllyOwnerName(ally) || (deletedLinked ? t('characters.allyDeletedLinkedCharacter') : '-')}
                                   </span>
                                 </div>
                                 <RatingHearts rating={ally.rating} />

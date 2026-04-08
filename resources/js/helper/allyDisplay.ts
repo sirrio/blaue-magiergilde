@@ -1,5 +1,9 @@
 import { Ally, Character } from '@/types'
 
+export const isDeletedLinkedAlly = (ally: Ally) => {
+  return Boolean(ally.linked_character_id && !ally.linked_character)
+}
+
 export const getAllyDisplayName = (ally: Ally) => {
   const linkedName = ally.linked_character?.name?.trim()
   const allyName = ally.name?.trim()
