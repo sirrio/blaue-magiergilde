@@ -18,8 +18,7 @@ class ShopItem extends Model
         'item_rarity',
         'item_type',
         'roll_source_kind',
-        'roll_section_title',
-        'roll_sort_order',
+        'roll_rule_id',
         'snapshot_custom',
         'spell_id',
         'spell_name',
@@ -42,5 +41,10 @@ class ShopItem extends Model
     public function spell(): BelongsTo
     {
         return $this->belongsTo(Spell::class);
+    }
+
+    public function rollRule(): BelongsTo
+    {
+        return $this->belongsTo(ShopRollRule::class, 'roll_rule_id');
     }
 }

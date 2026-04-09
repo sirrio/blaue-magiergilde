@@ -54,6 +54,8 @@ export interface ShopItem {
   item_cost?: string | null
   item_rarity?: Item['rarity'] | string | null
   item_type?: Item['type'] | string | null
+  roll_source_kind?: ShopRollRule['source_kind'] | null
+  roll_rule_id?: number | null
   snapshot_custom?: boolean | null
   spell?: Spell | null
   spell_name?: string | null
@@ -142,10 +144,11 @@ export interface ShopSettings {
 
 export interface ShopRollRule {
   id?: number
+  row_kind: 'heading' | 'rule'
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
   selection_types: Array<'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'>
   source_kind: 'all' | 'official' | 'third_party'
-  section_title: string
+  heading_title: string
   count: number
   sort_order?: number
 }

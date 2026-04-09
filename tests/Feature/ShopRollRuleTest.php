@@ -1,62 +1,113 @@
 <?php
 
 use App\Models\Item;
+use App\Models\Shop;
 use App\Models\ShopRollRule;
 use App\Models\Source;
 use App\Models\User;
 use App\Services\ShopRollService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
-it('lets admins update shop roll rules', function () {
+it('lets admins update shop roll rows without recreating existing row ids', function () {
     $admin = User::factory()->create(['is_admin' => true]);
+    $existingHeading = ShopRollRule::query()->create([
+        'row_kind' => 'heading',
+        'rarity' => 'common',
+        'selection_types' => ['item'],
+        'source_kind' => 'all',
+        'heading_title' => 'Common picks',
+        'count' => 0,
+        'sort_order' => 10,
+    ]);
+    $existingRule = ShopRollRule::query()->create([
+        'row_kind' => 'rule',
+        'rarity' => 'common',
+        'selection_types' => ['weapon', 'armor', 'item'],
+        'source_kind' => 'official',
+        'heading_title' => '',
+        'count' => 2,
+        'sort_order' => 20,
+    ]);
 
     $response = $this->actingAs($admin)
         ->patchJson(route('admin.shop-settings.update'), [
             'roll_rules' => [
                 [
+                    'id' => $existingHeading->id,
+                    'row_kind' => 'heading',
                     'rarity' => 'common',
-                    'selection_types' => ['weapon', 'armor', 'spellscroll'],
-                    'source_kind' => 'official',
-                    'section_title' => 'Common WotC Picks',
-                    'count' => 2,
+                    'selection_types' => ['item'],
+                    'source_kind' => 'all',
+                    'heading_title' => 'Common WotC Picks',
+                    'count' => 0,
                     'sort_order' => 10,
                 ],
                 [
-                    'rarity' => 'rare',
+                    'id' => $existingRule->id,
+                    'row_kind' => 'rule',
+                    'rarity' => 'common',
+                    'selection_types' => ['weapon', 'armor', 'item'],
+                    'source_kind' => 'official',
+                    'heading_title' => '',
+                    'count' => 5,
+                    'sort_order' => 20,
+                ],
+                [
+                    'row_kind' => 'rule',
+                    'rarity' => 'common',
                     'selection_types' => ['consumable'],
                     'source_kind' => 'third_party',
-                    'section_title' => 'Rare 3rd-party Consumables',
+                    'heading_title' => '',
                     'count' => 1,
-                    'sort_order' => 20,
+                    'sort_order' => 30,
                 ],
             ],
         ]);
 
     $response->assertOk()
-        ->assertJsonPath('shop_settings.roll_rules.0.source_kind', 'official')
-        ->assertJsonPath('shop_settings.roll_rules.0.selection_types.0', 'weapon')
-        ->assertJsonPath('shop_settings.roll_rules.0.selection_types.2', 'spellscroll')
-        ->assertJsonPath('shop_settings.roll_rules.0.section_title', 'Common WotC Picks')
-        ->assertJsonPath('shop_settings.roll_rules.0.count', 2)
-        ->assertJsonPath('shop_settings.roll_rules.1.source_kind', 'third_party');
+        ->assertJsonPath('shop_settings.roll_rules.0.id', $existingHeading->id)
+        ->assertJsonPath('shop_settings.roll_rules.0.heading_title', 'Common WotC Picks')
+        ->assertJsonPath('shop_settings.roll_rules.1.id', $existingRule->id)
+        ->assertJsonPath('shop_settings.roll_rules.1.count', 5)
+        ->assertJsonPath('shop_settings.roll_rules.2.row_kind', 'rule')
+        ->assertJsonPath('shop_settings.roll_rules.2.source_kind', 'third_party');
 
-    expect(ShopRollRule::query()->count())->toBe(2)
-        ->and(ShopRollRule::query()->orderBy('sort_order')->value('source_kind'))->toBe('official');
+    expect(ShopRollRule::query()->count())->toBe(3)
+        ->and($existingHeading->fresh()?->heading_title)->toBe('Common WotC Picks')
+        ->and($existingRule->fresh()?->count)->toBe(5)
+        ->and(
+            ShopRollRule::query()
+                ->where('id', '!=', $existingHeading->id)
+                ->where('id', '!=', $existingRule->id)
+                ->exists()
+        )->toBeTrue();
 });
 
-it('respects source kind rules when rolling a shop', function () {
+it('stores the rule row id on rolled shop items', function () {
     ShopRollRule::query()->delete();
+
     ShopRollRule::query()->create([
+        'row_kind' => 'heading',
+        'rarity' => 'common',
+        'selection_types' => ['item'],
+        'source_kind' => 'all',
+        'heading_title' => 'Official Common Gear',
+        'count' => 0,
+        'sort_order' => 10,
+    ]);
+    $rule = ShopRollRule::query()->create([
+        'row_kind' => 'rule',
         'rarity' => 'common',
         'selection_types' => ['weapon', 'item'],
         'source_kind' => 'official',
-        'section_title' => 'Official Common Gear',
+        'heading_title' => '',
         'count' => 1,
-        'sort_order' => 10,
+        'sort_order' => 20,
     ]);
 
     $officialSource = Source::factory()->create([
@@ -94,59 +145,43 @@ it('respects source kind rules when rolling a shop', function () {
     expect($rolledLine)->not->toBeNull()
         ->and($rolledLine?->item_id)->toBe($officialItem->id)
         ->and($rolledLine?->roll_source_kind)->toBe('official')
-        ->and($rolledLine?->roll_section_title)->toBe('Official Common Gear')
-        ->and($rolledLine?->roll_sort_order)->toBe(10);
+        ->and($rolledLine?->roll_rule_id)->toBe($rule->id);
 });
 
-it('backfills shop rule sections for legacy databases', function () {
+it('backfills existing shop items to the new roll rule fields during migration', function () {
+    $source = Source::factory()->create([
+        'kind' => 'official',
+    ]);
     $item = Item::factory()->create([
-        'name' => 'Legacy Shop Item',
         'rarity' => 'common',
-        'type' => 'item',
-        'shop_enabled' => true,
+        'type' => 'consumable',
+        'source_id' => $source->id,
     ]);
-
-    Schema::table('shop_roll_rules', function ($table): void {
-        $table->dropColumn('section_title');
-    });
-
-    Schema::table('item_shop', function ($table): void {
-        $table->dropColumn(['roll_section_title', 'roll_sort_order']);
-    });
-
-    DB::table('shop_roll_rules')->insert([
-        'rarity' => 'common',
-        'selection_types' => json_encode(['weapon', 'armor', 'item'], JSON_THROW_ON_ERROR),
-        'source_kind' => 'all',
-        'count' => 5,
-        'sort_order' => 10,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    DB::table('shops')->insert([
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    DB::table('item_shop')->insert([
-        'shop_id' => 1,
+    $shop = Shop::factory()->create();
+    $shopItemId = DB::table('item_shop')->insertGetId([
+        'shop_id' => $shop->id,
         'item_id' => $item->id,
-        'item_name' => 'Legacy Shop Item',
-        'item_rarity' => 'common',
-        'item_type' => 'item',
-        'roll_source_kind' => 'all',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
-    $migration = include database_path('migrations/2026_04_09_210647_backfill_shop_roll_rule_sections_for_existing_databases.php');
+    Schema::table('item_shop', function (Blueprint $table) {
+        $table->dropForeign(['roll_rule_id']);
+        $table->dropColumn('roll_rule_id');
+        $table->dropColumn('roll_source_kind');
+    });
+
+    $migration = require database_path('migrations/2026_04_09_200204_add_roll_source_kind_to_item_shop_table.php');
     $migration->up();
 
-    expect(Schema::hasColumn('shop_roll_rules', 'section_title'))->toBeTrue()
-        ->and(Schema::hasColumn('item_shop', 'roll_section_title'))->toBeTrue()
-        ->and(Schema::hasColumn('item_shop', 'roll_sort_order'))->toBeTrue()
-        ->and(DB::table('shop_roll_rules')->value('section_title'))->toBe('Common Magic Items (Ab Low Tier)')
-        ->and(DB::table('item_shop')->value('roll_section_title'))->toBe('Common Magic Items (Ab Low Tier)')
-        ->and((int) DB::table('item_shop')->value('roll_sort_order'))->toBe(10);
+    $shopItem = DB::table('item_shop')->where('id', $shopItemId)->first();
+    $expectedRuleId = ShopRollRule::query()
+        ->where('row_kind', 'rule')
+        ->where('rarity', 'common')
+        ->where('selection_types', json_encode(['consumable']))
+        ->value('id');
+
+    expect($shopItem)->not->toBeNull()
+        ->and($shopItem?->roll_source_kind)->toBe('official')
+        ->and((int) $shopItem?->roll_rule_id)->toBe($expectedRuleId);
 });

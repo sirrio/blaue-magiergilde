@@ -13,10 +13,11 @@ class ShopRollRule extends Model
     use HasFactory;
 
     protected $fillable = [
+        'row_kind',
         'rarity',
         'selection_types',
         'source_kind',
-        'section_title',
+        'heading_title',
         'count',
         'sort_order',
     ];
@@ -28,23 +29,31 @@ class ShopRollRule extends Model
     ];
 
     /**
-     * @return array<int, array{rarity:string,selection_types:array<int, string>,source_kind:string,section_title:string,count:int,sort_order:int}>
+     * @return array<int, array{row_kind:string,rarity:string,selection_types:array<int, string>,source_kind:string,heading_title:string,count:int,sort_order:int}>
      */
     public static function defaults(): array
     {
         return [
-            ['rarity' => 'common', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'section_title' => 'Common Magic Items (Ab Low Tier)', 'count' => 5, 'sort_order' => 10],
-            ['rarity' => 'common', 'selection_types' => ['consumable'], 'source_kind' => 'all', 'section_title' => 'Common Consumable', 'count' => 1, 'sort_order' => 20],
-            ['rarity' => 'common', 'selection_types' => ['spellscroll'], 'source_kind' => 'all', 'section_title' => 'Common Spell Scroll', 'count' => 1, 'sort_order' => 30],
-            ['rarity' => 'uncommon', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'section_title' => 'Uncommon Magic Items (Ab Low Tier)', 'count' => 3, 'sort_order' => 40],
-            ['rarity' => 'uncommon', 'selection_types' => ['consumable'], 'source_kind' => 'all', 'section_title' => 'Uncommon Consumable', 'count' => 1, 'sort_order' => 50],
-            ['rarity' => 'uncommon', 'selection_types' => ['spellscroll'], 'source_kind' => 'all', 'section_title' => 'Uncommon Spell Scroll', 'count' => 1, 'sort_order' => 60],
-            ['rarity' => 'rare', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'section_title' => 'Rare Magic Items (Ab High Tier)', 'count' => 2, 'sort_order' => 70],
-            ['rarity' => 'rare', 'selection_types' => ['consumable', 'spellscroll'], 'source_kind' => 'all', 'section_title' => 'Rare Consumable/Spell Scroll', 'count' => 1, 'sort_order' => 80],
-            ['rarity' => 'rare', 'selection_types' => ['spellscroll'], 'source_kind' => 'all', 'section_title' => 'Rare Spell Scroll', 'count' => 0, 'sort_order' => 90],
-            ['rarity' => 'very_rare', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'section_title' => 'Very Rare Magic Items (Ab Epic Tier)', 'count' => 1, 'sort_order' => 100],
-            ['rarity' => 'very_rare', 'selection_types' => ['consumable', 'spellscroll'], 'source_kind' => 'all', 'section_title' => 'Very Rare Consumable/Spell Scroll', 'count' => 1, 'sort_order' => 110],
-            ['rarity' => 'very_rare', 'selection_types' => ['spellscroll'], 'source_kind' => 'all', 'section_title' => 'Very Rare Spell Scroll', 'count' => 0, 'sort_order' => 120],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Common Magic Items (Ab Low Tier)', 'count' => 0, 'sort_order' => 10],
+            ['row_kind' => 'rule', 'rarity' => 'common', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 5, 'sort_order' => 20],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Common Consumable', 'count' => 0, 'sort_order' => 30],
+            ['row_kind' => 'rule', 'rarity' => 'common', 'selection_types' => ['consumable'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 40],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Common Spell Scroll', 'count' => 0, 'sort_order' => 50],
+            ['row_kind' => 'rule', 'rarity' => 'common', 'selection_types' => ['spellscroll'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 60],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Uncommon Magic Items (Ab Low Tier)', 'count' => 0, 'sort_order' => 70],
+            ['row_kind' => 'rule', 'rarity' => 'uncommon', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 3, 'sort_order' => 80],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Uncommon Consumable', 'count' => 0, 'sort_order' => 90],
+            ['row_kind' => 'rule', 'rarity' => 'uncommon', 'selection_types' => ['consumable'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 100],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Uncommon Spell Scroll', 'count' => 0, 'sort_order' => 110],
+            ['row_kind' => 'rule', 'rarity' => 'uncommon', 'selection_types' => ['spellscroll'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 120],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Rare Magic Items (Ab High Tier)', 'count' => 0, 'sort_order' => 130],
+            ['row_kind' => 'rule', 'rarity' => 'rare', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 2, 'sort_order' => 140],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Rare Consumable/Spell Scroll', 'count' => 0, 'sort_order' => 150],
+            ['row_kind' => 'rule', 'rarity' => 'rare', 'selection_types' => ['consumable', 'spellscroll'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 160],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Very Rare Magic Items (Ab Epic Tier)', 'count' => 0, 'sort_order' => 170],
+            ['row_kind' => 'rule', 'rarity' => 'very_rare', 'selection_types' => ['weapon', 'armor', 'item'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 180],
+            ['row_kind' => 'heading', 'rarity' => 'common', 'selection_types' => ['item'], 'source_kind' => 'all', 'heading_title' => 'Very Rare Consumable/Spell Scroll', 'count' => 0, 'sort_order' => 190],
+            ['row_kind' => 'rule', 'rarity' => 'very_rare', 'selection_types' => ['consumable', 'spellscroll'], 'source_kind' => 'all', 'heading_title' => '', 'count' => 1, 'sort_order' => 200],
         ];
     }
 

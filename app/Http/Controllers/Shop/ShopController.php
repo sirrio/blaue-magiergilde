@@ -60,10 +60,11 @@ class ShopController extends Controller
             ]) + [
                 'roll_rules' => ShopRollRule::ordered()->map(fn (ShopRollRule $rule): array => [
                     'id' => $rule->id,
+                    'row_kind' => $rule->row_kind,
                     'rarity' => $rule->rarity,
                     'selection_types' => $rule->selection_types ?? [],
                     'source_kind' => $rule->source_kind,
-                    'section_title' => $rule->section_title,
+                    'heading_title' => $rule->heading_title,
                     'count' => $rule->count,
                     'sort_order' => $rule->sort_order,
                 ])->all(),

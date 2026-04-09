@@ -212,6 +212,10 @@ class ShopRollService
         $pickedItemIds = [];
 
         foreach (ShopRollRule::ordered() as $rule) {
+            if ($rule->row_kind === 'heading') {
+                continue;
+            }
+
             if ($rule->count <= 0) {
                 continue;
             }
@@ -258,8 +262,7 @@ class ShopRollService
                     $payload = $item->toArray();
                     $payload['display_cost'] = ItemCostResolver::resolveForItem($item);
                     $payload['roll_source_kind'] = $rule->source_kind;
-                    $payload['roll_section_title'] = $rule->section_title;
-                    $payload['roll_sort_order'] = $rule->sort_order;
+                    $payload['roll_rule_id'] = $rule->id;
 
                     return $payload;
                 })
@@ -295,8 +298,7 @@ class ShopRollService
                     'item_rarity' => $pickedItem['rarity'] ?? null,
                     'item_type' => $pickedItem['type'] ?? null,
                     'roll_source_kind' => $pickedItem['roll_source_kind'] ?? 'all',
-                    'roll_section_title' => $pickedItem['roll_section_title'] ?? null,
-                    'roll_sort_order' => $pickedItem['roll_sort_order'] ?? null,
+                    'roll_rule_id' => $pickedItem['roll_rule_id'] ?? null,
                     'snapshot_custom' => false,
                     'spell_id' => $spellId,
                     'spell_name' => $spellSnapshot?->name,

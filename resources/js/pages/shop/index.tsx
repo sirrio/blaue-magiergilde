@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import BotOperationProgress, { isTerminalBotOperation } from '@/components/bot-operation-progress'
-import { List } from '@/components/ui/list'
+import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
@@ -47,13 +47,56 @@ const itemTypeBadgeLabels: Record<ShopRollRule['selection_types'][number], strin
 }
 
 const createEmptyRollRule = (sortOrder: number): ShopRollRule => ({
+  row_kind: 'rule',
   rarity: 'common',
   selection_types: ['item'],
   source_kind: 'all',
-  section_title: '',
+  heading_title: '',
   count: 1,
   sort_order: sortOrder,
 })
+
+const createEmptyHeading = (sortOrder: number): ShopRollRule => ({
+  row_kind: 'heading',
+  rarity: 'common',
+  selection_types: ['item'],
+  source_kind: 'all',
+  heading_title: 'New heading',
+  count: 0,
+  sort_order: sortOrder,
+})
+
+const normalizeRollRulesForSave = (rules: ShopRollRule[]): ShopRollRule[] => {
+  return rules.map((rule, index) => {
+    const sortOrder = (index + 1) * 10
+
+    if (rule.row_kind === 'heading') {
+      const headingTitle = rule.heading_title.trim()
+
+      return {
+        ...rule,
+        heading_title: headingTitle,
+        rarity: 'common',
+        selection_types: ['item'],
+        source_kind: 'all',
+        count: 0,
+        sort_order: sortOrder,
+      }
+    }
+
+    return {
+      ...rule,
+      row_kind: 'rule',
+      heading_title: '',
+      count: Number(rule.count),
+      sort_order: sortOrder,
+    }
+  })
+}
+
+type ShopDisplayRow =
+  | { key: string; type: 'heading'; title: string }
+  | { key: string; type: 'item'; item: ShopItem }
 
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
   const resolveFallbackShop = useCallback(
@@ -126,15 +169,61 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const getShopItemSnapshot = (shopItem: ShopItem): Item => {
     const item = shopItem.item ?? ({} as Item)
     return {
-    id: item.id ?? 0,
-    name: shopItem.item_name ?? item.name ?? 'Unknown item',
-    url: shopItem.item_url ?? item.url ?? '',
-    cost: shopItem.item_cost ?? item.display_cost ?? item.cost ?? '',
-    rarity: (shopItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
+      id: item.id ?? 0,
+      name: shopItem.item_name ?? item.name ?? 'Unknown item',
+      url: shopItem.item_url ?? item.url ?? '',
+      cost: shopItem.item_cost ?? item.display_cost ?? item.cost ?? '',
+      rarity: (shopItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
       type: (shopItem.item_type ?? item.type ?? 'item') as Item['type'],
       pick_count: item.pick_count ?? 0,
     }
   }
+
+  const shopDisplayRows = React.useMemo<ShopDisplayRow[]>(() => {
+    if (!selectedShop) {
+      return []
+    }
+
+    const normalizedRules = normalizeRollRulesForSave(rollRules)
+
+    if (!normalizedRules.length) {
+      return []
+    }
+
+    const itemsByRuleId = new Map<number, ShopItem[]>()
+
+    selectedShop?.shop_items.forEach((shopItem) => {
+      const rollRuleId = Number(shopItem.roll_rule_id ?? 0)
+
+      if (!rollRuleId) {
+        return
+      }
+
+      const existingItems = itemsByRuleId.get(rollRuleId) ?? []
+      existingItems.push(shopItem)
+      itemsByRuleId.set(rollRuleId, existingItems)
+    })
+
+    return normalizedRules.flatMap<ShopDisplayRow>((rule, index) => {
+      if (rule.row_kind === 'heading') {
+        return [{
+          key: `heading-${rule.id ?? `new-${index}`}`,
+          type: 'heading' as const,
+          title: rule.heading_title.trim(),
+        }]
+      }
+
+      if (!rule.id) {
+        return []
+      }
+
+      return (itemsByRuleId.get(rule.id) ?? []).map((shopItem) => ({
+        key: `item-${shopItem.id}`,
+        type: 'item' as const,
+        item: shopItem,
+      }))
+    })
+  }, [rollRules, selectedShop])
 
   const handleCreateShop = (): void => {
     if (!window.confirm('Roll a new draft shop?')) {
@@ -290,6 +379,13 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     ])
   }, [])
 
+  const handleAddHeading = useCallback(() => {
+    setRollRules((current) => [
+      ...current,
+      createEmptyHeading((current.length + 1) * 10),
+    ])
+  }, [])
+
   const handleRemoveRollRule = useCallback((index: number) => {
     setRollRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index).map((rule, ruleIndex) => ({
       ...rule,
@@ -356,13 +452,15 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         },
         credentials: 'same-origin',
         body: JSON.stringify({
-          roll_rules: rollRules.map((rule, index) => ({
+          roll_rules: normalizeRollRulesForSave(rollRules).map((rule) => ({
+            id: rule.id,
+            row_kind: rule.row_kind,
             rarity: rule.rarity,
             selection_types: rule.selection_types,
             source_kind: rule.source_kind,
-            section_title: rule.section_title.trim(),
+            heading_title: rule.heading_title,
             count: Number(rule.count),
-            sort_order: (index + 1) * 10,
+            sort_order: rule.sort_order,
           })),
         }),
       })
@@ -701,22 +799,28 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                       <div>
                         <p className="text-sm font-semibold">Roll rules</p>
                         <p className="text-xs text-base-content/60">
-                          Configure how many shop entries are rolled per rarity, pool, and source type.
+                          Configure heading rows and rule rows in the same order they will be processed.
                         </p>
                         <p className="mt-1 text-[11px] text-base-content/50">
-                          Rules are processed top to bottom. Items already rolled by earlier rules are excluded from later ones.
+                          Heading rows are rendered directly. Rule rows roll items top to bottom, and earlier rolls are excluded from later ones.
                         </p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={handleAddRollRule}>
-                        <Plus size={14} />
-                        Add rule
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={handleAddHeading}>
+                          <Plus size={14} />
+                          Add heading
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleAddRollRule}>
+                          <Plus size={14} />
+                          Add rule
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-3">
-                      <div className="hidden grid-cols-[64px_120px_180px_minmax(0,1fr)_120px_64px_76px] items-center gap-2 rounded-box border border-base-200 bg-base-200/40 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 lg:grid">
+                      <div className="hidden grid-cols-[64px_72px_120px_minmax(0,1fr)_120px_64px_76px] items-center gap-2 rounded-box border border-base-200 bg-base-200/40 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 lg:grid">
                         <span>Move</span>
+                        <span>Kind</span>
                         <span>Rarity</span>
-                        <span>Section</span>
                         <span>Types</span>
                         <span>Source</span>
                         <span>Count</span>
@@ -725,11 +829,15 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                       {rollRules.map((rule, index) => (
                         <div
                           key={`${rule.id ?? 'new'}-${index}`}
-                          className="grid gap-2 rounded-box border border-base-200 p-2.5 lg:grid-cols-[64px_120px_180px_minmax(0,1fr)_120px_64px_76px] lg:items-center"
+                          className={cn(
+                            'grid gap-2 rounded-box border border-base-200 p-2.5',
+                            'lg:grid-cols-[64px_72px_120px_minmax(0,1fr)_120px_64px_76px] lg:items-center',
+                            rule.row_kind === 'heading' && 'bg-base-200/25',
+                          )}
                         >
                           <div className="flex items-center justify-between gap-3 lg:justify-start">
                             <span className="text-xs font-semibold uppercase tracking-wide text-base-content/60 lg:hidden">
-                              Rule {index + 1}
+                              {rule.row_kind === 'heading' ? `Heading ${index + 1}` : `Rule ${index + 1}`}
                             </span>
                             <div className="flex items-center gap-1 lg:hidden">
                               <Button
@@ -778,93 +886,110 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                               </Button>
                             </div>
                           </div>
-                          <Select
-                            value={rule.rarity}
-                            className="lg:select-xs lg:min-h-8 lg:h-8 lg:text-xs"
-                            onChange={(event) => handleRollRuleChange(index, 'rarity', event.target.value as ShopRollRule['rarity'])}
-                          >
-                            <SelectLabel className="lg:hidden">Rarity</SelectLabel>
-                            <SelectOptions>
-                              {rarityOptions.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
-                            </SelectOptions>
-                          </Select>
-                          <label className="form-control">
-                            <span className="label text-xs lg:hidden">Section title</span>
-                            <input
-                              type="text"
-                              className="input input-sm lg:input-xs lg:h-8 lg:min-h-8 lg:text-xs"
-                              value={rule.section_title}
-                              onChange={(event) => handleRollRuleChange(index, 'section_title', event.target.value)}
-                            />
-                          </label>
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-base-content/70 lg:hidden">Types</p>
-                            <div className="dropdown w-full">
-                              <div tabIndex={0} role="button" className="flex min-h-8 w-full items-center justify-between rounded-btn border border-base-300 bg-base-100 px-2 py-1 text-left text-xs text-base-content/80">
-                                <div className="flex min-w-0 flex-wrap items-center gap-1">
-                                  {rule.selection_types.map((type) => (
-                                    <span
-                                      key={type}
-                                      className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                                    >
-                                      {itemTypeBadgeLabels[type]}
-                                    </span>
-                                  ))}
-                                </div>
-                                <span className="shrink-0 text-[10px] text-base-content/45">Edit</span>
-                              </div>
-                              <div tabIndex={0} className="dropdown-content z-10 mt-2 w-64 rounded-box border border-base-200 bg-base-100 p-2 shadow-xl">
-                                <div className="space-y-1">
-                                  {itemTypeOptions.map((option) => {
-                                    const active = rule.selection_types.includes(option.value)
-
-                                    return (
-                                      <label
-                                        key={option.value}
-                                        className={cn(
-                                          'flex cursor-pointer items-center gap-2 rounded-btn px-2 py-1.5 text-xs transition',
-                                          active ? 'bg-primary/10 text-primary' : 'text-base-content/80 hover:bg-base-200',
-                                        )}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          className="checkbox checkbox-xs"
-                                          checked={active}
-                                          onChange={() => handleToggleRollRuleType(index, option.value)}
-                                        />
-                                        {option.label}
-                                      </label>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            </div>
+                          <div className="flex items-center lg:justify-center">
+                            <span
+                              className={cn(
+                                'rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide',
+                                rule.row_kind === 'heading'
+                                  ? 'border-secondary/30 bg-secondary/10 text-secondary'
+                                  : 'border-primary/30 bg-primary/10 text-primary',
+                              )}
+                            >
+                              {rule.row_kind === 'heading' ? 'Heading' : 'Rule'}
+                            </span>
                           </div>
-                          <Select
-                            value={rule.source_kind}
-                            className="lg:select-xs lg:min-h-8 lg:h-8 lg:text-xs"
-                            onChange={(event) => handleRollRuleChange(index, 'source_kind', event.target.value as ShopRollRule['source_kind'])}
-                          >
-                            <SelectLabel className="lg:hidden">Source type</SelectLabel>
-                            <SelectOptions>
-                              {sourceKindOptions.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
-                            </SelectOptions>
-                          </Select>
-                          <label className="form-control">
-                            <span className="label text-xs lg:hidden">Count</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={50}
-                              className="input input-xs lg:h-8 lg:min-h-8 lg:w-16 lg:px-2 lg:text-center lg:text-xs"
-                              value={rule.count}
-                              onChange={(event) => handleRollRuleChange(index, 'count', Math.max(0, Number(event.target.value) || 0))}
-                            />
-                          </label>
+                          {rule.row_kind === 'heading' ? (
+                            <div className="space-y-1 lg:col-span-4 lg:space-y-0">
+                              <span className="block text-xs text-base-content/70 lg:hidden">Heading title</span>
+                              <input
+                                type="text"
+                                className="input input-sm lg:h-8 lg:min-h-8 lg:text-xs"
+                                value={rule.heading_title}
+                                onChange={(event) => handleRollRuleChange(index, 'heading_title', event.target.value)}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <Select
+                                value={rule.rarity}
+                                className="lg:select-xs lg:min-h-8 lg:h-8 lg:text-xs"
+                                onChange={(event) => handleRollRuleChange(index, 'rarity', event.target.value as ShopRollRule['rarity'])}
+                              >
+                                <SelectLabel className="lg:hidden">Rarity</SelectLabel>
+                                <SelectOptions>
+                                  {rarityOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </SelectOptions>
+                              </Select>
+                              <div className="space-y-2">
+                                <p className="text-xs font-medium text-base-content/70 lg:hidden">Types</p>
+                                <div className="dropdown w-full">
+                                  <div tabIndex={0} role="button" className="flex min-h-8 w-full items-center justify-between rounded-btn border border-base-300 bg-base-100 px-2 py-1 text-left text-xs text-base-content/80">
+                                    <div className="flex min-w-0 flex-wrap items-center gap-1">
+                                      {rule.selection_types.map((type) => (
+                                        <span
+                                          key={type}
+                                          className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                                        >
+                                          {itemTypeBadgeLabels[type]}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <span className="shrink-0 text-[10px] text-base-content/45">Edit</span>
+                                  </div>
+                                  <div tabIndex={0} className="dropdown-content z-10 mt-2 w-64 rounded-box border border-base-200 bg-base-100 p-2 shadow-xl">
+                                    <div className="space-y-1">
+                                      {itemTypeOptions.map((option) => {
+                                        const active = rule.selection_types.includes(option.value)
+
+                                        return (
+                                          <label
+                                            key={option.value}
+                                            className={cn(
+                                              'flex cursor-pointer items-center gap-2 rounded-btn px-2 py-1.5 text-xs transition',
+                                              active ? 'bg-primary/10 text-primary' : 'text-base-content/80 hover:bg-base-200',
+                                            )}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              className="checkbox checkbox-xs"
+                                              checked={active}
+                                              onChange={() => handleToggleRollRuleType(index, option.value)}
+                                            />
+                                            {option.label}
+                                          </label>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <Select
+                                value={rule.source_kind}
+                                className="lg:select-xs lg:min-h-8 lg:h-8 lg:text-xs"
+                                onChange={(event) => handleRollRuleChange(index, 'source_kind', event.target.value as ShopRollRule['source_kind'])}
+                              >
+                                <SelectLabel className="lg:hidden">Source type</SelectLabel>
+                                <SelectOptions>
+                                  {sourceKindOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </SelectOptions>
+                              </Select>
+                              <label className="form-control">
+                                <span className="label text-xs lg:hidden">Count</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={50}
+                                  className="input input-xs lg:h-8 lg:min-h-8 lg:w-16 lg:px-2 lg:text-center lg:text-xs"
+                                  value={rule.count}
+                                  onChange={(event) => handleRollRuleChange(index, 'count', Math.max(0, Number(event.target.value) || 0))}
+                                />
+                              </label>
+                            </>
+                          )}
                           <div className="flex justify-end gap-1 lg:justify-center">
                             <Button
                               size="sm"
@@ -936,13 +1061,27 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
           </div>
         ) : null}
         <List>
-          {selectedShop?.shop_items.map((si) => (
-            <ItemRow
-              key={si.id}
-              item={getShopItemSnapshot(si)}
-              shopItem={si}
-              canUpdatePostLine={canUpdateSelectedShopLine}
-            />
+          {shopDisplayRows.map((row) => (
+            row.type === 'heading'
+              ? (
+                <ListRow
+                  key={row.key}
+                  className="grid-cols-1 border-b border-base-200 bg-base-200/25 px-4 py-3"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold italic">
+                    <span aria-hidden="true">⚔</span>
+                    <span>{row.title}</span>
+                  </div>
+                </ListRow>
+              )
+              : (
+              <ItemRow
+                key={row.key}
+                item={getShopItemSnapshot(row.item)}
+                shopItem={row.item}
+                canUpdatePostLine={canUpdateSelectedShopLine}
+              />
+              )
           ))}
         </List>
       </div>

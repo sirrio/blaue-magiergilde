@@ -8,7 +8,7 @@ use App\Models\ShopRollRule;
 use App\Models\ShopSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ShopSettingController extends Controller
 {
@@ -21,37 +21,49 @@ class ShopSettingController extends Controller
         $settings->update($payload);
 
         if (is_array($rulePayload)) {
-            ShopRollRule::query()->delete();
+            DB::transaction(function () use ($rulePayload): void {
+                $existingRules = ShopRollRule::query()->get()->keyBy('id');
+                $persistedIds = [];
 
-            $rules = collect($rulePayload)
-                ->values()
-                ->map(static function (array $rule, int $index): array {
-                    return [
-                        'rarity' => (string) $rule['rarity'],
-                        'selection_types' => array_values(array_map(
-                            static fn (mixed $type): string => (string) $type,
-                            $rule['selection_types'] ?? [],
-                        )),
-                        'source_kind' => (string) $rule['source_kind'],
-                        'section_title' => trim((string) $rule['section_title']),
-                        'count' => (int) $rule['count'],
-                        'sort_order' => isset($rule['sort_order']) ? (int) $rule['sort_order'] : (($index + 1) * 10),
-                    ];
-                })
-                ->all();
+                collect($rulePayload)
+                    ->values()
+                    ->each(function (array $rule, int $index) use ($existingRules, &$persistedIds): void {
+                        $rowKind = (string) $rule['row_kind'];
 
-            if ($rules !== []) {
-                $timestamp = Carbon::now();
+                        $attributes = [
+                            'row_kind' => $rowKind,
+                            'rarity' => $rowKind === 'heading' ? 'common' : (string) $rule['rarity'],
+                            'selection_types' => array_values(array_map(
+                                static fn (mixed $type): string => (string) $type,
+                                $rowKind === 'heading' ? ['item'] : ($rule['selection_types'] ?? []),
+                            )),
+                            'source_kind' => $rowKind === 'heading' ? 'all' : (string) $rule['source_kind'],
+                            'heading_title' => $rowKind === 'heading' ? trim((string) $rule['heading_title']) : '',
+                            'count' => $rowKind === 'heading' ? 0 : (int) $rule['count'],
+                            'sort_order' => isset($rule['sort_order']) ? (int) $rule['sort_order'] : (($index + 1) * 10),
+                        ];
 
-                ShopRollRule::query()->insert(array_map(
-                    static fn (array $rule): array => array_merge($rule, [
-                        'selection_types' => json_encode($rule['selection_types'], JSON_THROW_ON_ERROR),
-                        'created_at' => $timestamp,
-                        'updated_at' => $timestamp,
-                    ]),
-                    $rules,
-                ));
-            }
+                        $ruleId = isset($rule['id']) ? (int) $rule['id'] : null;
+
+                        if ($ruleId !== null && $existingRules->has($ruleId)) {
+                            $existingRules[$ruleId]->update($attributes);
+                            $persistedIds[] = $ruleId;
+
+                            return;
+                        }
+
+                        $createdRule = ShopRollRule::query()->create($attributes);
+                        $persistedIds[] = $createdRule->id;
+                    });
+
+                ShopRollRule::query()
+                    ->when(
+                        $persistedIds !== [],
+                        fn ($query) => $query->whereNotIn('id', $persistedIds),
+                        fn ($query) => $query,
+                    )
+                    ->delete();
+            });
         }
 
         $rollRules = ShopRollRule::ordered();
@@ -74,10 +86,11 @@ class ShopSettingController extends Controller
             ]) + [
                 'roll_rules' => $rollRules->map(fn (ShopRollRule $rule): array => [
                     'id' => $rule->id,
+                    'row_kind' => $rule->row_kind,
                     'rarity' => $rule->rarity,
                     'selection_types' => $rule->selection_types ?? [],
                     'source_kind' => $rule->source_kind,
-                    'section_title' => $rule->section_title,
+                    'heading_title' => $rule->heading_title,
                     'count' => $rule->count,
                     'sort_order' => $rule->sort_order,
                 ])->all(),
