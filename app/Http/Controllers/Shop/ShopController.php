@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Shop;
+use App\Models\ShopRollRule;
 use App\Services\ShopLifecycleService;
 use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
@@ -56,7 +57,17 @@ class ShopController extends Controller
                 'last_auto_posted_at',
                 'current_shop_id',
                 'draft_shop_id',
-            ]),
+            ]) + [
+                'roll_rules' => ShopRollRule::ordered()->map(fn (ShopRollRule $rule): array => [
+                    'id' => $rule->id,
+                    'rarity' => $rule->rarity,
+                    'selection_types' => $rule->selection_types ?? [],
+                    'source_kind' => $rule->source_kind,
+                    'section_title' => $rule->section_title,
+                    'count' => $rule->count,
+                    'sort_order' => $rule->sort_order,
+                ])->all(),
+            ],
         ]);
     }
 

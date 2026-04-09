@@ -58,6 +58,64 @@ function tierRequirementForRarity(rarity) {
     }
 }
 
+function legacySectionTitle(rarity, type) {
+    const rarityLabel = rarityDisplayName(rarity);
+    const tierText = tierRequirementForRarity(rarity);
+    const itemLikeTypes = ['weapon', 'armor', 'item'];
+
+    if (itemLikeTypes.includes(type)) {
+        return tierText
+            ? `${rarityLabel} Magic Items (${tierText})`
+            : `${rarityLabel} Magic Items`;
+    }
+
+    if ((rarity === 'common' || rarity === 'uncommon') && type === 'consumable') {
+        return `${rarityLabel} Consumable`;
+    }
+
+    if ((rarity === 'common' || rarity === 'uncommon') && type === 'spellscroll') {
+        return `${rarityLabel} Spell Scroll`;
+    }
+
+    return `${rarityLabel} Consumable/Spell Scroll`;
+}
+
+function legacySectionSortOrder(rarity, type) {
+    const rarityBase = {
+        common: 10,
+        uncommon: 40,
+        rare: 70,
+        very_rare: 100,
+        legendary: 130,
+        artifact: 160,
+        unknown_rarity: 190,
+    }[rarity] ?? 900;
+
+    if (['weapon', 'armor', 'item'].includes(type)) {
+        return rarityBase;
+    }
+
+    if ((rarity === 'common' || rarity === 'uncommon') && type === 'consumable') {
+        return rarityBase + 10;
+    }
+
+    if ((rarity === 'common' || rarity === 'uncommon') && type === 'spellscroll') {
+        return rarityBase + 20;
+    }
+
+    return rarityBase + 10;
+}
+
+function resolveSectionMeta(row) {
+    const rarity = row.rarity ?? 'common';
+    const type = row.type ?? 'item';
+
+    return {
+        title: row.roll_section_title || legacySectionTitle(rarity, type),
+        sortOrder: Number(row.roll_sort_order || 0) || legacySectionSortOrder(rarity, type),
+    };
+}
+
 function formatLink(name, url) {
     if (!url) return String(name ?? '');
     return `[${name}](<${url}>)`;
@@ -247,6 +305,8 @@ async function fetchShopItems(shopId) {
                 COALESCE(si.item_cost, i.cost) AS cost,
                 COALESCE(si.item_rarity, i.rarity) AS rarity,
                 COALESCE(si.item_type, i.type) AS type,
+                si.roll_section_title,
+                si.roll_sort_order,
                 si.notes,
                 si.spell_id,
                 COALESCE(si.spell_name, s.name) AS spell_name,
@@ -277,6 +337,8 @@ async function fetchShopItemById(shopItemId) {
                 COALESCE(si.item_cost, i.cost) AS cost,
                 COALESCE(si.item_rarity, i.rarity) AS rarity,
                 COALESCE(si.item_type, i.type) AS type,
+                si.roll_section_title,
+                si.roll_sort_order,
                 si.notes,
                 si.spell_id,
                 COALESCE(si.spell_name, s.name) AS spell_name,
@@ -379,33 +441,13 @@ async function sendOneLine(destination, line) {
     return message?.id ?? null;
 }
 
-function countPlannedShopLines(grouped, rarityOrder) {
+function countPlannedShopLines(sections) {
     // Top header line.
     let total = 1;
-    const itemLikeTypes = ['weapon', 'armor', 'item'];
 
-    for (const rarity of rarityOrder) {
-        const byType = grouped.get(rarity);
-        if (!byType) continue;
-
-        // Rarity section header.
+    for (const section of sections) {
         total += 1;
-        for (const type of itemLikeTypes) {
-            total += (byType.get(type) || []).length;
-        }
-
-        if (rarity === 'common' || rarity === 'uncommon') {
-            // Consumable header.
-            total += 1;
-            total += (byType.get('consumable') || []).length;
-            // Spell scroll header.
-            total += 1;
-            total += (byType.get('spellscroll') || []).length;
-        } else {
-            // Mixed header.
-            total += 1;
-            total += (byType.get('consumable') || []).length + (byType.get('spellscroll') || []).length;
-        }
+        total += section.rows.length;
     }
 
     return total;
@@ -438,19 +480,29 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     const headerMessageIds = [];
     const itemMessageIds = {};
 
-    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
-    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
-    const itemLikeTypes = ['weapon', 'armor', 'item'];
-    const grouped = new Map();
+    const sectionsMap = new Map();
 
     for (const row of items) {
-        const rarity = row.rarity ?? 'common';
-        const type = row.type ?? 'item';
-        if (!grouped.has(rarity)) grouped.set(rarity, new Map());
-        const byType = grouped.get(rarity);
-        if (!byType.has(type)) byType.set(type, []);
-        byType.get(type).push(row);
+        const sectionMeta = resolveSectionMeta(row);
+        const sectionKey = `${String(sectionMeta.sortOrder).padStart(4, '0')}::${sectionMeta.title}`;
+
+        if (!sectionsMap.has(sectionKey)) {
+            sectionsMap.set(sectionKey, {
+                title: sectionMeta.title,
+                sortOrder: sectionMeta.sortOrder,
+                rows: [],
+            });
+        }
+
+        sectionsMap.get(sectionKey).rows.push(row);
     }
+
+    const sections = Array.from(sectionsMap.values())
+        .sort((a, b) => a.sortOrder - b.sortOrder || String(a.title).localeCompare(String(b.title)))
+        .map((section) => ({
+            ...section,
+            rows: section.rows.sort((a, b) => String(a.name).localeCompare(String(b.name))),
+        }));
 
     const previousMessageIds = new Set(
         [
@@ -460,7 +512,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
         ].filter(Boolean),
     );
     const deleteCount = previousMessageIds.size;
-    const postCount = countPlannedShopLines(grouped, rarityOrder);
+    const postCount = countPlannedShopLines(sections);
     const totalLines = Math.max(1, deleteCount + postCount);
     let postedLines = 0;
     await updateOperationProgress(resolvedOperationId, {
@@ -517,64 +569,16 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     );
     if (headerId) headerMessageIds.push(headerId);
 
-    for (const rarity of rarityOrder) {
-        const byType = grouped.get(rarity);
-        if (!byType) continue;
-
-        const rarityLabel = rarityDisplayName(rarity);
-        const tierText = tierRequirementForRarity(rarity);
-
-        for (const type of typeOrder) {
-            const rows = byType.get(type);
-            if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-        }
-
-        const title = tierText
-            ? `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`
-            : `## ***:crossed_swords: ${rarityLabel} Magic Items:***`;
-        const sectionId = await sendTrackedLine(title, `${rarityLabel} section`);
+    for (const section of sections) {
+        const sectionId = await sendTrackedLine(
+            `## ***:crossed_swords: ${section.title}:***`,
+            section.title,
+        );
         if (sectionId) headerMessageIds.push(sectionId);
-        for (const type of itemLikeTypes) {
-            for (const row of byType.get(type) ?? []) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-        }
 
-        if (rarity === 'common' || rarity === 'uncommon') {
-            const consumableHeaderId = await sendTrackedLine(
-                `### ${rarityLabel} Consumable`,
-                `${rarityLabel} consumables`,
-            );
-            if (consumableHeaderId) headerMessageIds.push(consumableHeaderId);
-            for (const row of byType.get('consumable') ?? []) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Consumable');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-
-            const scrollHeaderId = await sendTrackedLine(
-                `### ${rarityLabel} Spell Scroll`,
-                `${rarityLabel} spell scrolls`,
-            );
-            if (scrollHeaderId) headerMessageIds.push(scrollHeaderId);
-            for (const row of byType.get('spellscroll') ?? []) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Spell scroll');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-        } else {
-            const mixedHeaderId = await sendTrackedLine(
-                `### ${rarityLabel} Consumable/Spell Scroll`,
-                `${rarityLabel} mixed`,
-            );
-            if (mixedHeaderId) headerMessageIds.push(mixedHeaderId);
-            for (const row of [...(byType.get('consumable') ?? []), ...(byType.get('spellscroll') ?? [])]) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Consumable/Scroll');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
+        for (const row of section.rows) {
+            const messageId = await sendTrackedLine(formatItemLine(row), row.name || section.title);
+            if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
         }
     }
 
@@ -767,6 +771,7 @@ async function updateShopItemPost({ client, shopItemId }) {
 }
 
 module.exports = {
+    resolveSectionMeta,
     postShopToChannel,
     updateShopPost,
     updateShopItemPost,

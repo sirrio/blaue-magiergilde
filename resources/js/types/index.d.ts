@@ -137,6 +137,17 @@ export interface ShopSettings {
   last_auto_posted_at?: string | null
   current_shop_id?: number | null
   draft_shop_id?: number | null
+  roll_rules?: ShopRollRule[]
+}
+
+export interface ShopRollRule {
+  id?: number
+  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
+  selection_types: Array<'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'>
+  source_kind: 'all' | 'official' | 'third_party'
+  section_title: string
+  count: number
+  sort_order?: number
 }
 
 export interface BotOperation {
