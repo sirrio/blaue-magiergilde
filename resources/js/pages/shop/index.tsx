@@ -9,9 +9,12 @@ import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
 import { cn } from '@/lib/utils'
 import { BotOperation, DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopRollRule, ShopSettings } from '@/types'
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Head, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
-import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Send, Settings, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { Copy, GripVertical, Plus, RotateCcw, Send, Settings, SlidersHorizontal, Trash2 } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 const rarityOptions: Array<{ value: ShopRollRule['rarity']; label: string }> = [
@@ -61,7 +64,7 @@ const createEmptyHeading = (sortOrder: number): ShopRollRule => ({
   rarity: 'common',
   selection_types: ['item'],
   source_kind: 'all',
-  heading_title: 'New heading',
+  heading_title: '## ***:crossed_swords: New heading:***',
   count: 0,
   sort_order: sortOrder,
 })
@@ -98,6 +101,192 @@ type ShopDisplayRow =
   | { key: string; type: 'heading'; title: string }
   | { key: string; type: 'item'; item: ShopItem }
 
+type EditableShopRollRule = ShopRollRule & { client_key: string }
+
+type SortableRollRuleRowProps = {
+  index: number
+  rollRulesLength: number
+  rule: EditableShopRollRule
+  handleRollRuleChange: <K extends keyof ShopRollRule>(index: number, key: K, value: ShopRollRule[K]) => void
+  handleToggleRollRuleType: (index: number, type: ShopRollRule['selection_types'][number]) => void
+  handleDuplicateRollRule: (index: number) => void
+  handleRemoveRollRule: (index: number) => void
+}
+
+function SortableRollRuleRow({
+  index,
+  rollRulesLength,
+  rule,
+  handleRollRuleChange,
+  handleToggleRollRuleType,
+  handleDuplicateRollRule,
+  handleRemoveRollRule,
+}: SortableRollRuleRowProps) {
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: rule.client_key,
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'grid gap-1.5 rounded-box border border-base-200 px-2 py-1.5',
+        'lg:grid-cols-[46px_64px_108px_minmax(0,1fr)_104px_56px_64px] lg:items-center',
+        rule.row_kind === 'heading' && 'bg-base-200/25',
+        isDragging && 'opacity-80 shadow-lg ring-1 ring-primary/20',
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 lg:justify-start">
+        <span className="text-xs font-semibold uppercase tracking-wide text-base-content/60 lg:hidden">
+          {rule.row_kind === 'heading' ? `Heading ${index + 1}` : `Rule ${index + 1}`}
+        </span>
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className="inline-flex h-7 min-h-7 w-7 items-center justify-center rounded-btn text-base-content/55 transition hover:bg-base-200 hover:text-base-content active:cursor-grabbing lg:h-5 lg:min-h-5 lg:w-5"
+          aria-label={`Drag ${rule.row_kind} ${index + 1}`}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={12} />
+        </button>
+      </div>
+      <div className="flex items-center lg:justify-center">
+        <span
+          className={cn(
+            'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+            rule.row_kind === 'heading'
+              ? 'border-secondary/30 bg-secondary/10 text-secondary'
+              : 'border-primary/30 bg-primary/10 text-primary',
+          )}
+        >
+          {rule.row_kind === 'heading' ? 'Heading' : 'Rule'}
+        </span>
+      </div>
+      {rule.row_kind === 'heading' ? (
+        <div className="space-y-1 lg:col-span-4 lg:space-y-0">
+          <span className="block text-xs text-base-content/70 lg:hidden">Discord heading line</span>
+          <input
+            type="text"
+            className="input input-xs lg:h-7 lg:min-h-7 lg:text-xs"
+            placeholder="## ***:crossed_swords: Rare Items:***"
+            value={rule.heading_title}
+            onChange={(event) => handleRollRuleChange(index, 'heading_title', event.target.value)}
+          />
+        </div>
+      ) : (
+        <>
+          <Select
+            value={rule.rarity}
+            className="select-xs lg:min-h-7 lg:h-7 lg:text-xs"
+            onChange={(event) => handleRollRuleChange(index, 'rarity', event.target.value as ShopRollRule['rarity'])}
+          >
+            <SelectLabel className="lg:hidden">Rarity</SelectLabel>
+            <SelectOptions>
+              {rarityOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </SelectOptions>
+          </Select>
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-base-content/70 lg:hidden">Types</p>
+            <div className="dropdown w-full">
+              <div tabIndex={0} role="button" className="flex min-h-7 w-full items-center justify-between rounded-btn border border-base-300 bg-base-100 px-1.5 py-0.5 text-left text-[11px] text-base-content/80">
+                <div className="flex min-w-0 flex-wrap items-center gap-1">
+                  {rule.selection_types.map((type) => (
+                    <span
+                      key={type}
+                      className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary"
+                    >
+                      {itemTypeBadgeLabels[type]}
+                    </span>
+                  ))}
+                </div>
+                <span className="shrink-0 text-[9px] text-base-content/45">Edit</span>
+              </div>
+              <div tabIndex={0} className="dropdown-content z-10 mt-2 w-64 rounded-box border border-base-200 bg-base-100 p-2 shadow-xl">
+                <div className="space-y-1">
+                  {itemTypeOptions.map((option) => {
+                    const active = rule.selection_types.includes(option.value)
+
+                    return (
+                      <label
+                        key={option.value}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2 rounded-btn px-2 py-1.5 text-xs transition',
+                          active ? 'bg-primary/10 text-primary' : 'text-base-content/80 hover:bg-base-200',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-xs"
+                          checked={active}
+                          onChange={() => handleToggleRollRuleType(index, option.value)}
+                        />
+                        {option.label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+          <Select
+            value={rule.source_kind}
+            className="select-xs lg:min-h-7 lg:h-7 lg:text-xs"
+            onChange={(event) => handleRollRuleChange(index, 'source_kind', event.target.value as ShopRollRule['source_kind'])}
+          >
+            <SelectLabel className="lg:hidden">Source</SelectLabel>
+            <SelectOptions>
+              {sourceKindOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </SelectOptions>
+          </Select>
+          <div className="space-y-1">
+            <span className="block text-xs text-base-content/70 lg:hidden">Count</span>
+            <input
+              type="number"
+              min={0}
+              className="input input-xs w-full lg:h-7 lg:min-h-7 lg:px-1.5 lg:text-center lg:text-xs"
+              value={rule.count}
+              onChange={(event) => handleRollRuleChange(index, 'count', Math.max(0, Number(event.target.value) || 0))}
+            />
+          </div>
+        </>
+      )}
+      <div className="flex items-center justify-end gap-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          modifier="square"
+          className="h-6 min-h-6 w-6 text-base-content/60 hover:text-base-content"
+          onClick={() => handleDuplicateRollRule(index)}
+          aria-label={`Duplicate ${rule.row_kind} ${index + 1}`}
+        >
+          <Copy size={12} />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          modifier="square"
+          className="h-6 min-h-6 w-6 text-error/70 hover:text-error"
+          onClick={() => handleRemoveRollRule(index)}
+          aria-label={`Remove ${rule.row_kind} ${index + 1}`}
+          disabled={rollRulesLength === 1}
+        >
+          <Trash2 size={12} />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSettings: ShopSettings }) {
   const resolveFallbackShop = useCallback(
     (availableShops: Shop[], preferredShopId?: number | null): Shop | null => {
@@ -123,10 +312,23 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const [autoPostEnabled, setAutoPostEnabled] = useState(Boolean(shopSettings?.auto_post_enabled))
   const [autoPostWeekday, setAutoPostWeekday] = useState<number>(shopSettings?.auto_post_weekday ?? 0)
   const [autoPostTime, setAutoPostTime] = useState<string>(shopSettings?.auto_post_time ?? '09:00')
-  const [rollRules, setRollRules] = useState<ShopRollRule[]>(shopSettings?.roll_rules ?? [])
+  const rollRuleKeyCounterRef = useRef(0)
+  const createRuleClientKey = useCallback(() => {
+    rollRuleKeyCounterRef.current += 1
+    return `shop-roll-rule-${rollRuleKeyCounterRef.current}`
+  }, [])
+  const toEditableRollRules = useCallback(
+    (rules: ShopRollRule[] = []): EditableShopRollRule[] => rules.map((rule) => ({
+      ...rule,
+      client_key: createRuleClientKey(),
+    })),
+    [createRuleClientKey],
+  )
+  const [rollRules, setRollRules] = useState<EditableShopRollRule[]>(toEditableRollRules(shopSettings?.roll_rules ?? []))
   const rollRulesSyncKeyRef = useRef<string>('')
   const { auth } = usePage<PageProps>().props
   const isAdmin = Boolean(auth?.user?.is_admin)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   useEffect(() => {
     setSelectedShop((current) => {
@@ -155,8 +357,8 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     }
 
     rollRulesSyncKeyRef.current = syncKey
-    setRollRules(shopSettings?.roll_rules ?? [])
-  }, [shopSettings?.roll_rules])
+    setRollRules(toEditableRollRules(shopSettings?.roll_rules ?? []))
+  }, [shopSettings?.roll_rules, toEditableRollRules])
 
   const formatShopCreatedAt = (createdAt: string) => format(new Date(createdAt), "iiii dd MMM'.' yyyy ' - ' HH:mm")
 
@@ -375,16 +577,22 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const handleAddRollRule = useCallback(() => {
     setRollRules((current) => [
       ...current,
-      createEmptyRollRule((current.length + 1) * 10),
+      {
+        ...createEmptyRollRule((current.length + 1) * 10),
+        client_key: createRuleClientKey(),
+      },
     ])
-  }, [])
+  }, [createRuleClientKey])
 
   const handleAddHeading = useCallback(() => {
     setRollRules((current) => [
       ...current,
-      createEmptyHeading((current.length + 1) * 10),
+      {
+        ...createEmptyHeading((current.length + 1) * 10),
+        client_key: createRuleClientKey(),
+      },
     ])
-  }, [])
+  }, [createRuleClientKey])
 
   const handleRemoveRollRule = useCallback((index: number) => {
     setRollRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index).map((rule, ruleIndex) => ({
@@ -405,6 +613,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         ...ruleToDuplicate,
         id: undefined,
         selection_types: [...ruleToDuplicate.selection_types],
+        client_key: createRuleClientKey(),
       })
 
       return nextRules.map((rule, ruleIndex) => ({
@@ -412,18 +621,22 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         sort_order: (ruleIndex + 1) * 10,
       }))
     })
-  }, [])
+  }, [createRuleClientKey])
 
-  const handleMoveRollRule = useCallback((index: number, direction: 'up' | 'down') => {
+  const handleRollRuleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) {
+      return
+    }
+
     setRollRules((current) => {
-      const targetIndex = direction === 'up' ? index - 1 : index + 1
-      if (targetIndex < 0 || targetIndex >= current.length) {
+      const oldIndex = current.findIndex((rule) => rule.client_key === String(active.id))
+      const newIndex = current.findIndex((rule) => rule.client_key === String(over.id))
+      if (oldIndex < 0 || newIndex < 0) {
         return current
       }
 
-      const nextRules = [...current]
-      const [movedRule] = nextRules.splice(index, 1)
-      nextRules.splice(targetIndex, 0, movedRule)
+      const nextRules = arrayMove(current, oldIndex, newIndex)
 
       return nextRules.map((rule, ruleIndex) => ({
         ...rule,
@@ -473,7 +686,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
 
       const nextSettings = (data?.shop_settings ?? {}) as ShopSettings
       setSettings((current) => ({ ...current, ...nextSettings }))
-      setRollRules(nextSettings.roll_rules ?? [])
+      setRollRules(toEditableRollRules(nextSettings.roll_rules ?? []))
       rollRulesSyncKeyRef.current = JSON.stringify(nextSettings.roll_rules ?? [])
       toast.show('Roll rules saved.', 'info')
     } catch {
@@ -481,7 +694,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     } finally {
       setIsSavingRules(false)
     }
-  }, [getCsrfToken, isSavingRules, rollRules])
+  }, [getCsrfToken, isSavingRules, rollRules, toEditableRollRules])
 
   const handlePostShop = useCallback(async () => {
     if (isPosting) return
@@ -816,9 +1029,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-3">
-                      <div className="hidden grid-cols-[64px_72px_120px_minmax(0,1fr)_120px_64px_76px] items-center gap-2 rounded-box border border-base-200 bg-base-200/40 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 lg:grid">
-                        <span>Move</span>
+                    <div className="space-y-2">
+                      <div className="hidden grid-cols-[46px_64px_108px_minmax(0,1fr)_104px_56px_64px] items-center gap-1.5 rounded-box border border-base-200 bg-base-200/40 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-base-content/60 lg:grid">
+                        <span>Drag</span>
                         <span>Kind</span>
                         <span>Rarity</span>
                         <span>Types</span>
@@ -826,196 +1039,24 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                         <span>Count</span>
                         <span className="text-right">Actions</span>
                       </div>
-                      {rollRules.map((rule, index) => (
-                        <div
-                          key={`${rule.id ?? 'new'}-${index}`}
-                          className={cn(
-                            'grid gap-2 rounded-box border border-base-200 p-2.5',
-                            'lg:grid-cols-[64px_72px_120px_minmax(0,1fr)_120px_64px_76px] lg:items-center',
-                            rule.row_kind === 'heading' && 'bg-base-200/25',
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-3 lg:justify-start">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-base-content/60 lg:hidden">
-                              {rule.row_kind === 'heading' ? `Heading ${index + 1}` : `Rule ${index + 1}`}
-                            </span>
-                            <div className="flex items-center gap-1 lg:hidden">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                modifier="square"
-                                onClick={() => handleMoveRollRule(index, 'up')}
-                                aria-label={`Move rule ${index + 1} up`}
-                                disabled={index === 0}
-                              >
-                                <ArrowUp size={14} />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                modifier="square"
-                                onClick={() => handleMoveRollRule(index, 'down')}
-                                aria-label={`Move rule ${index + 1} down`}
-                                disabled={index === rollRules.length - 1}
-                              >
-                                <ArrowDown size={14} />
-                              </Button>
-                            </div>
-                            <div className="hidden items-center justify-center gap-0.5 lg:flex">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                modifier="square"
-                                className="h-5 min-h-5 w-5"
-                                onClick={() => handleMoveRollRule(index, 'up')}
-                                aria-label={`Move rule ${index + 1} up`}
-                                disabled={index === 0}
-                              >
-                                <ArrowUp size={12} />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                modifier="square"
-                                className="h-5 min-h-5 w-5"
-                                onClick={() => handleMoveRollRule(index, 'down')}
-                                aria-label={`Move rule ${index + 1} down`}
-                                disabled={index === rollRules.length - 1}
-                              >
-                                <ArrowDown size={12} />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="flex items-center lg:justify-center">
-                            <span
-                              className={cn(
-                                'rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide',
-                                rule.row_kind === 'heading'
-                                  ? 'border-secondary/30 bg-secondary/10 text-secondary'
-                                  : 'border-primary/30 bg-primary/10 text-primary',
-                              )}
-                            >
-                              {rule.row_kind === 'heading' ? 'Heading' : 'Rule'}
-                            </span>
-                          </div>
-                          {rule.row_kind === 'heading' ? (
-                            <div className="space-y-1 lg:col-span-4 lg:space-y-0">
-                              <span className="block text-xs text-base-content/70 lg:hidden">Heading title</span>
-                              <input
-                                type="text"
-                                className="input input-sm lg:h-8 lg:min-h-8 lg:text-xs"
-                                value={rule.heading_title}
-                                onChange={(event) => handleRollRuleChange(index, 'heading_title', event.target.value)}
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRollRuleDragEnd}>
+                        <SortableContext items={rollRules.map((rule) => rule.client_key)} strategy={verticalListSortingStrategy}>
+                          <div className="space-y-1.5">
+                            {rollRules.map((rule, index) => (
+                              <SortableRollRuleRow
+                                key={rule.client_key}
+                                index={index}
+                                rollRulesLength={rollRules.length}
+                                rule={rule}
+                                handleRollRuleChange={handleRollRuleChange}
+                                handleToggleRollRuleType={handleToggleRollRuleType}
+                                handleDuplicateRollRule={handleDuplicateRollRule}
+                                handleRemoveRollRule={handleRemoveRollRule}
                               />
-                            </div>
-                          ) : (
-                            <>
-                              <Select
-                                value={rule.rarity}
-                                className="lg:select-xs lg:min-h-8 lg:h-8 lg:text-xs"
-                                onChange={(event) => handleRollRuleChange(index, 'rarity', event.target.value as ShopRollRule['rarity'])}
-                              >
-                                <SelectLabel className="lg:hidden">Rarity</SelectLabel>
-                                <SelectOptions>
-                                  {rarityOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </SelectOptions>
-                              </Select>
-                              <div className="space-y-2">
-                                <p className="text-xs font-medium text-base-content/70 lg:hidden">Types</p>
-                                <div className="dropdown w-full">
-                                  <div tabIndex={0} role="button" className="flex min-h-8 w-full items-center justify-between rounded-btn border border-base-300 bg-base-100 px-2 py-1 text-left text-xs text-base-content/80">
-                                    <div className="flex min-w-0 flex-wrap items-center gap-1">
-                                      {rule.selection_types.map((type) => (
-                                        <span
-                                          key={type}
-                                          className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                                        >
-                                          {itemTypeBadgeLabels[type]}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <span className="shrink-0 text-[10px] text-base-content/45">Edit</span>
-                                  </div>
-                                  <div tabIndex={0} className="dropdown-content z-10 mt-2 w-64 rounded-box border border-base-200 bg-base-100 p-2 shadow-xl">
-                                    <div className="space-y-1">
-                                      {itemTypeOptions.map((option) => {
-                                        const active = rule.selection_types.includes(option.value)
-
-                                        return (
-                                          <label
-                                            key={option.value}
-                                            className={cn(
-                                              'flex cursor-pointer items-center gap-2 rounded-btn px-2 py-1.5 text-xs transition',
-                                              active ? 'bg-primary/10 text-primary' : 'text-base-content/80 hover:bg-base-200',
-                                            )}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              className="checkbox checkbox-xs"
-                                              checked={active}
-                                              onChange={() => handleToggleRollRuleType(index, option.value)}
-                                            />
-                                            {option.label}
-                                          </label>
-                                        )
-                                      })}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <Select
-                                value={rule.source_kind}
-                                className="lg:select-xs lg:min-h-8 lg:h-8 lg:text-xs"
-                                onChange={(event) => handleRollRuleChange(index, 'source_kind', event.target.value as ShopRollRule['source_kind'])}
-                              >
-                                <SelectLabel className="lg:hidden">Source type</SelectLabel>
-                                <SelectOptions>
-                                  {sourceKindOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </SelectOptions>
-                              </Select>
-                              <label className="form-control">
-                                <span className="label text-xs lg:hidden">Count</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={50}
-                                  className="input input-xs lg:h-8 lg:min-h-8 lg:w-16 lg:px-2 lg:text-center lg:text-xs"
-                                  value={rule.count}
-                                  onChange={(event) => handleRollRuleChange(index, 'count', Math.max(0, Number(event.target.value) || 0))}
-                                />
-                              </label>
-                            </>
-                          )}
-                          <div className="flex justify-end gap-1 lg:justify-center">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              modifier="square"
-                              className="text-base-content/60"
-                              onClick={() => handleDuplicateRollRule(index)}
-                              aria-label="Duplicate rule"
-                              title="Duplicate rule"
-                            >
-                              <Copy size={14} />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              modifier="square"
-                              className="text-error"
-                              onClick={() => handleRemoveRollRule(index)}
-                              aria-label="Remove rule"
-                              disabled={rollRules.length <= 1}
-                            >
-                              <Trash2 size={14} />
-                            </Button>
+                            ))}
                           </div>
-                        </div>
-                      ))}
+                        </SortableContext>
+                      </DndContext>
                     </div>
                     <div className="flex justify-end">
                       <Button size="sm" variant="outline" onClick={handleRollRulesSave} disabled={isSavingRules}>
@@ -1068,9 +1109,8 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                   key={row.key}
                   className="grid-cols-1 border-b border-base-200 bg-base-200/25 px-4 py-3"
                 >
-                  <div className="flex items-center gap-2 text-sm font-semibold italic">
-                    <span aria-hidden="true">⚔</span>
-                    <span>{row.title}</span>
+                  <div className="text-sm font-semibold whitespace-pre-wrap break-words">
+                    {row.title}
                   </div>
                 </ListRow>
               )
@@ -1088,3 +1128,5 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     </AppLayout>
   )
 }
+
+

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildShopPostRows } = require('../shopPoster');
+const { buildShopPostRows, formatHeadingLine } = require('../shopPoster');
 
 test('renders heading and item rows in the stored roll rule order', () => {
     const postRows = buildShopPostRows(
@@ -39,4 +39,11 @@ test('does not invent rows for shop items without a matching rule row', () => {
     assert.deepEqual(postRows.map((row) => row.type === 'heading' ? row.title : row.row.name), [
         'Common',
     ]);
+});
+
+test('keeps discord heading markdown unchanged', () => {
+    assert.equal(
+        formatHeadingLine('## ***:crossed_swords: Very Rare Magic Items (Ab Epic Tier):***'),
+        '## ***:crossed_swords: Very Rare Magic Items (Ab Epic Tier):***',
+    );
 });

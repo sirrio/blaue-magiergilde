@@ -43,7 +43,7 @@ it('lets admins update shop roll rows without recreating existing row ids', func
                     'rarity' => 'common',
                     'selection_types' => ['item'],
                     'source_kind' => 'all',
-                    'heading_title' => 'Common WotC Picks',
+                    'heading_title' => '## ***:crossed_swords: Common WotC Picks:***',
                     'count' => 0,
                     'sort_order' => 10,
                 ],
@@ -71,14 +71,14 @@ it('lets admins update shop roll rows without recreating existing row ids', func
 
     $response->assertOk()
         ->assertJsonPath('shop_settings.roll_rules.0.id', $existingHeading->id)
-        ->assertJsonPath('shop_settings.roll_rules.0.heading_title', 'Common WotC Picks')
+        ->assertJsonPath('shop_settings.roll_rules.0.heading_title', '## ***:crossed_swords: Common WotC Picks:***')
         ->assertJsonPath('shop_settings.roll_rules.1.id', $existingRule->id)
         ->assertJsonPath('shop_settings.roll_rules.1.count', 5)
         ->assertJsonPath('shop_settings.roll_rules.2.row_kind', 'rule')
         ->assertJsonPath('shop_settings.roll_rules.2.source_kind', 'third_party');
 
     expect(ShopRollRule::query()->count())->toBe(3)
-        ->and($existingHeading->fresh()?->heading_title)->toBe('Common WotC Picks')
+        ->and($existingHeading->fresh()?->heading_title)->toBe('## ***:crossed_swords: Common WotC Picks:***')
         ->and($existingRule->fresh()?->count)->toBe(5)
         ->and(
             ShopRollRule::query()
@@ -145,6 +145,66 @@ it('stores the rule row id on rolled shop items', function () {
     expect($rolledLine)->not->toBeNull()
         ->and($rolledLine?->item_id)->toBe($officialItem->id)
         ->and($rolledLine?->roll_source_kind)->toBe('official')
+        ->and($rolledLine?->roll_rule_id)->toBe($rule->id);
+});
+
+it('rolls third-party items only for third-party rules', function () {
+    ShopRollRule::query()->delete();
+
+    ShopRollRule::query()->create([
+        'row_kind' => 'heading',
+        'rarity' => 'common',
+        'selection_types' => ['item'],
+        'source_kind' => 'all',
+        'heading_title' => 'Third-party common gear',
+        'count' => 0,
+        'sort_order' => 10,
+    ]);
+    $rule = ShopRollRule::query()->create([
+        'row_kind' => 'rule',
+        'rarity' => 'common',
+        'selection_types' => ['weapon', 'armor', 'item'],
+        'source_kind' => 'third_party',
+        'heading_title' => '',
+        'count' => 1,
+        'sort_order' => 20,
+    ]);
+
+    $officialSource = Source::factory()->create([
+        'name' => 'Dungeon Master’s Guide',
+        'shortcode' => 'DMG',
+        'kind' => 'official',
+    ]);
+    $thirdPartySource = Source::factory()->create([
+        'name' => 'The Griffon\'s Saddlebag',
+        'shortcode' => 'GSB',
+        'kind' => 'third_party',
+    ]);
+
+    Item::factory()->create([
+        'name' => 'Official Blade',
+        'rarity' => 'common',
+        'type' => 'item',
+        'shop_enabled' => true,
+        'pick_count' => 0,
+        'source_id' => $officialSource->id,
+    ]);
+    $thirdPartyItem = Item::factory()->create([
+        'name' => 'Third Party Blade',
+        'rarity' => 'common',
+        'type' => 'item',
+        'shop_enabled' => true,
+        'pick_count' => 0,
+        'source_id' => $thirdPartySource->id,
+    ]);
+
+    $shop = app(ShopRollService::class)->roll();
+
+    $rolledLine = $shop->shopItems()->first();
+
+    expect($rolledLine)->not->toBeNull()
+        ->and($rolledLine?->item_id)->toBe($thirdPartyItem->id)
+        ->and($rolledLine?->roll_source_kind)->toBe('third_party')
         ->and($rolledLine?->roll_rule_id)->toBe($rule->id);
 });
 

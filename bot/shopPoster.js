@@ -60,6 +60,10 @@ function formatItemLine(row) {
     return `${prefix}${cost}`;
 }
 
+function formatHeadingLine(title) {
+    return String(title ?? '').trim();
+}
+
 function normalizeMessageId(value) {
     if (value === null || value === undefined) return null;
     const id = String(value).trim();
@@ -484,8 +488,8 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     for (const postRow of postRows) {
         if (postRow.type === 'heading') {
             const headingId = await sendTrackedLine(
-                `## ***:crossed_swords: ${postRow.title}:***`,
-                postRow.title,
+                formatHeadingLine(postRow.title),
+                formatHeadingLine(postRow.title),
             );
             if (headingId) headingLineMessageIds.push(headingId);
 
@@ -686,6 +690,7 @@ async function updateShopItemPost({ client, shopItemId }) {
 
 module.exports = {
     buildShopPostRows,
+    formatHeadingLine,
     postShopToChannel,
     updateShopPost,
     updateShopItemPost,
