@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
+import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
+import { cn } from '@/lib/utils'
 import AppLayout from '@/layouts/app-layout'
+import { formatSourceKindLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import {
   CompendiumImportRun,
@@ -127,6 +130,7 @@ export default function Settings({
   const createSourceForm = useForm({
     name: '',
     shortcode: '',
+    kind: 'official' as Source['kind'],
   })
   const levelProgressionForm = useForm({
     entries: levelProgression.map((entry) => ({
@@ -138,6 +142,7 @@ export default function Settings({
     id: 0,
     name: '',
     shortcode: '',
+    kind: 'official' as Source['kind'],
   })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
@@ -147,6 +152,7 @@ export default function Settings({
   const statusIntervalRef = useRef<number | null>(null)
   const fetchBackupStatusRef = useRef<(showToast: boolean) => Promise<void>>(async () => {})
   const levelProgressionSyncKeyRef = useRef<string>('')
+  const sourceEditSyncKeyRef = useRef<string>('')
   const [editingSource, setEditingSource] = useState<Source | null>(null)
   const [importEntityType, setImportEntityType] = useState<'items' | 'spells'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -558,11 +564,29 @@ export default function Settings({
   }
 
   useEffect(() => {
-    if (!editingSource) return
+    if (!editingSource) {
+      sourceEditSyncKeyRef.current = ''
+      return
+    }
+
+    const syncKey = JSON.stringify({
+      id: editingSource.id,
+      name: editingSource.name,
+      shortcode: editingSource.shortcode,
+      kind: editingSource.kind,
+    })
+
+    if (sourceEditSyncKeyRef.current === syncKey) {
+      return
+    }
+
+    sourceEditSyncKeyRef.current = syncKey
+
     sourceEditForm.setData({
       id: editingSource.id,
       name: editingSource.name,
       shortcode: editingSource.shortcode,
+      kind: editingSource.kind,
     })
   }, [editingSource, sourceEditForm])
 
@@ -1056,7 +1080,7 @@ export default function Settings({
               Manage source books used by items and spells.
             </p>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_220px_auto] sm:items-end">
             <Input
               value={createSourceForm.data.name}
               onChange={(event) => createSourceForm.setData('name', event.target.value)}
@@ -1070,16 +1094,27 @@ export default function Settings({
               onChange={(event) => createSourceForm.setData('shortcode', event.target.value)}
               errors={createSourceForm.errors.shortcode}
               placeholder="PHB"
+              >
+                {t('compendium.shortcode')}
+              </Input>
+            <Select
+              value={createSourceForm.data.kind}
+              onChange={(event) => createSourceForm.setData('kind', event.target.value as Source['kind'])}
+              errors={createSourceForm.errors.kind}
             >
-              {t('compendium.shortcode')}
-            </Input>
+              <SelectLabel>{t('compendium.sourceKind')}</SelectLabel>
+              <SelectOptions>
+                <option value="official">{t('compendium.officialSource')}</option>
+                <option value="third_party">{t('compendium.thirdPartySource')}</option>
+              </SelectOptions>
+            </Select>
             <Button size="sm" variant="outline" onClick={handleSourceCreate} disabled={createSourceForm.processing}>
               {t('compendium.addSource')}
             </Button>
           </div>
           <div className="mt-4 space-y-2">
             {sources.length === 0 ? (
-              <p className="text-xs text-base-content/60">No sources configured yet.</p>
+              <p className="text-xs text-base-content/60">{t('compendium.noSourcesConfigured')}</p>
             ) : (
               sources.map((source) => (
                 <div key={source.id} className="flex items-center justify-between gap-3 rounded-lg border border-base-200 px-3 py-2">
@@ -1087,14 +1122,17 @@ export default function Settings({
                     <span className="rounded-full border border-base-300 px-2 py-0.5 text-[10px] uppercase text-base-content/70">
                       {source.shortcode}
                     </span>
+                    <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', sourceKindBadgeClass(source.kind))}>
+                      {formatSourceKindLabel(source.kind, t)}
+                    </span>
                     <span className="truncate text-sm">{source.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button size="xs" variant="ghost" onClick={() => setEditingSource(source)}>
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     <Button size="xs" variant="ghost" className="text-error" onClick={() => handleSourceDelete(source)}>
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </div>
                 </div>
@@ -1120,6 +1158,17 @@ export default function Settings({
               >
                 {t('compendium.shortcode')}
               </Input>
+              <Select
+                value={sourceEditForm.data.kind}
+                onChange={(event) => sourceEditForm.setData('kind', event.target.value as Source['kind'])}
+                errors={sourceEditForm.errors.kind}
+              >
+                <SelectLabel>{t('compendium.sourceKind')}</SelectLabel>
+                <SelectOptions>
+                  <option value="official">{t('compendium.officialSource')}</option>
+                  <option value="third_party">{t('compendium.thirdPartySource')}</option>
+                </SelectOptions>
+              </Select>
               <div className="flex justify-end">
                 <Button size="sm" variant="outline" onClick={handleSourceUpdate} disabled={sourceEditForm.processing}>
                   {t('compendium.saveSource')}

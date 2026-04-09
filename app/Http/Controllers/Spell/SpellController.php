@@ -24,7 +24,7 @@ class SpellController extends Controller
         $searchTerm = request('search', '');
 
         $spellQuery = Spell::query();
-        $spellQuery->with('source:id,name,shortcode');
+        $spellQuery->with('source:id,name,shortcode,kind');
 
         if (! empty($searchTerm)) {
             $spellQuery->where('name', 'LIKE', "%{$searchTerm}%");
@@ -61,7 +61,7 @@ class SpellController extends Controller
             'sources' => Source::query()
                 ->orderBy('shortcode')
                 ->orderBy('name')
-                ->get(['id', 'name', 'shortcode']),
+                ->get(['id', 'name', 'shortcode', 'kind']),
             'canManage' => request()->routeIs('admin.spells.index'),
             'indexRoute' => request()->routeIs('admin.spells.index')
                 ? 'admin.spells.index'

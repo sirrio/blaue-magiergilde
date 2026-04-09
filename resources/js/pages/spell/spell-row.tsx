@@ -5,6 +5,8 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
+import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
@@ -40,6 +42,7 @@ const closeMenu = (event: MouseEvent<HTMLElement>) => {
 }
 
 const SuggestSpellUpdateModal = ({ spell, sources }: { spell: Spell; sources: Source[] }) => {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { data, setData, reset, errors } = useForm({
@@ -200,7 +203,7 @@ const SuggestSpellUpdateModal = ({ spell, sources }: { spell: Spell; sources: So
               <option value="">No source</option>
               {sources.map((source) => (
                 <option key={source.id} value={source.id}>
-                  {source.shortcode} - {source.name}
+                  {formatSourceOptionLabel(source, t)}
                 </option>
               ))}
             </SelectOptions>
@@ -221,6 +224,7 @@ const SuggestSpellUpdateModal = ({ spell, sources }: { spell: Spell; sources: So
 }
 
 export default function SpellRow({ spell, sources = [], canManage = true }: { spell: Spell; sources?: Source[]; canManage?: boolean }) {
+  const t = useTranslate()
   const formData = {
     id: spell.id,
     name: spell.name,
@@ -297,9 +301,14 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
         )}{' '}
         <span className={'text-xs font-light italic'}>(Level {spell.spell_level})</span>
         {spell.source?.shortcode ? (
-          <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
-            {spell.source.shortcode}
-          </span>
+          <>
+            <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
+              {spell.source.shortcode}
+            </span>
+            <span className={cn('ml-1 rounded-full border px-2 py-0.5 text-[9px] uppercase', sourceKindBadgeClass(spell.source.kind))}>
+              {formatSourceKindShortLabel(spell.source.kind, t)}
+            </span>
+          </>
         ) : null}
         {hasCurrentUrl ? (
           <a
@@ -430,7 +439,7 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
                         <option value="">No source</option>
                         {sources.map((source) => (
                           <option key={source.id} value={source.id}>
-                            {source.shortcode} - {source.name}
+                              {formatSourceOptionLabel(source, t)}
                           </option>
                         ))}
                       </SelectOptions>

@@ -33,7 +33,7 @@ class ItemController extends Controller
 
         $itemQuery = Item::query();
         $itemQuery->with([
-            'source:id,name,shortcode',
+            'source:id,name,shortcode,kind',
             'mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order',
         ]);
 
@@ -142,7 +142,7 @@ class ItemController extends Controller
             'sources' => Source::query()
                 ->orderBy('shortcode')
                 ->orderBy('name')
-                ->get(['id', 'name', 'shortcode']),
+                ->get(['id', 'name', 'shortcode', 'kind']),
             'mundaneVariants' => MundaneItemVariant::query()
                 ->orderBy('category')
                 ->orderBy('sort_order')

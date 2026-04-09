@@ -242,6 +242,7 @@ export interface Source {
   id: number
   name: string
   shortcode: string
+  kind: 'official' | 'third_party'
 }
 
 export interface MundaneItemVariant {

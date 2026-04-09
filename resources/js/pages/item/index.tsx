@@ -6,6 +6,7 @@ import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import AppLayout from '@/layouts/app-layout'
+import { formatSourceOptionLabel } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import ItemRow from '@/pages/item/item-row'
@@ -382,7 +383,7 @@ const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; 
               <option value="">No source</option>
               {sources.map((source) => (
                 <option key={source.id} value={source.id}>
-                  {source.shortcode} - {source.name}
+                  {formatSourceOptionLabel(source, t)}
                 </option>
               ))}
             </SelectOptions>
@@ -564,7 +565,7 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
                 <option value="">No source</option>
                 {sources.map((source) => (
                   <option key={source.id} value={source.id}>
-                    {source.shortcode} - {source.name}
+                    {formatSourceOptionLabel(source, t)}
                   </option>
                 ))}
               </SelectOptions>
@@ -802,7 +803,7 @@ export default function Index({
   const spellLabelMap = Object.fromEntries(spellFilters.map((entry) => [entry.value, entry.label]))
   const rulingLabelMap = Object.fromEntries(rulingFilters.map((entry) => [entry.value, entry.label]))
   const sourceLabelMap = Object.fromEntries(
-    sources.map((source) => [String(source.id), `${source.shortcode} - ${source.name}`]),
+    sources.map((source) => [String(source.id), formatSourceOptionLabel(source, t)]),
   )
 
   const navigateTo = (href: string) => {
@@ -936,7 +937,7 @@ export default function Index({
                   <option value="none">{t('compendium.noSource')}</option>
                   {sources.map((source) => (
                     <option key={source.id} value={source.id}>
-                      {source.shortcode} - {source.name}
+                      {formatSourceOptionLabel(source, t)}
                     </option>
                   ))}
                 </select>

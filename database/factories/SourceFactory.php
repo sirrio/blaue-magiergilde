@@ -22,6 +22,7 @@ class SourceFactory extends Factory
         return [
             'name' => $this->faker->words(2, true),
             'shortcode' => strtoupper($this->faker->unique()->lexify('SRC???')),
+            'kind' => 'official',
         ];
     }
 }

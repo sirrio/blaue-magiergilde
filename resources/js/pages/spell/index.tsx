@@ -5,6 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import AppLayout from '@/layouts/app-layout'
+import { formatSourceOptionLabel } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import SpellRow from '@/pages/spell/spell-row'
 import { Source, Spell } from '@/types'
@@ -98,7 +99,7 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
                 <option value="">No source</option>
                 {sources.map((source) => (
                   <option key={source.id} value={source.id}>
-                    {source.shortcode} - {source.name}
+                    {formatSourceOptionLabel(source, t)}
                   </option>
                 ))}
               </SelectOptions>

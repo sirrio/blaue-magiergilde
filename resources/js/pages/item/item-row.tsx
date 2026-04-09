@@ -5,6 +5,8 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
+import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Item, MundaneItemVariant, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
@@ -498,6 +500,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
 }
 
 const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item; sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({})
@@ -734,7 +737,7 @@ const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item
               <option value="">No source</option>
               {sources.map((source) => (
                 <option key={source.id} value={source.id}>
-                  {source.shortcode} - {source.name}
+                  {formatSourceOptionLabel(source, t)}
                 </option>
               ))}
             </SelectOptions>
@@ -769,6 +772,7 @@ export default function ItemRow({
   canUpdatePostLine?: boolean
   canManage?: boolean
 }) {
+  const t = useTranslate()
   const formData = {
     id: item.id,
     name: item.name,
@@ -1010,12 +1014,17 @@ export default function ItemRow({
           ) : (
             <span>{displayName}</span>
           )}{' '}
-          <span className={'text-xs font-light italic'}>({item.pick_count})</span>
-          {item.source?.shortcode ? (
-            <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
-              {item.source.shortcode}
-            </span>
-          ) : null}
+            <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+            {item.source?.shortcode ? (
+              <>
+                <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
+                  {item.source.shortcode}
+                </span>
+                <span className={cn('ml-1 rounded-full border px-2 py-0.5 text-[9px] uppercase', sourceKindBadgeClass(item.source.kind))}>
+                  {formatSourceKindShortLabel(item.source.kind, t)}
+                </span>
+              </>
+            ) : null}
           {item.mundane_variants?.length ? (
             <span className="ml-2 rounded-full border border-info/40 px-2 py-0.5 text-[9px] uppercase text-info">
               {item.mundane_variants.length} variant{item.mundane_variants.length === 1 ? '' : 's'}
@@ -1166,7 +1175,7 @@ export default function ItemRow({
                         <option value="">No source</option>
                         {sources.map((source) => (
                           <option key={source.id} value={source.id}>
-                            {source.shortcode} - {source.name}
+                              {formatSourceOptionLabel(source, t)}
                           </option>
                         ))}
                       </SelectOptions>

@@ -73,7 +73,7 @@ class BackupController extends Controller
             'sources' => Source::query()
                 ->orderBy('shortcode')
                 ->orderBy('name')
-                ->get(['id', 'name', 'shortcode']),
+                ->get(['id', 'name', 'shortcode', 'kind']),
             'compendiumImportRuns' => CompendiumImportRun::query()
                 ->with('user:id,name')
                 ->orderByDesc('applied_at')

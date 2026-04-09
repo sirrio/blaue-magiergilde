@@ -153,10 +153,30 @@ const RoomFormModal = ({
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false)
   const [activeCharacterIndex, setActiveCharacterIndex] = useState(0)
   const characterInputRef = useRef<HTMLInputElement | null>(null)
+  const initializedFormKeyRef = useRef<string | null>(null)
   const { data, setData, processing, reset } = useForm<RoomFormData>(initialValues)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      initializedFormKeyRef.current = null
+      return
+    }
+
+    const initializationKey = JSON.stringify({
+      name: initialValues.name,
+      character_id: initialValues.character_id,
+      grid_x: initialValues.grid_x,
+      grid_y: initialValues.grid_y,
+      grid_w: initialValues.grid_w,
+      grid_h: initialValues.grid_h,
+    })
+
+    if (initializedFormKeyRef.current === initializationKey) {
+      return
+    }
+
+    initializedFormKeyRef.current = initializationKey
+
     reset()
     setData({ ...initialValues })
     const selected = characters.find((character) => character.id === initialValues.character_id) ?? null

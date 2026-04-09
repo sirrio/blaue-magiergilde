@@ -15,6 +15,7 @@ test('admin can create and update sources from settings', function () {
         ->post(route('admin.settings.sources.store'), [
             'name' => "Player's Handbook",
             'shortcode' => 'phb',
+            'kind' => 'official',
         ])
         ->assertRedirect();
 
@@ -24,18 +25,21 @@ test('admin can create and update sources from settings', function () {
 
     expect($source)->not->toBeNull()
         ->and($source?->shortcode)->toBe('PHB')
-        ->and($source?->name)->toBe("Player's Handbook");
+        ->and($source?->name)->toBe("Player's Handbook")
+        ->and($source?->kind)->toBe('official');
 
     $this->actingAs($admin)
         ->patch(route('admin.settings.sources.update', $source), [
             'name' => "Dungeon Master's Guide",
             'shortcode' => 'dmg',
+            'kind' => 'third_party',
         ])
         ->assertRedirect();
 
     expect($source->fresh())
         ->shortcode->toBe('DMG')
-        ->name->toBe("Dungeon Master's Guide");
+        ->name->toBe("Dungeon Master's Guide")
+        ->kind->toBe('third_party');
 });
 
 test('deleting a source nulls source references on items and spells', function () {

@@ -27,6 +27,7 @@ class UpdateSourceRequest extends FormRequest
         $this->merge([
             'name' => $name,
             'shortcode' => $shortcode,
+            'kind' => trim((string) $this->input('kind', 'official')),
         ]);
     }
 
@@ -49,6 +50,7 @@ class UpdateSourceRequest extends FormRequest
                 'regex:/^[A-Z0-9_-]+$/',
                 Rule::unique('sources', 'shortcode')->ignore($source?->id),
             ],
+            'kind' => ['required', Rule::in(['official', 'third_party'])],
         ];
     }
 }
