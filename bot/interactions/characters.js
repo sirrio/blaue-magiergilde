@@ -48,6 +48,7 @@ const {
 const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateLevel } = require('../utils/characterTier');
+const { ensureLevelProgressionLoaded } = require('../utils/levelProgression');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -154,6 +155,7 @@ function clearAvatarUpdateState(userId) {
 }
 
 async function updateCharacterListMessage(interaction, ownerDiscordId) {
+    await ensureLevelProgressionLoaded();
     const characters = await listCharactersForDiscord(interaction.user);
     const locale = await getLinkedUserLocaleForDiscord(interaction.user);
     const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
@@ -1292,6 +1294,8 @@ async function getAdventureWithParticipants(interaction, adventureId) {
 }
 
 async function handle(interaction) {
+    await ensureLevelProgressionLoaded();
+
     if (interaction.isMessageComponent?.()) {
         setManageMessageTarget(interaction);
     }

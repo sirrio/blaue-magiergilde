@@ -53,12 +53,42 @@ type LegacyCharacterApprovalImportPreview = {
   error_samples: Array<{ line?: number; message?: string }>
 }
 
+const buildLevelProgressionStepValues = (entries: Array<{ level: number; required_bubbles: number }>) => {
+  return entries.map((entry, index) => {
+    const nextEntry = entries[index + 1]
+
+    if (!nextEntry) {
+      return null
+    }
+
+    return Math.max(0, Number(nextEntry.required_bubbles) - Number(entry.required_bubbles))
+  })
+}
+
+const buildLevelProgressionEntriesFromSteps = (steps: Array<number | null>) => {
+  let runningTotal = 0
+
+  return Array.from({ length: 20 }, (_, index) => {
+    const level = index + 1
+
+    if (level === 1) {
+      return { level, required_bubbles: 0 }
+    }
+
+    const previousStep = steps[index - 1]
+    runningTotal += Math.max(0, Number.isFinite(Number(previousStep)) ? Number(previousStep) : 0)
+
+    return { level, required_bubbles: runningTotal }
+  })
+}
+
 export default function Settings({
   discordBackup,
   discordBotSettings,
   sources,
   compendiumImportRuns,
   legacyCharacterApprovalStats,
+  levelProgression,
 }: {
   discordBackup: DiscordBackupStats
   discordBotSettings: DiscordBotSettings
@@ -68,6 +98,10 @@ export default function Settings({
     total_rows: number
     last_imported_at?: string | null
   }
+  levelProgression: Array<{
+    level: number
+    required_bubbles: number
+  }>
 }) {
   const t = useTranslate()
   const { errors: pageErrors, botChannelOverride } = usePage<PageProps>().props
@@ -94,6 +128,12 @@ export default function Settings({
     name: '',
     shortcode: '',
   })
+  const levelProgressionForm = useForm({
+    entries: levelProgression.map((entry) => ({
+      level: Number(entry.level),
+      required_bubbles: Number(entry.required_bubbles),
+    })),
+  })
   const sourceEditForm = useForm({
     id: 0,
     name: '',
@@ -106,6 +146,7 @@ export default function Settings({
   const [backupStatus, setBackupStatus] = useState<DiscordBackupStatus | null>(null)
   const statusIntervalRef = useRef<number | null>(null)
   const fetchBackupStatusRef = useRef<(showToast: boolean) => Promise<void>>(async () => {})
+  const levelProgressionSyncKeyRef = useRef<string>('')
   const [editingSource, setEditingSource] = useState<Source | null>(null)
   const [importEntityType, setImportEntityType] = useState<'items' | 'spells'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -135,6 +176,32 @@ export default function Settings({
   const [legacyImportBusy, setLegacyImportBusy] = useState(false)
   const [legacyApplyBusy, setLegacyApplyBusy] = useState(false)
   const [legacyImportPreview, setLegacyImportPreview] = useState<LegacyCharacterApprovalImportPreview | null>(null)
+  const levelProgressionStepValues = useMemo(
+    () => buildLevelProgressionStepValues(levelProgressionForm.data.entries),
+    [levelProgressionForm.data.entries]
+  )
+  const levelProgressionColumns = useMemo(
+    () => [
+      levelProgressionForm.data.entries.slice(0, 10),
+      levelProgressionForm.data.entries.slice(10, 20),
+    ],
+    [levelProgressionForm.data.entries]
+  )
+
+  useEffect(() => {
+    const syncKey = JSON.stringify(levelProgression)
+
+    if (levelProgressionSyncKeyRef.current === syncKey) {
+      return
+    }
+
+    levelProgressionSyncKeyRef.current = syncKey
+
+    levelProgressionForm.setData('entries', levelProgression.map((entry) => ({
+      level: Number(entry.level),
+      required_bubbles: Number(entry.required_bubbles),
+    })))
+  }, [levelProgression, levelProgressionForm])
 
   fetchBackupStatusRef.current = async (showToast: boolean) => {
     const csrfToken = getCsrfToken()
@@ -466,6 +533,26 @@ export default function Settings({
       },
       onError: () => {
         toast.show('Bot settings could not be saved.', 'error')
+      },
+    })
+  }
+
+  const updateLevelProgressionEntry = (index: number, value: string) => {
+    const nextValue = Number(value)
+    const nextSteps = [...levelProgressionStepValues]
+    nextSteps[index] = Math.max(1, Number.isFinite(nextValue) ? Math.floor(nextValue) : 1)
+
+    levelProgressionForm.setData('entries', buildLevelProgressionEntriesFromSteps(nextSteps))
+  }
+
+  const handleLevelProgressionSave = () => {
+    levelProgressionForm.patch(route('admin.settings.level-progression.update'), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.show('Level progression saved.', 'info')
+      },
+      onError: () => {
+        toast.show('Level progression could not be saved.', 'error')
       },
     })
   }
@@ -1371,6 +1458,73 @@ export default function Settings({
           <div className="mt-3 flex justify-end">
             <Button size="sm" variant="outline" onClick={handleBotSettingsSave} disabled={botSettingsForm.processing}>
               Save bot settings
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-box bg-base-100 p-3 shadow-md">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold">Level-Fortschritt</h2>
+            <p className="text-xs text-base-content/60">
+              Lege fest, wie viele Bubbles ein Level bis zum nächsten braucht. Die Gesamt-Bubbles werden automatisch daraus berechnet.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {levelProgressionColumns.map((columnEntries, columnIndex) => (
+              <div key={columnIndex} className="overflow-x-auto rounded-lg border border-base-200">
+                <div className="border-b border-base-200 bg-base-200/30 px-4 py-2 text-sm font-medium">
+                  {columnIndex === 0 ? 'Level 1-10' : 'Level 11-20'}
+                </div>
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Level</th>
+                      <th>Bis zum nächsten Level</th>
+                      <th className="text-right">Gesamt-Bubbles</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {columnEntries.map((entry) => {
+                      const index = entry.level - 1
+                      const stepValue = levelProgressionStepValues[index]
+                      const highlightCapBoundary = entry.level === 10 || entry.level === 11
+
+                      return (
+                        <tr key={entry.level} className={highlightCapBoundary ? 'bg-warning/5' : undefined}>
+                          <td className="font-medium">{entry.level}</td>
+                          <td className="min-w-36">
+                            {stepValue === null ? (
+                              <span className="text-sm text-base-content/50">—</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min={1}
+                                max={5000}
+                                className="input input-bordered input-sm w-28 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                value={stepValue}
+                                onChange={(event) => updateLevelProgressionEntry(index, event.target.value)}
+                              />
+                            )}
+                          </td>
+                          <td className="text-right font-mono text-sm text-base-content/60">{entry.required_bubbles}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+          {levelProgressionForm.errors.entries ? (
+            <p className="mt-3 text-xs text-error">{levelProgressionForm.errors.entries}</p>
+          ) : null}
+          <div className="mt-4 flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleLevelProgressionSave}
+              disabled={levelProgressionForm.processing}
+            >
+              {levelProgressionForm.processing ? 'Saving...' : 'Save level progression'}
             </Button>
           </div>
         </div>

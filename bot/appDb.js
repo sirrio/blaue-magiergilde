@@ -5,6 +5,7 @@ const {
     calculateMinAllowedLevel,
     calculateRequiredAdventureBubbles,
 } = require('./utils/quickMode');
+const { ensureLevelProgressionLoaded } = require('./utils/levelProgression');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -443,6 +444,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
 }
 
 async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel) {
+    await ensureLevelProgressionLoaded();
+
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
 

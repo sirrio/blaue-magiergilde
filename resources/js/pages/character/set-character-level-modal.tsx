@@ -1,5 +1,6 @@
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { calculateLevel } from '@/helper/calculateLevel'
+import { clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
 import { useTranslate } from '@/lib/i18n'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
@@ -8,22 +9,10 @@ import { cn } from '@/lib/utils'
 import { Gauge } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
-const MIN_LEVEL = 1
 const MAX_LEVEL = 20
-
-const clampLevel = (value: number): number => {
-  return Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(value)))
-}
 
 const bubblesForAdventure = (duration: number, hasAdditionalBubble: boolean): number => {
   return Math.floor(duration / 10800) + (hasAdditionalBubble ? 1 : 0)
-}
-
-const levelFromBubbles = (availableBubbles: number): number => {
-  const effective = Math.max(0, availableBubbles)
-  const level = Math.floor(1 + (Math.sqrt(8 * effective + 1) - 1) / 2)
-
-  return clampLevel(level)
 }
 
 const additionalBubblesForStartTier = (startTier?: Character['start_tier']): number => {
@@ -71,13 +60,13 @@ const SetCharacterLevelModal = ({
   const immutableAdventureBubbles = latestPseudo
     ? Math.max(0, realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles))
     : Math.max(0, realAdventureBubbles + pseudoAdventureBubbles)
-  const minAllowedLevel = levelFromBubbles(
+  const minAllowedLevel = levelFromAvailableBubbles(
     immutableAdventureBubbles
       + Number(character.dm_bubbles ?? 0)
       + additionalBubblesForStartTier(character.start_tier)
       - Number(character.bubble_shop_spend ?? 0),
   )
-  const minSelectableLevel = character.is_filler ? MIN_LEVEL : minAllowedLevel
+  const minSelectableLevel = character.is_filler ? 1 : minAllowedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
 
   useEffect(() => {

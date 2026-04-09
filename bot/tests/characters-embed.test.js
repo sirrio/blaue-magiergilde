@@ -1,9 +1,16 @@
 const assert = require('node:assert/strict');
+const { setLevelProgressionTotals } = require('../utils/levelProgression');
 const { buildCharacterEmbed } = require('../commands/game/characters');
 
 const originalBaseUrl = process.env.BOT_PUBLIC_APP_URL;
 
 process.env.BOT_PUBLIC_APP_URL = 'https://example.test';
+setLevelProgressionTotals({
+    1: 0, 2: 1, 3: 3, 4: 6, 5: 10,
+    6: 15, 7: 21, 8: 28, 9: 36, 10: 45,
+    11: 55, 12: 66, 13: 78, 14: 91, 15: 105,
+    16: 120, 17: 136, 18: 153, 19: 171, 20: 190,
+});
 
 const character = {
     id: 42,

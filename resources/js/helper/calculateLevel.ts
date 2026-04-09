@@ -1,5 +1,6 @@
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble, type BubbleCharacter } from '@/helper/calculateBubble'
+import { levelFromAvailableBubbles } from '@/helper/levelProgression'
 import type { Character } from '@/types'
 
 type LevelCharacter = BubbleCharacter & Pick<Character, 'bubble_shop_spend' | 'start_tier'>
@@ -14,10 +15,7 @@ const calculateLevel = (character: LevelCharacter): number => {
 
   const availableBubbles = Math.max(0, normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend)
 
-  return Math.min(
-    20,
-    Math.floor(1 + (Math.sqrt(8 * availableBubbles + 1) - 1) / 2),
-  )
+  return levelFromAvailableBubbles(availableBubbles)
 }
 
 export { calculateLevel }

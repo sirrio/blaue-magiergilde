@@ -15,6 +15,7 @@ export interface PageProps {
   botChannelOverride?: { active: boolean; channel_id?: string | null }
   discordConnected: boolean
   handbookChannels?: { id: string; name: string }[]
+  levelProgressionTotals?: Record<number, number>
   activeChannelId?: string | null
   ziggy: Config & { location: string }
 

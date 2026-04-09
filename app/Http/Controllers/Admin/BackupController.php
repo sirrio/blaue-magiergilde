@@ -11,6 +11,7 @@ use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
 use App\Models\LegacyCharacterApproval;
 use App\Models\Source;
+use App\Support\LevelProgression;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -95,6 +96,14 @@ class BackupController extends Controller
                 'total_rows' => LegacyCharacterApproval::query()->count(),
                 'last_imported_at' => LegacyCharacterApproval::query()->max('updated_at'),
             ],
+            'levelProgression' => collect(LevelProgression::totals())
+                ->map(function (int $requiredBubbles, int $level): array {
+                    return [
+                        'level' => $level,
+                        'required_bubbles' => $requiredBubbles,
+                    ];
+                })
+                ->values(),
         ]);
     }
 }

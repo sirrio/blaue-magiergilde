@@ -3,6 +3,8 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+const { levelFromAvailableBubbles } = require('./levelProgression');
+
 function additionalBubblesForStartTier(startTier) {
     switch (String(startTier || '').toLowerCase()) {
         case 'lt':
@@ -24,8 +26,7 @@ function calculateLevel(character) {
     const spend = safeInt(character.bubble_shop_spend);
 
     const effective = Math.max(0, bubbles + additional - spend);
-    const level = Math.floor(1 + (Math.sqrt(8 * effective + 1) - 1) / 2);
-    return Math.min(20, Math.max(1, level));
+    return levelFromAvailableBubbles(effective);
 }
 
 function calculateTierFromLevel(level) {

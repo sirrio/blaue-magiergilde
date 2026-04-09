@@ -1,3 +1,4 @@
+import { setLevelProgressionTotals } from '@/helper/levelProgression'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
@@ -21,7 +22,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
-import { ReactNode, useRef, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useInitials } from '@/hooks/use-initials'
 import ThemeSwitcher from '@/components/theme-switcher'
@@ -31,7 +32,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales } =
+  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales, levelProgressionTotals } =
     usePage<PageProps>().props
   const t = useTranslate()
   const [localeUpdating, setLocaleUpdating] = useState(false)
@@ -59,6 +60,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   useClickOutside(handbookMobileRef, () =>
     handbookMobileRef.current?.removeAttribute('open')
   )
+
+  useEffect(() => {
+    setLevelProgressionTotals(levelProgressionTotals)
+  }, [levelProgressionTotals])
 
   const menuLinks = [
     { name: t('nav.characters'), route: 'characters.index', method: 'get' as const, icon: Users },

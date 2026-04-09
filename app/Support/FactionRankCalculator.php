@@ -55,9 +55,8 @@ class FactionRankCalculator
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
         $bubbleShopSpend = $this->safeInt($character->bubble_shop_spend);
         $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
-        $level = (int) floor(1 + (sqrt(8 * $availableBubbles + 1) - 1) / 2);
 
-        return min(20, max(1, $level));
+        return LevelProgression::levelFromAvailableBubbles($availableBubbles);
     }
 
     private function calculateBubbles(Character $character): int

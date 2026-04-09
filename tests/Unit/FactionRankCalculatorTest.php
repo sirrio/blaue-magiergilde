@@ -3,12 +3,13 @@
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\Downtime;
+use App\Support\LevelProgression;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 function requiredBubblesForLevel(int $level): int
 {
-    return (int) (($level - 1) * $level / 2);
+    return LevelProgression::bubblesRequiredForLevel($level);
 }
 
 test('it calculates faction ranks based on level, downtime, and adventures', function (int $level, int $adventures, int $downtime, int $expectedRank) {

@@ -4,6 +4,7 @@ namespace App\Actions\Character;
 
 use App\Models\Adventure;
 use App\Models\Character;
+use App\Support\LevelProgression;
 use Illuminate\Support\Facades\DB;
 
 class SetQuickLevel
@@ -94,10 +95,7 @@ class SetQuickLevel
 
     private function calculateLevelFromBubbles(int $availableBubbles): int
     {
-        $effective = max(0, $availableBubbles);
-        $level = (int) floor(1 + (sqrt(8 * $effective + 1) - 1) / 2);
-
-        return min(20, max(1, $level));
+        return LevelProgression::levelFromAvailableBubbles($availableBubbles);
     }
 
     private function calculateRequiredAdventureBubbles(
@@ -107,7 +105,7 @@ class SetQuickLevel
         int $bubbleSpend,
     ): int {
         $normalizedLevel = min(20, max(1, $level));
-        $targetAvailableBubbles = ($normalizedLevel - 1) * $normalizedLevel / 2;
+        $targetAvailableBubbles = LevelProgression::bubblesRequiredForLevel($normalizedLevel);
         $required = $targetAvailableBubbles - $dmBubbles - $additionalBubbles + $bubbleSpend;
 
         return max(0, $required);

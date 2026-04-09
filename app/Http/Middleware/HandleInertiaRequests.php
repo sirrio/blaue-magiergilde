@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\CharacterClass;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
+use App\Support\LevelProgression;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -115,6 +116,7 @@ class HandleInertiaRequests extends Middleware
                 'et' => 'Epic Tier',
             ],
             'handbookChannels' => $handbookChannels,
+            'levelProgressionTotals' => LevelProgression::totals(),
         ];
     }
 }

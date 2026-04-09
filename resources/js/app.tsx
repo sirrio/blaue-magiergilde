@@ -1,6 +1,7 @@
 import '../css/app.css'
 
 import { FrontendErrorBoundary } from '@/components/error-boundary'
+import { setLevelProgressionTotals } from '@/helper/levelProgression'
 import { installFrontendErrorReporting, installInertiaErrorReporting, setCurrentPageComponent } from '@/lib/frontend-error-reporting'
 import { ToastProvider } from '@/components/ui/toast'
 import { createInertiaApp } from '@inertiajs/react'
@@ -16,6 +17,7 @@ createInertiaApp({
     installFrontendErrorReporting()
     installInertiaErrorReporting()
     setCurrentPageComponent((props as { initialPage?: { component?: string } }).initialPage?.component || null)
+    setLevelProgressionTotals((props as { initialPage?: { props?: { levelProgressionTotals?: Record<number, number> } } }).initialPage?.props?.levelProgressionTotals)
 
     const root = createRoot(el)
 

@@ -10,6 +10,13 @@ let executedStatements = [];
 
 const fakeDb = {
     async execute(sql, bindings = []) {
+        if (sql.startsWith('SELECT level, required_bubbles FROM level_progressions')) {
+            return [[
+                { level: 1, required_bubbles: 0 },
+                { level: 2, required_bubbles: 1 },
+            ]];
+        }
+
         executedStatements.push({ sql, bindings });
 
         if (sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1')) {

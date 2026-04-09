@@ -24,6 +24,10 @@ const {
     calculateLevel,
     calculateTierFromLevel,
 } = require('../../utils/characterTier');
+const {
+    bubblesRequiredForLevel,
+    ensureLevelProgressionLoaded,
+} = require('../../utils/levelProgression');
 const { formatDurationSeconds } = require('../../utils/time');
 
 function isHttpUrl(urlString) {
@@ -86,8 +90,8 @@ function secondsToHourMinuteString(seconds) {
 
 function calculateTotalBubblesToNextLevel(character, level) {
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const currentTotal = ((level - 1) * level) / 2 - additional;
-    const nextTotal = (level * (level + 1)) / 2 - additional;
+    const currentTotal = bubblesRequiredForLevel(level) - additional;
+    const nextTotal = bubblesRequiredForLevel(level + 1) - additional;
     return Math.max(0, nextTotal - currentTotal);
 }
 
@@ -95,7 +99,7 @@ function calculateBubblesInCurrentLevel(character, level) {
     const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
     const additional = additionalBubblesForStartTier(character.start_tier);
     const spend = safeInt(character.bubble_shop_spend);
-    const currentTotal = ((level - 1) * level) / 2 - additional;
+    const currentTotal = bubblesRequiredForLevel(level) - additional;
     return Math.max(0, bubbles - currentTotal - spend);
 }
 
@@ -534,6 +538,8 @@ module.exports = {
         .setName(commandName('characters'))
         .setDescription(t('characters.commandDescription')),
     async execute(interaction) {
+        await ensureLevelProgressionLoaded();
+
         if (!interaction.inGuild()) {
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });

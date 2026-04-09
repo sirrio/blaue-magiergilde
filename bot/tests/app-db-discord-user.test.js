@@ -11,6 +11,13 @@ let insertParams = null;
 
 const fakeDb = {
     async execute(sql, params) {
+        if (sql.startsWith('SELECT level, required_bubbles FROM level_progressions')) {
+            return [[
+                { level: 1, required_bubbles: 0 },
+                { level: 2, required_bubbles: 1 },
+            ]];
+        }
+
         step += 1;
 
         if (step === 1) {
