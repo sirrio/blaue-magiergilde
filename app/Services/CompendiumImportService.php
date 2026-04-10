@@ -16,7 +16,7 @@ class CompendiumImportService
      */
     public function supportedEntityTypes(): array
     {
-        return ['items', 'spells'];
+        return ['items', 'spells', 'sources'];
     }
 
     public function templateFor(string $entityType): string
@@ -24,7 +24,14 @@ class CompendiumImportService
         if ($entityType === 'items') {
             return implode("\n", [
                 implode(',', $this->columnsFor('items')),
-                'Potion of Healing,consumable,common,50 GP,Component cost,https://example.test/items/potion-healing,PHB,true,true,false,',
+                'Potion of Healing,consumable,common,50 GP,Component cost,https://example.test/items/potion-healing,PHB,,false,,,true,true,false,',
+            ])."\n";
+        }
+
+        if ($entityType === 'sources') {
+            return implode("\n", [
+                implode(',', $this->columnsFor('sources')),
+                "PHB,Player's Handbook,official",
             ])."\n";
         }
 
@@ -40,7 +47,11 @@ class CompendiumImportService
     public function columnsFor(string $entityType): array
     {
         if ($entityType === 'items') {
-            return ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source_shortcode', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note'];
+            return ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source_shortcode', 'mundane_variant_slugs', 'default_spell_roll_enabled', 'default_spell_levels', 'default_spell_schools', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note'];
+        }
+
+        if ($entityType === 'sources') {
+            return ['shortcode', 'name', 'kind'];
         }
 
         return ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source_shortcode', 'guild_enabled', 'ruling_changed', 'ruling_note'];
@@ -73,10 +84,38 @@ class CompendiumImportService
                     (string) ($item->url ?? ''),
                     (string) ($item->source?->shortcode ?? ''),
                     implode(',', $item->mundaneVariants->pluck('slug')->filter()->sort()->values()->all()),
+                    $this->formatBooleanForCsv((bool) $item->default_spell_roll_enabled),
+                    implode(',', collect((array) ($item->default_spell_levels ?? []))
+                        ->map(static fn ($level): string => (string) $level)
+                        ->filter()
+                        ->values()
+                        ->all()),
+                    implode(',', collect((array) ($item->default_spell_schools ?? []))
+                        ->map(static fn ($school): string => (string) $school)
+                        ->filter()
+                        ->values()
+                        ->all()),
                     $this->formatBooleanForCsv((bool) $item->guild_enabled),
                     $this->formatBooleanForCsv((bool) $item->shop_enabled),
                     $this->formatBooleanForCsv((bool) $item->ruling_changed),
                     (string) ($item->ruling_note ?? ''),
+                ];
+            })->all();
+        }
+
+        if ($entityType === 'sources') {
+            /** @var Collection<int, Source> $sources */
+            $sources = Source::query()
+                ->orderBy('shortcode')
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get();
+
+            return $sources->map(function (Source $source): array {
+                return [
+                    (string) $source->shortcode,
+                    (string) $source->name,
+                    (string) $source->kind,
                 ];
             })->all();
         }
@@ -157,9 +196,13 @@ class CompendiumImportService
             /** @var array<string, string> $row */
             $row = $rowData['row'];
 
-            [$payload, $errors] = $entityType === 'items'
-                ? $this->normalizeItemRow($row, $sourceMap->toArray())
-                : $this->normalizeSpellRow($row, $sourceMap->toArray());
+            if ($entityType === 'items') {
+                [$payload, $errors] = $this->normalizeItemRow($row, $sourceMap->toArray());
+            } elseif ($entityType === 'spells') {
+                [$payload, $errors] = $this->normalizeSpellRow($row, $sourceMap->toArray());
+            } else {
+                [$payload, $errors] = $this->normalizeSourceRow($row);
+            }
 
             if ($payload === null) {
                 $summary['invalid_rows']++;
@@ -173,9 +216,13 @@ class CompendiumImportService
                 continue;
             }
 
-            [$action, $existingId, $changes] = $entityType === 'items'
-                ? $this->determineItemAction($payload)
-                : $this->determineSpellAction($payload);
+            if ($entityType === 'items') {
+                [$action, $existingId, $changes] = $this->determineItemAction($payload);
+            } elseif ($entityType === 'spells') {
+                [$action, $existingId, $changes] = $this->determineSpellAction($payload);
+            } else {
+                [$action, $existingId, $changes] = $this->determineSourceAction($payload);
+            }
 
             $summary["{$action}_rows"]++;
 
@@ -190,7 +237,9 @@ class CompendiumImportService
                 'line' => $line,
                 'action' => $action,
                 'payload' => $payload,
-                'source_shortcode' => strtoupper(trim((string) ($row['source_shortcode'] ?? $row['source'] ?? ''))),
+                'source_shortcode' => $entityType === 'sources'
+                    ? strtoupper(trim((string) ($row['shortcode'] ?? '')))
+                    : strtoupper(trim((string) ($row['source_shortcode'] ?? $row['source'] ?? ''))),
                 'existing_id' => $existingId,
                 'changes' => $changes,
             ];
@@ -220,14 +269,21 @@ class CompendiumImportService
 
         foreach ($importRows as $importRow) {
             $payload = is_array($importRow['payload'] ?? null) ? $importRow['payload'] : null;
+            $action = is_string($importRow['action'] ?? null) ? $importRow['action'] : null;
+            $existingId = is_numeric($importRow['existing_id'] ?? null) ? (int) $importRow['existing_id'] : null;
             if (! is_array($payload)) {
                 $summary['invalid_rows']++;
 
                 continue;
             }
 
+            if ($action === 'unchanged') {
+                $summary['unchanged_rows']++;
+
+                continue;
+            }
+
             if ($entityType === 'items') {
-                [$action] = $this->determineItemAction($payload);
                 if ($action === 'new') {
                     $item = new Item;
                     $itemPayload = $payload;
@@ -240,11 +296,7 @@ class CompendiumImportService
                     continue;
                 }
 
-                $existing = Item::query()
-                    ->where('name', $payload['name'])
-                    ->where('type', $payload['type'])
-                    ->where('source_id', $payload['source_id'])
-                    ->first();
+                $existing = $existingId !== null ? Item::query()->find($existingId) : null;
                 if (! $existing) {
                     $existing = $this->findMatchingItem($payload);
                 }
@@ -272,33 +324,59 @@ class CompendiumImportService
                     continue;
                 }
 
-                $summary['unchanged_rows']++;
+                continue;
+            }
+
+            if ($entityType === 'spells') {
+                if ($action === 'new') {
+                    $spell = new Spell;
+                    $spell->forceFill($payload)->save();
+                    $summary['new_rows']++;
+
+                    continue;
+                }
+
+                $existing = $existingId !== null ? Spell::query()->find($existingId) : null;
+                if (! $existing) {
+                    $existing = $this->findMatchingSpell($payload);
+                }
+
+                if (! $existing) {
+                    $spell = new Spell;
+                    $spell->forceFill($payload)->save();
+                    $summary['new_rows']++;
+
+                    continue;
+                }
+
+                if ($action === 'updated') {
+                    $existing->forceFill($payload)->save();
+                    $summary['updated_rows']++;
+
+                    continue;
+                }
 
                 continue;
             }
 
-            [$action] = $this->determineSpellAction($payload);
             if ($action === 'new') {
-                $spell = new Spell;
-                $spell->forceFill($payload)->save();
+                $source = new Source;
+                $source->forceFill($payload)->save();
                 $summary['new_rows']++;
 
                 continue;
             }
 
-            $existing = Spell::query()
-                ->where('name', $payload['name'])
-                ->where('spell_level', $payload['spell_level'])
-                ->where('spell_school', $payload['spell_school'])
-                ->where('source_id', $payload['source_id'])
-                ->first();
+            $existing = $existingId !== null ? Source::query()->find($existingId) : null;
             if (! $existing) {
-                $existing = $this->findMatchingSpell($payload);
+                $existing = Source::query()
+                    ->where('shortcode', $payload['shortcode'])
+                    ->first();
             }
 
             if (! $existing) {
-                $spell = new Spell;
-                $spell->forceFill($payload)->save();
+                $source = new Source;
+                $source->forceFill($payload)->save();
                 $summary['new_rows']++;
 
                 continue;
@@ -324,6 +402,10 @@ class CompendiumImportService
     {
         if ($entityType === 'items') {
             return ['name', 'type', 'rarity'];
+        }
+
+        if ($entityType === 'sources') {
+            return ['shortcode', 'name', 'kind'];
         }
 
         return ['name', 'spell_level', 'spell_school'];
@@ -475,6 +557,53 @@ class CompendiumImportService
             }
         }
 
+        $defaultSpellRollEnabled = $this->parseBoolean($row['default_spell_roll_enabled'] ?? null, false, 'default_spell_roll_enabled', $errors);
+        $defaultSpellLevelsRaw = $this->parseStringCsvList($row['default_spell_levels'] ?? null, false);
+        $invalidDefaultSpellLevelEntries = collect($defaultSpellLevelsRaw)
+            ->reject(static fn (string $level): bool => ctype_digit($level))
+            ->values();
+        if ($invalidDefaultSpellLevelEntries->isNotEmpty()) {
+            $errors[] = 'default_spell_levels must contain integers between 0 and 9';
+        }
+        $defaultSpellLevels = collect($defaultSpellLevelsRaw)
+            ->filter(static fn (string $level): bool => ctype_digit($level))
+            ->map(static fn (string $level): int => (int) $level)
+            ->values()
+            ->all();
+        $defaultSpellSchools = $this->parseStringCsvList($row['default_spell_schools'] ?? null);
+
+        $invalidSpellLevels = collect($defaultSpellLevels)
+            ->filter(static fn (int $level): bool => $level < 0 || $level > 9)
+            ->values();
+        if ($invalidSpellLevels->isNotEmpty()) {
+            $errors[] = 'default_spell_levels must contain integers between 0 and 9';
+        }
+
+        $allowedSpellSchools = [
+            'abjuration',
+            'conjuration',
+            'divination',
+            'enchantment',
+            'evocation',
+            'illusion',
+            'necromancy',
+            'transmutation',
+        ];
+        $invalidSpellSchools = collect($defaultSpellSchools)
+            ->reject(static fn (string $school): bool => in_array($school, $allowedSpellSchools, true))
+            ->values();
+        if ($invalidSpellSchools->isNotEmpty()) {
+            $errors[] = 'default_spell_schools must contain valid spell schools';
+        }
+
+        if ($defaultSpellRollEnabled && $defaultSpellLevels === []) {
+            $errors[] = 'default_spell_levels are required when default_spell_roll_enabled is true';
+        }
+        if (! $defaultSpellRollEnabled) {
+            $defaultSpellLevels = [];
+            $defaultSpellSchools = [];
+        }
+
         $guildEnabled = $this->parseBoolean($row['guild_enabled'] ?? null, true, 'guild_enabled', $errors);
         $shopEnabled = $this->parseBoolean($row['shop_enabled'] ?? null, true, 'shop_enabled', $errors);
         $rulingChanged = $this->parseBoolean($row['ruling_changed'] ?? null, false, 'ruling_changed', $errors);
@@ -496,6 +625,9 @@ class CompendiumImportService
             'url' => $url,
             'source_id' => $sourceId,
             'mundane_variant_ids' => $mundaneVariantIds,
+            'default_spell_roll_enabled' => $defaultSpellRollEnabled,
+            'default_spell_levels' => $defaultSpellRollEnabled ? $defaultSpellLevels : null,
+            'default_spell_schools' => $defaultSpellRollEnabled ? ($defaultSpellSchools === [] ? null : $defaultSpellSchools) : null,
             'guild_enabled' => $guildEnabled,
             'shop_enabled' => $shopEnabled,
             'ruling_changed' => $rulingChanged,
@@ -584,6 +716,44 @@ class CompendiumImportService
     }
 
     /**
+     * @param  array<string, string>  $row
+     * @return array{0: array<string, mixed>|null, 1: array<int, string>}
+     */
+    private function normalizeSourceRow(array $row): array
+    {
+        $errors = [];
+        $shortcode = strtoupper(trim((string) ($row['shortcode'] ?? '')));
+        $name = trim((string) ($row['name'] ?? ''));
+        $kind = strtolower(trim((string) ($row['kind'] ?? '')));
+
+        if ($shortcode === '') {
+            $errors[] = 'shortcode is required';
+        } elseif (mb_strlen($shortcode) > 32) {
+            $errors[] = 'shortcode must be 32 characters or less';
+        } elseif (! preg_match('/^[A-Z0-9_-]+$/', $shortcode)) {
+            $errors[] = 'shortcode must contain only A-Z, 0-9, underscore, or hyphen';
+        }
+
+        if ($name === '') {
+            $errors[] = 'name is required';
+        }
+
+        if (! in_array($kind, ['official', 'third_party'], true)) {
+            $errors[] = 'kind must be official|third_party';
+        }
+
+        if ($errors !== []) {
+            return [null, $errors];
+        }
+
+        return [[
+            'shortcode' => $shortcode,
+            'name' => $name,
+            'kind' => $kind,
+        ], []];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array{0:'new'|'updated'|'unchanged',1:int|null,2:array<string, array{from:mixed,to:mixed}>}
      */
@@ -603,6 +773,7 @@ class CompendiumImportService
             'source_id' => $payload['source_id'],
             'guild_enabled' => (bool) $payload['guild_enabled'],
             'shop_enabled' => (bool) $payload['shop_enabled'],
+            'default_spell_roll_enabled' => (bool) $payload['default_spell_roll_enabled'],
             'ruling_changed' => (bool) $payload['ruling_changed'],
             'ruling_note' => $payload['ruling_note'],
         ];
@@ -633,6 +804,42 @@ class CompendiumImportService
             $changes['mundane_variant_ids'] = [
                 'from' => $existingVariantIds,
                 'to' => $payloadVariantIds,
+            ];
+        }
+
+        $existingDefaultSpellLevels = collect((array) ($existing->default_spell_levels ?? []))
+            ->map(static fn ($level): int => (int) $level)
+            ->sort()
+            ->values()
+            ->all();
+        $payloadDefaultSpellLevels = collect((array) ($payload['default_spell_levels'] ?? []))
+            ->map(static fn ($level): int => (int) $level)
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($existingDefaultSpellLevels !== $payloadDefaultSpellLevels) {
+            $changes['default_spell_levels'] = [
+                'from' => $existingDefaultSpellLevels,
+                'to' => $payloadDefaultSpellLevels,
+            ];
+        }
+
+        $existingDefaultSpellSchools = collect((array) ($existing->default_spell_schools ?? []))
+            ->map(static fn ($school): string => (string) $school)
+            ->sort()
+            ->values()
+            ->all();
+        $payloadDefaultSpellSchools = collect((array) ($payload['default_spell_schools'] ?? []))
+            ->map(static fn ($school): string => (string) $school)
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($existingDefaultSpellSchools !== $payloadDefaultSpellSchools) {
+            $changes['default_spell_schools'] = [
+                'from' => $existingDefaultSpellSchools,
+                'to' => $payloadDefaultSpellSchools,
             ];
         }
 
@@ -681,6 +888,42 @@ class CompendiumImportService
         return ['unchanged', $existing->id, []];
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0:'new'|'updated'|'unchanged',1:int|null,2:array<string, array{from:mixed,to:mixed}>}
+     */
+    private function determineSourceAction(array $payload): array
+    {
+        $existing = Source::query()
+            ->where('shortcode', $payload['shortcode'])
+            ->first();
+
+        if (! $existing) {
+            return ['new', null, []];
+        }
+
+        $comparableFields = [
+            'name' => $payload['name'],
+            'kind' => $payload['kind'],
+        ];
+
+        $changes = [];
+        foreach ($comparableFields as $field => $value) {
+            if ($existing->{$field} !== $value) {
+                $changes[$field] = [
+                    'from' => $existing->{$field},
+                    'to' => $value,
+                ];
+            }
+        }
+
+        if ($changes !== []) {
+            return ['updated', $existing->id, $changes];
+        }
+
+        return ['unchanged', $existing->id, []];
+    }
+
     private function nullableString(mixed $value): ?string
     {
         if (! is_string($value)) {
@@ -694,6 +937,24 @@ class CompendiumImportService
     private function formatBooleanForCsv(bool $value): string
     {
         return $value ? 'true' : 'false';
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function parseStringCsvList(mixed $value, bool $lowercase = true): array
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        return collect(explode(',', $value))
+            ->map(static fn (string $entry): string => trim($entry))
+            ->map(static fn (string $entry): string => $lowercase ? strtolower($entry) : $entry)
+            ->filter(static fn (string $entry): bool => $entry !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

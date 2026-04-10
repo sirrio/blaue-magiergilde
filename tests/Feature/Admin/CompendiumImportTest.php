@@ -25,9 +25,9 @@ test('admin can preview and apply item compendium import', function () {
     ]);
 
     $csv = implode("\n", [
-        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,guild_enabled,shop_enabled,ruling_changed,ruling_note',
-        'Potion of Healing,consumable,common,55 GP,,https://example.test/potion,PHB,,true,true,false,',
-        'Bag of Holding,item,uncommon,,,https://example.test/bag,PHB,,true,true,false,',
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Potion of Healing,consumable,common,55 GP,,https://example.test/potion,PHB,,false,,,true,true,false,',
+        'Bag of Holding,item,uncommon,,,https://example.test/bag,PHB,,false,,,true,true,false,',
     ]);
 
     $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
@@ -282,7 +282,7 @@ test('export download returns item csv content in import schema', function () {
     $row = str_getcsv($lines[1] ?? '');
 
     expect($header)->toBe([
-        'name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source_shortcode', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note',
+        'name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source_shortcode', 'mundane_variant_slugs', 'default_spell_roll_enabled', 'default_spell_levels', 'default_spell_schools', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note',
     ]);
     expect($row)->toBe([
         'Potion of Healing',
@@ -292,6 +292,9 @@ test('export download returns item csv content in import schema', function () {
         'Component cost',
         'https://example.test/items/potion-healing',
         'PHB',
+        '',
+        'false',
+        '',
         '',
         'true',
         'false',
@@ -349,6 +352,108 @@ test('export download returns spell csv content in import schema', function () {
     ]);
 });
 
+test('admin can preview and apply source compendium import', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $existing = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+        'kind' => 'official',
+    ]);
+
+    $csv = implode("\n", [
+        'shortcode,name,kind',
+        'PHB,Players Handbook,official',
+        'EXEB,Exploring Eberron,third_party',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'sources',
+        'file' => UploadedFile::fake()->createWithContent('sources.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.total_rows'))->toBe(2)
+        ->and((int) $previewResponse->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $previewResponse->json('summary.new_rows'))->toBe(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+
+    expect($existing->fresh())
+        ->name->toBe('Players Handbook')
+        ->kind->toBe('official');
+
+    $this->assertDatabaseHas('sources', [
+        'shortcode' => 'EXEB',
+        'name' => 'Exploring Eberron',
+        'kind' => 'third_party',
+    ]);
+});
+
+test('source compendium import keeps unchanged rows unchanged during apply', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+        'kind' => 'official',
+    ]);
+
+    $csv = implode("\n", [
+        'shortcode,name,kind',
+        'PHB,Player\'s Handbook,official',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'sources',
+        'file' => UploadedFile::fake()->createWithContent('sources.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.unchanged_rows'))->toBe(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+    expect((int) $applyResponse->json('summary.unchanged_rows'))->toBe(1);
+});
+
+test('export download returns source csv content in import schema', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+        'kind' => 'official',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('admin.settings.compendium.export', [
+        'entity_type' => 'sources',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $content = $response->streamedContent();
+    $lines = preg_split('/\r\n|\r|\n/', trim($content)) ?: [];
+    $header = str_getcsv($lines[0] ?? '');
+    $rows = collect(array_slice($lines, 1))
+        ->map(static fn (string $line): array => str_getcsv($line))
+        ->values();
+
+    expect($header)->toBe([
+        'shortcode', 'name', 'kind',
+    ]);
+    expect($rows->contains([
+        'PHB',
+        "Player's Handbook",
+        'official',
+    ]))->toBeTrue();
+});
+
 test('item import and export include mundane variant slugs', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $source = Source::factory()->create([
@@ -359,8 +464,8 @@ test('item import and export include mundane variant slugs', function () {
     $warhammer = MundaneItemVariant::query()->where('slug', 'warhammer')->firstOrFail();
 
     $csv = implode("\n", [
-        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,guild_enabled,shop_enabled,ruling_changed,ruling_note',
-        'Blade of Testing,weapon,rare,1000 GP,,https://example.test/blade,PHB,"longsword,warhammer",true,true,false,',
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Blade of Testing,weapon,rare,1000 GP,,https://example.test/blade,PHB,"longsword,warhammer",false,,,true,true,false,',
     ]);
 
     $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
@@ -393,6 +498,51 @@ test('item import and export include mundane variant slugs', function () {
 
     expect($content)->toContain('mundane_variant_slugs');
     expect($content)->toContain('"longsword,warhammer"');
+});
+
+test('item import and export include default spell roll fields', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Spell Bottle,item,rare,2500 GP,,https://example.test/spell-bottle,PHB,,true,"2,3","evocation,illusion",true,true,false,',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+
+    $item = Item::query()->where('name', 'Spell Bottle')->first();
+
+    expect($item)->not->toBeNull()
+        ->and($item?->default_spell_roll_enabled)->toBeTrue()
+        ->and($item?->default_spell_levels)->toBe([2, 3])
+        ->and($item?->default_spell_schools)->toBe(['evocation', 'illusion']);
+
+    $exportResponse = $this->actingAs($admin)->get(route('admin.settings.compendium.export', [
+        'entity_type' => 'items',
+    ]));
+
+    $exportResponse->assertOk();
+
+    $content = $exportResponse->streamedContent();
+
+    expect($content)->toContain('default_spell_roll_enabled');
+    expect($content)->toContain('"2,3"');
+    expect($content)->toContain('"evocation,illusion"');
 });
 
 test('non admin cannot preview compendium import', function () {

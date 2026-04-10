@@ -154,13 +154,13 @@ export default function Settings({
   const levelProgressionSyncKeyRef = useRef<string>('')
   const sourceEditSyncKeyRef = useRef<string>('')
   const [editingSource, setEditingSource] = useState<Source | null>(null)
-  const [importEntityType, setImportEntityType] = useState<'items' | 'spells'>('items')
+  const [importEntityType, setImportEntityType] = useState<'items' | 'spells' | 'sources'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importBusy, setImportBusy] = useState(false)
   const [applyBusy, setApplyBusy] = useState(false)
   const [importPreview, setImportPreview] = useState<{
     preview_token: string
-    entity_type: 'items' | 'spells'
+    entity_type: 'items' | 'spells' | 'sources'
     filename: string
     summary: {
       total_rows: number
@@ -1181,7 +1181,7 @@ export default function Settings({
           <div className="space-y-2">
             <h2 className="text-sm font-semibold">Compendium import</h2>
             <p className="text-xs text-base-content/60">
-              Upload CSV metadata for items or spells, preview changes, then apply.
+              Upload CSV metadata for items, spells, or sources, preview changes, then apply.
             </p>
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
@@ -1190,10 +1190,11 @@ export default function Settings({
               <select
                 className="select select-sm w-full"
                 value={importEntityType}
-                onChange={(event) => setImportEntityType(event.target.value as 'items' | 'spells')}
+                onChange={(event) => setImportEntityType(event.target.value as 'items' | 'spells' | 'sources')}
               >
                 <option value="items">Items</option>
                 <option value="spells">Spells</option>
+                <option value="sources">Sources</option>
               </select>
             </label>
             <label className="form-control">
@@ -1248,8 +1249,10 @@ export default function Settings({
                       <th>Line</th>
                       <th>Action</th>
                       {(importPreview.entity_type === 'items'
-                        ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
-                        : ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
+                        ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'default_spell_roll_enabled', 'default_spell_levels', 'default_spell_schools', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
+                        : importPreview.entity_type === 'spells'
+                          ? ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
+                          : ['shortcode', 'name', 'kind']
                       ).map((column) => (
                         <th key={column}>{column}</th>
                       ))}
@@ -1262,8 +1265,10 @@ export default function Settings({
                         <td>{sample.line}</td>
                         <td>{sample.action}</td>
                         {(importPreview.entity_type === 'items'
-                          ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
-                          : ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
+                          ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'default_spell_roll_enabled', 'default_spell_levels', 'default_spell_schools', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
+                          : importPreview.entity_type === 'spells'
+                            ? ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
+                            : ['shortcode', 'name', 'kind']
                         ).map((column) => {
                           const rawValue = column === 'source' ? sample.payload?.source_id : sample.payload?.[column]
                           let displayValue: string | number | boolean | null = rawValue ?? null

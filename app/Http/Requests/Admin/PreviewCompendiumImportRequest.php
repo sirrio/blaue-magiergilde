@@ -25,7 +25,7 @@ class PreviewCompendiumImportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'entity_type' => ['required', 'in:items,spells'],
+            'entity_type' => ['required', 'in:items,spells,sources'],
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
         ];
     }
