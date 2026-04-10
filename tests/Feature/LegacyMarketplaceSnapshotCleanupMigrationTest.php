@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 
 test('cleanup migration normalizes legacy snapshot markers and removes invalid variant links', function () {
     $weaponVariantId = (int) DB::table('mundane_item_variants')
-        ->where('slug', 'any-weapon-price-legacy')
+        ->where('slug', 'any-weapon')
         ->value('id');
 
     $consumable = Item::factory()->create([
