@@ -130,7 +130,7 @@ export default function Settings({
   const createSourceForm = useForm({
     name: '',
     shortcode: '',
-    kind: 'official' as Source['kind'],
+    kind: 'third_party' as Source['kind'],
   })
   const levelProgressionForm = useForm({
     entries: levelProgression.map((entry) => ({
@@ -142,7 +142,7 @@ export default function Settings({
     id: 0,
     name: '',
     shortcode: '',
-    kind: 'official' as Source['kind'],
+    kind: 'third_party' as Source['kind'],
   })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}

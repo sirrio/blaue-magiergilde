@@ -26,7 +26,7 @@ class StoreSourceRequest extends FormRequest
         $this->merge([
             'name' => $name,
             'shortcode' => $shortcode,
-            'kind' => trim((string) $this->input('kind', 'official')),
+            'kind' => trim((string) $this->input('kind', 'third_party')),
         ]);
     }
 

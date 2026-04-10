@@ -42,6 +42,20 @@ test('admin can create and update sources from settings', function () {
         ->kind->toBe('third_party');
 });
 
+test('admin source creation defaults kind to third party when omitted', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.settings.sources.store'), [
+            'name' => 'Exploring Eberron',
+            'shortcode' => 'exeb',
+        ])
+        ->assertRedirect();
+
+    expect(Source::query()->where('shortcode', 'EXEB')->value('kind'))
+        ->toBe('third_party');
+});
+
 test('deleting a source nulls source references on items and spells', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $source = Source::factory()->create();
