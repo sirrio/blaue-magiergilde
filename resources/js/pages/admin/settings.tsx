@@ -85,6 +85,60 @@ const buildLevelProgressionEntriesFromSteps = (steps: Array<number | null>) => {
   })
 }
 
+const buildCompendiumOverrideConfirmMessage = (
+  entityType: 'items' | 'spells' | 'sources',
+  deletedRows: number
+) => {
+  const noun = entityType === 'items' ? 'items' : entityType === 'spells' ? 'spells' : 'sources'
+
+  return [
+    'Override mode is active.',
+    '',
+    `${deletedRows} existing ${noun} ${deletedRows === 1 ? 'entry is' : 'entries are'} missing from this CSV and ${deletedRows === 1 ? 'will' : 'will'} be removed.`,
+    '',
+    'Apply import?',
+  ].join('\n')
+}
+
+const getCompendiumPreviewTitle = (
+  entityType: 'items' | 'spells' | 'sources',
+  payload: Record<string, string | number | boolean | null>,
+  sourceLabel?: string
+) => {
+  if (entityType === 'items') {
+    const details = [payload.type, payload.rarity, sourceLabel].filter(Boolean).join(' · ')
+    return {
+      title: String(payload.name ?? 'Unnamed item'),
+      details,
+    }
+  }
+
+  if (entityType === 'spells') {
+    const details = [`Level ${payload.spell_level ?? '-'}`, payload.spell_school, sourceLabel].filter(Boolean).join(' · ')
+    return {
+      title: String(payload.name ?? 'Unnamed spell'),
+      details,
+    }
+  }
+
+  return {
+    title: String(payload.shortcode ?? 'Unknown source'),
+    details: [payload.name, payload.kind].filter(Boolean).join(' · '),
+  }
+}
+
+const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged') => {
+  if (action === 'new') {
+    return 'border-success/40 bg-success/10 text-success'
+  }
+
+  if (action === 'updated') {
+    return 'border-warning/40 bg-warning/10 text-warning'
+  }
+
+  return 'border-base-200 bg-base-200/40 text-base-content/70'
+}
+
 export default function Settings({
   discordBackup,
   discordBotSettings,
@@ -156,16 +210,22 @@ export default function Settings({
   const [editingSource, setEditingSource] = useState<Source | null>(null)
   const [importEntityType, setImportEntityType] = useState<'items' | 'spells' | 'sources'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
+  const [importOverrideMissing, setImportOverrideMissing] = useState(false)
+  const [showNewPreviewRows, setShowNewPreviewRows] = useState(true)
+  const [showUpdatedPreviewRows, setShowUpdatedPreviewRows] = useState(true)
+  const [showUnchangedPreviewRows, setShowUnchangedPreviewRows] = useState(false)
   const [importBusy, setImportBusy] = useState(false)
   const [applyBusy, setApplyBusy] = useState(false)
   const [importPreview, setImportPreview] = useState<{
     preview_token: string
     entity_type: 'items' | 'spells' | 'sources'
+    override_missing: boolean
     filename: string
     summary: {
       total_rows: number
       new_rows: number
       updated_rows: number
+      deleted_rows: number
       unchanged_rows: number
       invalid_rows: number
     }
@@ -652,6 +712,7 @@ export default function Settings({
     const formData = new FormData()
     formData.append('entity_type', importEntityType)
     formData.append('file', importFile)
+    formData.append('override_missing', importOverrideMissing ? '1' : '0')
 
     setImportBusy(true)
     try {
@@ -672,18 +733,31 @@ export default function Settings({
       }
 
       setImportPreview(payload)
+      setShowNewPreviewRows(true)
+      setShowUpdatedPreviewRows(true)
+      setShowUnchangedPreviewRows(false)
       toast.show('Preview ready.', 'info')
     } catch {
       toast.show('Preview failed.', 'error')
     } finally {
       setImportBusy(false)
     }
-  }, [importEntityType, importFile])
+  }, [importEntityType, importFile, importOverrideMissing])
 
   const handleApplyImport = useCallback(async () => {
     if (!importPreview?.preview_token) {
       toast.show('Run preview first.', 'error')
       return
+    }
+
+    if (importPreview.override_missing) {
+      const confirmed = window.confirm(
+        buildCompendiumOverrideConfirmMessage(importPreview.entity_type, importPreview.summary.deleted_rows)
+      )
+
+      if (!confirmed) {
+        return
+      }
     }
 
     const csrfToken = getCsrfToken()
@@ -809,6 +883,23 @@ export default function Settings({
   const sourceById = useMemo(() => {
     return Object.fromEntries(sources.map((source) => [source.id, `${source.shortcode} - ${source.name}`]))
   }, [sources])
+  const filteredImportPreviewRows = useMemo(() => {
+    if (!importPreview) {
+      return []
+    }
+
+    return importPreview.row_samples.filter((sample) => {
+      if (sample.action === 'new') {
+        return showNewPreviewRows
+      }
+
+      if (sample.action === 'updated') {
+        return showUpdatedPreviewRows
+      }
+
+      return showUnchangedPreviewRows
+    })
+  }, [importPreview, showNewPreviewRows, showUpdatedPreviewRows, showUnchangedPreviewRows])
 
   const approvalChannelLabel = useMemo(() => {
     if (botSettingsForm.data.character_approval_channel_name) {
@@ -1181,116 +1272,179 @@ export default function Settings({
           <div className="space-y-2">
             <h2 className="text-sm font-semibold">Compendium import</h2>
             <p className="text-xs text-base-content/60">
-              Upload CSV metadata for items, spells, or sources, preview changes, then apply.
+              Upload a CSV, review a compact preview, then apply the import.
             </p>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
-            <label className="form-control">
-              <span className="label text-xs">Entity</span>
-              <select
-                className="select select-sm w-full"
-                value={importEntityType}
-                onChange={(event) => setImportEntityType(event.target.value as 'items' | 'spells' | 'sources')}
-              >
-                <option value="items">Items</option>
-                <option value="spells">Spells</option>
-                <option value="sources">Sources</option>
-              </select>
-            </label>
-            <label className="form-control">
-              <span className="label text-xs">CSV file</span>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                className="file-input file-input-bordered file-input-sm w-full"
-                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-              />
-            </label>
-            <div className="flex items-center gap-2">
-              <Button
-                as="a"
-                size="sm"
-                variant="outline"
-                href={route('admin.settings.compendium.template', { entity_type: importEntityType })}
-              >
-                Template
-              </Button>
-              <Button
-                as="a"
-                size="sm"
-                variant="outline"
-                href={route('admin.settings.compendium.export', { entity_type: importEntityType })}
-              >
-                Export
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => void handlePreviewImport()} disabled={importBusy}>
-                {importBusy ? 'Previewing...' : 'Preview compendium'}
-              </Button>
+          <div className="mt-3 space-y-3">
+            <div className="grid gap-3 lg:grid-cols-[180px_auto] lg:items-end lg:justify-between">
+              <label className="form-control">
+                <span className="label text-xs">Entity</span>
+                <select
+                  className="select select-sm w-full"
+                  value={importEntityType}
+                  onChange={(event) => setImportEntityType(event.target.value as 'items' | 'spells' | 'sources')}
+                >
+                  <option value="items">Items</option>
+                  <option value="spells">Spells</option>
+                  <option value="sources">Sources</option>
+                </select>
+              </label>
+              <div className="flex items-end justify-end">
+                <Button
+                  as="a"
+                  size="sm"
+                  variant="outline"
+                  href={route('admin.settings.compendium.export', { entity_type: importEntityType })}
+                >
+                  Export {importEntityType}
+                </Button>
+              </div>
             </div>
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+              <label className="form-control">
+                <span className="label text-xs">CSV file</span>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="file-input file-input-bordered file-input-sm w-full"
+                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <div className="flex items-end justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => void handlePreviewImport()} disabled={importBusy}>
+                  {importBusy ? 'Previewing...' : 'Preview import'}
+                </Button>
+              </div>
+            </div>
+            <label className="flex items-start gap-3 rounded-lg border border-base-200 px-3 py-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs mt-0.5"
+                checked={importOverrideMissing}
+                onChange={(event) => setImportOverrideMissing(event.target.checked)}
+              />
+              <span className="space-y-1">
+                <span className="block text-xs font-semibold text-base-content">Override missing rows</span>
+                <span className="block text-xs text-base-content/60">
+                  Delete existing {importEntityType} entries not present in this CSV.
+                </span>
+              </span>
+            </label>
           </div>
-          {importFile ? (
-            <p className="mt-2 text-xs text-base-content/60">
-              Selected file: <span className="font-semibold text-base-content">{importFile.name}</span>
-            </p>
-          ) : null}
           {importPreview ? (
             <div className="mt-4 space-y-3 rounded-lg border border-base-200 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-base-content">Preview</p>
+                  <p className="text-xs text-base-content/60">
+                    {importPreview.filename} · {importPreview.entity_type}
+                  </p>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleApplyImport()}
+                    disabled={applyBusy || (importPreview.override_missing && importPreview.summary.invalid_rows > 0)}
+                  >
+                    {applyBusy ? 'Applying...' : 'Apply import'}
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full border border-base-200 px-2 py-1">Rows: {importPreview.summary.total_rows}</span>
-                <span className="rounded-full border border-success/40 px-2 py-1 text-success">New: {importPreview.summary.new_rows}</span>
-                <span className="rounded-full border border-warning/40 px-2 py-1 text-warning">Updated: {importPreview.summary.updated_rows}</span>
-                <span className="rounded-full border border-base-200 px-2 py-1">Unchanged: {importPreview.summary.unchanged_rows}</span>
-                <span className="rounded-full border border-error/40 px-2 py-1 text-error">Invalid: {importPreview.summary.invalid_rows}</span>
+                {importPreview.override_missing ? (
+                  <span className="rounded-full border border-error/40 px-2 py-1 text-error">Deleted on apply: {importPreview.summary.deleted_rows}</span>
+                ) : null}
+                <span className="rounded-full border border-base-200 px-2 py-1">Visible: {filteredImportPreviewRows.length}</span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="table table-xs">
-                  <thead>
-                    <tr>
-                      <th>Line</th>
-                      <th>Action</th>
-                      {(importPreview.entity_type === 'items'
-                        ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'default_spell_roll_enabled', 'default_spell_levels', 'default_spell_schools', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
-                        : importPreview.entity_type === 'spells'
-                          ? ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
-                          : ['shortcode', 'name', 'kind']
-                      ).map((column) => (
-                        <th key={column}>{column}</th>
-                      ))}
-                      <th>Changes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importPreview.row_samples.map((sample) => (
-                      <tr key={`${sample.line}-${sample.action}`}>
-                        <td>{sample.line}</td>
-                        <td>{sample.action}</td>
-                        {(importPreview.entity_type === 'items'
-                          ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'default_spell_roll_enabled', 'default_spell_levels', 'default_spell_schools', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
-                          : importPreview.entity_type === 'spells'
-                            ? ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
-                            : ['shortcode', 'name', 'kind']
-                        ).map((column) => {
-                          const rawValue = column === 'source' ? sample.payload?.source_id : sample.payload?.[column]
-                          let displayValue: string | number | boolean | null = rawValue ?? null
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-base-content/60">Show:</span>
+                <label className="flex items-center gap-2 rounded-full border border-success/30 px-2 py-1 text-success">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs"
+                    checked={showNewPreviewRows}
+                    onChange={(event) => setShowNewPreviewRows(event.target.checked)}
+                  />
+                  New: {importPreview.summary.new_rows}
+                </label>
+                <label className="flex items-center gap-2 rounded-full border border-warning/30 px-2 py-1 text-warning">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs"
+                    checked={showUpdatedPreviewRows}
+                    onChange={(event) => setShowUpdatedPreviewRows(event.target.checked)}
+                  />
+                  Updated: {importPreview.summary.updated_rows}
+                </label>
+                <label className="flex items-center gap-2 rounded-full border border-base-200 px-2 py-1 text-base-content/70">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs"
+                    checked={showUnchangedPreviewRows}
+                    onChange={(event) => setShowUnchangedPreviewRows(event.target.checked)}
+                  />
+                  Unchanged: {importPreview.summary.unchanged_rows}
+                </label>
+                <span className="rounded-full border border-error/40 px-2 py-1 text-error">
+                  Invalid: {importPreview.summary.invalid_rows}
+                </span>
+              </div>
+              {importPreview.override_missing ? (
+                <p className="text-xs text-warning">
+                  Override mode is active. Existing {importPreview.entity_type} entries missing from this import will be removed on apply.
+                </p>
+              ) : null}
+              <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+                {filteredImportPreviewRows.map((sample) => {
+                  const sourceId = typeof sample.payload?.source_id === 'number'
+                    ? sample.payload.source_id
+                    : Number(sample.payload?.source_id)
+                  const sourceLabel = Number.isFinite(sourceId) && sourceById[sourceId]
+                    ? sourceById[sourceId]
+                    : sample.source_shortcode
+                  const previewLabel = getCompendiumPreviewTitle(importPreview.entity_type, sample.payload, sourceLabel)
+                  const changeKeys = sample.changes ? Object.keys(sample.changes) : []
 
-                          if (column === 'source') {
-                            const sourceId = typeof rawValue === 'number' ? rawValue : Number(rawValue)
-                            const resolved = Number.isFinite(sourceId) && sourceById[sourceId]
-                              ? sourceById[sourceId]
-                              : null
-                            displayValue = resolved ?? sample.source_shortcode ?? null
-                          }
-
-                          return <td key={`${sample.line}-${column}`}>{displayValue === null ? '-' : String(displayValue)}</td>
-                        })}
-                        <td>{sample.changes ? Object.keys(sample.changes).join(', ') || '-' : '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  return (
+                    <div
+                      key={`${sample.line}-${sample.action}`}
+                      className="rounded-lg border border-base-200 bg-base-100 px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold text-base-content/70">Line {sample.line}</span>
+                            <span
+                              className={cn(
+                                'rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                                getCompendiumActionBadgeClass(sample.action)
+                              )}
+                            >
+                              {sample.action}
+                            </span>
+                          </div>
+                          <p className="truncate text-sm font-semibold text-base-content">{previewLabel.title}</p>
+                          {previewLabel.details ? (
+                            <p className="text-xs text-base-content/60">{previewLabel.details}</p>
+                          ) : null}
+                        </div>
+                        <div className="text-right text-xs text-base-content/60">
+                          {changeKeys.length > 0 ? `Changed: ${changeKeys.join(', ')}` : 'No field changes'}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {filteredImportPreviewRows.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-base-300 px-3 py-6 text-center text-sm text-base-content/60">
+                    No preview rows match the current filter.
+                  </div>
+                ) : null}
               </div>
               {importPreview.error_samples.length > 0 ? (
-                <div className="space-y-1">
+                <div className="space-y-2 rounded-lg border border-error/20 bg-error/5 p-3">
                   <p className="text-xs font-semibold text-error">Errors</p>
                   {importPreview.error_samples.map((error, index) => (
                     <p key={`${error.line ?? index}-${index}`} className="text-xs text-error">
@@ -1299,11 +1453,6 @@ export default function Settings({
                   ))}
                 </div>
               ) : null}
-              <div className="flex justify-end">
-                <Button size="sm" variant="outline" onClick={() => void handleApplyImport()} disabled={applyBusy}>
-                  {applyBusy ? 'Applying...' : 'Apply import'}
-                </Button>
-              </div>
             </div>
           ) : null}
           <div className="mt-4 space-y-2">
@@ -1311,7 +1460,7 @@ export default function Settings({
             {compendiumImportRuns.length === 0 ? (
               <p className="text-xs text-base-content/60">No imports yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-72 overflow-auto">
                 <table className="table table-xs">
                   <thead>
                     <tr>
@@ -1321,6 +1470,7 @@ export default function Settings({
                       <th>Total</th>
                       <th>New</th>
                       <th>Updated</th>
+                      <th>Deleted</th>
                       <th>Unchanged</th>
                       <th>Invalid</th>
                       <th>By</th>
@@ -1335,6 +1485,7 @@ export default function Settings({
                         <td>{run.total_rows}</td>
                         <td>{run.new_rows}</td>
                         <td>{run.updated_rows}</td>
+                        <td>{run.deleted_rows}</td>
                         <td>{run.unchanged_rows}</td>
                         <td>{run.invalid_rows}</td>
                         <td>{run.user?.name ?? '-'}</td>

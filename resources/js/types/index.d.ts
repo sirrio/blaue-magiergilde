@@ -270,11 +270,12 @@ export interface MundaneItemVariant {
 
 export interface CompendiumImportRun {
   id: number
-  entity_type: 'items' | 'spells'
+  entity_type: 'items' | 'spells' | 'sources'
   filename: string
   total_rows: number
   new_rows: number
   updated_rows: number
+  deleted_rows: number
   unchanged_rows: number
   invalid_rows: number
   error_samples?: Array<{ line?: number; message?: string }> | null

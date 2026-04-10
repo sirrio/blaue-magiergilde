@@ -145,13 +145,13 @@ class CompendiumImportService
 
     /**
      * @return array{
-     *     summary: array{total_rows:int,new_rows:int,updated_rows:int,unchanged_rows:int,invalid_rows:int},
+     *     summary: array{total_rows:int,new_rows:int,updated_rows:int,deleted_rows:int,unchanged_rows:int,invalid_rows:int},
      *     row_samples: array<int, array<string, mixed>>,
      *     error_samples: array<int, array<string, mixed>>,
      *     import_rows: array<int, array<string, mixed>>
      * }
      */
-    public function preview(string $entityType, UploadedFile $file): array
+    public function preview(string $entityType, UploadedFile $file, bool $overrideMissing = false): array
     {
         $sourceMap = Source::query()
             ->get(['id', 'shortcode'])
@@ -167,6 +167,7 @@ class CompendiumImportService
                     'total_rows' => 0,
                     'new_rows' => 0,
                     'updated_rows' => 0,
+                    'deleted_rows' => 0,
                     'unchanged_rows' => 0,
                     'invalid_rows' => 1,
                 ],
@@ -183,6 +184,7 @@ class CompendiumImportService
             'total_rows' => 0,
             'new_rows' => 0,
             'updated_rows' => 0,
+            'deleted_rows' => 0,
             'unchanged_rows' => 0,
             'invalid_rows' => 0,
         ];
@@ -245,6 +247,10 @@ class CompendiumImportService
             ];
         }
 
+        if ($overrideMissing) {
+            $summary['deleted_rows'] = $this->countRowsMissingFromImport($entityType, $importRows);
+        }
+
         return [
             'summary' => $summary,
             'row_samples' => $rowSamples,
@@ -255,14 +261,15 @@ class CompendiumImportService
 
     /**
      * @param  array<int, array<string, mixed>>  $importRows
-     * @return array{total_rows:int,new_rows:int,updated_rows:int,unchanged_rows:int,invalid_rows:int}
+     * @return array{total_rows:int,new_rows:int,updated_rows:int,deleted_rows:int,unchanged_rows:int,invalid_rows:int}
      */
-    public function apply(string $entityType, array $importRows): array
+    public function apply(string $entityType, array $importRows, bool $overrideMissing = false): array
     {
         $summary = [
             'total_rows' => count($importRows),
             'new_rows' => 0,
             'updated_rows' => 0,
+            'deleted_rows' => 0,
             'unchanged_rows' => 0,
             'invalid_rows' => 0,
         ];
@@ -392,6 +399,10 @@ class CompendiumImportService
             $summary['unchanged_rows']++;
         }
 
+        if ($overrideMissing) {
+            $summary['deleted_rows'] = $this->deleteRowsMissingFromImport($entityType, $importRows);
+        }
+
         return $summary;
     }
 
@@ -459,7 +470,8 @@ class CompendiumImportService
     private function normalizeHeader(string $header): string
     {
         $normalized = trim($header);
-        $normalized = preg_replace('/^\xEF\xBB\xBF/u', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/^\x{FEFF}/u', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/^\xEF\xBB\xBF/', '', $normalized) ?? $normalized;
 
         return strtolower($normalized);
     }
@@ -922,6 +934,159 @@ class CompendiumImportService
         }
 
         return ['unchanged', $existing->id, []];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $importRows
+     */
+    private function countRowsMissingFromImport(string $entityType, array $importRows): int
+    {
+        $importKeys = $this->importKeysByEntityType($entityType, $importRows);
+
+        if ($entityType === 'items') {
+            return Item::query()
+                ->get(['id', 'name', 'type', 'source_id'])
+                ->reject(fn (Item $item): bool => isset($importKeys[$this->itemIdentityKey([
+                    'name' => $item->name,
+                    'type' => $item->type,
+                    'source_id' => $item->source_id,
+                ])]))
+                ->count();
+        }
+
+        if ($entityType === 'spells') {
+            return Spell::query()
+                ->get(['id', 'name', 'spell_level', 'spell_school', 'source_id'])
+                ->reject(fn (Spell $spell): bool => isset($importKeys[$this->spellIdentityKey([
+                    'name' => $spell->name,
+                    'spell_level' => $spell->spell_level,
+                    'spell_school' => $spell->spell_school,
+                    'source_id' => $spell->source_id,
+                ])]))
+                ->count();
+        }
+
+        return Source::query()
+            ->get(['id', 'shortcode'])
+            ->reject(fn (Source $source): bool => isset($importKeys[$this->sourceIdentityKey([
+                'shortcode' => $source->shortcode,
+            ])]))
+            ->count();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $importRows
+     */
+    private function deleteRowsMissingFromImport(string $entityType, array $importRows): int
+    {
+        $importKeys = $this->importKeysByEntityType($entityType, $importRows);
+
+        if ($entityType === 'items') {
+            $itemsToDelete = Item::query()
+                ->get(['id', 'name', 'type', 'source_id'])
+                ->reject(fn (Item $item): bool => isset($importKeys[$this->itemIdentityKey([
+                    'name' => $item->name,
+                    'type' => $item->type,
+                    'source_id' => $item->source_id,
+                ])]));
+
+            $itemsToDelete->each(static fn (Item $item): bool => $item->delete());
+
+            return $itemsToDelete->count();
+        }
+
+        if ($entityType === 'spells') {
+            $spellsToDelete = Spell::query()
+                ->get(['id', 'name', 'spell_level', 'spell_school', 'source_id'])
+                ->reject(fn (Spell $spell): bool => isset($importKeys[$this->spellIdentityKey([
+                    'name' => $spell->name,
+                    'spell_level' => $spell->spell_level,
+                    'spell_school' => $spell->spell_school,
+                    'source_id' => $spell->source_id,
+                ])]));
+
+            $spellsToDelete->each(static fn (Spell $spell): bool => $spell->delete());
+
+            return $spellsToDelete->count();
+        }
+
+        $sourcesToDelete = Source::query()
+            ->get(['id', 'shortcode'])
+            ->reject(fn (Source $source): bool => isset($importKeys[$this->sourceIdentityKey([
+                'shortcode' => $source->shortcode,
+            ])]));
+
+        $sourcesToDelete->each(static fn (Source $source): bool => $source->delete());
+
+        return $sourcesToDelete->count();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $importRows
+     * @return array<string, true>
+     */
+    private function importKeysByEntityType(string $entityType, array $importRows): array
+    {
+        $keys = [];
+
+        foreach ($importRows as $importRow) {
+            $payload = is_array($importRow['payload'] ?? null) ? $importRow['payload'] : null;
+
+            if (! is_array($payload)) {
+                continue;
+            }
+
+            if ($entityType === 'items') {
+                $keys[$this->itemIdentityKey($payload)] = true;
+
+                continue;
+            }
+
+            if ($entityType === 'spells') {
+                $keys[$this->spellIdentityKey($payload)] = true;
+
+                continue;
+            }
+
+            $keys[$this->sourceIdentityKey($payload)] = true;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function itemIdentityKey(array $payload): string
+    {
+        return json_encode([
+            'name' => (string) $payload['name'],
+            'type' => (string) $payload['type'],
+            'source_id' => $payload['source_id'] !== null ? (int) $payload['source_id'] : null,
+        ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function spellIdentityKey(array $payload): string
+    {
+        return json_encode([
+            'name' => (string) $payload['name'],
+            'spell_level' => (int) $payload['spell_level'],
+            'spell_school' => (string) $payload['spell_school'],
+            'source_id' => $payload['source_id'] !== null ? (int) $payload['source_id'] : null,
+        ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function sourceIdentityKey(array $payload): string
+    {
+        return json_encode([
+            'shortcode' => (string) $payload['shortcode'],
+        ], JSON_THROW_ON_ERROR);
     }
 
     private function nullableString(mixed $value): ?string

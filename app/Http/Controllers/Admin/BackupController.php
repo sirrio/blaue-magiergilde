@@ -87,6 +87,7 @@ class BackupController extends Controller
                     'total_rows',
                     'new_rows',
                     'updated_rows',
+                    'deleted_rows',
                     'unchanged_rows',
                     'invalid_rows',
                     'error_samples',

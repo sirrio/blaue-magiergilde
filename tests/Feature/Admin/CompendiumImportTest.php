@@ -79,6 +79,29 @@ test('admin can preview and apply item compendium import', function () {
     ]);
 });
 
+test('item compendium preview accepts csv files with utf8 bom header', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $csv = "\xEF\xBB\xBF".implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Potion of Healing,consumable,common,50 GP,,https://example.test/potion,PHB,,false,,,true,true,false,',
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items-bom.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $response->assertOk();
+    expect((int) $response->json('summary.invalid_rows'))->toBe(0)
+        ->and((int) $response->json('summary.new_rows'))->toBe(1)
+        ->and($response->json('error_samples'))->toBe([]);
+});
+
 test('preview flags invalid spell rows with unknown source', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
@@ -422,6 +445,95 @@ test('source compendium import keeps unchanged rows unchanged during apply', fun
     expect((int) $applyResponse->json('summary.unchanged_rows'))->toBe(1);
 });
 
+test('source compendium import preview and apply can override missing rows', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $baselineCount = Source::query()->count();
+    Source::factory()->create([
+        'name' => 'Test Source One',
+        'shortcode' => 'TST1',
+        'kind' => 'official',
+    ]);
+    Source::factory()->create([
+        'name' => 'Test Source Two',
+        'shortcode' => 'TST2',
+        'kind' => 'third_party',
+    ]);
+
+    $csv = implode("\n", [
+        'shortcode,name,kind',
+        'TST1,Test Source One,official',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'sources',
+        'override_missing' => '1',
+        'file' => UploadedFile::fake()->createWithContent('sources.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect($previewResponse->json('override_missing'))->toBeTrue()
+        ->and((int) $previewResponse->json('summary.deleted_rows'))->toBe($baselineCount + 1)
+        ->and((int) $previewResponse->json('summary.unchanged_rows'))->toBe(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+    expect((int) $applyResponse->json('summary.deleted_rows'))->toBe($baselineCount + 1);
+
+    $this->assertDatabaseHas('sources', [
+        'shortcode' => 'TST1',
+    ]);
+    $this->assertDatabaseMissing('sources', [
+        'shortcode' => 'TST2',
+    ]);
+    $this->assertDatabaseHas('compendium_import_runs', [
+        'entity_type' => 'sources',
+        'filename' => 'sources.csv',
+        'deleted_rows' => $baselineCount + 1,
+    ]);
+});
+
+test('override compendium import cannot be applied while preview contains invalid rows', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $baselineCount = Source::query()->count();
+    Source::factory()->create([
+        'name' => 'Test Source One',
+        'shortcode' => 'TST1',
+        'kind' => 'official',
+    ]);
+
+    $csv = implode("\n", [
+        'shortcode,name,kind',
+        'PHB,Player\'s Handbook,official',
+        'EXEB,Exploring Eberron,invalid-kind',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'sources',
+        'override_missing' => '1',
+        'file' => UploadedFile::fake()->createWithContent('sources.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.invalid_rows'))->toBe(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertStatus(422)
+        ->assertJson([
+            'message' => 'Override import cannot be applied while invalid rows are present.',
+        ]);
+
+    $this->assertDatabaseHas('sources', [
+        'shortcode' => 'TST1',
+    ]);
+    expect(Source::query()->count())->toBe($baselineCount + 1);
+});
+
 test('export download returns source csv content in import schema', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     Source::factory()->create([
@@ -543,6 +655,70 @@ test('item import and export include default spell roll fields', function () {
     expect($content)->toContain('default_spell_roll_enabled');
     expect($content)->toContain('"2,3"');
     expect($content)->toContain('"evocation,illusion"');
+});
+
+test('override item compendium import soft deletes missing items and keeps shop snapshots intact', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $keptItem = Item::factory()->create([
+        'name' => 'Kept Item',
+        'type' => 'item',
+        'rarity' => 'common',
+        'cost' => '100 GP',
+        'source_id' => $source->id,
+    ]);
+    $removedItem = Item::factory()->create([
+        'name' => 'Removed Item',
+        'type' => 'item',
+        'rarity' => 'common',
+        'cost' => '100 GP',
+        'source_id' => $source->id,
+    ]);
+
+    $shop = \App\Models\Shop::query()->create();
+    $shopSnapshot = \App\Models\ShopItem::query()->create([
+        'shop_id' => $shop->id,
+        'item_id' => $removedItem->id,
+        'item_name' => $removedItem->name,
+        'item_url' => $removedItem->url,
+        'item_cost' => $removedItem->cost,
+        'item_rarity' => $removedItem->rarity,
+        'item_type' => $removedItem->type,
+        'snapshot_custom' => false,
+    ]);
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        "Kept Item,item,common,100 GP,,{$keptItem->url},PHB,,false,,,true,true,false,",
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'override_missing' => '1',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.deleted_rows'))->toBeGreaterThanOrEqual(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+
+    $this->assertSoftDeleted('items', [
+        'id' => $removedItem->id,
+    ]);
+    $this->assertDatabaseHas('item_shop', [
+        'id' => $shopSnapshot->id,
+        'item_id' => $removedItem->id,
+        'item_name' => 'Removed Item',
+    ]);
 });
 
 test('non admin cannot preview compendium import', function () {

@@ -27,6 +27,7 @@ class PreviewCompendiumImportRequest extends FormRequest
         return [
             'entity_type' => ['required', 'in:items,spells,sources'],
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+            'override_missing' => ['nullable', 'boolean'],
         ];
     }
 }
