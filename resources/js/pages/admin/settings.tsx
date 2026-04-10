@@ -1214,6 +1214,14 @@ export default function Settings({
               >
                 Template
               </Button>
+              <Button
+                as="a"
+                size="sm"
+                variant="outline"
+                href={route('admin.settings.compendium.export', { entity_type: importEntityType })}
+              >
+                Export
+              </Button>
               <Button size="sm" variant="outline" onClick={() => void handlePreviewImport()} disabled={importBusy}>
                 {importBusy ? 'Previewing...' : 'Preview compendium'}
               </Button>
@@ -1240,7 +1248,7 @@ export default function Settings({
                       <th>Line</th>
                       <th>Action</th>
                       {(importPreview.entity_type === 'items'
-                        ? ['name', 'type', 'rarity', 'cost', 'url', 'source', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
+                        ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
                         : ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
                       ).map((column) => (
                         <th key={column}>{column}</th>
@@ -1254,7 +1262,7 @@ export default function Settings({
                         <td>{sample.line}</td>
                         <td>{sample.action}</td>
                         {(importPreview.entity_type === 'items'
-                          ? ['name', 'type', 'rarity', 'cost', 'url', 'source', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
+                          ? ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note']
                           : ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source', 'guild_enabled', 'ruling_changed', 'ruling_note']
                         ).map((column) => {
                           const rawValue = column === 'source' ? sample.payload?.source_id : sample.payload?.[column]

@@ -35,6 +35,35 @@ class CompendiumImportController extends Controller
         ]);
     }
 
+    public function export(Request $request, CompendiumImportService $service): StreamedResponse
+    {
+        $entityType = (string) $request->query('entity_type', '');
+        if (! in_array($entityType, $service->supportedEntityTypes(), true)) {
+            throw new HttpException(422, 'Invalid entity type.');
+        }
+
+        $filename = $entityType.'-export.csv';
+        $columns = $service->columnsFor($entityType);
+        $rows = $service->exportRowsFor($entityType);
+
+        return response()->streamDownload(function () use ($columns, $rows): void {
+            $handle = fopen('php://output', 'wb');
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, $columns);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function preview(PreviewCompendiumImportRequest $request, CompendiumImportService $service): JsonResponse
     {
         $data = $request->validated();

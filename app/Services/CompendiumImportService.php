@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Item;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Models\Spell;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 
 class CompendiumImportService
@@ -21,15 +23,85 @@ class CompendiumImportService
     {
         if ($entityType === 'items') {
             return implode("\n", [
-                'name,type,rarity,cost,extra_cost_note,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+                implode(',', $this->columnsFor('items')),
                 'Potion of Healing,consumable,common,50 GP,Component cost,https://example.test/items/potion-healing,PHB,true,true,false,',
             ])."\n";
         }
 
         return implode("\n", [
-            'name,spell_level,spell_school,url,legacy_url,source_shortcode,guild_enabled,ruling_changed,ruling_note',
+            implode(',', $this->columnsFor('spells')),
             'Fireball,3,evocation,https://example.test/spells/fireball,https://example.test/spells/legacy-fireball,PHB,true,false,',
         ])."\n";
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function columnsFor(string $entityType): array
+    {
+        if ($entityType === 'items') {
+            return ['name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source_shortcode', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note'];
+        }
+
+        return ['name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source_shortcode', 'guild_enabled', 'ruling_changed', 'ruling_note'];
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    public function exportRowsFor(string $entityType): array
+    {
+        if ($entityType === 'items') {
+            /** @var Collection<int, Item> $items */
+            $items = Item::query()
+                ->with([
+                    'source:id,shortcode',
+                    'mundaneVariants:id,slug',
+                ])
+                ->orderBy('name')
+                ->orderBy('type')
+                ->orderBy('id')
+                ->get();
+
+            return $items->map(function (Item $item): array {
+                return [
+                    (string) $item->name,
+                    (string) $item->type,
+                    (string) $item->rarity,
+                    (string) ($item->cost ?? ''),
+                    (string) ($item->extra_cost_note ?? ''),
+                    (string) ($item->url ?? ''),
+                    (string) ($item->source?->shortcode ?? ''),
+                    implode(',', $item->mundaneVariants->pluck('slug')->filter()->sort()->values()->all()),
+                    $this->formatBooleanForCsv((bool) $item->guild_enabled),
+                    $this->formatBooleanForCsv((bool) $item->shop_enabled),
+                    $this->formatBooleanForCsv((bool) $item->ruling_changed),
+                    (string) ($item->ruling_note ?? ''),
+                ];
+            })->all();
+        }
+
+        /** @var Collection<int, Spell> $spells */
+        $spells = Spell::query()
+            ->with('source:id,shortcode')
+            ->orderBy('name')
+            ->orderBy('spell_level')
+            ->orderBy('id')
+            ->get();
+
+        return $spells->map(function (Spell $spell): array {
+            return [
+                (string) $spell->name,
+                (string) $spell->spell_level,
+                (string) $spell->spell_school,
+                (string) ($spell->url ?? ''),
+                (string) ($spell->legacy_url ?? ''),
+                (string) ($spell->source?->shortcode ?? ''),
+                $this->formatBooleanForCsv((bool) $spell->guild_enabled),
+                $this->formatBooleanForCsv((bool) $spell->ruling_changed),
+                (string) ($spell->ruling_note ?? ''),
+            ];
+        })->all();
     }
 
     /**
@@ -158,7 +230,11 @@ class CompendiumImportService
                 [$action] = $this->determineItemAction($payload);
                 if ($action === 'new') {
                     $item = new Item;
-                    $item->forceFill($payload)->save();
+                    $itemPayload = $payload;
+                    $mundaneVariantIds = $this->extractMundaneVariantIds($itemPayload);
+
+                    $item->forceFill($itemPayload)->save();
+                    $item->mundaneVariants()->sync($mundaneVariantIds);
                     $summary['new_rows']++;
 
                     continue;
@@ -175,14 +251,22 @@ class CompendiumImportService
 
                 if (! $existing) {
                     $item = new Item;
-                    $item->forceFill($payload)->save();
+                    $itemPayload = $payload;
+                    $mundaneVariantIds = $this->extractMundaneVariantIds($itemPayload);
+
+                    $item->forceFill($itemPayload)->save();
+                    $item->mundaneVariants()->sync($mundaneVariantIds);
                     $summary['new_rows']++;
 
                     continue;
                 }
 
                 if ($action === 'updated') {
-                    $existing->forceFill($payload)->save();
+                    $itemPayload = $payload;
+                    $mundaneVariantIds = $this->extractMundaneVariantIds($itemPayload);
+
+                    $existing->forceFill($itemPayload)->save();
+                    $existing->mundaneVariants()->sync($mundaneVariantIds);
                     $summary['updated_rows']++;
 
                     continue;
@@ -313,7 +397,9 @@ class CompendiumImportService
         $extraCostNote = $this->nullableString($row['extra_cost_note'] ?? $row['extra_cost'] ?? null);
         $url = $this->nullableString($row['url'] ?? null);
         $sourceShortcode = strtoupper(trim((string) ($row['source_shortcode'] ?? $row['source'] ?? $row['source_code'] ?? '')));
+        $mundaneVariantSlugs = trim((string) ($row['mundane_variant_slugs'] ?? ''));
         $sourceId = null;
+        $mundaneVariantIds = [];
 
         if ($name === '') {
             $errors[] = 'name is required';
@@ -332,6 +418,51 @@ class CompendiumImportService
             if ($sourceId === null) {
                 $errors[] = "unknown source shortcode '{$sourceShortcode}'";
             }
+        }
+
+        if ($mundaneVariantSlugs !== '') {
+            $variantSlugs = collect(explode(',', $mundaneVariantSlugs))
+                ->map(static fn (string $slug): string => trim($slug))
+                ->filter(static fn (string $slug): bool => $slug !== '')
+                ->unique()
+                ->values();
+
+            $variants = MundaneItemVariant::query()
+                ->whereIn('slug', $variantSlugs->all())
+                ->get(['id', 'slug', 'category', 'is_placeholder']);
+
+            $foundSlugs = $variants->pluck('slug')->all();
+            $missingSlugs = $variantSlugs
+                ->reject(static fn (string $slug): bool => in_array($slug, $foundSlugs, true))
+                ->values();
+
+            if ($missingSlugs->isNotEmpty()) {
+                $errors[] = 'unknown mundane_variant_slugs: '.$missingSlugs->implode(', ');
+            }
+
+            if (in_array($type, ['weapon', 'armor'], true)) {
+                $invalidCount = $variants
+                    ->where('category', '!=', $type)
+                    ->count();
+
+                if ($invalidCount > 0) {
+                    $errors[] = "Only {$type} variants can be attached to {$type} items.";
+                }
+
+                $hasAnyOption = $variants->contains(static fn ($variant): bool => (bool) $variant->is_placeholder);
+                if ($hasAnyOption && $variantSlugs->count() > 1) {
+                    $label = ucfirst($type);
+                    $errors[] = "The Any {$label} option cannot be combined with specific {$type} variants.";
+                }
+            } elseif ($variantSlugs->isNotEmpty()) {
+                $errors[] = 'Mundane variants are only allowed for weapon or armor items.';
+            }
+
+            $mundaneVariantIds = $variants
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->values()
+                ->all();
         }
 
         if (in_array($type, ['weapon', 'armor'], true)) {
@@ -364,6 +495,7 @@ class CompendiumImportService
             'extra_cost_note' => $extraCostNote,
             'url' => $url,
             'source_id' => $sourceId,
+            'mundane_variant_ids' => $mundaneVariantIds,
             'guild_enabled' => $guildEnabled,
             'shop_enabled' => $shopEnabled,
             'ruling_changed' => $rulingChanged,
@@ -485,6 +617,25 @@ class CompendiumImportService
             }
         }
 
+        $existingVariantIds = $existing->mundaneVariants()
+            ->pluck('mundane_item_variants.id')
+            ->map(static fn ($id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $payloadVariantIds = collect((array) ($payload['mundane_variant_ids'] ?? []))
+            ->map(static fn ($id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($existingVariantIds !== $payloadVariantIds) {
+            $changes['mundane_variant_ids'] = [
+                'from' => $existingVariantIds,
+                'to' => $payloadVariantIds,
+            ];
+        }
+
         if ($changes !== []) {
             return ['updated', $existing->id, $changes];
         }
@@ -538,6 +689,29 @@ class CompendiumImportService
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function formatBooleanForCsv(bool $value): string
+    {
+        return $value ? 'true' : 'false';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<int, int>
+     */
+    private function extractMundaneVariantIds(array &$payload): array
+    {
+        $variantIds = collect((array) ($payload['mundane_variant_ids'] ?? []))
+            ->map(static fn ($id): ?int => is_numeric($id) ? (int) $id : null)
+            ->filter(static fn (?int $id): bool => $id !== null && $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        unset($payload['mundane_variant_ids']);
+
+        return $variantIds;
     }
 
     /**

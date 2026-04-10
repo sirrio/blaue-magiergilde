@@ -58,6 +58,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/settings/compendium/template', [CompendiumImportController::class, 'template'])
         ->name('admin.settings.compendium.template');
 
+    Route::get('/admin/settings/compendium/export', [CompendiumImportController::class, 'export'])
+        ->name('admin.settings.compendium.export');
+
     Route::post('/admin/settings/compendium/preview', [CompendiumImportController::class, 'preview'])
         ->name('admin.settings.compendium.preview');
 

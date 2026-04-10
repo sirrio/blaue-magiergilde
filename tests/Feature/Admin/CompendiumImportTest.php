@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Item;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Models\Spell;
 use App\Models\User;
@@ -24,9 +25,9 @@ test('admin can preview and apply item compendium import', function () {
     ]);
 
     $csv = implode("\n", [
-        'name,type,rarity,cost,url,source_shortcode,guild_enabled,shop_enabled,ruling_changed,ruling_note',
-        'Potion of Healing,consumable,common,55 GP,https://example.test/potion,PHB,true,true,false,',
-        'Bag of Holding,item,uncommon,,https://example.test/bag,PHB,true,true,false,',
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Potion of Healing,consumable,common,55 GP,,https://example.test/potion,PHB,,true,true,false,',
+        'Bag of Holding,item,uncommon,,,https://example.test/bag,PHB,,true,true,false,',
     ]);
 
     $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
@@ -246,6 +247,152 @@ test('template download returns csv content for items', function () {
     $response->assertOk();
     $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
     expect($response->streamedContent())->toContain('name,type,rarity,cost,extra_cost_note,url,source_shortcode');
+});
+
+test('export download returns item csv content in import schema', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+    Item::factory()->create([
+        'name' => 'Potion of Healing',
+        'type' => 'consumable',
+        'rarity' => 'common',
+        'cost' => '50 GP',
+        'extra_cost_note' => 'Component cost',
+        'url' => 'https://example.test/items/potion-healing',
+        'source_id' => $source->id,
+        'guild_enabled' => true,
+        'shop_enabled' => false,
+        'ruling_changed' => true,
+        'ruling_note' => 'Updated note',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('admin.settings.compendium.export', [
+        'entity_type' => 'items',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $content = $response->streamedContent();
+    $lines = preg_split('/\r\n|\r|\n/', trim($content)) ?: [];
+    $header = str_getcsv($lines[0] ?? '');
+    $row = str_getcsv($lines[1] ?? '');
+
+    expect($header)->toBe([
+        'name', 'type', 'rarity', 'cost', 'extra_cost_note', 'url', 'source_shortcode', 'mundane_variant_slugs', 'guild_enabled', 'shop_enabled', 'ruling_changed', 'ruling_note',
+    ]);
+    expect($row)->toBe([
+        'Potion of Healing',
+        'consumable',
+        'common',
+        '50 GP',
+        'Component cost',
+        'https://example.test/items/potion-healing',
+        'PHB',
+        '',
+        'true',
+        'false',
+        'true',
+        'Updated note',
+    ]);
+});
+
+test('export download returns spell csv content in import schema', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+    Spell::factory()->create([
+        'name' => 'Fireball',
+        'spell_level' => 3,
+        'spell_school' => 'evocation',
+        'url' => 'https://example.test/spells/fireball',
+        'legacy_url' => 'https://example.test/spells/legacy-fireball',
+        'source_id' => $source->id,
+        'guild_enabled' => false,
+        'ruling_changed' => true,
+        'ruling_note' => 'Needs review',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('admin.settings.compendium.export', [
+        'entity_type' => 'spells',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $content = $response->streamedContent();
+    $lines = preg_split('/\r\n|\r|\n/', trim($content)) ?: [];
+    $header = str_getcsv($lines[0] ?? '');
+    $row = str_getcsv($lines[1] ?? '');
+
+    expect($content)
+        ->toContain('name,spell_level,spell_school,url,legacy_url,source_shortcode,guild_enabled,ruling_changed,ruling_note');
+
+    expect($header)->toBe([
+        'name', 'spell_level', 'spell_school', 'url', 'legacy_url', 'source_shortcode', 'guild_enabled', 'ruling_changed', 'ruling_note',
+    ]);
+    expect($row)->toBe([
+        'Fireball',
+        '3',
+        'evocation',
+        'https://example.test/spells/fireball',
+        'https://example.test/spells/legacy-fireball',
+        'PHB',
+        'false',
+        'true',
+        'Needs review',
+    ]);
+});
+
+test('item import and export include mundane variant slugs', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+    $longsword = MundaneItemVariant::query()->where('slug', 'longsword')->firstOrFail();
+    $warhammer = MundaneItemVariant::query()->where('slug', 'warhammer')->firstOrFail();
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Blade of Testing,weapon,rare,1000 GP,,https://example.test/blade,PHB,"longsword,warhammer",true,true,false,',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.new_rows'))->toBe(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+
+    $item = Item::query()->where('name', 'Blade of Testing')->first();
+
+    expect($item)->not->toBeNull()
+        ->and($item?->mundaneVariants()->pluck('slug')->sort()->values()->all())
+        ->toBe([$longsword->slug, $warhammer->slug]);
+
+    $exportResponse = $this->actingAs($admin)->get(route('admin.settings.compendium.export', [
+        'entity_type' => 'items',
+    ]));
+
+    $exportResponse->assertOk();
+
+    $content = $exportResponse->streamedContent();
+
+    expect($content)->toContain('mundane_variant_slugs');
+    expect($content)->toContain('"longsword,warhammer"');
 });
 
 test('non admin cannot preview compendium import', function () {
