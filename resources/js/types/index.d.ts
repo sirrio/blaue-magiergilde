@@ -48,21 +48,27 @@ export interface User {
 
 export interface ShopItem {
   id: number
+  item_id?: number | null
   item?: Item | null
   item_name?: string | null
   item_url?: string | null
   item_cost?: string | null
   item_rarity?: Item['rarity'] | string | null
   item_type?: Item['type'] | string | null
+  item_ruling_changed?: boolean | null
+  item_ruling_note?: string | null
   roll_source_kind?: ShopRollRule['source_kind'] | null
   roll_rule_id?: number | null
   snapshot_custom?: boolean | null
+  spell_id?: number | null
   spell?: Spell | null
   spell_name?: string | null
   spell_url?: string | null
   spell_legacy_url?: string | null
   spell_level?: number | null
   spell_school?: Spell['spell_school'] | string | null
+  spell_ruling_changed?: boolean | null
+  spell_ruling_note?: string | null
   notes?: string | null
 }
 
@@ -74,6 +80,7 @@ export interface Shop {
 
 export interface BackstockItem {
   id: number
+  item_id?: number | null
   item?: Item | null
   item_name?: string | null
   item_url?: string | null
@@ -103,6 +110,7 @@ export interface AuctionHiddenBid {
 
 export interface AuctionItem {
   id: number
+  item_id?: number | null
   item?: Item | null
   item_name?: string | null
   item_url?: string | null

@@ -15,11 +15,6 @@ class BackstockController extends Controller
     public function index(): Response
     {
         $backstockItems = BackstockItem::query()
-            ->with([
-                'item' => fn ($query) => $query
-                    ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
-                    ->select(['id', 'name', 'url', 'cost', 'rarity', 'type']),
-            ])
             ->orderBy('id')
             ->get([
                 'id',
@@ -32,14 +27,7 @@ class BackstockController extends Controller
                 'snapshot_custom',
                 'notes',
                 'created_at',
-            ])
-            ->map(function (BackstockItem $backstockItem): BackstockItem {
-                if ($backstockItem->item) {
-                    $backstockItem->item->setAttribute('display_cost', ItemCostResolver::resolveForItem($backstockItem->item));
-                }
-
-                return $backstockItem;
-            });
+            ]);
 
         $items = Item::query()
             ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')

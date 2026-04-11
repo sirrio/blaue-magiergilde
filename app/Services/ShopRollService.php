@@ -78,7 +78,7 @@ class ShopRollService
         }
 
         $query = Spell::query()
-            ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school'])
+            ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school', 'ruling_changed', 'ruling_note'])
             ->whereIn('spell_level', $normalizedLevels);
         if ($normalizedSchools !== []) {
             $query->whereIn('spell_school', $normalizedSchools);
@@ -109,6 +109,8 @@ class ShopRollService
                 'rarity',
                 'type',
                 'pick_count',
+                'ruling_changed',
+                'ruling_note',
                 'default_spell_roll_enabled',
                 'default_spell_levels',
                 'default_spell_schools',
@@ -191,6 +193,8 @@ class ShopRollService
             $line->item_cost = $replacement['display_cost'] ?? ($replacement['cost'] ?? null);
             $line->item_rarity = $replacement['rarity'] ?? null;
             $line->item_type = $replacement['type'] ?? null;
+            $line->item_ruling_changed = (bool) ($replacement['ruling_changed'] ?? false);
+            $line->item_ruling_note = $replacement['ruling_note'] ?? null;
             $line->roll_source_kind = $sourceKind;
             $line->spell_id = $spellId;
             $line->spell_name = $spellSnapshot?->name;
@@ -198,6 +202,8 @@ class ShopRollService
             $line->spell_legacy_url = $spellSnapshot?->legacy_url;
             $line->spell_level = $spellSnapshot?->spell_level;
             $line->spell_school = $spellSnapshot?->spell_school;
+            $line->spell_ruling_changed = $spellSnapshot?->ruling_changed ?? false;
+            $line->spell_ruling_note = $spellSnapshot?->ruling_note;
             $line->notes = null;
             $line->snapshot_custom = false;
             $line->save();
@@ -229,6 +235,8 @@ class ShopRollService
                     'rarity',
                     'type',
                     'pick_count',
+                    'ruling_changed',
+                    'ruling_note',
                     'default_spell_roll_enabled',
                     'default_spell_levels',
                     'default_spell_schools',
@@ -297,6 +305,8 @@ class ShopRollService
                     'item_cost' => $pickedItem['display_cost'] ?? ($pickedItem['cost'] ?? null),
                     'item_rarity' => $pickedItem['rarity'] ?? null,
                     'item_type' => $pickedItem['type'] ?? null,
+                    'item_ruling_changed' => (bool) ($pickedItem['ruling_changed'] ?? false),
+                    'item_ruling_note' => $pickedItem['ruling_note'] ?? null,
                     'roll_source_kind' => $pickedItem['roll_source_kind'] ?? 'all',
                     'roll_rule_id' => $pickedItem['roll_rule_id'] ?? null,
                     'snapshot_custom' => false,
@@ -306,6 +316,8 @@ class ShopRollService
                     'spell_legacy_url' => $spellSnapshot?->legacy_url,
                     'spell_level' => $spellSnapshot?->spell_level,
                     'spell_school' => $spellSnapshot?->spell_school,
+                    'spell_ruling_changed' => $spellSnapshot?->ruling_changed ?? false,
+                    'spell_ruling_note' => $spellSnapshot?->ruling_note,
                 ]);
             }
         });

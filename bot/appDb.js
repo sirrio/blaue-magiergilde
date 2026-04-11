@@ -1444,9 +1444,9 @@ async function listOpenAuctionItemsForHiddenBids(discordIdentity, limit = 100) {
                 ai.repair_current,
                 ai.repair_max,
                 ai.sold_at,
-                COALESCE(ai.item_name, i.name) AS item_name,
-                COALESCE(ai.item_rarity, i.rarity) AS item_rarity,
-                COALESCE(ai.item_type, i.type) AS item_type,
+                ai.item_name AS item_name,
+                ai.item_rarity AS item_rarity,
+                ai.item_type AS item_type,
                 a.title AS auction_title,
                 a.currency AS auction_currency,
                 a.created_at AS auction_created_at,
@@ -1458,7 +1458,6 @@ async function listOpenAuctionItemsForHiddenBids(discordIdentity, limit = 100) {
                 hb.max_amount AS user_hidden_max
             FROM auction_items ai
             INNER JOIN auctions a ON a.id = ai.auction_id
-            LEFT JOIN items i ON i.id = ai.item_id
             LEFT JOIN auction_hidden_bids hb
                 ON hb.auction_item_id = ai.id
                AND hb.bidder_discord_id = ?
@@ -1492,9 +1491,9 @@ async function findOpenAuctionItemForHiddenBid(discordIdentity, auctionItemId, c
                 ai.repair_current,
                 ai.repair_max,
                 ai.sold_at,
-                COALESCE(ai.item_name, i.name) AS item_name,
-                COALESCE(ai.item_rarity, i.rarity) AS item_rarity,
-                COALESCE(ai.item_type, i.type) AS item_type,
+                ai.item_name AS item_name,
+                ai.item_rarity AS item_rarity,
+                ai.item_type AS item_type,
                 a.status AS auction_status,
                 a.title AS auction_title,
                 a.currency AS auction_currency,
@@ -1508,7 +1507,6 @@ async function findOpenAuctionItemForHiddenBid(discordIdentity, auctionItemId, c
                 hb.max_amount AS user_hidden_max
             FROM auction_items ai
             INNER JOIN auctions a ON a.id = ai.auction_id
-            LEFT JOIN items i ON i.id = ai.item_id
             LEFT JOIN auction_hidden_bids hb
                 ON hb.auction_item_id = ai.id
                AND hb.bidder_discord_id = ?

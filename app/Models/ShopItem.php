@@ -17,6 +17,8 @@ class ShopItem extends Model
         'item_cost',
         'item_rarity',
         'item_type',
+        'item_ruling_changed',
+        'item_ruling_note',
         'roll_source_kind',
         'roll_rule_id',
         'snapshot_custom',
@@ -26,12 +28,19 @@ class ShopItem extends Model
         'spell_legacy_url',
         'spell_level',
         'spell_school',
+        'spell_ruling_changed',
+        'spell_ruling_note',
         'notes',
     ];
 
-    protected $casts = [
-        'snapshot_custom' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'snapshot_custom' => 'boolean',
+            'item_ruling_changed' => 'boolean',
+            'spell_ruling_changed' => 'boolean',
+        ];
+    }
 
     public function item(): BelongsTo
     {

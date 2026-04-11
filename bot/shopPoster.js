@@ -208,21 +208,19 @@ async function fetchShopItems(shopId) {
             SELECT
                 si.id AS shop_item_id,
                 si.item_id,
-                COALESCE(si.item_name, i.name) AS name,
-                COALESCE(si.item_url, i.url) AS url,
-                COALESCE(si.item_cost, i.cost) AS cost,
-                COALESCE(si.item_rarity, i.rarity) AS rarity,
-                COALESCE(si.item_type, i.type) AS type,
+                si.item_name AS name,
+                si.item_url AS url,
+                si.item_cost AS cost,
+                si.item_rarity AS rarity,
+                si.item_type AS type,
                 si.roll_rule_id,
                 si.notes,
                 si.spell_id,
-                COALESCE(si.spell_name, s.name) AS spell_name,
-                COALESCE(si.spell_url, s.url) AS spell_url,
-                COALESCE(si.spell_legacy_url, s.legacy_url) AS spell_legacy_url,
-                COALESCE(si.spell_level, s.spell_level) AS spell_level
+                si.spell_name AS spell_name,
+                si.spell_url AS spell_url,
+                si.spell_legacy_url AS spell_legacy_url,
+                si.spell_level AS spell_level
             FROM item_shop si
-            LEFT JOIN items i ON i.id = si.item_id
-            LEFT JOIN spells s ON s.id = si.spell_id
             WHERE si.shop_id = ?
             ORDER BY si.id ASC
         `,
@@ -239,21 +237,19 @@ async function fetchShopItemById(shopItemId) {
                 si.id AS shop_item_id,
                 si.shop_id,
                 si.item_id,
-                COALESCE(si.item_name, i.name) AS name,
-                COALESCE(si.item_url, i.url) AS url,
-                COALESCE(si.item_cost, i.cost) AS cost,
-                COALESCE(si.item_rarity, i.rarity) AS rarity,
-                COALESCE(si.item_type, i.type) AS type,
+                si.item_name AS name,
+                si.item_url AS url,
+                si.item_cost AS cost,
+                si.item_rarity AS rarity,
+                si.item_type AS type,
                 si.roll_rule_id,
                 si.notes,
                 si.spell_id,
-                COALESCE(si.spell_name, s.name) AS spell_name,
-                COALESCE(si.spell_url, s.url) AS spell_url,
-                COALESCE(si.spell_legacy_url, s.legacy_url) AS spell_legacy_url,
-                COALESCE(si.spell_level, s.spell_level) AS spell_level
+                si.spell_name AS spell_name,
+                si.spell_url AS spell_url,
+                si.spell_legacy_url AS spell_legacy_url,
+                si.spell_level AS spell_level
             FROM item_shop si
-            LEFT JOIN items i ON i.id = si.item_id
-            LEFT JOIN spells s ON s.id = si.spell_id
             WHERE si.id = ?
             LIMIT 1
         `,

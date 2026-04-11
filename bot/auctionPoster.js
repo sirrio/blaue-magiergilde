@@ -205,19 +205,18 @@ async function fetchAuctionItems(auctionId) {
                 ai.notes,
                 ai.sold_at,
                 ai.sold_bid_id,
-                COALESCE(ai.item_name, i.name) AS name,
-                COALESCE(ai.item_url, i.url) AS url,
-                COALESCE(ai.item_cost, i.cost) AS cost,
-                COALESCE(ai.item_rarity, i.rarity) AS rarity,
-                COALESCE(ai.item_type, i.type) AS type,
+                ai.item_name AS name,
+                ai.item_url AS url,
+                ai.item_cost AS cost,
+                ai.item_rarity AS rarity,
+                ai.item_type AS type,
                 b.bidder_name AS sold_bidder_name,
                 b.bidder_discord_id AS sold_bidder_discord_id,
                 b.amount AS sold_amount
             FROM auction_items ai
-            LEFT JOIN items i ON i.id = ai.item_id
             LEFT JOIN auction_bids b ON b.id = ai.sold_bid_id
             WHERE ai.auction_id = ?
-            ORDER BY COALESCE(ai.item_name, i.name) ASC
+            ORDER BY ai.item_name ASC, ai.id ASC
         `,
         [auctionId],
     );
@@ -236,17 +235,16 @@ async function fetchAuctionItemById(auctionItemId) {
                 ai.notes,
                 ai.sold_at,
                 ai.sold_bid_id,
-                COALESCE(ai.item_name, i.name) AS name,
-                COALESCE(ai.item_url, i.url) AS url,
-                COALESCE(ai.item_cost, i.cost) AS cost,
-                COALESCE(ai.item_rarity, i.rarity) AS rarity,
-                COALESCE(ai.item_type, i.type) AS type,
+                ai.item_name AS name,
+                ai.item_url AS url,
+                ai.item_cost AS cost,
+                ai.item_rarity AS rarity,
+                ai.item_type AS type,
                 b.bidder_name AS sold_bidder_name,
                 b.bidder_discord_id AS sold_bidder_discord_id,
                 b.amount AS sold_amount,
                 a.currency AS auction_currency
             FROM auction_items ai
-            LEFT JOIN items i ON i.id = ai.item_id
             LEFT JOIN auction_bids b ON b.id = ai.sold_bid_id
             INNER JOIN auctions a ON a.id = ai.auction_id
             WHERE ai.id = ?

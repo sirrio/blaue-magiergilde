@@ -78,16 +78,15 @@ const buildAuctionAddItemLabel = (item: Item): string => {
 }
 
 const getAuctionItemSnapshot = (auctionItem: AuctionItem): Item => {
-  const item = auctionItem.item ?? ({} as Item)
-  return {
-    id: item.id ?? 0,
-    name: auctionItem.item_name ?? item.name ?? 'Unknown item',
-    url: auctionItem.item_url ?? item.url ?? '',
-    cost: auctionItem.item_cost ?? item.display_cost ?? item.cost ?? '',
-    rarity: (auctionItem.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
-    type: (auctionItem.item_type ?? item.type ?? 'item') as Item['type'],
-    pick_count: item.pick_count ?? 0,
-  }
+    return {
+      id: auctionItem.item_id ?? 0,
+      name: auctionItem.item_name ?? 'Unknown item',
+      url: auctionItem.item_url ?? '',
+      cost: auctionItem.item_cost ?? '',
+      rarity: (auctionItem.item_rarity ?? 'common') as Item['rarity'],
+      type: (auctionItem.item_type ?? 'item') as Item['type'],
+      pick_count: 0,
+    }
 }
 
 const getBidStep = (item: Item): number => {

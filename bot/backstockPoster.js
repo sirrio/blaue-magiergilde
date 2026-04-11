@@ -223,14 +223,13 @@ async function fetchBackstockItems() {
             SELECT
                 bi.id,
                 bi.notes,
-                COALESCE(bi.item_name, i.name) AS name,
-                COALESCE(bi.item_url, i.url) AS url,
-                COALESCE(bi.item_cost, i.cost) AS cost,
-                COALESCE(bi.item_rarity, i.rarity) AS rarity,
-                COALESCE(bi.item_type, i.type) AS type
+                bi.item_name AS name,
+                bi.item_url AS url,
+                bi.item_cost AS cost,
+                bi.item_rarity AS rarity,
+                bi.item_type AS type
             FROM backstock_items bi
-            LEFT JOIN items i ON i.id = bi.item_id
-            ORDER BY COALESCE(bi.item_name, i.name) ASC
+            ORDER BY bi.item_name ASC, bi.id ASC
         `,
     );
     return rows;
@@ -242,13 +241,12 @@ async function fetchBackstockItemById(backstockItemId) {
             SELECT
                 bi.id,
                 bi.notes,
-                COALESCE(bi.item_name, i.name) AS name,
-                COALESCE(bi.item_url, i.url) AS url,
-                COALESCE(bi.item_cost, i.cost) AS cost,
-                COALESCE(bi.item_rarity, i.rarity) AS rarity,
-                COALESCE(bi.item_type, i.type) AS type
+                bi.item_name AS name,
+                bi.item_url AS url,
+                bi.item_cost AS cost,
+                bi.item_rarity AS rarity,
+                bi.item_type AS type
             FROM backstock_items bi
-            LEFT JOIN items i ON i.id = bi.item_id
             WHERE bi.id = ?
             LIMIT 1
         `,

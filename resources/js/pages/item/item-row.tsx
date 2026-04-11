@@ -41,20 +41,18 @@ const renderIcon = (type: string): ReactElement | null => {
 
 const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
   if (!shopItem) return null
-  if (shopItem.spell_name) {
+  if (shopItem.spell_name || shopItem.spell_id) {
     return {
-      id: 0,
+      id: shopItem.spell?.id ?? 0,
       name: shopItem.spell_name ?? 'Unknown spell',
       url: shopItem.spell_url ?? '',
       legacy_url: shopItem.spell_legacy_url ?? '',
       spell_level: shopItem.spell_level ?? 0,
       spell_school: (shopItem.spell_school ?? 'abjuration') as Spell['spell_school'],
-      guild_enabled: shopItem.spell ? shopItem.spell.guild_enabled : undefined,
-      ruling_changed: shopItem.spell ? shopItem.spell.ruling_changed : undefined,
-      ruling_note: shopItem.spell ? shopItem.spell.ruling_note : undefined,
+      ruling_changed: shopItem.spell_ruling_changed ?? false,
+      ruling_note: shopItem.spell_ruling_note ?? null,
     }
   }
-  if (shopItem.spell) return shopItem.spell
   return null
 }
 
