@@ -87,7 +87,7 @@ class CompendiumImportService
                     $this->formatBooleanForCsv((bool) $item->default_spell_roll_enabled),
                     implode(',', collect((array) ($item->default_spell_levels ?? []))
                         ->map(static fn ($level): string => (string) $level)
-                        ->filter()
+                        ->filter(static fn (string $level): bool => $level !== '')
                         ->values()
                         ->all()),
                     implode(',', collect((array) ($item->default_spell_schools ?? []))

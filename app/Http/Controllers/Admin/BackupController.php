@@ -10,6 +10,7 @@ use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
 use App\Models\LegacyCharacterApproval;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Support\LevelProgression;
 use Inertia\Inertia;
@@ -74,6 +75,11 @@ class BackupController extends Controller
                 ->orderBy('shortcode')
                 ->orderBy('name')
                 ->get(['id', 'name', 'shortcode', 'kind']),
+            'mundaneVariants' => MundaneItemVariant::query()
+                ->orderBy('category')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'category', 'is_placeholder']),
             'compendiumImportRuns' => CompendiumImportRun::query()
                 ->with('user:id,name')
                 ->orderByDesc('applied_at')

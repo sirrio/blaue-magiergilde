@@ -1,11 +1,17 @@
 <?php
 
 use App\Models\LevelProgressionEntry;
+use App\Models\MundaneItemVariant;
 use App\Models\User;
 use App\Support\LevelProgression;
 
 it('shows the level progression table on admin settings', function () {
     $admin = User::factory()->create(['is_admin' => true]);
+    $variant = MundaneItemVariant::factory()->create([
+        'name' => 'Preview Test Blade',
+        'slug' => 'preview-test-blade',
+        'category' => 'weapon',
+    ]);
 
     $response = $this->actingAs($admin)->get(route('admin.settings'));
 
@@ -13,6 +19,11 @@ it('shows the level progression table on admin settings', function () {
     $response->assertInertia(fn ($page) => $page
         ->component('admin/settings')
         ->has('levelProgression', 20)
+        ->where('mundaneVariants', fn ($variants): bool => collect($variants)->contains(
+            fn (array $entry): bool => $entry['id'] === $variant->id
+                && $entry['slug'] === 'preview-test-blade'
+                && $entry['category'] === 'weapon'
+        ))
         ->where('levelProgression.0.level', 1)
         ->where('levelProgression.0.required_bubbles', 0)
         ->where('levelProgression.11.level', 12)

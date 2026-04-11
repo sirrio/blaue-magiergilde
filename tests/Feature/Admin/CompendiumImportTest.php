@@ -657,6 +657,28 @@ test('item import and export include default spell roll fields', function () {
     expect($content)->toContain('"evocation,illusion"');
 });
 
+test('item export preserves spell level zero in default spell levels', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    Item::factory()->create([
+        'name' => 'Enspelled Test Item',
+        'type' => 'item',
+        'rarity' => 'uncommon',
+        'default_spell_roll_enabled' => true,
+        'default_spell_levels' => [0, 1],
+    ]);
+
+    $exportResponse = $this->actingAs($admin)->get(route('admin.settings.compendium.export', [
+        'entity_type' => 'items',
+    ]));
+
+    $exportResponse->assertOk();
+
+    $content = $exportResponse->streamedContent();
+
+    expect($content)->toContain('"0,1"');
+});
+
 test('override item compendium import soft deletes missing items and keeps shop snapshots intact', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $source = Source::factory()->create([

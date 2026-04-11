@@ -16,6 +16,7 @@ import {
   DiscordBackupStats,
   DiscordBackupStatus,
   DiscordBotSettings,
+  MundaneItemVariant,
   PageProps,
   Source,
 } from '@/types'
@@ -139,10 +140,31 @@ const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged') 
   return 'border-base-200 bg-base-200/40 text-base-content/70'
 }
 
+const getCompendiumChangeLabel = (field: string) => {
+  const labels: Record<string, string> = {
+    source_id: 'Source',
+    mundane_variant_ids: 'Mundane variants',
+    default_spell_roll_enabled: 'Default spell roll',
+    default_spell_levels: 'Default spell levels',
+    default_spell_schools: 'Default spell schools',
+    guild_enabled: 'Guild enabled',
+    shop_enabled: 'Shop enabled',
+    ruling_changed: 'Ruling changed',
+    ruling_note: 'Ruling note',
+    extra_cost_note: 'Extra cost note',
+    legacy_url: 'Legacy URL',
+    spell_level: 'Spell level',
+    spell_school: 'Spell school',
+  }
+
+  return labels[field] ?? field.replaceAll('_', ' ')
+}
+
 export default function Settings({
   discordBackup,
   discordBotSettings,
   sources,
+  mundaneVariants,
   compendiumImportRuns,
   legacyCharacterApprovalStats,
   levelProgression,
@@ -150,6 +172,7 @@ export default function Settings({
   discordBackup: DiscordBackupStats
   discordBotSettings: DiscordBotSettings
   sources: Source[]
+  mundaneVariants: MundaneItemVariant[]
   compendiumImportRuns: CompendiumImportRun[]
   legacyCharacterApprovalStats: {
     total_rows: number
@@ -235,7 +258,13 @@ export default function Settings({
       action: 'new' | 'updated' | 'unchanged'
       payload: Record<string, string | number | boolean | null>
       source_shortcode?: string
-      changes?: Record<string, { from: string | number | boolean | null; to: string | number | boolean | null }>
+      changes?: Record<
+        string,
+        {
+          from: string | number | boolean | null | string[] | number[]
+          to: string | number | boolean | null | string[] | number[]
+        }
+      >
     }>
     error_samples: Array<{ line?: number; message?: string }>
   } | null>(null)
@@ -890,6 +919,12 @@ export default function Settings({
   const sourceById = useMemo(() => {
     return Object.fromEntries(sources.map((source) => [source.id, `${source.shortcode} - ${source.name}`]))
   }, [sources])
+  const sourceShortcodeById = useMemo(() => {
+    return Object.fromEntries(sources.map((source) => [source.id, source.shortcode]))
+  }, [sources])
+  const mundaneVariantSlugById = useMemo(() => {
+    return Object.fromEntries(mundaneVariants.map((variant) => [variant.id, variant.slug]))
+  }, [mundaneVariants])
   const sourceCounts = useMemo(() => {
     const official = sources.filter((source) => source.kind === 'official').length
 
@@ -916,6 +951,55 @@ export default function Settings({
       return showUnchangedPreviewRows
     })
   }, [importPreview, showNewPreviewRows, showUpdatedPreviewRows, showUnchangedPreviewRows])
+
+  const formatCompendiumChangeValue = useCallback((
+    field: string,
+    value: string | number | boolean | null | string[] | number[] | undefined
+  ) => {
+    if (field === 'source_id') {
+      const sourceId = typeof value === 'number' ? value : Number(value)
+
+      if (Number.isFinite(sourceId) && sourceShortcodeById[sourceId]) {
+        return sourceShortcodeById[sourceId]
+      }
+
+      return 'none'
+    }
+
+    if (field === 'mundane_variant_ids') {
+      const ids = Array.isArray(value) ? value : []
+      const slugs = ids
+        .map((entry) => {
+          const variantId = typeof entry === 'number' ? entry : Number(entry)
+          return Number.isFinite(variantId) ? mundaneVariantSlugById[variantId] : null
+        })
+        .filter((entry): entry is string => Boolean(entry))
+
+      return slugs.length > 0 ? slugs.join(', ') : 'none'
+    }
+
+    if (field === 'default_spell_levels' || field === 'default_spell_schools') {
+      if (!Array.isArray(value) || value.length === 0) {
+        return 'none'
+      }
+
+      return value.join(', ')
+    }
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : 'none'
+    }
+
+    if (typeof value === 'boolean') {
+      return value ? 'true' : 'false'
+    }
+
+    if (value === null || value === undefined || value === '') {
+      return 'none'
+    }
+
+    return String(value)
+  }, [mundaneVariantSlugById, sourceShortcodeById])
 
   const approvalChannelLabel = useMemo(() => {
     if (botSettingsForm.data.character_approval_channel_name) {
@@ -1455,15 +1539,15 @@ export default function Settings({
                     ? sourceById[sourceId]
                     : sample.source_shortcode
                   const previewLabel = getCompendiumPreviewTitle(importPreview.entity_type, sample.payload, sourceLabel)
-                  const changeKeys = sample.changes ? Object.keys(sample.changes) : []
+                  const previewChanges = sample.changes ? Object.entries(sample.changes) : []
 
                   return (
                     <div
                       key={`${sample.line}-${sample.action}`}
                       className="rounded-lg border border-base-200 bg-base-100 px-3 py-2"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-semibold text-base-content/70">Line {sample.line}</span>
                             <span
@@ -1474,15 +1558,26 @@ export default function Settings({
                             >
                               {sample.action}
                             </span>
+                            <p className="truncate text-sm font-semibold text-base-content">{previewLabel.title}</p>
                           </div>
-                          <p className="truncate text-sm font-semibold text-base-content">{previewLabel.title}</p>
                           {previewLabel.details ? (
                             <p className="text-xs text-base-content/60">{previewLabel.details}</p>
                           ) : null}
                         </div>
-                        <div className="text-right text-xs text-base-content/60">
-                          {changeKeys.length > 0 ? `Changed: ${changeKeys.join(', ')}` : 'No field changes'}
+                        {previewChanges.length > 0 ? (
+                        <div className="space-y-1 pt-0.5 text-right text-xs">
+                          {previewChanges.map(([field, change]) => (
+                            <div key={field} className="flex flex-wrap items-start justify-end gap-1 text-base-content/70">
+                              <span className="font-semibold text-base-content">{getCompendiumChangeLabel(field)}:</span>
+                              <span>{formatCompendiumChangeValue(field, change.from)}</span>
+                              <span aria-hidden="true">→</span>
+                              <span className="font-medium text-base-content">{formatCompendiumChangeValue(field, change.to)}</span>
+                            </div>
+                          ))}
                         </div>
+                      ) : (
+                        <p className="pt-0.5 text-xs text-base-content/50">No field changes</p>
+                      )}
                       </div>
                     </div>
                   )

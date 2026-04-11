@@ -23,6 +23,8 @@ Artisan::command('shop:post-weekly', function (ShopLifecycleService $service) {
     return 0;
 })->purpose('Post the latest shop to Discord.');
 
+Schedule::command('users:cleanup-dormant')->daily()->withoutOverlapping();
+
 Schedule::command('shop:post-weekly')
     ->everyMinute()
     ->timezone('Europe/Berlin')
