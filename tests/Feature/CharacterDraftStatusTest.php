@@ -336,6 +336,133 @@ it('does not allow draft submission when character status switching is disabled'
     expect($character->guild_status)->toBe('draft');
 });
 
+it('blocks submission when the user already has eight active characters', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->count(8)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Attempting to register character nine.',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
+it('allows filler character submission even when the user already has eight active characters', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->count(8)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => true,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Filler registration is still allowed.',
+        ])
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending');
+});
+
+it('counts pending characters against the active character submission limit', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->count(7)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+    Character::factory()->for($owner)->create([
+        'guild_status' => 'pending',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Attempting to register after eight approved or pending characters.',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
+it('blocks submission of a second filler character when one filler is already approved or pending', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => true,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => true,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Attempting to register a second filler.',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
 it('ignores direct status changes from owners on update', function () {
     Config::set('features.character_status_switch', true);
 

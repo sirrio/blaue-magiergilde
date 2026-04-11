@@ -309,6 +309,7 @@ function getCharacterStatusHint(guildStatus: string, t: (key: string, params?: R
 
 export function CharacterCard({
   character,
+  allCharacters = [],
   guildCharacters = [],
   onTrackingModeChange,
   isTrackingModeUpdating = false,
@@ -318,6 +319,7 @@ export function CharacterCard({
   isPrivateModeUpdating = false,
 }: {
   character: Character
+  allCharacters?: Character[]
   guildCharacters?: Character[]
   onTrackingModeChange?: (value: boolean) => void
   isTrackingModeUpdating?: boolean
@@ -424,6 +426,24 @@ export function CharacterCard({
   const statusHint = getCharacterStatusHint(guildStatus, t)
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
+  const submittedActiveCharacterCount = allCharacters.filter((candidate) => {
+    if (candidate.id === character.id) return false
+    if (candidate.deleted_at) return false
+    if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
+    if (candidate.is_filler) return false
+    return ['bt', 'lt', 'ht'].includes(calculateTier(candidate))
+  }).length
+  const otherSubmittedFillerCount = allCharacters.filter((candidate) => {
+    if (candidate.id === character.id) return false
+    if (candidate.deleted_at) return false
+    if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
+    return Boolean(candidate.is_filler)
+  }).length
+  const submissionBlockedReason = !canSubmitForApproval
+    ? null
+    : character.is_filler
+      ? (otherSubmittedFillerCount >= 1 ? t('characters.submitBlockedFillerLimit') : null)
+      : (submittedActiveCharacterCount >= 8 ? t('characters.submitBlockedActiveLimit', { count: 8 }) : null)
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
   const [, startNavigationTransition] = useTransition()
 
@@ -567,6 +587,7 @@ export function CharacterCard({
               ) : null}
             </div>
             {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
+            {submissionBlockedReason ? <p className="mt-1 text-xs text-warning">{submissionBlockedReason}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}
@@ -697,11 +718,31 @@ export function CharacterCard({
             <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
               {canSubmitForApproval ? (
                 <div className="col-span-2 sm:col-span-4">
-                  <SubmitForApprovalModal
-                    character={character}
-                    processing={isSubmittingForApproval}
-                    onSubmit={submitForApproval}
-                  />
+                  {submissionBlockedReason ? (
+                    <div
+                      className="tooltip tooltip-bottom w-full"
+                      data-tip={submissionBlockedReason}
+                      aria-label={submissionBlockedReason}
+                    >
+                      <Button
+                        size="sm"
+                        color="warning"
+                        className="w-full justify-center"
+                        disabled
+                        aria-label={t('characters.registerWithMagiergilde')}
+                        title={submissionBlockedReason}
+                      >
+                        <Clock size={14} />
+                        <span>{t('characters.registerWithMagiergilde')}</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <SubmitForApprovalModal
+                      character={character}
+                      processing={isSubmittingForApproval}
+                      onSubmit={submitForApproval}
+                    />
+                  )}
                 </div>
               ) : (
                 <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>

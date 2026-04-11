@@ -89,9 +89,20 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
 
   const activeCharacterCount = characters.filter((char) => {
     if (char.deleted_at) return false
-    if (char.guild_status !== 'approved') return false
+    if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
     if (char.is_filler) return false
     return ['bt', 'lt', 'ht'].includes(calculateTier(char))
+  }).length
+  const activeFillerCount = characters.filter((char) => {
+    if (char.deleted_at) return false
+    if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
+    return Boolean(char.is_filler)
+  }).length
+  const activeEpicCharacterCount = characters.filter((char) => {
+    if (char.deleted_at) return false
+    if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
+    if (char.is_filler) return false
+    return calculateTier(char) === 'et'
   }).length
   const draftCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'draft').length
   const needsChangesCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'needs_changes').length
@@ -172,6 +183,8 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <h1 className="text-2xl font-bold">
               {t('characters.heading')}{' '}
               <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{t('characters.activeCount', { count: activeCharacterCount })}</span>
+              <span className="text-base-content/50 ml-2 inline-block text-xs font-normal">{t('characters.activeFillerCount', { count: activeFillerCount })}</span>
+              <span className="text-base-content/50 ml-2 inline-block text-xs font-normal">{t('characters.activeEpicCount', { count: activeEpicCharacterCount })}</span>
             </h1>
             <p className="text-xs text-base-content/70 sm:text-sm">{t('characters.subtitle')}</p>
             {isStatusSwitchEnabled && (draftCharacterCount > 0 || needsChangesCharacterCount > 0) ? (
@@ -228,6 +241,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
                   <CharacterCard
                     key={char.id}
                     character={char}
+                    allCharacters={characters}
                     guildCharacters={guildCharacters}
                     isTrackingModeUpdating={updatingTrackingIds.includes(char.id)}
                     onTrackingModeChange={(value) => updateTrackingMode(char.id, value)}
