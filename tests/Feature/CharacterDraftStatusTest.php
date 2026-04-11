@@ -366,6 +366,110 @@ it('blocks submission when the user already has eight active characters', functi
     expect($character->guild_status)->toBe('draft');
 });
 
+it('allows submitting a first high-tier character beyond eight occupied general slots', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->count(8)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => false,
+        'start_tier' => 'ht',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'First high-tier bonus slot.',
+        ])
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending');
+});
+
+it('allows submitting a second high-tier character beyond eight occupied general slots', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->count(8)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+    Character::factory()->for($owner)->create([
+        'guild_status' => 'pending',
+        'is_filler' => false,
+        'start_tier' => 'ht',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => false,
+        'start_tier' => 'ht',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Second high-tier bonus slot.',
+        ])
+        ->assertRedirect();
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('pending');
+});
+
+it('blocks submitting a third high-tier character when eight general slots are already occupied', function () {
+    Config::set('features.character_status_switch', true);
+
+    $owner = User::factory()->create();
+    Character::factory()->count(8)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+    Character::factory()->count(2)->for($owner)->create([
+        'guild_status' => 'approved',
+        'is_filler' => false,
+        'start_tier' => 'ht',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $character = Character::factory()->for($owner)->create([
+        'guild_status' => 'draft',
+        'is_filler' => false,
+        'start_tier' => 'ht',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('characters.submit-approval', $character), [
+            'registration_note' => 'Third high-tier should consume a general slot.',
+        ])
+        ->assertSessionHasErrors('guild_status');
+
+    $character->refresh();
+    expect($character->guild_status)->toBe('draft');
+});
+
 it('allows filler character submission even when the user already has eight active characters', function () {
     Config::set('features.character_status_switch', true);
 

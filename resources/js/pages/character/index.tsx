@@ -7,17 +7,15 @@ import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { CharacterCard } from '@/pages/character/character-card'
 import StoreCharacterModal from '@/pages/character/store-character-modal'
-import { Character, PageProps } from '@/types'
+import { Character } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, UniqueIdentifier, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { Head, router, usePage } from '@inertiajs/react'
+import { Head, router } from '@inertiajs/react'
 import { Archive, BookUser, Copy, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const t = useTranslate()
-  const { features } = usePage<PageProps>().props
-  const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
   const [updatingAvatarMaskIds, setUpdatingAvatarMaskIds] = useState<number[]>([])
   const [updatingPrivateModeIds, setUpdatingPrivateModeIds] = useState<number[]>([])
@@ -91,12 +89,23 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     if (char.deleted_at) return false
     if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
     if (char.is_filler) return false
-    return ['bt', 'lt', 'ht'].includes(calculateTier(char))
-  }).length
+    return ['bt', 'lt'].includes(calculateTier(char))
+  }).length + Math.max(0, characters.filter((char) => {
+    if (char.deleted_at) return false
+    if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
+    if (char.is_filler) return false
+    return calculateTier(char) === 'ht'
+  }).length - 2)
   const activeFillerCount = characters.filter((char) => {
     if (char.deleted_at) return false
     if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
     return Boolean(char.is_filler)
+  }).length
+  const activeHighTierCount = characters.filter((char) => {
+    if (char.deleted_at) return false
+    if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
+    if (char.is_filler) return false
+    return calculateTier(char) === 'ht'
   }).length
   const activeEpicCharacterCount = characters.filter((char) => {
     if (char.deleted_at) return false
@@ -104,9 +113,6 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     if (char.is_filler) return false
     return calculateTier(char) === 'et'
   }).length
-  const draftCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'draft').length
-  const needsChangesCharacterCount = characters.filter((char) => !char.deleted_at && char.guild_status === 'needs_changes').length
-
   const updateTrackingMode = (characterId: number, value: boolean) => {
     if (updatingTrackingIds.includes(characterId)) return
 
@@ -183,22 +189,11 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             <h1 className="text-2xl font-bold">
               {t('characters.heading')}{' '}
               <span className="text-base-content/50 ml-1 inline-block text-xs font-normal">{t('characters.activeCount', { count: activeCharacterCount })}</span>
+              <span className="text-base-content/50 ml-2 inline-block text-xs font-normal">{t('characters.activeHighTierCount', { count: activeHighTierCount })}</span>
               <span className="text-base-content/50 ml-2 inline-block text-xs font-normal">{t('characters.activeFillerCount', { count: activeFillerCount })}</span>
               <span className="text-base-content/50 ml-2 inline-block text-xs font-normal">{t('characters.activeEpicCount', { count: activeEpicCharacterCount })}</span>
             </h1>
             <p className="text-xs text-base-content/70 sm:text-sm">{t('characters.subtitle')}</p>
-            {isStatusSwitchEnabled && (draftCharacterCount > 0 || needsChangesCharacterCount > 0) ? (
-              <p className="mt-1 text-xs text-warning">
-                {draftCharacterCount > 0 ? t(draftCharacterCount === 1 ? 'characters.draftHintSingle' : 'characters.draftHintPlural', {
-                  drafts: draftCharacterCount,
-                }) : ''}
-                {draftCharacterCount > 0 && needsChangesCharacterCount > 0 ? ' ' : ''}
-                {needsChangesCharacterCount > 0 ? t(needsChangesCharacterCount === 1 ? 'characters.needsChangesHintSingle' : 'characters.needsChangesHintPlural', {
-                  count: needsChangesCharacterCount,
-                }) : ''}
-                {' '}{t('characters.registrationHint')}
-              </p>
-            ) : null}
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <Button size="sm" variant="ghost" className="flex items-center gap-1.5" onClick={() => copyCharactersToClipboard(characters)}>

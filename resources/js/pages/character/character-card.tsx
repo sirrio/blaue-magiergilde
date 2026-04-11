@@ -287,21 +287,17 @@ function SubmitForApprovalModal({
   )
 }
 
-function getCharacterStatusHint(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
-  if (guildStatus === 'draft') {
-    return t('characters.statusDraftHint')
-  }
-
+function getCharacterStatusSummary(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (guildStatus === 'pending') {
-    return t('characters.statusPendingHint')
+    return t('characters.statusPendingSummary')
   }
 
   if (guildStatus === 'needs_changes') {
-    return t('characters.statusNeedsChangesHint')
+    return t('characters.statusNeedsChangesSummary')
   }
 
   if (guildStatus === 'declined') {
-    return t('characters.statusDeclinedHint')
+    return t('characters.statusDeclinedSummary')
   }
 
   return ''
@@ -423,27 +419,52 @@ export function CharacterCard({
 
     return statusLabel
   })()
-  const statusHint = getCharacterStatusHint(guildStatus, t)
+  const statusHint = getCharacterStatusSummary(guildStatus, t)
+  const statusHintClass = guildStatus === 'draft'
+    ? 'border-base-300 bg-base-100 text-base-content/80'
+    : guildStatus === 'pending'
+    ? 'border-warning/25 bg-warning/10 text-warning'
+    : guildStatus === 'needs_changes'
+      ? 'border-warning/30 bg-warning/12 text-warning'
+      : guildStatus === 'declined'
+        ? 'border-error/25 bg-error/10 text-error'
+        : 'border-base-200 bg-base-200/35 text-base-content/75'
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
-  const submittedActiveCharacterCount = allCharacters.filter((candidate) => {
+  const submittedLowAndBaseTierCount = allCharacters.filter((candidate) => {
     if (candidate.id === character.id) return false
     if (candidate.deleted_at) return false
     if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
     if (candidate.is_filler) return false
-    return ['bt', 'lt', 'ht'].includes(calculateTier(candidate))
+    return ['bt', 'lt'].includes(calculateTier(candidate))
   }).length
+  const submittedHighTierCount = allCharacters.filter((candidate) => {
+    if (candidate.id === character.id) return false
+    if (candidate.deleted_at) return false
+    if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
+    if (candidate.is_filler) return false
+    return calculateTier(candidate) === 'ht'
+  }).length
+  const submittedGeneralSlotCount = submittedLowAndBaseTierCount + Math.max(0, submittedHighTierCount - 2)
   const otherSubmittedFillerCount = allCharacters.filter((candidate) => {
     if (candidate.id === character.id) return false
     if (candidate.deleted_at) return false
     if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
     return Boolean(candidate.is_filler)
   }).length
+  const candidateGeneralSlotCost = character.is_filler
+    ? 0
+    : tier === 'ht'
+      ? (submittedHighTierCount >= 2 ? 1 : 0)
+      : (['bt', 'lt'].includes(tier) ? 1 : 0)
   const submissionBlockedReason = !canSubmitForApproval
     ? null
     : character.is_filler
       ? (otherSubmittedFillerCount >= 1 ? t('characters.submitBlockedFillerLimit') : null)
-      : (submittedActiveCharacterCount >= 8 ? t('characters.submitBlockedActiveLimit', { count: 8 }) : null)
+      : (submittedGeneralSlotCount + candidateGeneralSlotCost > 8 ? t('characters.submitBlockedActiveLimit', { count: 8 }) : null)
+  const registrationSupportHint = canSubmitForApproval && !submissionBlockedReason
+    ? t(guildStatus === 'needs_changes' ? 'characters.registrationActionHintNeedsChanges' : 'characters.registrationActionHintDraft')
+    : ''
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
   const [, startNavigationTransition] = useTransition()
 
@@ -586,8 +607,6 @@ export function CharacterCard({
                 </span>
               ) : null}
             </div>
-            {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
-            {submissionBlockedReason ? <p className="mt-1 text-xs text-warning">{submissionBlockedReason}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}
@@ -715,6 +734,25 @@ export function CharacterCard({
                 </div>
               </div>
             )}
+            {statusHint || registrationSupportHint || submissionBlockedReason ? (
+              <div className="mt-3 space-y-2">
+                {statusHint ? (
+                  <div className={cn('rounded-md border px-2 py-1.5 text-xs font-medium', statusHintClass)}>
+                    {statusHint}
+                  </div>
+                ) : null}
+                {registrationSupportHint ? (
+                  <div className="rounded-md border border-info/20 bg-info/6 px-2 py-1.5 text-xs text-base-content/70">
+                    {registrationSupportHint}
+                  </div>
+                ) : null}
+                {submissionBlockedReason ? (
+                  <div className="rounded-md border border-warning/25 bg-warning/10 px-2 py-1.5 text-xs text-warning">
+                    {submissionBlockedReason}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
               {canSubmitForApproval ? (
                 <div className="col-span-2 sm:col-span-4">
