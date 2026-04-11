@@ -208,6 +208,7 @@ export default function Settings({
   const levelProgressionSyncKeyRef = useRef<string>('')
   const sourceEditSyncKeyRef = useRef<string>('')
   const [editingSource, setEditingSource] = useState<Source | null>(null)
+  const [isSourceManagerOpen, setIsSourceManagerOpen] = useState(false)
   const [importEntityType, setImportEntityType] = useState<'items' | 'spells' | 'sources'>('items')
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importOverrideMissing, setImportOverrideMissing] = useState(false)
@@ -697,6 +698,12 @@ export default function Settings({
     })
   }
 
+  const handleCloseSourceManager = () => {
+    setIsSourceManagerOpen(false)
+    setEditingSource(null)
+    sourceEditForm.reset()
+  }
+
   const handlePreviewImport = useCallback(async () => {
     if (!importFile) {
       toast.show('Select a CSV file first.', 'error')
@@ -882,6 +889,15 @@ export default function Settings({
 
   const sourceById = useMemo(() => {
     return Object.fromEntries(sources.map((source) => [source.id, `${source.shortcode} - ${source.name}`]))
+  }, [sources])
+  const sourceCounts = useMemo(() => {
+    const official = sources.filter((source) => source.kind === 'official').length
+
+    return {
+      total: sources.length,
+      official,
+      thirdParty: sources.length - official,
+    }
   }, [sources])
   const filteredImportPreviewRows = useMemo(() => {
     if (!importPreview) {
@@ -1171,99 +1187,133 @@ export default function Settings({
               Manage source books used by items and spells.
             </p>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_180px_220px_auto] sm:items-end">
-            <Input
-              value={createSourceForm.data.name}
-              onChange={(event) => createSourceForm.setData('name', event.target.value)}
-              errors={createSourceForm.errors.name}
-              placeholder="Player's Handbook"
-            >
-              {t('compendium.sourceName')}
-            </Input>
-            <Input
-              value={createSourceForm.data.shortcode}
-              onChange={(event) => createSourceForm.setData('shortcode', event.target.value)}
-              errors={createSourceForm.errors.shortcode}
-              placeholder="PHB"
-              >
-                {t('compendium.shortcode')}
-              </Input>
-            <Select
-              value={createSourceForm.data.kind}
-              onChange={(event) => createSourceForm.setData('kind', event.target.value as Source['kind'])}
-              errors={createSourceForm.errors.kind}
-            >
-              <SelectLabel>{t('compendium.sourceKind')}</SelectLabel>
-              <SelectOptions>
-                <option value="official">{t('compendium.officialSource')}</option>
-                <option value="third_party">{t('compendium.thirdPartySource')}</option>
-              </SelectOptions>
-            </Select>
-            <Button size="sm" variant="outline" onClick={handleSourceCreate} disabled={createSourceForm.processing}>
-              {t('compendium.addSource')}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-base-200 px-3 py-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-base-200 px-2 py-1">
+                Total: {sourceCounts.total}
+              </span>
+              <span className="rounded-full border border-success/30 px-2 py-1 text-success">
+                WotC: {sourceCounts.official}
+              </span>
+              <span className="rounded-full border border-warning/30 px-2 py-1 text-warning">
+                3rd party: {sourceCounts.thirdParty}
+              </span>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setIsSourceManagerOpen(true)}>
+              Manage sources
             </Button>
           </div>
-          <div className="mt-4 space-y-2">
-            {sources.length === 0 ? (
-              <p className="text-xs text-base-content/60">{t('compendium.noSourcesConfigured')}</p>
-            ) : (
-              sources.map((source) => (
-                <div key={source.id} className="flex items-center justify-between gap-3 rounded-lg border border-base-200 px-3 py-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="rounded-full border border-base-300 px-2 py-0.5 text-[10px] uppercase text-base-content/70">
-                      {source.shortcode}
-                    </span>
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', sourceKindBadgeClass(source.kind))}>
-                      {formatSourceKindLabel(source.kind, t)}
-                    </span>
-                    <span className="truncate text-sm">{source.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="xs" variant="ghost" onClick={() => setEditingSource(source)}>
-                      {t('common.edit')}
-                    </Button>
-                    <Button size="xs" variant="ghost" className="text-error" onClick={() => handleSourceDelete(source)}>
-                      {t('common.delete')}
+          <Modal wide isOpen={isSourceManagerOpen} onClose={handleCloseSourceManager}>
+            <ModalTitle>Compendium sources</ModalTitle>
+            <ModalContent>
+              <div className="space-y-4">
+                <p className="text-xs text-base-content/60">
+                  Manage source books used by items and spells.
+                </p>
+                <div className="grid gap-3 lg:grid-cols-[1fr_180px_220px_auto] lg:items-end">
+                  <Input
+                    value={editingSource ? sourceEditForm.data.name : createSourceForm.data.name}
+                    onChange={(event) => {
+                      if (editingSource) {
+                        sourceEditForm.setData('name', event.target.value)
+                      } else {
+                        createSourceForm.setData('name', event.target.value)
+                      }
+                    }}
+                    errors={editingSource ? sourceEditForm.errors.name : createSourceForm.errors.name}
+                    placeholder="Player's Handbook"
+                  >
+                    {t('compendium.sourceName')}
+                  </Input>
+                  <Input
+                    value={editingSource ? sourceEditForm.data.shortcode : createSourceForm.data.shortcode}
+                    onChange={(event) => {
+                      if (editingSource) {
+                        sourceEditForm.setData('shortcode', event.target.value)
+                      } else {
+                        createSourceForm.setData('shortcode', event.target.value)
+                      }
+                    }}
+                    errors={editingSource ? sourceEditForm.errors.shortcode : createSourceForm.errors.shortcode}
+                    placeholder="PHB"
+                  >
+                    {t('compendium.shortcode')}
+                  </Input>
+                  <Select
+                    value={editingSource ? sourceEditForm.data.kind : createSourceForm.data.kind}
+                    onChange={(event) => {
+                      if (editingSource) {
+                        sourceEditForm.setData('kind', event.target.value as Source['kind'])
+                      } else {
+                        createSourceForm.setData('kind', event.target.value as Source['kind'])
+                      }
+                    }}
+                    errors={editingSource ? sourceEditForm.errors.kind : createSourceForm.errors.kind}
+                  >
+                    <SelectLabel>{t('compendium.sourceKind')}</SelectLabel>
+                    <SelectOptions>
+                      <option value="official">{t('compendium.officialSource')}</option>
+                      <option value="third_party">{t('compendium.thirdPartySource')}</option>
+                    </SelectOptions>
+                  </Select>
+                  <div className="flex items-center justify-end gap-2">
+                    {editingSource ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingSource(null)
+                          sourceEditForm.reset()
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={editingSource ? handleSourceUpdate : handleSourceCreate}
+                      disabled={editingSource ? sourceEditForm.processing : createSourceForm.processing}
+                    >
+                      {editingSource ? t('compendium.saveSource') : t('compendium.addSource')}
                     </Button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-          <Modal isOpen={editingSource !== null} onClose={() => setEditingSource(null)}>
-            <ModalTitle>{t('compendium.editSource')}</ModalTitle>
-            <ModalContent>
-              <Input
-                value={sourceEditForm.data.name}
-                onChange={(event) => sourceEditForm.setData('name', event.target.value)}
-                errors={sourceEditForm.errors.name}
-                placeholder="Player's Handbook"
-              >
-                {t('compendium.sourceName')}
-              </Input>
-              <Input
-                value={sourceEditForm.data.shortcode}
-                onChange={(event) => sourceEditForm.setData('shortcode', event.target.value)}
-                errors={sourceEditForm.errors.shortcode}
-                placeholder="PHB"
-              >
-                {t('compendium.shortcode')}
-              </Input>
-              <Select
-                value={sourceEditForm.data.kind}
-                onChange={(event) => sourceEditForm.setData('kind', event.target.value as Source['kind'])}
-                errors={sourceEditForm.errors.kind}
-              >
-                <SelectLabel>{t('compendium.sourceKind')}</SelectLabel>
-                <SelectOptions>
-                  <option value="official">{t('compendium.officialSource')}</option>
-                  <option value="third_party">{t('compendium.thirdPartySource')}</option>
-                </SelectOptions>
-              </Select>
-              <div className="flex justify-end">
-                <Button size="sm" variant="outline" onClick={handleSourceUpdate} disabled={sourceEditForm.processing}>
-                  {t('compendium.saveSource')}
-                </Button>
+                <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+                  {sources.length === 0 ? (
+                    <p className="text-xs text-base-content/60">{t('compendium.noSourcesConfigured')}</p>
+                  ) : (
+                    sources.map((source) => (
+                      <div
+                        key={source.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-base-200 px-3 py-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="rounded-full border border-base-300 px-2 py-0.5 text-[10px] uppercase text-base-content/70">
+                            {source.shortcode}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                              sourceKindBadgeClass(source.kind)
+                            )}
+                          >
+                            {formatSourceKindLabel(source.kind, t)}
+                          </span>
+                          <span className="truncate text-sm">{source.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="xs" variant="ghost" onClick={() => setEditingSource(source)}>
+                            {t('common.edit')}
+                          </Button>
+                          <Button size="xs" variant="ghost" className="text-error" onClick={() => handleSourceDelete(source)}>
+                            {t('common.delete')}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </ModalContent>
           </Modal>
