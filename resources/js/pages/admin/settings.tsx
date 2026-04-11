@@ -128,13 +128,17 @@ const getCompendiumPreviewTitle = (
   }
 }
 
-const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged') => {
+const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged' | 'deleted') => {
   if (action === 'new') {
     return 'border-success/40 bg-success/10 text-success'
   }
 
   if (action === 'updated') {
     return 'border-warning/40 bg-warning/10 text-warning'
+  }
+
+  if (action === 'deleted') {
+    return 'border-error/40 bg-error/10 text-error'
   }
 
   return 'border-base-200 bg-base-200/40 text-base-content/70'
@@ -238,6 +242,7 @@ export default function Settings({
   const [showNewPreviewRows, setShowNewPreviewRows] = useState(true)
   const [showUpdatedPreviewRows, setShowUpdatedPreviewRows] = useState(true)
   const [showUnchangedPreviewRows, setShowUnchangedPreviewRows] = useState(false)
+  const [showDeletedPreviewRows, setShowDeletedPreviewRows] = useState(true)
   const [importBusy, setImportBusy] = useState(false)
   const [applyBusy, setApplyBusy] = useState(false)
   const [importPreview, setImportPreview] = useState<{
@@ -254,10 +259,11 @@ export default function Settings({
       invalid_rows: number
     }
     row_samples: Array<{
-      line: number
-      action: 'new' | 'updated' | 'unchanged'
+      line?: number | null
+      action: 'new' | 'updated' | 'unchanged' | 'deleted'
       payload: Record<string, string | number | boolean | null>
       source_shortcode?: string
+      existing_id?: number | null
       changes?: Record<
         string,
         {
@@ -948,9 +954,13 @@ export default function Settings({
         return showUpdatedPreviewRows
       }
 
+      if (sample.action === 'deleted') {
+        return showDeletedPreviewRows
+      }
+
       return showUnchangedPreviewRows
     })
-  }, [importPreview, showNewPreviewRows, showUpdatedPreviewRows, showUnchangedPreviewRows])
+  }, [importPreview, showDeletedPreviewRows, showNewPreviewRows, showUpdatedPreviewRows, showUnchangedPreviewRows])
 
   const formatCompendiumChangeValue = useCallback((
     field: string,
@@ -1521,6 +1531,17 @@ export default function Settings({
                   />
                   Unchanged: {importPreview.summary.unchanged_rows}
                 </label>
+                {importPreview.override_missing ? (
+                  <label className="flex items-center gap-2 rounded-full border border-error/40 px-2 py-1 text-error">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-xs"
+                      checked={showDeletedPreviewRows}
+                      onChange={(event) => setShowDeletedPreviewRows(event.target.checked)}
+                    />
+                    Deleted: {importPreview.summary.deleted_rows}
+                  </label>
+                ) : null}
                 <span className="rounded-full border border-error/40 px-2 py-1 text-error">
                   Invalid: {importPreview.summary.invalid_rows}
                 </span>
@@ -1531,7 +1552,7 @@ export default function Settings({
                 </p>
               ) : null}
               <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-                {filteredImportPreviewRows.map((sample) => {
+                {filteredImportPreviewRows.map((sample, index) => {
                   const sourceId = typeof sample.payload?.source_id === 'number'
                     ? sample.payload.source_id
                     : Number(sample.payload?.source_id)
@@ -1543,13 +1564,15 @@ export default function Settings({
 
                   return (
                     <div
-                      key={`${sample.line}-${sample.action}`}
+                      key={`${sample.action}-${sample.existing_id ?? sample.line ?? index}`}
                       className="rounded-lg border border-base-200 bg-base-100 px-3 py-2"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-semibold text-base-content/70">Line {sample.line}</span>
+                            <span className="text-xs font-semibold text-base-content/70">
+                              {typeof sample.line === 'number' ? `Line ${sample.line}` : 'Delete'}
+                            </span>
                             <span
                               className={cn(
                                 'rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
@@ -1576,7 +1599,9 @@ export default function Settings({
                           ))}
                         </div>
                       ) : (
-                        <p className="pt-0.5 text-xs text-base-content/50">No field changes</p>
+                        <p className={cn('pt-0.5 text-xs', sample.action === 'deleted' ? 'text-error' : 'text-base-content/50')}>
+                          {sample.action === 'deleted' ? 'Missing from import. Will be removed on apply.' : 'No field changes'}
+                        </p>
                       )}
                       </div>
                     </div>

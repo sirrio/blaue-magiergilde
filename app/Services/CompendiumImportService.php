@@ -248,7 +248,9 @@ class CompendiumImportService
         }
 
         if ($overrideMissing) {
-            $summary['deleted_rows'] = $this->countRowsMissingFromImport($entityType, $importRows);
+            $deletedRowSamples = $this->deletedRowsMissingFromImport($entityType, $importRows);
+            $summary['deleted_rows'] = count($deletedRowSamples);
+            $rowSamples = [...$rowSamples, ...$deletedRowSamples];
         }
 
         return [
@@ -875,6 +877,9 @@ class CompendiumImportService
         }
 
         $comparableFields = [
+            'name' => $payload['name'],
+            'spell_level' => $payload['spell_level'],
+            'spell_school' => $payload['spell_school'],
             'url' => $payload['url'],
             'legacy_url' => $payload['legacy_url'],
             'source_id' => $payload['source_id'],
@@ -942,36 +947,132 @@ class CompendiumImportService
     private function countRowsMissingFromImport(string $entityType, array $importRows): int
     {
         $importKeys = $this->importKeysByEntityType($entityType, $importRows);
+        $matchedExistingIds = $this->matchedExistingIds($importRows);
 
         if ($entityType === 'items') {
             return Item::query()
                 ->get(['id', 'name', 'type', 'source_id'])
-                ->reject(fn (Item $item): bool => isset($importKeys[$this->itemIdentityKey([
-                    'name' => $item->name,
-                    'type' => $item->type,
-                    'source_id' => $item->source_id,
-                ])]))
+                ->reject(fn (Item $item): bool => isset($matchedExistingIds[$item->id])
+                    || isset($importKeys[$this->itemIdentityKey([
+                        'name' => $item->name,
+                        'type' => $item->type,
+                        'source_id' => $item->source_id,
+                    ])]))
                 ->count();
         }
 
         if ($entityType === 'spells') {
             return Spell::query()
                 ->get(['id', 'name', 'spell_level', 'spell_school', 'source_id'])
-                ->reject(fn (Spell $spell): bool => isset($importKeys[$this->spellIdentityKey([
-                    'name' => $spell->name,
-                    'spell_level' => $spell->spell_level,
-                    'spell_school' => $spell->spell_school,
-                    'source_id' => $spell->source_id,
-                ])]))
+                ->reject(fn (Spell $spell): bool => isset($matchedExistingIds[$spell->id])
+                    || isset($importKeys[$this->spellIdentityKey([
+                        'name' => $spell->name,
+                        'spell_level' => $spell->spell_level,
+                        'spell_school' => $spell->spell_school,
+                        'source_id' => $spell->source_id,
+                    ])]))
                 ->count();
         }
 
         return Source::query()
             ->get(['id', 'shortcode'])
-            ->reject(fn (Source $source): bool => isset($importKeys[$this->sourceIdentityKey([
-                'shortcode' => $source->shortcode,
-            ])]))
+            ->reject(fn (Source $source): bool => isset($matchedExistingIds[$source->id])
+                || isset($importKeys[$this->sourceIdentityKey([
+                    'shortcode' => $source->shortcode,
+                ])]))
             ->count();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $importRows
+     * @return array<int, array{
+     *     line:null,
+     *     action:'deleted',
+     *     payload:array<string, mixed>,
+     *     source_shortcode?:string,
+     *     existing_id:int,
+     *     changes:array<string, mixed>
+     * }>
+     */
+    private function deletedRowsMissingFromImport(string $entityType, array $importRows): array
+    {
+        $importKeys = $this->importKeysByEntityType($entityType, $importRows);
+        $matchedExistingIds = $this->matchedExistingIds($importRows);
+
+        if ($entityType === 'items') {
+            return Item::query()
+                ->with('source:id,shortcode')
+                ->get()
+                ->reject(fn (Item $item): bool => isset($matchedExistingIds[$item->id])
+                    || isset($importKeys[$this->itemIdentityKey([
+                        'name' => $item->name,
+                        'type' => $item->type,
+                        'source_id' => $item->source_id,
+                    ])]))
+                ->values()
+                ->map(fn (Item $item): array => [
+                    'line' => null,
+                    'action' => 'deleted',
+                    'payload' => [
+                        'name' => $item->name,
+                        'type' => $item->type,
+                        'rarity' => $item->rarity,
+                        'source_id' => $item->source_id,
+                    ],
+                    'source_shortcode' => $item->source?->shortcode,
+                    'existing_id' => $item->id,
+                    'changes' => [],
+                ])
+                ->all();
+        }
+
+        if ($entityType === 'spells') {
+            return Spell::query()
+                ->with('source:id,shortcode')
+                ->get()
+                ->reject(fn (Spell $spell): bool => isset($matchedExistingIds[$spell->id])
+                    || isset($importKeys[$this->spellIdentityKey([
+                        'name' => $spell->name,
+                        'spell_level' => $spell->spell_level,
+                        'spell_school' => $spell->spell_school,
+                        'source_id' => $spell->source_id,
+                    ])]))
+                ->values()
+                ->map(fn (Spell $spell): array => [
+                    'line' => null,
+                    'action' => 'deleted',
+                    'payload' => [
+                        'name' => $spell->name,
+                        'spell_level' => $spell->spell_level,
+                        'spell_school' => $spell->spell_school,
+                        'source_id' => $spell->source_id,
+                    ],
+                    'source_shortcode' => $spell->source?->shortcode,
+                    'existing_id' => $spell->id,
+                    'changes' => [],
+                ])
+                ->all();
+        }
+
+        return Source::query()
+            ->get()
+            ->reject(fn (Source $source): bool => isset($matchedExistingIds[$source->id])
+                || isset($importKeys[$this->sourceIdentityKey([
+                    'shortcode' => $source->shortcode,
+                ])]))
+            ->values()
+            ->map(fn (Source $source): array => [
+                'line' => null,
+                'action' => 'deleted',
+                'payload' => [
+                    'shortcode' => $source->shortcode,
+                    'name' => $source->name,
+                    'kind' => $source->kind,
+                ],
+                'existing_id' => $source->id,
+                'changes' => [],
+            ])
+            ->all();
     }
 
     /**
@@ -980,15 +1081,17 @@ class CompendiumImportService
     private function deleteRowsMissingFromImport(string $entityType, array $importRows): int
     {
         $importKeys = $this->importKeysByEntityType($entityType, $importRows);
+        $matchedExistingIds = $this->matchedExistingIds($importRows);
 
         if ($entityType === 'items') {
             $itemsToDelete = Item::query()
                 ->get(['id', 'name', 'type', 'source_id'])
-                ->reject(fn (Item $item): bool => isset($importKeys[$this->itemIdentityKey([
-                    'name' => $item->name,
-                    'type' => $item->type,
-                    'source_id' => $item->source_id,
-                ])]));
+                ->reject(fn (Item $item): bool => isset($matchedExistingIds[$item->id])
+                    || isset($importKeys[$this->itemIdentityKey([
+                        'name' => $item->name,
+                        'type' => $item->type,
+                        'source_id' => $item->source_id,
+                    ])]));
 
             $itemsToDelete->each(static fn (Item $item): bool => $item->delete());
 
@@ -998,12 +1101,13 @@ class CompendiumImportService
         if ($entityType === 'spells') {
             $spellsToDelete = Spell::query()
                 ->get(['id', 'name', 'spell_level', 'spell_school', 'source_id'])
-                ->reject(fn (Spell $spell): bool => isset($importKeys[$this->spellIdentityKey([
-                    'name' => $spell->name,
-                    'spell_level' => $spell->spell_level,
-                    'spell_school' => $spell->spell_school,
-                    'source_id' => $spell->source_id,
-                ])]));
+                ->reject(fn (Spell $spell): bool => isset($matchedExistingIds[$spell->id])
+                    || isset($importKeys[$this->spellIdentityKey([
+                        'name' => $spell->name,
+                        'spell_level' => $spell->spell_level,
+                        'spell_school' => $spell->spell_school,
+                        'source_id' => $spell->source_id,
+                    ])]));
 
             $spellsToDelete->each(static fn (Spell $spell): bool => $spell->delete());
 
@@ -1012,9 +1116,10 @@ class CompendiumImportService
 
         $sourcesToDelete = Source::query()
             ->get(['id', 'shortcode'])
-            ->reject(fn (Source $source): bool => isset($importKeys[$this->sourceIdentityKey([
-                'shortcode' => $source->shortcode,
-            ])]));
+            ->reject(fn (Source $source): bool => isset($matchedExistingIds[$source->id])
+                || isset($importKeys[$this->sourceIdentityKey([
+                    'shortcode' => $source->shortcode,
+                ])]));
 
         $sourcesToDelete->each(static fn (Source $source): bool => $source->delete());
 
@@ -1052,6 +1157,24 @@ class CompendiumImportService
         }
 
         return $keys;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $importRows
+     * @return array<int, true>
+     */
+    private function matchedExistingIds(array $importRows): array
+    {
+        $ids = [];
+
+        foreach ($importRows as $importRow) {
+            $existingId = is_numeric($importRow['existing_id'] ?? null) ? (int) $importRow['existing_id'] : null;
+            if ($existingId !== null && $existingId > 0) {
+                $ids[$existingId] = true;
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -1210,6 +1333,27 @@ class CompendiumImportService
      */
     private function findMatchingSpell(array $payload): ?Spell
     {
+        $urlCandidates = collect([
+            is_string($payload['url'] ?? null) ? trim((string) $payload['url']) : '',
+            is_string($payload['legacy_url'] ?? null) ? trim((string) $payload['legacy_url']) : '',
+        ])
+            ->filter(static fn (string $url): bool => $url !== '')
+            ->unique()
+            ->values();
+
+        if ($urlCandidates->isNotEmpty()) {
+            $urlMatches = Spell::query()
+                ->where(function ($query) use ($urlCandidates): void {
+                    $query->whereIn('url', $urlCandidates->all())
+                        ->orWhereIn('legacy_url', $urlCandidates->all());
+                })
+                ->get();
+
+            if ($urlMatches->count() === 1) {
+                return $urlMatches->first();
+            }
+        }
+
         $exact = Spell::query()
             ->where('name', $payload['name'])
             ->where('spell_level', $payload['spell_level'])

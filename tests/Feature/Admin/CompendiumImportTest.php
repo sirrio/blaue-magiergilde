@@ -473,7 +473,9 @@ test('source compendium import preview and apply can override missing rows', fun
     $previewResponse->assertOk();
     expect($previewResponse->json('override_missing'))->toBeTrue()
         ->and((int) $previewResponse->json('summary.deleted_rows'))->toBe($baselineCount + 1)
-        ->and((int) $previewResponse->json('summary.unchanged_rows'))->toBe(1);
+        ->and((int) $previewResponse->json('summary.unchanged_rows'))->toBe(1)
+        ->and(collect($previewResponse->json('row_samples'))->where('action', 'deleted')->pluck('payload.shortcode')->all())
+        ->toContain('TST2');
 
     $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
         'preview_token' => (string) $previewResponse->json('preview_token'),
@@ -741,6 +743,132 @@ test('override item compendium import soft deletes missing items and keeps shop 
         'item_id' => $removedItem->id,
         'item_name' => 'Removed Item',
     ]);
+});
+
+test('override spell compendium import does not count fallback-matched updates as deletions', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $spell = Spell::factory()->create([
+        'name' => 'Absorb Elements',
+        'spell_level' => 1,
+        'spell_school' => 'abjuration',
+        'source_id' => null,
+        'guild_enabled' => false,
+    ]);
+
+    $csv = implode("\n", [
+        'name,spell_level,spell_school,url,legacy_url,source_shortcode,guild_enabled,ruling_changed,ruling_note',
+        'Absorb Elements,1,abjuration,,,PHB,true,false,',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'spells',
+        'override_missing' => '1',
+        'file' => UploadedFile::fake()->createWithContent('spells.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $previewResponse->json('summary.deleted_rows'))->toBe(0);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+    expect((int) $applyResponse->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $applyResponse->json('summary.deleted_rows'))->toBe(0)
+        ->and($spell->fresh()?->source_id)->toBe($source->id)
+        ->and((bool) $spell->fresh()?->guild_enabled)->toBeTrue();
+});
+
+test('spell import matches existing rows by url before level and school fallback', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $spell = Spell::factory()->create([
+        'name' => 'Absorb Elements',
+        'spell_level' => 1,
+        'spell_school' => 'abjuration',
+        'url' => 'https://example.test/spells/absorb-elements',
+        'legacy_url' => null,
+        'source_id' => null,
+        'guild_enabled' => false,
+        'ruling_changed' => false,
+        'ruling_note' => null,
+    ]);
+
+    $csv = implode("\n", [
+        'name,spell_level,spell_school,url,legacy_url,source_shortcode,guild_enabled,ruling_changed,ruling_note',
+        'Absorb Elements Revised,2,transmutation,https://example.test/spells/absorb-elements,,PHB,true,true,Updated ruling',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'spells',
+        'file' => UploadedFile::fake()->createWithContent('spells.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $previewResponse->json('summary.new_rows'))->toBe(0)
+        ->and((int) $previewResponse->json('row_samples.0.existing_id'))->toBe($spell->id)
+        ->and($previewResponse->json('row_samples.0.changes.name.to'))->toBe('Absorb Elements Revised')
+        ->and($previewResponse->json('row_samples.0.changes.spell_level.to'))->toBe(2)
+        ->and($previewResponse->json('row_samples.0.changes.spell_school.to'))->toBe('transmutation');
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+    expect($spell->fresh()?->name)->toBe('Absorb Elements Revised')
+        ->and($spell->fresh()?->spell_level)->toBe(2)
+        ->and($spell->fresh()?->spell_school)->toBe('transmutation')
+        ->and($spell->fresh()?->source_id)->toBe($source->id)
+        ->and((bool) $spell->fresh()?->guild_enabled)->toBeTrue()
+        ->and((bool) $spell->fresh()?->ruling_changed)->toBeTrue()
+        ->and($spell->fresh()?->ruling_note)->toBe('Updated ruling');
+});
+
+test('override spell compendium import keeps freshly created spells', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $csv = implode("\n", [
+        'name,spell_level,spell_school,url,legacy_url,source_shortcode,guild_enabled,ruling_changed,ruling_note',
+        'Fresh Import Spell,3,evocation,https://example.test/spells/fresh-import-spell,,PHB,true,false,',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'spells',
+        'override_missing' => '1',
+        'file' => UploadedFile::fake()->createWithContent('spells.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.new_rows'))->toBe(1);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+
+    $spell = Spell::query()->where('url', 'https://example.test/spells/fresh-import-spell')->first();
+
+    expect($spell)->not->toBeNull()
+        ->and($spell?->deleted_at)->toBeNull()
+        ->and($spell?->source_id)->toBe($source->id);
 });
 
 test('non admin cannot preview compendium import', function () {
