@@ -216,8 +216,22 @@ class ShopRollService
     {
         $pickedItems = [];
         $pickedItemIds = [];
+        $orderedRules = ShopRollRule::ordered();
+        $rollRowsSnapshot = $orderedRules
+            ->map(fn (ShopRollRule $rule): array => [
+                'id' => $rule->id,
+                'row_kind' => $rule->row_kind,
+                'rarity' => $rule->rarity,
+                'selection_types' => $rule->selection_types ?? [],
+                'source_kind' => $rule->source_kind,
+                'heading_title' => $rule->heading_title,
+                'count' => $rule->count,
+                'sort_order' => $rule->sort_order,
+            ])
+            ->values()
+            ->all();
 
-        foreach (ShopRollRule::ordered() as $rule) {
+        foreach ($orderedRules as $rule) {
             if ($rule->row_kind === 'heading') {
                 continue;
             }
@@ -290,9 +304,11 @@ class ShopRollService
 
         $shop = null;
 
-        DB::transaction(function () use (&$shop, $pickedItems, $pickedItemIds) {
+        DB::transaction(function () use (&$shop, $pickedItems, $pickedItemIds, $rollRowsSnapshot) {
             Item::query()->whereIn('id', $pickedItemIds)->increment('pick_count');
             $shop = Shop::query()->create();
+            $shop->roll_rows_snapshot = $rollRowsSnapshot;
+            $shop->save();
 
             foreach ($pickedItems as $pickedItem) {
                 [$spellId, $spellSnapshot] = $this->resolveSpellSnapshot($pickedItem);

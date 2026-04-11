@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildShopPostRows, formatHeadingLine } = require('../shopPoster');
+const { buildShopPostRows, formatHeadingLine, parseRollRowsSnapshot } = require('../shopPoster');
 
 test('renders heading and item rows in the stored roll rule order', () => {
     const postRows = buildShopPostRows(
@@ -46,4 +46,16 @@ test('keeps discord heading markdown unchanged', () => {
         formatHeadingLine('## ***:crossed_swords: Very Rare Magic Items (Ab Epic Tier):***'),
         '## ***:crossed_swords: Very Rare Magic Items (Ab Epic Tier):***',
     );
+});
+
+test('parses stored shop roll row snapshots from json', () => {
+    const parsed = parseRollRowsSnapshot(JSON.stringify([
+        { id: 10, row_kind: 'heading', heading_title: 'Common', sort_order: 10 },
+        { id: 20, row_kind: 'rule', heading_title: '', sort_order: 20 },
+    ]));
+
+    assert.deepEqual(parsed, [
+        { id: 10, row_kind: 'heading', heading_title: 'Common', sort_order: 10 },
+        { id: 20, row_kind: 'rule', heading_title: '', sort_order: 20 },
+    ]);
 });

@@ -13,6 +13,13 @@ class Shop extends Model
     /** @use HasFactory<ShopFactory> */
     use HasFactory;
 
+    protected function casts(): array
+    {
+        return [
+            'roll_rows_snapshot' => 'array',
+        ];
+    }
+
     public function items(): BelongsToMany
     {
         return $this->belongsToMany(Item::class);

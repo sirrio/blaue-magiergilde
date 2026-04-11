@@ -24,7 +24,7 @@ class ShopController extends Controller
         $shops = Shop::query()
             ->with(['shopItems'])
             ->orderByDesc('created_at')
-            ->select(['shops.id', 'created_at'])
+            ->select(['shops.id', 'created_at', 'roll_rows_snapshot'])
             ->get();
 
         return Inertia::render('shop/index', [

@@ -75,6 +75,7 @@ export interface ShopItem {
 export interface Shop {
   id: number
   created_at: string
+  roll_rows_snapshot?: ShopRollRule[] | null
   shop_items: ShopItem[]
 }
 

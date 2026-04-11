@@ -387,9 +387,11 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       return []
     }
 
-    const normalizedRules = normalizeRollRulesForSave(rollRules)
+    const snapshotRows = Array.isArray(selectedShop.roll_rows_snapshot)
+      ? selectedShop.roll_rows_snapshot
+      : []
 
-    if (!normalizedRules.length) {
+    if (!snapshotRows.length) {
       return []
     }
 
@@ -407,7 +409,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       itemsByRuleId.set(rollRuleId, existingItems)
     })
 
-    return normalizedRules.flatMap<ShopDisplayRow>((rule, index) => {
+    return snapshotRows.flatMap<ShopDisplayRow>((rule, index) => {
       if (rule.row_kind === 'heading') {
         return [{
           key: `heading-${rule.id ?? `new-${index}`}`,
@@ -426,7 +428,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
         item: shopItem,
       }))
     })
-  }, [rollRules, selectedShop])
+  }, [selectedShop])
 
   const handleCreateShop = (): void => {
     if (!window.confirm('Roll a new draft shop?')) {

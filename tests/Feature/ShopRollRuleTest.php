@@ -148,6 +148,62 @@ it('stores the rule row id on rolled shop items', function () {
         ->and($rolledLine?->roll_rule_id)->toBe($rule->id);
 });
 
+it('stores a roll row snapshot on rolled shops and keeps it stable after rule reordering', function () {
+    ShopRollRule::query()->delete();
+
+    $heading = ShopRollRule::query()->create([
+        'row_kind' => 'heading',
+        'rarity' => 'common',
+        'selection_types' => ['item'],
+        'source_kind' => 'all',
+        'heading_title' => '## ***:crossed_swords: Common Picks:***',
+        'count' => 0,
+        'sort_order' => 10,
+    ]);
+    $rule = ShopRollRule::query()->create([
+        'row_kind' => 'rule',
+        'rarity' => 'common',
+        'selection_types' => ['item'],
+        'source_kind' => 'all',
+        'heading_title' => '',
+        'count' => 1,
+        'sort_order' => 20,
+    ]);
+
+    Item::factory()->create([
+        'name' => 'Snapshot Blade',
+        'rarity' => 'common',
+        'type' => 'item',
+        'shop_enabled' => true,
+        'pick_count' => 0,
+    ]);
+
+    $shop = app(ShopRollService::class)->roll()->fresh();
+
+    expect($shop?->roll_rows_snapshot)->toBeArray()
+        ->and($shop?->roll_rows_snapshot[0]['id'] ?? null)->toBe($heading->id)
+        ->and($shop?->roll_rows_snapshot[0]['heading_title'] ?? null)->toBe('## ***:crossed_swords: Common Picks:***')
+        ->and($shop?->roll_rows_snapshot[0]['sort_order'] ?? null)->toBe(10)
+        ->and($shop?->roll_rows_snapshot[1]['id'] ?? null)->toBe($rule->id)
+        ->and($shop?->roll_rows_snapshot[1]['sort_order'] ?? null)->toBe(20);
+
+    $heading->update([
+        'heading_title' => '## ***:crossed_swords: Changed Later:***',
+        'sort_order' => 30,
+    ]);
+    $rule->update([
+        'sort_order' => 10,
+    ]);
+
+    $shop = $shop?->fresh();
+
+    expect($shop?->roll_rows_snapshot[0]['id'] ?? null)->toBe($heading->id)
+        ->and($shop?->roll_rows_snapshot[0]['heading_title'] ?? null)->toBe('## ***:crossed_swords: Common Picks:***')
+        ->and($shop?->roll_rows_snapshot[0]['sort_order'] ?? null)->toBe(10)
+        ->and($shop?->roll_rows_snapshot[1]['id'] ?? null)->toBe($rule->id)
+        ->and($shop?->roll_rows_snapshot[1]['sort_order'] ?? null)->toBe(20);
+});
+
 it('rolls third-party items only for third-party rules', function () {
     ShopRollRule::query()->delete();
 

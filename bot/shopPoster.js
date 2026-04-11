@@ -22,18 +22,6 @@ function formatPermissionList(perms) {
     return perms.map(p => `- ${names[p] || p}`).join('\n');
 }
 
-async function fetchOrderedRollRows() {
-    const [rows] = await db.execute(
-        `
-            SELECT id, row_kind, heading_title, sort_order
-            FROM shop_roll_rules
-            ORDER BY sort_order ASC, id ASC
-        `,
-    );
-
-    return rows;
-}
-
 function formatLink(name, url) {
     if (!url) return String(name ?? '');
     return `[${name}](<${url}>)`;
@@ -198,8 +186,36 @@ async function deletePreviousPosts({ client, settings, onProgress }) {
 }
 
 async function fetchShop(shopId) {
-    const [rows] = await db.execute('SELECT id, created_at FROM shops WHERE id = ? LIMIT 1', [shopId]);
+    const [rows] = await db.execute('SELECT id, created_at, roll_rows_snapshot FROM shops WHERE id = ? LIMIT 1', [shopId]);
     return rows[0] ?? null;
+}
+
+function parseRollRowsSnapshot(value) {
+    if (!value) {
+        return [];
+    }
+
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        } catch {
+            return [];
+        }
+    }
+
+    if (!Array.isArray(parsed)) {
+        return [];
+    }
+
+    return parsed
+        .filter((row) => row && typeof row === 'object')
+        .map((row) => ({
+            id: Number(row.id || 0),
+            row_kind: row.row_kind === 'heading' ? 'heading' : 'rule',
+            heading_title: typeof row.heading_title === 'string' ? row.heading_title : '',
+            sort_order: Number(row.sort_order || 0),
+        }));
 }
 
 async function fetchShopItems(shopId) {
@@ -414,7 +430,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     const destination = destinationResult.destination;
     const headingLineMessageIds = [];
     const itemMessageIds = {};
-    const ruleRows = await fetchOrderedRollRows();
+    const ruleRows = parseRollRowsSnapshot(shop.roll_rows_snapshot);
     const postRows = buildShopPostRows(ruleRows, items);
 
     const previousMessageIds = new Set(
@@ -687,6 +703,7 @@ async function updateShopItemPost({ client, shopItemId }) {
 module.exports = {
     buildShopPostRows,
     formatHeadingLine,
+    parseRollRowsSnapshot,
     postShopToChannel,
     updateShopPost,
     updateShopItemPost,
