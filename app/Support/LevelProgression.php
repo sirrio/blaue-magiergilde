@@ -9,11 +9,22 @@ use RuntimeException;
 class LevelProgression
 {
     /**
+     * @var array<int, array<int, int>>
+     */
+    private static array $totalsByVersion = [];
+
+    private static ?int $cachedActiveVersionId = null;
+
+    /**
      * @return array<int, int>
      */
     public static function totals(?int $versionId = null): array
     {
         $resolvedVersionId = $versionId ?? self::activeVersionId();
+
+        if (array_key_exists($resolvedVersionId, self::$totalsByVersion)) {
+            return self::$totalsByVersion[$resolvedVersionId];
+        }
 
         $totals = LevelProgressionEntry::query()
             ->where('version_id', $resolvedVersionId)
@@ -26,11 +37,17 @@ class LevelProgression
             throw new RuntimeException("The level progression table must contain exactly 20 levels for version {$resolvedVersionId}.");
         }
 
+        self::$totalsByVersion[$resolvedVersionId] = $totals;
+
         return $totals;
     }
 
     public static function activeVersionId(): int
     {
+        if (self::$cachedActiveVersionId !== null) {
+            return self::$cachedActiveVersionId;
+        }
+
         $activeVersionId = LevelProgressionVersion::query()
             ->where('is_active', true)
             ->orderByDesc('id')
@@ -40,10 +57,16 @@ class LevelProgression
             throw new RuntimeException('An active level progression version is required.');
         }
 
-        return (int) $activeVersionId;
+        self::$cachedActiveVersionId = (int) $activeVersionId;
+
+        return self::$cachedActiveVersionId;
     }
 
-    public static function clearCache(): void {}
+    public static function clearCache(): void
+    {
+        self::$totalsByVersion = [];
+        self::$cachedActiveVersionId = null;
+    }
 
     public static function bubblesRequiredForLevel(int $level, ?int $versionId = null): int
     {
