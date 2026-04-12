@@ -66,3 +66,26 @@ it('creates a new pseudo adventure when a real adventure follows the latest pseu
             ->first()?->target_level
     )->toBe(4);
 });
+
+it('ignores dm bubbles and bubble shop spend when setting levels in level tracking', function () {
+    $character = Character::factory()->create([
+        'start_tier' => 'bt',
+        'dm_bubbles' => 5,
+        'bubble_shop_spend' => 4,
+        'is_filler' => false,
+        'simplified_tracking' => true,
+    ]);
+
+    $result = app(SetQuickLevel::class)->handle($character, 4);
+
+    expect($result['ok'])->toBeTrue();
+
+    $pseudo = Adventure::query()
+        ->where('character_id', $character->id)
+        ->where('is_pseudo', true)
+        ->first();
+
+    expect($pseudo)->not->toBeNull()
+        ->and($pseudo?->duration)->toBe(6 * 10800)
+        ->and($pseudo?->target_level)->toBe(4);
+});

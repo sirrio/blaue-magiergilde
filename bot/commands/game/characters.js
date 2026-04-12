@@ -23,6 +23,7 @@ const {
     additionalBubblesForStartTier,
     calculateLevel,
     calculateTierFromLevel,
+    countsBubbleAdjustmentsForProgression,
 } = require('../../utils/characterTier');
 const {
     bubblesRequiredForLevel,
@@ -96,9 +97,10 @@ function calculateTotalBubblesToNextLevel(character, level) {
 }
 
 function calculateBubblesInCurrentLevel(character, level) {
-    const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const spend = safeInt(character.bubble_shop_spend);
+    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
     const currentTotal = bubblesRequiredForLevel(level) - additional;
     return Math.max(0, bubbles - currentTotal - spend);
 }
@@ -252,7 +254,8 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const hasAutoLevelAdventure = Boolean(safeInt(character.has_pseudo_adventure));
     const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure;
 
-    const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
     const inCurrent = calculateBubblesInCurrentLevel(character, level);
     const toNext = Math.max(0, toNextTotal - inCurrent);

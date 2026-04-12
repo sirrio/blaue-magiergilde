@@ -57,10 +57,12 @@ const simpleModeEmbed = buildCharacterEmbed({
 const simpleModeAdventures = simpleModeEmbed.fields.find((field) => field.name === 'Adventures');
 const simpleModeFactions = simpleModeEmbed.fields.find((field) => field.name === 'Factions');
 const simpleModeDowntime = simpleModeEmbed.fields.find((field) => field.name === 'Downtime');
+const simpleModeProgress = simpleModeEmbed.fields.find((field) => field.name === 'Progress');
 
 assert.equal(simpleModeAdventures?.value.includes('Played: **?**'), true);
 assert.equal(simpleModeFactions?.value.includes('Level: **?**'), true);
 assert.equal(simpleModeDowntime?.value, 'Cannot calculate downtime while level tracking entries exist.');
+assert.equal(simpleModeProgress?.value.includes('Remaining: **1** Bubble(s)'), true);
 
 if (originalBaseUrl === undefined) {
     delete process.env.BOT_PUBLIC_APP_URL;

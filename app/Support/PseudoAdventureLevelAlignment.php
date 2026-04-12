@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 class PseudoAdventureLevelAlignment
 {
+    public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+
     /**
      * @return array{pseudo_adventures_backfilled: int, characters_affected: int}
      */
@@ -90,8 +92,8 @@ class PseudoAdventureLevelAlignment
     private function backfillCharacter(Character $character, int $versionId): array
     {
         $runningAdventureBubbles = 0;
-        $dmBubbles = $this->safeInt($character->dm_bubbles);
-        $bubbleSpend = $this->safeInt($character->bubble_shop_spend);
+        $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
+        $bubbleSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
         $backfilledCount = 0;
 
@@ -127,8 +129,8 @@ class PseudoAdventureLevelAlignment
     private function realignCharacter(Character $character, int $versionId): array
     {
         $runningAdventureBubbles = 0;
-        $dmBubbles = $this->safeInt($character->dm_bubbles);
-        $bubbleSpend = $this->safeInt($character->bubble_shop_spend);
+        $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
+        $bubbleSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
         $realignedCount = 0;
 

@@ -36,4 +36,24 @@ assert.equal(calculateLevel({
     is_filler: 0,
 }), 11);
 
+assert.equal(calculateLevel({
+    start_tier: 'bt',
+    adventure_bubbles: 6,
+    dm_bubbles: 5,
+    bubble_shop_spend: 4,
+    simplified_tracking: 1,
+    has_pseudo_adventure: 0,
+    is_filler: 0,
+}), 4);
+
+assert.equal(calculateLevel({
+    start_tier: 'bt',
+    adventure_bubbles: 6,
+    dm_bubbles: 5,
+    bubble_shop_spend: 4,
+    simplified_tracking: 0,
+    has_pseudo_adventure: 1,
+    is_filler: 0,
+}), 4);
+
 console.log('character-tier.test.js passed');

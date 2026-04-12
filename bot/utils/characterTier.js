@@ -17,13 +17,18 @@ function additionalBubblesForStartTier(startTier) {
     }
 }
 
+function countsBubbleAdjustmentsForProgression(character) {
+    return !Boolean(character.simplified_tracking) && !Boolean(safeInt(character.has_pseudo_adventure));
+}
+
 function calculateLevel(character) {
     const isFiller = Boolean(character.is_filler);
     if (isFiller) return 3;
 
-    const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const spend = safeInt(character.bubble_shop_spend);
+    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
 
     const effective = Math.max(0, bubbles + additional - spend);
     return levelFromAvailableBubbles(effective);
@@ -40,4 +45,5 @@ module.exports = {
     additionalBubblesForStartTier,
     calculateLevel,
     calculateTierFromLevel,
+    countsBubbleAdjustmentsForProgression,
 };

@@ -15,6 +15,8 @@ class CharacterActivityRule
 
     private const MIN_BUBBLE_DURATION = 10800;
 
+    public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+
     public function blocksSubmission(Character $character): bool
     {
         if ($this->blocksFillerSubmission($character)) {
@@ -163,7 +165,7 @@ class CharacterActivityRule
 
         $bubbles = $this->calculateBubbles($character);
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
-        $bubbleShopSpend = $this->safeInt($character->bubble_shop_spend);
+        $bubbleShopSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
 
         return LevelProgression::levelFromAvailableBubbles($availableBubbles);
@@ -171,7 +173,7 @@ class CharacterActivityRule
 
     private function calculateBubbles(Character $character): int
     {
-        return $this->safeInt($character->dm_bubbles) + $this->calculateAdventureBubbles($character);
+        return $this->progressionState->dmBubblesForProgression($character) + $this->calculateAdventureBubbles($character);
     }
 
     private function calculateAdventureBubbles(Character $character): int

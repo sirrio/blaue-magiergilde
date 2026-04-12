@@ -50,6 +50,7 @@ type AdminCharacter = Pick<
 > & {
   total_adventure_duration?: number | null
   adventure_additional_bubbles_count?: number | null
+  pseudo_adventures_count?: number | null
   dndbeyond_character_id?: number | null
   has_legacy_approval?: boolean
   is_first_submission?: boolean
@@ -76,9 +77,15 @@ const resolveApprovalLevel = (character: AdminCharacter): number => {
   const normalizedAdventureDuration = Number.isFinite(totalAdventureDuration) ? totalAdventureDuration : 0
   const additionalAdventureBubbles = Number(character.adventure_additional_bubbles_count ?? 0)
   const normalizedAdditionalAdventureBubbles = Number.isFinite(additionalAdventureBubbles) ? additionalAdventureBubbles : 0
-  const dmBubbles = Number(character.dm_bubbles ?? 0)
+  const progressionUsesBubbleAdjustments = character.simplified_tracking !== true
+    && Number(character.pseudo_adventures_count ?? 0) === 0
+  const dmBubbles = progressionUsesBubbleAdjustments
+    ? Number(character.dm_bubbles ?? 0)
+    : 0
   const normalizedDmBubbles = Number.isFinite(dmBubbles) ? dmBubbles : 0
-  const bubbleShopSpend = Number(character.bubble_shop_spend ?? 0)
+  const bubbleShopSpend = progressionUsesBubbleAdjustments
+    ? Number(character.bubble_shop_spend ?? 0)
+    : 0
   const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
 
   const bubblesFromAdventures = Math.floor(normalizedAdventureDuration / 10800) + normalizedAdditionalAdventureBubbles

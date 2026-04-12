@@ -278,6 +278,8 @@ class CharacterApprovalController extends Controller
                 'room',
                 'adventures as adventure_additional_bubbles_count' => fn (Builder $adventureQuery) => $adventureQuery
                     ->where('has_additional_bubble', true),
+                'adventures as pseudo_adventures_count' => fn (Builder $adventureQuery) => $adventureQuery
+                    ->where('is_pseudo', true),
             ])
             ->withSum('adventures as total_adventure_duration', 'duration')
             ->with([

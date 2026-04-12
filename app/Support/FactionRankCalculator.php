@@ -15,6 +15,8 @@ class FactionRankCalculator
 
     private const RANK_FIVE_DOWNTIME = 1800000;
 
+    public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+
     public function calculate(Character $character): int
     {
         $faction = (string) ($character->faction ?? 'none');
@@ -53,7 +55,7 @@ class FactionRankCalculator
 
         $bubbles = $this->calculateBubbles($character);
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
-        $bubbleShopSpend = $this->safeInt($character->bubble_shop_spend);
+        $bubbleShopSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
 
         return LevelProgression::levelFromAvailableBubbles($availableBubbles);
@@ -61,7 +63,7 @@ class FactionRankCalculator
 
     private function calculateBubbles(Character $character): int
     {
-        $dmBubbles = $this->safeInt($character->dm_bubbles);
+        $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
 
         return $dmBubbles + $this->calculateAdventureBubbles($character);
     }

@@ -15,8 +15,8 @@ const embed = buildAdventureEmbed({
 }, 'Adventure');
 
 const embedData = embed.toJSON();
-const anchorField = embedData.fields.find(field => field.name === 'Levelanker');
+const anchorField = embedData.fields.find(field => field.name === 'Gesetztes Level');
 
-assert.equal(anchorField?.value, 'Levelanker · Level 7');
+assert.equal(anchorField?.value, 'Gesetztes Level: 7');
 
 console.log('adventure-embed-anchor.test.js passed');

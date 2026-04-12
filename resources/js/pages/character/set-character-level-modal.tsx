@@ -1,6 +1,7 @@
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { calculateLevel } from '@/helper/calculateLevel'
 import { clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
+import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
@@ -57,14 +58,15 @@ const SetCharacterLevelModal = ({
     .filter((adventure) => Boolean(adventure.is_pseudo))
     .reduce((sum, adventure) => sum + bubblesForAdventure(adventure.duration, adventure.has_additional_bubble), 0)
   const latestPseudoBubbles = latestPseudo ? bubblesForAdventure(latestPseudo.duration, latestPseudo.has_additional_bubble) : 0
+  const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
   const immutableAdventureBubbles = latestPseudo
     ? Math.max(0, realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles))
     : Math.max(0, realAdventureBubbles + pseudoAdventureBubbles)
   const minAllowedLevel = levelFromAvailableBubbles(
     immutableAdventureBubbles
-      + Number(character.dm_bubbles ?? 0)
+      + (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0)
       + additionalBubblesForStartTier(character.start_tier)
-      - Number(character.bubble_shop_spend ?? 0),
+      - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
   )
   const minSelectableLevel = character.is_filler ? 1 : minAllowedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })

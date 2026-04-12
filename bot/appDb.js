@@ -553,8 +553,8 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
         }
 
         const additional = additionalBubblesForStartTier(character.start_tier);
-        const dmBubbles = safeInt(character.dm_bubbles);
-        const bubbleSpend = safeInt(character.bubble_shop_spend);
+        const dmBubbles = 0;
+        const bubbleSpend = 0;
 
         const [[bubbleTotals]] = await connection.execute(
             `

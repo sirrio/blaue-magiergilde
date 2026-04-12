@@ -9,7 +9,6 @@ import { TextArea } from '@/components/ui/text-area'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
-import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
@@ -17,6 +16,7 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
+import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -336,10 +336,10 @@ export function CharacterCard({
   const privateMode = character.private_mode ?? false
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
-  const bubblesToNextLevel = calculateBubblesToNextLevel(character)
   const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
   const earnedBubbles = calculateBubble(character) + additionalBubbles
-  const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
+  const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
+  const isBubbleOverspent = bubbleAdjustmentsCount && character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
   const reviewedByName = character.reviewed_by_name?.trim() ?? ''
@@ -484,11 +484,25 @@ export function CharacterCard({
     remaining: secondsToHourMinuteString(remainingDowntimeSeconds),
   }
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
-  const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
-  const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
+  const pseudoAdventureCount = character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length
+  const realAdventureCount = character.adventures.length - pseudoAdventureCount
+  const hasLevelAnchors = pseudoAdventureCount > 0
+  const isMixedTrackingHistory = hasLevelAnchors && realAdventureCount > 0
+  const trackingModeLabel = simplifiedTracking
+    ? t('characters.levelTrackingBadge')
+    : t('characters.adventureTrackingBadge')
+  const trackingHistoryLabel = isMixedTrackingHistory
+    ? t('characters.mixedTrackingHistory')
+    : ''
+  const trackingSummaryTooltip = isMixedTrackingHistory
+    ? t('characters.mixedTrackingHistoryHint')
+    : hasLevelAnchors
+      ? t('characters.levelAnchorHistoryHint')
+      : trackingModeLabel
+  const derivedValuesBlockedByLevelAnchors = hasLevelAnchors
+  const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
   const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
-  const adventuresCountWarningReason = t('characters.adventuresSimpleModeBlocked')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
 
   const submitForApproval = (
@@ -637,22 +651,45 @@ export function CharacterCard({
             <CharacterImage className="mx-auto mb-2 mt-3 w-full max-w-44 sm:max-w-56" character={character} masked={avatarMasked} />
             {!character.is_filler ? (
               <>
-                {!simplifiedTracking ? (
-                  <>
-                    <Progress value={progressValue} max={progressMax} />
-                      <div className="flex items-center justify-end text-xs">
-                        {isBubbleOverspent ? (
-                        <span className="text-error/80">{t('characters.overspentBubbles')}</span>
-                      ) : (
-                        <>
-                          <span>{bubblesToNextLevel}</span>
-                          <Droplets size={13} />
-                          <span> {t('characters.toNextLevel')}</span>
-                        </>
-                      )}
+                <div
+                  className="mt-2.5 space-y-0.5"
+                  title={trackingSummaryTooltip}
+                  aria-label={trackingSummaryTooltip}
+                >
+                  <div className="flex items-center justify-between gap-2 leading-none">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-medium text-base-content/70">
+                        {trackingModeLabel}
+                      </span>
+                      {trackingHistoryLabel ? (
+                        <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-medium text-base-content/55">
+                          {trackingHistoryLabel}
+                        </span>
+                      ) : null}
                     </div>
-                  </>
-                ) : null}
+                  </div>
+                  {!simplifiedTracking ? (
+                    <>
+                      <Progress className="block h-2" value={progressValue} max={progressMax} />
+                      <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
+                        {isBubbleOverspent ? (
+                          <span className="text-error/80">{t('characters.overspentBubbles')}</span>
+                        ) : (
+                          <span>
+                            {progressValue}/{progressMax}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Progress className="block h-2 opacity-45" value={0} max={1} />
+                      <div className="flex min-h-4 items-center justify-end text-xs text-base-content/45">
+                        {t('characters.directlyTrackedShort')}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   <InfoBox>
                     <InfoBoxTitle>
@@ -660,12 +697,16 @@ export function CharacterCard({
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.played')}:{' '}
-                      {downtimeDisabledInSimpleMode ? (
-                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={adventuresCountWarningReason} aria-label={adventuresCountWarningReason}>
-                          <span className="cursor-help font-semibold text-warning">?</span>
+                      {derivedValuesBlockedByLevelAnchors ? (
+                        <span
+                          className="tooltip tooltip-warning tooltip-bottom cursor-help text-warning"
+                          data-tip={adventuresDisabledReason}
+                          aria-label={adventuresDisabledReason}
+                        >
+                          {t('characters.autoDisabledShort')}
                         </span>
                       ) : (
-                        character.adventures.length
+                        realAdventureCount
                       )}
                     </InfoBoxLine>
                     <InfoBoxLine>
@@ -683,9 +724,13 @@ export function CharacterCard({
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
                     <InfoBoxLine>
                       {t('characters.levelLabel')}:{' '}
-                      {downtimeDisabledInSimpleMode ? (
-                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={factionLevelWarningReason} aria-label={factionLevelWarningReason}>
-                          <span className="cursor-help font-semibold text-warning">?</span>
+                      {derivedValuesBlockedByLevelAnchors ? (
+                        <span
+                          className="tooltip tooltip-warning tooltip-bottom cursor-help text-warning"
+                          data-tip={factionLevelWarningReason}
+                          aria-label={factionLevelWarningReason}
+                        >
+                          {t('characters.autoDisabledShort')}
                         </span>
                       ) : (
                         factionLevel
@@ -696,8 +741,14 @@ export function CharacterCard({
                     <InfoBoxTitle>
                       <FlameKindling size={15} /> {t('characters.downtime')}
                     </InfoBoxTitle>
-                    {downtimeDisabledInSimpleMode ? (
-                      <InfoBoxLine className="text-warning">{t('characters.cannotCalculateDowntime')}</InfoBoxLine>
+                    {derivedValuesBlockedByLevelAnchors ? (
+                      <InfoBoxLine
+                        className="tooltip tooltip-warning tooltip-bottom cursor-help text-warning"
+                        data-tip={downtimeDisabledReason}
+                        aria-label={downtimeDisabledReason}
+                      >
+                        {t('characters.autoDisabledShort')}
+                      </InfoBoxLine>
                     ) : (
                       <>
                         <InfoBoxLine>{t('characters.total')}: {formattedDowntimes.total}</InfoBoxLine>
@@ -826,7 +877,7 @@ export function CharacterCard({
                   </Button>
                 </div>
               ) : canLogActivity ? (
-                downtimeDisabledInSimpleMode ? (
+                derivedValuesBlockedByLevelAnchors ? (
                   <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} aria-label={downtimeDisabledReason}>
                     <Button
                       size="sm"

@@ -1,13 +1,16 @@
 import type { Adventure, Character, Game } from '@/types'
+import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 
-type BubbleCharacter = Pick<Character, 'adventures' | 'dm_bubbles' | 'is_filler'>
+type BubbleCharacter = Pick<Character, 'adventures' | 'dm_bubbles' | 'is_filler' | 'simplified_tracking'>
 
 enum Bubble {
   MIN_DURATION = 10800,
 }
 
 const calculateBubble = (character: BubbleCharacter): number => {
-  const dmBubbles = Number(character.dm_bubbles ?? 0)
+  const dmBubbles = countsBubbleAdjustmentsForProgression(character)
+    ? Number(character.dm_bubbles ?? 0)
+    : 0
 
   return calculateBubbleByAdventures(character.adventures) + (Number.isFinite(dmBubbles) ? dmBubbles : 0)
 }

@@ -4,18 +4,21 @@ namespace App\Actions\Character;
 
 use App\Models\Adventure;
 use App\Models\Character;
+use App\Support\CharacterProgressionState;
 use App\Support\LevelProgression;
 use Illuminate\Support\Facades\DB;
 
 class SetQuickLevel
 {
+    public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+
     public function handle(Character $character, int $level): array
     {
         return DB::transaction(function () use ($character, $level): array {
             $activeVersionId = LevelProgression::activeVersionId();
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
-            $dmBubbles = $this->safeInt($character->dm_bubbles);
-            $bubbleSpend = $this->safeInt($character->bubble_shop_spend);
+            $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
+            $bubbleSpend = $this->progressionState->bubbleShopSpendForProgression($character);
 
             $durationBubbleSql = $this->durationBubbleSql();
 
