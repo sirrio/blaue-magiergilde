@@ -3,6 +3,7 @@
 use App\Actions\Character\SetQuickLevel;
 use App\Models\Adventure;
 use App\Models\Character;
+use App\Support\LevelProgression;
 
 it('updates the latest pseudo adventure when it is the most recent adventure', function () {
     $character = Character::factory()->create([
@@ -25,6 +26,8 @@ it('updates the latest pseudo adventure when it is the most recent adventure', f
     expect($result['ok'])->toBeTrue();
     expect(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(1);
     expect($pseudo->fresh()->duration)->toBe(6 * 10800);
+    expect($pseudo->fresh()->target_level)->toBe(4);
+    expect($pseudo->fresh()->progression_version_id)->toBe(LevelProgression::activeVersionId());
 });
 
 it('creates a new pseudo adventure when a real adventure follows the latest pseudo', function () {
@@ -55,4 +58,11 @@ it('creates a new pseudo adventure when a real adventure follows the latest pseu
 
     expect($result['ok'])->toBeTrue();
     expect(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(2);
+    expect(
+        Adventure::query()
+            ->where('character_id', $character->id)
+            ->where('is_pseudo', true)
+            ->orderByDesc('id')
+            ->first()?->target_level
+    )->toBe(4);
 });

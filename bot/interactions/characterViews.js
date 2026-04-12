@@ -1789,7 +1789,15 @@ function buildAdventureManageEmbed(adventure, participants) {
         );
 
     if (adventure.is_pseudo) {
-        embed.setDescription(t('characters.pseudoAdventureNotEditable', {}, locale));
+        const anchorDetails = Number.isFinite(Number(adventure.target_level))
+            ? t('characters.levelTrackingAnchorWithLevel', {
+                level: Number(adventure.target_level),
+            }, locale)
+            : null;
+        embed.setDescription([
+            t('characters.pseudoAdventureNotEditable', {}, locale),
+            anchorDetails,
+        ].filter(Boolean).join('\n'));
     }
 
     return embed;
@@ -1983,6 +1991,15 @@ function buildAdventureEmbed(adventure, title, participants = []) {
     if (adventure.title) embed.addFields({ name: t('characters.titleField'), value: String(adventure.title).slice(0, 1024), inline: false });
     if (adventure.game_master) embed.addFields({ name: t('characters.gameMasterField'), value: String(adventure.game_master).slice(0, 1024), inline: false });
     if (adventure.notes) embed.addFields({ name: t('characters.notesField'), value: String(adventure.notes).slice(0, 1024), inline: false });
+    if (adventure.is_pseudo && Number.isFinite(Number(adventure.target_level))) {
+        embed.addFields({
+            name: t('characters.levelTrackingAnchor'),
+            value: t('characters.levelTrackingAnchorWithLevel', {
+                level: Number(adventure.target_level),
+            }),
+            inline: false,
+        });
+    }
     return embed;
 }
 

@@ -1,0 +1,22 @@
+const assert = require('node:assert/strict');
+const { buildAdventureEmbed } = require('../interactions/characterViews');
+
+const embed = buildAdventureEmbed({
+    id: 17,
+    duration: 21600,
+    start_date: '2026-04-12',
+    has_additional_bubble: false,
+    is_pseudo: true,
+    target_level: 7,
+    progression_version_id: 2,
+    title: 'Level tracking adjustment',
+    game_master: 'Level tracking',
+    notes: 'Auto-generated to align the level tracking value.',
+}, 'Adventure');
+
+const embedData = embed.toJSON();
+const anchorField = embedData.fields.find(field => field.name === 'Levelanker');
+
+assert.equal(anchorField?.value, 'Levelanker · Level 7');
+
+console.log('adventure-embed-anchor.test.js passed');

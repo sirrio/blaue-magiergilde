@@ -118,6 +118,8 @@ module.exports = {
         adventureNotFound: 'Adventure not found.',
         downtimeNotFound: 'Downtime not found.',
         pseudoAdventureNotEditable: 'Level tracking adventures are auto-generated and cannot be edited.',
+        levelTrackingAnchor: 'Level anchor',
+        levelTrackingAnchorWithLevel: 'Level anchor · level {level}',
         createTitle: 'Create character',
         createBasicsDescription: 'Edit the basic details.',
         createBasicsStart: 'Start with the basic details.',

@@ -57,6 +57,29 @@ type LegacyCharacterApprovalImportPreview = {
   error_samples: Array<{ line?: number; message?: string }>
 }
 
+type LevelProgressionVersionSummary = {
+  id: number
+  is_active: boolean
+  created_at?: string | null
+  changed_levels_count: number
+  change_samples: Array<{
+    level: number
+    delta: number
+  }>
+}
+
+type LevelProgressionUpdateReport = {
+  new_version_id: number
+  backfill: {
+    pseudo_adventures_backfilled: number
+    characters_affected: number
+  }
+  realign: {
+    pseudo_adventures_realigned: number
+    characters_affected: number
+  }
+}
+
 const buildLevelProgressionStepValues = (entries: Array<{ level: number; required_bubbles: number }>) => {
   return entries.map((entry, index) => {
     const nextEntry = entries[index + 1]
@@ -172,6 +195,8 @@ export default function Settings({
   compendiumImportRuns,
   legacyCharacterApprovalStats,
   levelProgression,
+  levelProgressionVersions,
+  levelProgressionUpdateReport,
 }: {
   discordBackup: DiscordBackupStats
   discordBotSettings: DiscordBotSettings
@@ -186,6 +211,8 @@ export default function Settings({
     level: number
     required_bubbles: number
   }>
+  levelProgressionVersions: LevelProgressionVersionSummary[]
+  levelProgressionUpdateReport?: LevelProgressionUpdateReport | null
 }) {
   const t = useTranslate()
   const { errors: pageErrors, botChannelOverride } = usePage<PageProps>().props
@@ -289,6 +316,21 @@ export default function Settings({
     ],
     [levelProgressionForm.data.entries]
   )
+  const formattedLevelProgressionVersionTimestamp = useCallback((value?: string | null) => {
+    if (!value) {
+      return 'Unknown time'
+    }
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
+
+    return new Intl.DateTimeFormat('de-DE', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(date)
+  }, [])
 
   useEffect(() => {
     const syncKey = JSON.stringify(levelProgression)
@@ -1850,6 +1892,59 @@ export default function Settings({
             <p className="text-xs text-base-content/60">
               Lege fest, wie viele Bubbles ein Level bis zum nächsten braucht. Die Gesamt-Bubbles werden automatisch daraus berechnet.
             </p>
+          </div>
+          <div className="mt-4 rounded-lg border border-warning/30 bg-warning/8 p-3 text-xs text-base-content/75">
+            <p className="font-medium text-base-content">Kurvenwechsel erzeugt immer eine neue Version.</p>
+            <p className="mt-1">
+              Pseudoabenteuer werden auf die neue Kurve neu ausgerichtet. Echte Abenteuer bleiben unverändert.
+            </p>
+          </div>
+          {levelProgressionUpdateReport ? (
+            <div className="mt-4 rounded-lg border border-success/30 bg-success/8 p-3 text-xs text-base-content/75">
+              <p className="font-medium text-base-content">Version {levelProgressionUpdateReport.new_version_id} wurde aktiviert.</p>
+              <p className="mt-1">
+                Neu ausgerichtet: {levelProgressionUpdateReport.realign.pseudo_adventures_realigned} Pseudoabenteuer bei{' '}
+                {levelProgressionUpdateReport.realign.characters_affected} Charakteren.
+              </p>
+              {levelProgressionUpdateReport.backfill.pseudo_adventures_backfilled > 0 ? (
+                <p className="mt-1">
+                  Vorher ergänzt: {levelProgressionUpdateReport.backfill.pseudo_adventures_backfilled} fehlende Metadaten bei{' '}
+                  {levelProgressionUpdateReport.backfill.characters_affected} Charakteren.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-2 lg:grid-cols-3">
+            {levelProgressionVersions.map((version) => (
+              <div key={version.id} className="rounded-lg border border-base-200 bg-base-100 p-3 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium text-base-content">Version {version.id}</div>
+                  <span className={cn(
+                    'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                    version.is_active
+                      ? 'border-success/40 bg-success/10 text-success'
+                      : 'border-base-200 bg-base-200/40 text-base-content/60'
+                  )}>
+                    {version.is_active ? 'Aktiv' : 'Archiv'}
+                  </span>
+                </div>
+                <div className="mt-1 text-base-content/60">
+                  Erstellt: {formattedLevelProgressionVersionTimestamp(version.created_at)}
+                </div>
+                <div className="mt-2 text-base-content/70">
+                  {version.changed_levels_count > 0 ? `${version.changed_levels_count} geänderte Levels` : 'Ausgangsversion'}
+                </div>
+                {version.change_samples.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {version.change_samples.map((sample) => (
+                      <span key={`${version.id}-${sample.level}`} className="rounded-full border border-base-200 bg-base-200/40 px-2 py-0.5 text-[11px] text-base-content/70">
+                        L{sample.level} {sample.delta > 0 ? `+${sample.delta}` : sample.delta}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             {levelProgressionColumns.map((columnEntries, columnIndex) => (

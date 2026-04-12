@@ -5,7 +5,7 @@ const {
     calculateMinAllowedLevel,
     calculateRequiredAdventureBubbles,
 } = require('./utils/quickMode');
-const { ensureLevelProgressionLoaded } = require('./utils/levelProgression');
+const { activeLevelProgressionVersionId, ensureLevelProgressionLoaded } = require('./utils/levelProgression');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -458,6 +458,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
+        const activeVersionId = activeLevelProgressionVersionId();
 
         const [[character]] = await connection.execute(
             `
@@ -541,20 +542,22 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             }
         } else if (latestPseudo) {
             const now = nowSql();
-            await connection.execute(
-                'UPDATE adventures SET duration = ?, has_additional_bubble = 0, updated_at = ? WHERE id = ?',
-                [desiredLatestPseudoBubbles * 10800, now, latestPseudo.id],
-            );
-        } else {
-            const duration = desiredLatestPseudoBubbles * 10800;
-            const now = nowSql();
-            await connection.execute(
+                await connection.execute(
+                    'UPDATE adventures SET duration = ?, has_additional_bubble = 0, target_level = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
+                    [desiredLatestPseudoBubbles * 10800, level, activeVersionId, now, latestPseudo.id],
+                );
+            } else {
+                const duration = desiredLatestPseudoBubbles * 10800;
+                const now = nowSql();
+                await connection.execute(
                 `
                     INSERT INTO adventures (
                         duration,
                         start_date,
                         has_additional_bubble,
                         is_pseudo,
+                        target_level,
+                        progression_version_id,
                         character_id,
                         title,
                         game_master,
@@ -562,17 +565,19 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                         created_at,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
-                [
-                    duration,
-                    todaySqlDate(),
-                    0,
-                    1,
-                    characterId,
-                    'Level tracking adjustment',
-                    'Level tracking',
-                    'Auto-generated to align the level tracking value.',
+                    [
+                        duration,
+                        todaySqlDate(),
+                        0,
+                        1,
+                        level,
+                        activeVersionId,
+                        characterId,
+                        'Level tracking adjustment',
+                        'Level tracking',
+                        'Auto-generated to align the level tracking value.',
                     now,
                     now,
                 ],
@@ -855,9 +860,9 @@ async function listAdventuresForDiscord(discordUser, characterId, limit = 25) {
     if (!userId) throw new DiscordNotLinkedError();
 
     const safeLimit = Math.max(1, Math.min(25, Number(limit) || 25));
-    const [rows] = await db.execute(
-        `
-            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id, a.is_pseudo
+        const [rows] = await db.execute(
+            `
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id, a.is_pseudo, a.target_level, a.progression_version_id
             FROM adventures a
             INNER JOIN characters c ON c.id = a.character_id
             WHERE a.character_id = ?
@@ -877,7 +882,7 @@ async function findAdventureForDiscord(discordUser, adventureId) {
 
     const [rows] = await db.execute(
         `
-            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id, a.is_pseudo, a.target_level, a.progression_version_id
             FROM adventures a
             INNER JOIN characters c ON c.id = a.character_id
             WHERE a.id = ?

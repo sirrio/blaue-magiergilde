@@ -5,6 +5,7 @@ use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
 use App\Models\User;
+use App\Support\LevelProgression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -104,6 +105,26 @@ it('includes adventure participants on the character detail payload', function (
             ->where('character.adventures.0.title', 'Into the Blue')
             ->where('character.adventures.0.allies.0.id', $ally->id)
             ->where('character.adventures.0.allies.0.name', $linkedCharacter->name));
+});
+
+it('includes pseudo adventure anchor metadata on the character detail payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create();
+    $pseudoAdventure = Adventure::factory()->for($character)->create([
+        'title' => 'Level tracking adjustment',
+        'is_pseudo' => true,
+        'target_level' => 7,
+        'progression_version_id' => LevelProgression::activeVersionId(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('character.adventures.0.id', $pseudoAdventure->id)
+            ->where('character.adventures.0.target_level', 7)
+            ->where('character.adventures.0.progression_version_id', LevelProgression::activeVersionId()));
 });
 
 it('keeps deleted linked allies as snapshots on the character detail payload', function () {

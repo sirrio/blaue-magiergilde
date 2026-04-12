@@ -550,14 +550,19 @@ export default function Show({
                         {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
-                    <List className="md:hidden shadow-none">
-                      {sortedAdventures.map((adv) => {
-                        const notes = adventureNotesMap.get(adv.id) ?? ''
-                        const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
-                        const gameMasterName = adv.game_master?.trim() || '-'
-                        const adventureTitle = adv.title || 'Adventure'
-                        return (
-                          <ListRow key={adv.id} className="block">
+                      <List className="md:hidden shadow-none">
+                        {sortedAdventures.map((adv) => {
+                          const notes = adventureNotesMap.get(adv.id) ?? ''
+                          const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                          const gameMasterName = adv.game_master?.trim() || '-'
+                          const adventureTitle = adv.title || 'Adventure'
+                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
+                            ? t('characters.levelTrackingAnchorWithLevel', {
+                                level: adv.target_level,
+                              })
+                            : t('characters.levelTrackingAnchor')
+                          return (
+                            <ListRow key={adv.id} className="block">
                             <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -585,12 +590,12 @@ export default function Show({
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
-                              {adv.is_pseudo ? (
-                                    <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                      {t('characters.levelTracking')}
-                                    </span>
-                                  ) : null}
-                              <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
+                                    {adv.is_pseudo ? (
+                                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                                        {pseudoAnchorLabel}
+                                      </span>
+                                    ) : null}
+                                <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
                                 <span className="badge badge-ghost badge-sm font-medium">
                                   {secondsToHourMinuteString(adv.duration)}
                                 </span>
@@ -657,13 +662,18 @@ export default function Show({
                           </button>
                           <span className="text-right">{t('characters.actions')}</span>
                         </div>
-                        <List className="shadow-none">
-                          {sortedAdventures.map((adv) => {
-                            const notes = adventureNotesMap.get(adv.id) ?? ''
-                            const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
-                            const gameMasterName = adv.game_master?.trim() || '-'
-                            const adventureTitle = adv.title || 'Adventure'
-                            return (
+                          <List className="shadow-none">
+                            {sortedAdventures.map((adv) => {
+                              const notes = adventureNotesMap.get(adv.id) ?? ''
+                              const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                              const gameMasterName = adv.game_master?.trim() || '-'
+                              const adventureTitle = adv.title || 'Adventure'
+                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
+                                ? t('characters.levelTrackingAnchorWithLevel', {
+                                    level: adv.target_level,
+                                  })
+                                : t('characters.levelTrackingAnchor')
+                              return (
                               <ListRow
                                 key={adv.id}
                                 className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
@@ -687,13 +697,13 @@ export default function Show({
                                         <ScrollText size={14} />
                                       </Button>
                                     </div>
-                                    {adv.is_pseudo ? (
-                                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                        {t('characters.levelTracking')}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+                                      {adv.is_pseudo ? (
+                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                                          {pseudoAnchorLabel}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                                     <span>DM: {gameMasterName}</span>
                                     {participantSummary ? <span>{t('characters.playedWith')}: {participantSummary}</span> : null}
                                   </div>

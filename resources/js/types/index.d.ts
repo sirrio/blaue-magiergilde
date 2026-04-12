@@ -498,6 +498,8 @@ export interface Adventure {
   start_date: string
   has_additional_bubble: boolean
   is_pseudo?: boolean
+  target_level?: number | null
+  progression_version_id?: number | null
   notes: string
   game_master: string
   character_id: number

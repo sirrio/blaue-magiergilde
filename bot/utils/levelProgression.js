@@ -3,6 +3,7 @@ const db = require('../db');
 const cacheTtlMs = 60 * 1000;
 let cachedTotals = null;
 let cachedAt = 0;
+let cachedVersionId = null;
 
 function clampLevel(value) {
     return Math.min(20, Math.max(1, Math.round(Number(value) || 0)));
@@ -34,6 +35,7 @@ function setLevelProgressionTotals(totals) {
     }
 
     cachedTotals = normalizedTotals;
+    cachedVersionId = null;
     cachedAt = Date.now();
 }
 
@@ -51,17 +53,33 @@ async function ensureLevelProgressionLoaded(force = false) {
     }
 
     const [rows] = await db.execute(
-        'SELECT level, required_bubbles FROM level_progressions ORDER BY level ASC',
+        `
+            SELECT lp.level, lp.required_bubbles, lp.version_id
+            FROM level_progressions lp
+            INNER JOIN level_progression_versions lpv ON lpv.id = lp.version_id
+            WHERE lpv.is_active = 1
+            ORDER BY lp.level ASC
+        `,
     );
 
     const totals = {};
+    const versionId = rows[0] ? Number(rows[0].version_id) : null;
     for (const row of rows || []) {
         totals[Number(row.level)] = Number(row.required_bubbles);
     }
 
     setLevelProgressionTotals(totals);
+    cachedVersionId = Number.isFinite(versionId) ? versionId : null;
 
     return cachedTotals;
+}
+
+function activeLevelProgressionVersionId() {
+    if (!Number.isInteger(cachedVersionId) || cachedVersionId <= 0) {
+        throw new Error('Active level progression version has not been loaded.');
+    }
+
+    return cachedVersionId;
 }
 
 function bubblesRequiredForLevel(level) {
@@ -97,6 +115,7 @@ function levelFromAvailableBubbles(availableBubbles) {
 }
 
 module.exports = {
+    activeLevelProgressionVersionId,
     bubblesRequiredForLevel,
     bubblesRequiredForNextLevel,
     clampLevel,

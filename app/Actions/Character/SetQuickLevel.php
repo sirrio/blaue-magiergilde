@@ -12,6 +12,7 @@ class SetQuickLevel
     public function handle(Character $character, int $level): array
     {
         return DB::transaction(function () use ($character, $level): array {
+            $activeVersionId = LevelProgression::activeVersionId();
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
             $dmBubbles = $this->safeInt($character->dm_bubbles);
             $bubbleSpend = $this->safeInt($character->bubble_shop_spend);
@@ -70,6 +71,8 @@ class SetQuickLevel
             } elseif ($latestPseudo) {
                 $latestPseudo->duration = $desiredLatestPseudoBubbles * 10800;
                 $latestPseudo->has_additional_bubble = false;
+                $latestPseudo->target_level = $level;
+                $latestPseudo->progression_version_id = $activeVersionId;
                 $latestPseudo->save();
             } else {
                 $adventure = new Adventure;
@@ -77,6 +80,8 @@ class SetQuickLevel
                 $adventure->start_date = now()->toDateString();
                 $adventure->has_additional_bubble = false;
                 $adventure->is_pseudo = true;
+                $adventure->target_level = $level;
+                $adventure->progression_version_id = $activeVersionId;
                 $adventure->character_id = $character->id;
                 $adventure->title = 'Level tracking adjustment';
                 $adventure->game_master = 'Level tracking';

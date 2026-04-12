@@ -3,6 +3,7 @@
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\User;
+use App\Support\LevelProgression;
 
 it('updates tracking mode for an owned character', function () {
     $user = User::factory()->create();
@@ -83,6 +84,8 @@ it('creates and removes pseudo adventures for quick mode levels', function () {
 
     expect($pseudo)->not->toBeNull();
     expect($pseudo->duration)->toBe(21600);
+    expect($pseudo->target_level)->toBe(3);
+    expect($pseudo->progression_version_id)->toBe(LevelProgression::activeVersionId());
 
     $this->actingAs($user)->post(route('characters.quick-level', $character), [
         'level' => 2,
@@ -120,4 +123,6 @@ it('uses the seeded default progression for quick mode levels', function () {
 
     expect($pseudo)->not->toBeNull();
     expect($pseudo->duration)->toBe(66 * 10800);
+    expect($pseudo->target_level)->toBe(12);
+    expect($pseudo->progression_version_id)->toBe(LevelProgression::activeVersionId());
 });
