@@ -1,5 +1,5 @@
 const db = require('./db');
-const { additionalBubblesForStartTier } = require('./utils/characterTier');
+const { additionalBubblesForStartTier, calculateLevel, calculateTierFromLevel } = require('./utils/characterTier');
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
 const {
     calculateMinAllowedLevel,
@@ -52,6 +52,8 @@ const allowedGuildStatuses = new Set(['pending', 'approved', 'declined', 'needs_
 const allowedUserGuildStatuses = new Set(['pending', 'draft']);
 const allowedBotLocales = new Set(['de', 'en']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
+const maxActiveCharacters = 8;
+const exemptHighTierCharacters = 2;
 
 function guildCharacterStatusesForAllies() {
     const statuses = ['pending', 'approved', 'needs_changes'];
@@ -371,6 +373,81 @@ async function listCharactersForDiscord(discordUser) {
         [userId],
     );
     return rows;
+}
+
+function submittedCharacterCounts(characters, excludeCharacterId = null) {
+    const submittedCharacters = (characters || []).filter(character => {
+        if (excludeCharacterId !== null && Number(character.id) === Number(excludeCharacterId)) {
+            return false;
+        }
+
+        const status = String(character.guild_status || '').trim().toLowerCase();
+        return status === 'approved' || status === 'pending';
+    });
+
+    const submittedFillerCount = submittedCharacters.filter(character => Boolean(character.is_filler)).length;
+    const submittedHighTierCount = submittedCharacters.filter(character => {
+        if (character.is_filler) {
+            return false;
+        }
+
+        return calculateTierFromLevel(calculateLevel(character)) === 'HT';
+    }).length;
+    const submittedLowAndBaseTierCount = submittedCharacters.filter(character => {
+        if (character.is_filler) {
+            return false;
+        }
+
+        const tier = calculateTierFromLevel(calculateLevel(character));
+        return tier === 'BT' || tier === 'LT';
+    }).length;
+
+    return {
+        submittedFillerCount,
+        submittedHighTierCount,
+        consumedGeneralSlots: submittedLowAndBaseTierCount + Math.max(0, submittedHighTierCount - exemptHighTierCharacters),
+    };
+}
+
+async function getCharacterSubmissionStateForDiscord(discordUser, characterId) {
+    const character = await findCharacterForDiscord(discordUser, characterId);
+    if (!character) {
+        return { ok: false, reason: 'not_found' };
+    }
+
+    const characters = await listCharactersForDiscord(discordUser);
+    const counts = submittedCharacterCounts(characters, characterId);
+    const tier = character.is_filler ? 'FILLER' : calculateTierFromLevel(calculateLevel(character));
+    const candidateGeneralSlotCost = character.is_filler
+        ? 0
+        : (tier === 'BT' || tier === 'LT'
+            ? 1
+            : (tier === 'HT' && counts.submittedHighTierCount >= exemptHighTierCharacters ? 1 : 0));
+
+    if (character.is_filler && counts.submittedFillerCount >= 1) {
+        return {
+            ok: true,
+            character,
+            blockedReason: 'filler_limit',
+            counts,
+        };
+    }
+
+    if (candidateGeneralSlotCost > 0 && (counts.consumedGeneralSlots + candidateGeneralSlotCost) > maxActiveCharacters) {
+        return {
+            ok: true,
+            character,
+            blockedReason: 'active_limit',
+            counts,
+        };
+    }
+
+    return {
+        ok: true,
+        character,
+        blockedReason: null,
+        counts,
+    };
 }
 
 async function findCharacterForDiscord(discordUser, characterId) {
@@ -723,6 +800,30 @@ async function updateCharacterForDiscord(
     const existing = await findCharacterForDiscord(discordUser, characterId);
     if (!existing) return { ok: false, reason: 'not_found' };
 
+    const newGuildStatus = !isCharacterStatusSwitchEnabled
+        ? 'draft'
+        : typeof guildStatus !== 'undefined'
+            ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
+            : existing.guild_status;
+
+    if (
+        newGuildStatus === 'pending'
+        && ['draft', 'needs_changes'].includes(String(existing.guild_status || '').trim().toLowerCase())
+    ) {
+        const submissionState = await getCharacterSubmissionStateForDiscord(discordUser, characterId);
+        if (!submissionState.ok) {
+            return { ok: false, reason: 'register_failed' };
+        }
+
+        if (submissionState.blockedReason) {
+            return {
+                ok: false,
+                reason: submissionState.blockedReason,
+                counts: submissionState.counts,
+            };
+        }
+    }
+
     const updatedAt = nowSql();
     const newName = typeof name === 'string' ? name : existing.name;
     const newStartTier = typeof startTier === 'string' ? normalizeTier(startTier, existing.start_tier) : existing.start_tier;
@@ -744,11 +845,6 @@ async function updateCharacterForDiscord(
         ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
         : existing.bubble_shop_spend;
     const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
-    const newGuildStatus = !isCharacterStatusSwitchEnabled
-        ? 'draft'
-        : typeof guildStatus !== 'undefined'
-            ? normalizeUserGuildStatus(guildStatus, existing.guild_status)
-            : existing.guild_status;
     const newRegistrationNote = typeof registrationNote === 'string'
         ? registrationNote.trim()
         : existing.registration_note;
@@ -1730,6 +1826,7 @@ module.exports = {
     updateLinkedUserTrackingDefaultForDiscord,
     createUserForDiscord,
     listCharactersForDiscord,
+    getCharacterSubmissionStateForDiscord,
     findCharacterForDiscord,
     updateCharacterManualLevelForDiscord,
     createCharacterForDiscord,

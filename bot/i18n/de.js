@@ -158,6 +158,8 @@ module.exports = {
         invalidCharacterId: 'Ungültige Charakter-ID.',
         registrationDisabled: 'Die Registrierung ist derzeit deaktiviert.',
         registerFailed: 'Der Charakter konnte gerade nicht registriert werden.',
+        submitBlockedActiveLimit: 'Einreichen nicht möglich: {count}/8 Standard-Slots belegt.',
+        submitBlockedFillerLimit: 'Einreichen nicht möglich: Filler-Slot bereits belegt.',
         registerFirst: 'Bitte registriere den Charakter zuerst bei der Magiergilde.',
         deleteCharacterPrompt: 'Charakter löschen?',
         characterNotFoundOrDeleted: 'Charakter nicht gefunden oder bereits gelöscht.',

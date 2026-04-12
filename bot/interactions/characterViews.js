@@ -310,7 +310,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
     };
 }
 
-function buildCharacterCardPayload({ character, ownerDiscordId }) {
+function buildCharacterCardPayload({ character, ownerDiscordId, registrationBlockedReason = null, registrationCounts = null }) {
     const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
         ? true
         : Boolean(character.avatar_masked);
@@ -333,6 +333,8 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
             isFiller: character.is_filler,
             simplifiedTracking,
             guildStatus: character.guild_status,
+            registrationBlockedReason,
+            registrationCounts,
         }),
         files,
     };
@@ -1220,7 +1222,7 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus, registrationBlockedReason = null, registrationCounts = null }) {
     const primaryRow = new ActionRowBuilder();
     const normalizedStatus = String(guildStatus || '').trim().toLowerCase();
     const canRegister = normalizedStatus === 'draft' || normalizedStatus === 'needs_changes';
@@ -1231,7 +1233,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
                 .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.registerWithMagiergilde'))
                 .setStyle(ButtonStyle.Success)
-                .setDisabled(!isCharacterStatusSwitchEnabled),
+                .setDisabled(!isCharacterStatusSwitchEnabled || Boolean(registrationBlockedReason)),
         );
     }
     if (!simplifiedTracking && canLogActivity) {
@@ -1306,6 +1308,20 @@ function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
         embeds: [embed],
         components: [buildCharacterRegisterConfirmRow({ characterId: character.id, ownerDiscordId })],
     };
+}
+
+function buildCharacterRegistrationBlockedContent(blockedReason, counts = null, locale = null) {
+    if (blockedReason === 'active_limit') {
+        return t('characters.submitBlockedActiveLimit', {
+            count: counts?.consumedGeneralSlots ?? 8,
+        }, locale);
+    }
+
+    if (blockedReason === 'filler_limit') {
+        return t('characters.submitBlockedFillerLimit', {}, locale);
+    }
+
+    return t('characters.registerFailed', {}, locale);
 }
 
 function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialNote = '' }) {
@@ -2216,6 +2232,7 @@ module.exports = {
     buildCharacterCardRows,
     buildCharacterRegisterConfirmRow,
     buildCharacterRegisterConfirmView,
+    buildCharacterRegistrationBlockedContent,
     buildCharacterRegisterNoteModal,
     buildAdventureListRows,
     buildDowntimeStepEmbed,

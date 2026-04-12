@@ -5,28 +5,28 @@ const originalDbModule = require.cache[dbPath];
 
 const fakeDb = {
     async execute(sql, bindings = []) {
-        if (sql.startsWith('SELECT level, required_bubbles FROM level_progressions')) {
+        if (sql.includes('SELECT lp.level, lp.required_bubbles, lp.version_id') && sql.includes('FROM level_progressions lp')) {
             return [[
-                { level: 1, required_bubbles: 0 },
-                { level: 2, required_bubbles: 1 },
-                { level: 3, required_bubbles: 3 },
-                { level: 4, required_bubbles: 6 },
-                { level: 5, required_bubbles: 10 },
-                { level: 6, required_bubbles: 15 },
-                { level: 7, required_bubbles: 21 },
-                { level: 8, required_bubbles: 28 },
-                { level: 9, required_bubbles: 36 },
-                { level: 10, required_bubbles: 45 },
-                { level: 11, required_bubbles: 55 },
-                { level: 12, required_bubbles: 66 },
-                { level: 13, required_bubbles: 78 },
-                { level: 14, required_bubbles: 91 },
-                { level: 15, required_bubbles: 105 },
-                { level: 16, required_bubbles: 120 },
-                { level: 17, required_bubbles: 136 },
-                { level: 18, required_bubbles: 153 },
-                { level: 19, required_bubbles: 171 },
-                { level: 20, required_bubbles: 190 },
+                { level: 1, required_bubbles: 0, version_id: 1 },
+                { level: 2, required_bubbles: 1, version_id: 1 },
+                { level: 3, required_bubbles: 3, version_id: 1 },
+                { level: 4, required_bubbles: 6, version_id: 1 },
+                { level: 5, required_bubbles: 10, version_id: 1 },
+                { level: 6, required_bubbles: 15, version_id: 1 },
+                { level: 7, required_bubbles: 21, version_id: 1 },
+                { level: 8, required_bubbles: 28, version_id: 1 },
+                { level: 9, required_bubbles: 36, version_id: 1 },
+                { level: 10, required_bubbles: 45, version_id: 1 },
+                { level: 11, required_bubbles: 55, version_id: 1 },
+                { level: 12, required_bubbles: 66, version_id: 1 },
+                { level: 13, required_bubbles: 78, version_id: 1 },
+                { level: 14, required_bubbles: 91, version_id: 1 },
+                { level: 15, required_bubbles: 105, version_id: 1 },
+                { level: 16, required_bubbles: 120, version_id: 1 },
+                { level: 17, required_bubbles: 136, version_id: 1 },
+                { level: 18, required_bubbles: 153, version_id: 1 },
+                { level: 19, required_bubbles: 171, version_id: 1 },
+                { level: 20, required_bubbles: 190, version_id: 1 },
             ]];
         }
 

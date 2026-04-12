@@ -1,9 +1,8 @@
 const db = require('../db');
 
-const cacheTtlMs = 60 * 1000;
 let cachedTotals = null;
-let cachedAt = 0;
 let cachedVersionId = null;
+let cachedFromTestInjection = false;
 
 function clampLevel(value) {
     return Math.min(20, Math.max(1, Math.round(Number(value) || 0)));
@@ -36,7 +35,7 @@ function setLevelProgressionTotals(totals) {
 
     cachedTotals = normalizedTotals;
     cachedVersionId = null;
-    cachedAt = Date.now();
+    cachedFromTestInjection = true;
 }
 
 function currentTotals() {
@@ -48,7 +47,7 @@ function currentTotals() {
 }
 
 async function ensureLevelProgressionLoaded(force = false) {
-    if (!force && cachedTotals && (Date.now() - cachedAt) < cacheTtlMs) {
+    if (!force && cachedTotals && cachedFromTestInjection) {
         return cachedTotals;
     }
 
@@ -68,8 +67,9 @@ async function ensureLevelProgressionLoaded(force = false) {
         totals[Number(row.level)] = Number(row.required_bubbles);
     }
 
-    setLevelProgressionTotals(totals);
+    cachedTotals = totals;
     cachedVersionId = Number.isFinite(versionId) ? versionId : null;
+    cachedFromTestInjection = false;
 
     return cachedTotals;
 }

@@ -158,6 +158,8 @@ module.exports = {
         invalidCharacterId: 'Invalid character ID.',
         registrationDisabled: 'Registration is currently disabled.',
         registerFailed: 'Could not register character right now.',
+        submitBlockedActiveLimit: 'Cannot submit: {count}/8 standard slots are occupied.',
+        submitBlockedFillerLimit: 'Cannot submit: filler slot already occupied.',
         registerFirst: 'Register with Magiergilde first.',
         deleteCharacterPrompt: 'Delete character?',
         characterNotFoundOrDeleted: 'Character not found or already deleted.',

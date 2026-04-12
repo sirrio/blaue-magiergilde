@@ -21,6 +21,7 @@ const {
     getLinkedUserLocaleForDiscord,
     getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
+    getCharacterSubmissionStateForDiscord,
     updateCharacterManualLevelForDiscord,
     updateLinkedUserLocaleForDiscord,
     updateLinkedUserTrackingDefaultForDiscord,
@@ -79,6 +80,7 @@ const {
     buildParticipantOptions,
     buildCharacterCardPayload,
     buildCharacterCardRows,
+    buildCharacterRegistrationBlockedContent,
     buildCharacterRegisterNoteModal,
     buildCharacterRegisterConfirmView,
     buildCharacterClassesView,
@@ -162,6 +164,29 @@ async function updateCharacterListMessage(interaction, ownerDiscordId) {
     await interaction.update({
         ...listView,
         content: '',
+    });
+}
+
+async function getCharacterRegistrationBlock(interactionUser, characterId) {
+    const submissionState = await getCharacterSubmissionStateForDiscord(interactionUser, characterId);
+    if (!submissionState.ok) {
+        return { blockedReason: null, counts: null };
+    }
+
+    return {
+        blockedReason: submissionState.blockedReason,
+        counts: submissionState.counts,
+    };
+}
+
+async function buildCharacterCardPayloadForInteraction(interactionUser, character, ownerDiscordId) {
+    const registrationState = await getCharacterRegistrationBlock(interactionUser, character.id);
+
+    return buildCharacterCardPayload({
+        character,
+        ownerDiscordId,
+        registrationBlockedReason: registrationState.blockedReason,
+        registrationCounts: registrationState.counts,
     });
 }
 
@@ -1054,7 +1079,7 @@ async function finalizeCharacterCreation(state) {
     }
 
     await updateCreationMessage(state, {
-        ...buildCharacterCardPayload({ character, ownerDiscordId }),
+        ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
         content: '',
     });
 }
@@ -1649,7 +1674,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterCardPayload({ character, ownerDiscordId }),
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
             content: '',
         });
         return true;
@@ -2538,7 +2563,25 @@ async function handle(interaction) {
         const status = String(character.guild_status || '').trim().toLowerCase();
         if (status !== 'draft' && status !== 'needs_changes') {
             await updateManageMessage(interaction, {
-                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
+                flags: MessageFlags.Ephemeral,
+            });
+            return true;
+        }
+
+        const registrationState = await getCharacterSubmissionStateForDiscord(interaction.user, characterId);
+        if (!registrationState.ok) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFailed'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (registrationState.blockedReason) {
+            await updateManageMessage(interaction, {
+                content: buildCharacterRegistrationBlockedContent(
+                    registrationState.blockedReason,
+                    registrationState.counts,
+                    await resolveInteractionLocale(interaction),
+                ),
                 flags: MessageFlags.Ephemeral,
             });
             return true;
@@ -2551,7 +2594,14 @@ async function handle(interaction) {
             registrationNote,
         });
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFailed'), flags: MessageFlags.Ephemeral });
+            const failureMessage = result.reason === 'active_limit' || result.reason === 'filler_limit'
+                ? buildCharacterRegistrationBlockedContent(
+                    result.reason,
+                    result.counts || null,
+                    await resolveInteractionLocale(interaction),
+                )
+                : await translateInteraction(interaction, 'characters.registerFailed');
+            await updateManageMessage(interaction, { content: failureMessage, flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2562,7 +2612,7 @@ async function handle(interaction) {
         }
 
         await updateManageMessage(interaction, {
-            ...buildCharacterCardPayload({ character: refreshed, ownerDiscordId }),
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, refreshed, ownerDiscordId)),
             flags: MessageFlags.Ephemeral,
         });
         return true;
@@ -2621,8 +2671,26 @@ async function handle(interaction) {
             const status = String(character.guild_status || '').trim().toLowerCase();
             if (status !== 'draft' && status !== 'needs_changes') {
                 await interaction.update({
-                    ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                    ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
                     content: '',
+                });
+                return true;
+            }
+
+            const registrationState = await getCharacterSubmissionStateForDiscord(interaction.user, characterId);
+            if (!registrationState.ok) {
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFailed'), flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            if (registrationState.blockedReason) {
+                await updateManageMessage(interaction, {
+                    content: buildCharacterRegistrationBlockedContent(
+                        registrationState.blockedReason,
+                        registrationState.counts,
+                        await resolveInteractionLocale(interaction),
+                    ),
+                    flags: MessageFlags.Ephemeral,
                 });
                 return true;
             }
@@ -2656,13 +2724,7 @@ async function handle(interaction) {
 
         if (action === 'back') {
             await interaction.update({
-                components: buildCharacterCardRows({
-                    characterId: character.id,
-                    ownerDiscordId,
-                    isFiller: character.is_filler,
-                    simplifiedTracking: Boolean(character.simplified_tracking),
-                    guildStatus: character.guild_status,
-                }),
+                ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
                 content: '',
             });
             return true;
@@ -2717,7 +2779,7 @@ async function handle(interaction) {
 
         if (action === 'back') {
             await interaction.update({
-                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
                 content: '',
             });
             return true;
@@ -2972,7 +3034,7 @@ async function handle(interaction) {
 
         if (action === 'characterRegisterCancel') {
             await interaction.update({
-                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
                 content: '',
             });
             return true;
@@ -2990,8 +3052,26 @@ async function handle(interaction) {
         const status = String(character.guild_status || '').trim().toLowerCase();
         if (status !== 'draft' && status !== 'needs_changes') {
             await interaction.update({
-                ...buildCharacterCardPayload({ character, ownerDiscordId }),
+                ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
                 content: '',
+            });
+            return true;
+        }
+
+        const registrationState = await getCharacterSubmissionStateForDiscord(interaction.user, characterId);
+        if (!registrationState.ok) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.registerFailed'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        if (registrationState.blockedReason) {
+            await updateManageMessage(interaction, {
+                content: buildCharacterRegistrationBlockedContent(
+                    registrationState.blockedReason,
+                    registrationState.counts,
+                    await resolveInteractionLocale(interaction),
+                ),
+                flags: MessageFlags.Ephemeral,
             });
             return true;
         }
@@ -4796,7 +4876,7 @@ async function handle(interaction) {
         }
 
         await interaction.update({
-            ...buildCharacterCardPayload({ character, ownerDiscordId }),
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
             content: '',
         });
         return true;
@@ -4829,7 +4909,7 @@ async function handle(interaction) {
         }
 
         await interaction.update({
-            ...buildCharacterCardPayload({ character, ownerDiscordId }),
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
             content: '',
         });
         return true;
