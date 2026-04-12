@@ -1,3 +1,16 @@
+const { MessageType } = require('discord.js');
+
+function isThreadStarterSystemMessage(message) {
+    const messageType = message?.type;
+    if (messageType === MessageType.ThreadStarterMessage) {
+        return true;
+    }
+
+    const content = String(message?.content || '').toLowerCase();
+    return content.includes('hat einen thread begonnen:')
+        || content.includes('has started a thread:');
+}
+
 function extractTier(rawContent) {
     const content = String(rawContent || '');
     const emojiMatch = content.match(/:MG_?(BT|LT|HT|ET)(?:~?\d+)?/i);
@@ -446,6 +459,10 @@ function hasCancelledText(content) {
 }
 
 function parseAnnouncement(message) {
+    if (isThreadStarterSystemMessage(message)) {
+        return null;
+    }
+
     const content = message?.content ?? '';
     const tier = extractTier(content);
     const fallbackDate = message?.createdAt ?? null;
@@ -575,6 +592,7 @@ async function scanGameAnnouncements(client, { channelId, since }) {
 }
 
 module.exports = {
+    isThreadStarterSystemMessage,
     parseAnnouncement,
     scanGameAnnouncements,
 };

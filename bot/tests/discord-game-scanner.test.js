@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { MessageType } = require('discord.js');
 const { parseAnnouncement } = require('../discordGameScanner');
 
 const makeMessage = (content, createdAt = new Date('2026-01-22T12:00:00Z'), reactions = []) => ({
@@ -185,5 +186,22 @@ const dateSepCheck = parseAnnouncement(
 );
 assert.equal(dateSepCheck.starts_at, '2026-01-16 20:15:00');
 assert.equal(dateSepCheck.confidence, 0.55);
+
+const threadStarterTypeCheck = parseAnnouncement({
+    ...makeMessage(
+        'sirrio hat einen Thread begonnen: :MG_LT: 03/4.04.26 - 0.00 Uhr - "Alle Threads..."',
+        new Date('2026-04-03T12:00:00Z'),
+    ),
+    type: MessageType.ThreadStarterMessage,
+});
+assert.equal(threadStarterTypeCheck, null);
+
+const threadStarterTextFallbackCheck = parseAnnouncement(
+    makeMessage(
+        'sirrio has started a thread: :MG_LT: 03/4.04.26 - 0.00 Uhr - "All Threads..."',
+        new Date('2026-04-03T12:00:00Z'),
+    ),
+);
+assert.equal(threadStarterTextFallbackCheck, null);
 
 console.log('discord-game-scanner.test.js passed');
