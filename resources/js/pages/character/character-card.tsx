@@ -16,7 +16,7 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
-import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
+import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -25,6 +25,7 @@ import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
+import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import { Character } from '@/types'
 import { PageProps } from '@/types'
@@ -487,6 +488,7 @@ export function CharacterCard({
   const pseudoAdventureCount = character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length
   const realAdventureCount = character.adventures.length - pseudoAdventureCount
   const hasLevelAnchors = pseudoAdventureCount > 0
+  const usesManualDerivedValues = usesManualLevelTracking(character)
   const isMixedTrackingHistory = hasLevelAnchors && realAdventureCount > 0
   const trackingModeLabel = simplifiedTracking
     ? t('characters.levelTrackingBadge')
@@ -499,7 +501,16 @@ export function CharacterCard({
     : hasLevelAnchors
       ? t('characters.levelAnchorHistoryHint')
       : trackingModeLabel
-  const derivedValuesBlockedByLevelAnchors = hasLevelAnchors
+  const manualAdventuresCount = character.manual_adventures_count ?? null
+  const manualFactionRank = character.manual_faction_rank ?? null
+  const manualTotalDowntimeSeconds = character.manual_total_downtime_seconds ?? null
+  const hasDerivedRemainingDowntime = !usesManualDerivedValues || manualTotalDowntimeSeconds !== null
+  const totalDowntimeDisplay = usesManualDerivedValues
+    ? (manualTotalDowntimeSeconds === null ? t('characters.autoDisabledShort') : secondsToHourMinuteString(manualTotalDowntimeSeconds))
+    : formattedDowntimes.total
+  const remainingDowntimeDisplay = usesManualDerivedValues
+    ? (hasDerivedRemainingDowntime ? formattedDowntimes.remaining : '?')
+    : formattedDowntimes.remaining
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
   const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
@@ -697,13 +708,23 @@ export function CharacterCard({
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.played')}:{' '}
-                      {derivedValuesBlockedByLevelAnchors ? (
-                        <span
-                          className="tooltip tooltip-warning tooltip-bottom cursor-help text-warning"
-                          data-tip={adventuresDisabledReason}
-                          aria-label={adventuresDisabledReason}
-                        >
-                          {t('characters.autoDisabledShort')}
+                      {usesManualDerivedValues ? (
+                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                          <span className={manualAdventuresCount === null ? 'text-warning' : ''}>
+                            {manualAdventuresCount ?? t('characters.autoDisabledShort')}
+                          </span>
+                          <CharacterManualOverrideModal character={character} field="adventures" value={manualAdventuresCount}>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              aria-label={t('characters.manualAdventuresCountLabel')}
+                              title={adventuresDisabledReason}
+                            >
+                              <Pencil size={10} />
+                            </Button>
+                          </CharacterManualOverrideModal>
                         </span>
                       ) : (
                         realAdventureCount
@@ -724,13 +745,23 @@ export function CharacterCard({
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
                     <InfoBoxLine>
                       {t('characters.levelLabel')}:{' '}
-                      {derivedValuesBlockedByLevelAnchors ? (
-                        <span
-                          className="tooltip tooltip-warning tooltip-bottom cursor-help text-warning"
-                          data-tip={factionLevelWarningReason}
-                          aria-label={factionLevelWarningReason}
-                        >
-                          {t('characters.autoDisabledShort')}
+                      {usesManualDerivedValues ? (
+                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                          <span className={manualFactionRank === null ? 'text-warning' : ''}>
+                            {manualFactionRank ?? t('characters.autoDisabledShort')}
+                          </span>
+                          <CharacterManualOverrideModal character={character} field="factionRank" value={manualFactionRank}>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              aria-label={t('characters.manualFactionRankLabel')}
+                              title={factionLevelWarningReason}
+                            >
+                              <Pencil size={10} />
+                            </Button>
+                          </CharacterManualOverrideModal>
                         </span>
                       ) : (
                         factionLevel
@@ -741,23 +772,43 @@ export function CharacterCard({
                     <InfoBoxTitle>
                       <FlameKindling size={15} /> {t('characters.downtime')}
                     </InfoBoxTitle>
-                    {derivedValuesBlockedByLevelAnchors ? (
-                      <InfoBoxLine
-                        className="tooltip tooltip-warning tooltip-bottom cursor-help text-warning"
-                        data-tip={downtimeDisabledReason}
-                        aria-label={downtimeDisabledReason}
-                      >
-                        {t('characters.autoDisabledShort')}
-                      </InfoBoxLine>
+                    <InfoBoxLine>
+                      {t('characters.total')}:{' '}
+                      {usesManualDerivedValues ? (
+                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                          <span className={manualTotalDowntimeSeconds === null ? 'text-warning' : ''}>
+                            {totalDowntimeDisplay}
+                          </span>
+                          <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              aria-label={t('characters.manualTotalDowntimeLabel')}
+                              title={downtimeDisabledReason}
+                            >
+                              <Pencil size={10} />
+                            </Button>
+                          </CharacterManualOverrideModal>
+                        </span>
+                      ) : (
+                        totalDowntimeDisplay
+                      )}
+                    </InfoBoxLine>
+                    <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
+                    <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
+                    {hasDerivedRemainingDowntime ? (
+                      <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
+                        <InfoBoxLine className="font-semibold cursor-help">
+                          {t('characters.remaining')}: {remainingDowntimeDisplay}
+                        </InfoBoxLine>
+                      </div>
                     ) : (
-                      <>
-                        <InfoBoxLine>{t('characters.total')}: {formattedDowntimes.total}</InfoBoxLine>
-                        <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
-                        <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
-                        <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
-                          <InfoBoxLine className="font-semibold cursor-help">{t('characters.remaining')}: {formattedDowntimes.remaining}</InfoBoxLine>
-                        </div>
-                      </>
+                      <InfoBoxLine className="font-semibold">
+                        {t('characters.remaining')}:{' '}
+                        <span className="text-warning">{remainingDowntimeDisplay}</span>
+                      </InfoBoxLine>
                     )}
                   </InfoBox>
                   <InfoBox>
@@ -877,21 +928,7 @@ export function CharacterCard({
                   </Button>
                 </div>
               ) : canLogActivity ? (
-                derivedValuesBlockedByLevelAnchors ? (
-                  <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} aria-label={downtimeDisabledReason}>
-                    <Button
-                      size="sm"
-                      className="w-full justify-center gap-1"
-                      disabled
-                      aria-label={t('characters.addDowntimeDisabled')}
-                    >
-                      <FlameKindling size={14} />
-                      <span className="md:hidden">{t('characters.downtime')}</span>
-                    </Button>
-                  </div>
-                ) : (
-                  <StoreDowntimeModal character={character}></StoreDowntimeModal>
-                )
+                <StoreDowntimeModal character={character}></StoreDowntimeModal>
               ) : null}
               {requiresSubmissionBeforeDowntime ? (
                 <div

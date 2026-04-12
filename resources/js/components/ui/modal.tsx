@@ -72,7 +72,7 @@ export const Modal = ({
 
   return (
     <>
-      <div onClick={openModal}>{triggerElement}</div>
+      {triggerElement ? <div onClick={openModal}>{triggerElement}</div> : null}
       {isOpen &&
         ReactDOM.createPortal(
           <dialog

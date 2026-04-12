@@ -85,6 +85,15 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+function nullableInt(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
 function secondsToHourMinuteString(seconds) {
     return formatDurationSeconds(safeInt(seconds, 0));
 }
@@ -252,7 +261,10 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const hasRoom = safeInt(character.has_room) > 0;
     const simplifiedTracking = Boolean(character.simplified_tracking);
     const hasAutoLevelAdventure = Boolean(safeInt(character.has_pseudo_adventure));
-    const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure;
+    const usesManualDerivedValues = simplifiedTracking || hasAutoLevelAdventure;
+    const manualAdventuresCount = nullableInt(character.manual_adventures_count);
+    const manualFactionRank = nullableInt(character.manual_faction_rank);
+    const manualTotalDowntime = nullableInt(character.manual_total_downtime_seconds);
 
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
@@ -264,19 +276,19 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const downtimeFaction = safeInt(character.faction_downtime);
     const downtimeOther = safeInt(character.other_downtime);
     const downtimeAllowed = totalBubbles * 8 * 60 * 60;
-    const downtimeRemaining = downtimeAllowed - downtimeTotal;
+    const downtimeRemaining = usesManualDerivedValues && manualTotalDowntime !== null
+        ? manualTotalDowntime - downtimeTotal
+        : downtimeAllowed - downtimeTotal;
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
-    const adventuresValue = downtimeDisabledInSimpleMode
-        ? `Played: **?**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`
+    const adventuresValue = usesManualDerivedValues
+        ? `Played: **${manualAdventuresCount ?? 'Manual'}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`
         : `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`;
-    const factionsValue = downtimeDisabledInSimpleMode
-        ? `${factionName}\nLevel: **?**`
+    const factionsValue = usesManualDerivedValues
+        ? `${factionName}\nLevel: **${manualFactionRank ?? 'Manual'}**`
         : `${factionName}\nLevel: **${factionLevel}**`;
-    const downtimeValue = downtimeDisabledInSimpleMode
-        ? 'Cannot calculate downtime while level tracking entries exist.'
-        : `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`;
+    const downtimeValue = `Total: **${usesManualDerivedValues ? (manualTotalDowntime === null ? 'Manual' : secondsToHourMinuteString(manualTotalDowntime)) : secondsToHourMinuteString(downtimeAllowed)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${usesManualDerivedValues ? (manualTotalDowntime === null ? 'Manual' : secondsToHourMinuteString(Math.max(0, downtimeRemaining))) : secondsToHourMinuteString(Math.max(0, downtimeRemaining))}**`;
 
     const titleParts = [
         String(character.name || `Character ${character.id}`),

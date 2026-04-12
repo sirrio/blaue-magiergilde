@@ -3,6 +3,7 @@
 use App\Http\Controllers\Character\AvatarMaskController;
 use App\Http\Controllers\Character\AvatarModeController;
 use App\Http\Controllers\Character\CharacterController;
+use App\Http\Controllers\Character\CharacterManualOverridesController;
 use App\Http\Controllers\Character\DeletedCharacterController;
 use App\Http\Controllers\Character\DownloadCharacterController;
 use App\Http\Controllers\Character\ForceDeleteDeletedCharacterController;
@@ -32,6 +33,9 @@ Route::patch('characters/{character}/avatar-mode', AvatarModeController::class)
 Route::patch('characters/{character}/private-mode', PrivateModeController::class)
     ->middleware(['auth'])
     ->name('characters.private-mode');
+Route::patch('characters/{character}/manual-overrides', CharacterManualOverridesController::class)
+    ->middleware(['auth'])
+    ->name('characters.manual-overrides');
 Route::get('avatars/masked', AvatarMaskController::class)
     ->name('avatars.masked');
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
