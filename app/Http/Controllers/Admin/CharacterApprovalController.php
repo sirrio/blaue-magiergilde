@@ -9,8 +9,12 @@ use App\Models\LegacyCharacterApproval;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
 use App\Support\DndBeyondCharacterLink;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -24,60 +28,67 @@ class CharacterApprovalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->is_admin, 403);
 
-        $search = $request->string('search')->trim();
+        $search = trim((string) $request->input('search', ''));
         $status = $request->input('status');
         $tier = $request->input('tier');
         $discordFilter = $request->input('discord');
         $legacyFilter = $request->input('legacy');
         $noDiscord = $request->boolean('no_discord');
 
-        $charactersQuery = Character::query()
-            ->without(['allies', 'downtimes', 'characterClasses'])
-            ->withCount('room')
-            ->with([
-                'user' => fn ($query) => $query
-                    ->select(['id', 'name', 'discord_id', 'discord_username', 'discord_display_name', 'avatar'])
-                    ->withCount([
-                        'characters as submitted_characters_count' => fn ($characterQuery) => $characterQuery
-                            ->where('guild_status', '!=', 'draft'),
-                    ]),
-                'adventures:id,character_id,duration,has_additional_bubble',
-                'characterClasses:id,name',
-            ]);
-
-        if ($search->isNotEmpty()) {
-            $charactersQuery->where(function ($query) use ($search) {
-                $query->where('name', 'LIKE', "%{$search}%")
-                    ->orWhereHas('user', function ($userQuery) use ($search) {
-                        $userQuery->where('name', 'LIKE', "%{$search}%")
-                            ->orWhere('discord_username', 'LIKE', "%{$search}%")
-                            ->orWhere('discord_display_name', 'LIKE', "%{$search}%")
-                            ->orWhere('discord_id', 'LIKE', "%{$search}%");
-                    });
-            });
-        }
-
-        if (in_array($status, ['pending', 'approved', 'declined', 'needs_changes', 'retired', 'draft'], true)) {
-            $charactersQuery->where('guild_status', $status);
-        }
-
-        if (in_array($tier, ['bt', 'lt', 'ht', 'et', 'filler'], true)) {
-            $charactersQuery->where('start_tier', $tier);
-        }
-
-        if ($discordFilter === 'only') {
-            $charactersQuery->whereHas('user', function ($query) {
-                $query->whereNotNull('discord_id');
-            });
-        } elseif ($discordFilter === 'none' || $noDiscord) {
-            $charactersQuery->whereHas('user', function ($query) {
-                $query->whereNull('discord_id');
-            });
-        }
-
-        $characters = $charactersQuery
+        $lightweightCharacters = $this->buildFilteredCharacterIdsQuery(
+            $search,
+            $status,
+            $tier,
+            $discordFilter,
+            $noDiscord,
+        )
             ->orderBy('user_id')
             ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'user_id',
+                'external_link',
+            ]);
+
+        $filteredCharacterIds = $this->filterCharacterIdsByLegacy(
+            $lightweightCharacters,
+            $legacyFilter,
+        );
+
+        $characterUserIds = $filteredCharacterIds
+            ->pluck('user_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $includeEmptyUsers = blank($status) && blank($tier) && blank($legacyFilter);
+        $pageSize = 10;
+        $emptyUserIds = $includeEmptyUsers
+            ? $this->buildEmptyUsersQuery($search, $discordFilter, $noDiscord, $characterUserIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all()
+            : [];
+        $paginatedUsers = $this->buildApprovalUsersPaginator(
+            array_values(array_unique([...$characterUserIds, ...$emptyUserIds])),
+            $pageSize,
+        );
+
+        $pageUserIds = $paginatedUsers->getCollection()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $pageUserOrder = $pageUserIds->flip();
+        $pageCharacterIds = $filteredCharacterIds
+            ->filter(fn (Character $character) => $pageUserIds->contains((int) $character->user_id))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $characters = $this->buildCharacterDetailsQuery($pageCharacterIds)
             ->get([
                 'id',
                 'name',
@@ -100,6 +111,226 @@ class CharacterApprovalController extends Controller
                 'simplified_tracking',
             ]);
 
+        $characters = $this->attachLegacyApprovalData($characters)
+            ->sort(function (Character $left, Character $right) use ($pageUserOrder) {
+                $leftOrder = $pageUserOrder->get((int) $left->user_id, PHP_INT_MAX);
+                $rightOrder = $pageUserOrder->get((int) $right->user_id, PHP_INT_MAX);
+
+                if ($leftOrder !== $rightOrder) {
+                    return $leftOrder <=> $rightOrder;
+                }
+
+                return strcasecmp($left->name, $right->name);
+            })
+            ->values();
+
+        $characterUserIdsOnPage = $characters
+            ->pluck('user_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $emptyUsers = $paginatedUsers->getCollection()
+            ->filter(fn (User $approvalUser) => ! in_array((int) $approvalUser->id, $characterUserIdsOnPage, true))
+            ->values();
+
+        return Inertia::render('character-approvals/list', [
+            'characters' => $characters,
+            'emptyUsers' => $emptyUsers,
+            'userOrder' => $pageUserIds->all(),
+            'pagination' => [
+                'currentPage' => $paginatedUsers->currentPage(),
+                'lastPage' => $paginatedUsers->lastPage(),
+                'perPage' => $paginatedUsers->perPage(),
+                'total' => $paginatedUsers->total(),
+                'hasMorePages' => $paginatedUsers->hasMorePages(),
+            ],
+        ]);
+    }
+
+    private function buildFilteredCharacterIdsQuery(
+        string $search,
+        mixed $status,
+        mixed $tier,
+        mixed $discordFilter,
+        bool $noDiscord,
+    ): Builder {
+        $query = Character::query()
+            ->select(['id', 'name', 'user_id', 'external_link']);
+
+        if ($search !== '') {
+            $query->where(function (Builder $characterQuery) use ($search) {
+                $characterQuery->where('name', 'LIKE', "%{$search}%")
+                    ->orWhereHas('user', function (Builder $userQuery) use ($search) {
+                        $userQuery->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('discord_username', 'LIKE', "%{$search}%")
+                            ->orWhere('discord_display_name', 'LIKE', "%{$search}%")
+                            ->orWhere('discord_id', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        if (in_array($status, ['pending', 'approved', 'declined', 'needs_changes', 'retired', 'draft'], true)) {
+            $query->where('guild_status', $status);
+        }
+
+        if (in_array($tier, ['bt', 'lt', 'ht', 'et', 'filler'], true)) {
+            $query->where('start_tier', $tier);
+        }
+
+        if ($discordFilter === 'only') {
+            $query->whereHas('user', function (Builder $userQuery) {
+                $userQuery->whereNotNull('discord_id');
+            });
+        } elseif ($discordFilter === 'none' || $noDiscord) {
+            $query->whereHas('user', function (Builder $userQuery) {
+                $userQuery->whereNull('discord_id');
+            });
+        }
+
+        return $query;
+    }
+
+    private function buildEmptyUsersQuery(
+        string $search,
+        mixed $discordFilter,
+        bool $noDiscord,
+        array $characterUserIds,
+    ): Builder {
+        $query = User::query()
+            ->select([
+                'id',
+                'name',
+                'discord_id',
+                'discord_username',
+                'discord_display_name',
+                'avatar',
+                'simplified_tracking',
+            ]);
+
+        if ($characterUserIds !== []) {
+            $query->whereNotIn('id', $characterUserIds);
+        }
+
+        if ($search !== '') {
+            $query->where(function (Builder $userQuery) use ($search) {
+                $userQuery->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('discord_username', 'LIKE', "%{$search}%")
+                    ->orWhere('discord_display_name', 'LIKE', "%{$search}%")
+                    ->orWhere('discord_id', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($discordFilter === 'only') {
+            $query->whereNotNull('discord_id');
+        } elseif ($discordFilter === 'none' || $noDiscord) {
+            $query->whereNull('discord_id');
+        }
+
+        return $query;
+    }
+
+    private function buildApprovalUsersPaginator(array $userIds, int $perPage): LengthAwarePaginator
+    {
+        if ($userIds === []) {
+            return User::query()
+                ->select([
+                    'id',
+                    'name',
+                    'discord_id',
+                    'discord_username',
+                    'discord_display_name',
+                    'avatar',
+                    'simplified_tracking',
+                ])
+                ->whereRaw('1 = 0')
+                ->paginate($perPage)
+                ->withQueryString();
+        }
+
+        return User::query()
+            ->select([
+                'id',
+                'name',
+                'discord_id',
+                'discord_username',
+                'discord_display_name',
+                'avatar',
+                'simplified_tracking',
+            ])
+            ->whereIn('id', $userIds)
+            ->withCount([
+                'characters as submitted_characters_count' => fn (Builder $characterQuery) => $characterQuery
+                    ->where('guild_status', '!=', 'draft'),
+            ])
+            ->orderBy('name')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    private function buildCharacterDetailsQuery(array $characterIds): Builder
+    {
+        return Character::query()
+            ->without(['allies', 'downtimes', 'characterClasses'])
+            ->withCount([
+                'room',
+                'adventures as adventure_additional_bubbles_count' => fn (Builder $adventureQuery) => $adventureQuery
+                    ->where('has_additional_bubble', true),
+            ])
+            ->withSum('adventures as total_adventure_duration', 'duration')
+            ->with([
+                'user' => fn ($query) => $query
+                    ->select(['id', 'name', 'discord_id', 'discord_username', 'discord_display_name', 'avatar'])
+                    ->withCount([
+                        'characters as submitted_characters_count' => fn (Builder $characterQuery) => $characterQuery
+                            ->where('guild_status', '!=', 'draft'),
+                    ]),
+                'characterClasses:id,name',
+            ])
+            ->whereKey($characterIds);
+    }
+
+    private function filterCharacterIdsByLegacy(
+        Collection $characters,
+        mixed $legacyFilter,
+    ): Collection {
+        $characterIdsByCharacterId = $characters
+            ->mapWithKeys(fn (Character $character) => [$character->id => DndBeyondCharacterLink::extractId($character->external_link)])
+            ->filter();
+
+        if ($characterIdsByCharacterId->isEmpty()) {
+            return $legacyFilter === 'matched'
+                ? collect()
+                : $characters->values();
+        }
+
+        $legacyMatches = LegacyCharacterApproval::query()
+            ->whereIn('dndbeyond_character_id', $characterIdsByCharacterId->values())
+            ->pluck('dndbeyond_character_id')
+            ->flip();
+
+        return $characters
+            ->filter(function (Character $character) use ($characterIdsByCharacterId, $legacyMatches, $legacyFilter) {
+                $dndBeyondCharacterId = $characterIdsByCharacterId[$character->id] ?? null;
+                $hasLegacyApproval = $dndBeyondCharacterId !== null && $legacyMatches->has($dndBeyondCharacterId);
+
+                if ($legacyFilter === 'matched') {
+                    return $hasLegacyApproval;
+                }
+
+                if ($legacyFilter === 'missing') {
+                    return ! $hasLegacyApproval;
+                }
+
+                return true;
+            })
+            ->values();
+    }
+
+    private function attachLegacyApprovalData(EloquentCollection $characters): EloquentCollection
+    {
         $characterIdsByCharacterId = $characters
             ->mapWithKeys(fn (Character $character) => [$character->id => DndBeyondCharacterLink::extractId($character->external_link)])
             ->filter();
@@ -120,7 +351,7 @@ class CharacterApprovalController extends Controller
             ])
             ->keyBy('dndbeyond_character_id');
 
-        $characters = $characters
+        return $characters
             ->map(function (Character $character) use ($characterIdsByCharacterId, $legacyMatches) {
                 $dndBeyondCharacterId = $characterIdsByCharacterId[$character->id] ?? null;
                 $legacyMatch = $dndBeyondCharacterId !== null ? $legacyMatches->get($dndBeyondCharacterId) : null;
@@ -147,71 +378,7 @@ class CharacterApprovalController extends Controller
 
                 return $character;
             })
-            ->filter(function (Character $character) use ($legacyFilter) {
-                if ($legacyFilter === 'matched') {
-                    return (bool) $character->getAttribute('has_legacy_approval');
-                }
-
-                if ($legacyFilter === 'missing') {
-                    return ! $character->getAttribute('has_legacy_approval');
-                }
-
-                return true;
-            })
             ->values();
-
-        $characterUserIds = $characters
-            ->pluck('user_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        $includeEmptyUsers = blank($status) && blank($tier) && blank($legacyFilter);
-        $emptyUsers = collect();
-
-        if ($includeEmptyUsers) {
-            $emptyUsersQuery = User::query()
-                ->select([
-                    'id',
-                    'name',
-                    'discord_id',
-                    'discord_username',
-                    'discord_display_name',
-                    'avatar',
-                    'simplified_tracking',
-                ])
-                ->whereNotIn('id', $characterUserIds);
-
-            if ($search->isNotEmpty()) {
-                $emptyUsersQuery->where(function ($query) use ($search) {
-                    $query->where('name', 'LIKE', "%{$search}%")
-                        ->orWhere('discord_username', 'LIKE', "%{$search}%")
-                        ->orWhere('discord_display_name', 'LIKE', "%{$search}%")
-                        ->orWhere('discord_id', 'LIKE', "%{$search}%");
-                });
-            }
-
-            if ($discordFilter === 'only') {
-                $emptyUsersQuery->whereNotNull('discord_id');
-            } elseif ($discordFilter === 'none' || $noDiscord) {
-                $emptyUsersQuery->whereNull('discord_id');
-            }
-
-            $emptyUsers = $emptyUsersQuery
-                ->withCount([
-                    'characters as submitted_characters_count' => fn ($characterQuery) => $characterQuery
-                        ->where('guild_status', '!=', 'draft'),
-                ])
-                ->orderBy('name')
-                ->get();
-        }
-
-        return Inertia::render('character-approvals/list', [
-            'characters' => $characters,
-            'emptyUsers' => $emptyUsers,
-        ]);
     }
 
     public function update(
