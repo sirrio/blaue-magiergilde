@@ -1333,11 +1333,6 @@ async function handle(interaction) {
             return true;
         }
 
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         const existingState = getCreationState(ownerDiscordId, { allowExpired: true });
         if (existingState) {
             if (!isCreationStateExpired(existingState)) {
@@ -1403,11 +1398,6 @@ async function handle(interaction) {
             return true;
         }
 
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         await interaction.deferUpdate().catch(() => undefined);
         const characters = await listCharactersForDiscord(interaction.user);
         const locale = await resolveInteractionLocale(interaction);
@@ -1421,11 +1411,6 @@ async function handle(interaction) {
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateActionDenied(interaction, { embeds: [], components: [] });
-            return true;
-        }
-
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1445,11 +1430,6 @@ async function handle(interaction) {
             return true;
         }
 
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         const locale = await resolveInteractionLocale(interaction);
         const trackingView = buildTrackingDefaultSelectionView({ ownerDiscordId, locale, source: 'settings' });
         await interaction.update({ ...trackingView, content: '' });
@@ -1461,11 +1441,6 @@ async function handle(interaction) {
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateActionDenied(interaction, { embeds: [], components: [] });
-            return true;
-        }
-
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1485,11 +1460,6 @@ async function handle(interaction) {
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateActionDenied(interaction, { embeds: [], components: [] });
-            return true;
-        }
-
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1521,11 +1491,6 @@ async function handle(interaction) {
             return true;
         }
 
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         const locale = await resolveInteractionLocale(interaction);
         await updateLinkedUserTrackingDefaultForDiscord(interaction.user, selectedMode === 'level');
         const characters = await listCharactersForDiscord(interaction.user);
@@ -1553,11 +1518,6 @@ async function handle(interaction) {
             return true;
         }
 
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.useInServer'), flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         const characters = await listCharactersForDiscord(interaction.user);
         const locale = await resolveInteractionLocale(interaction);
         const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
@@ -1570,11 +1530,6 @@ async function handle(interaction) {
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateActionDenied(interaction, { embeds: [], components: [] });
-            return true;
-        }
-
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -1593,11 +1548,6 @@ async function handle(interaction) {
             return true;
         }
 
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
-            return true;
-        }
-
         const characters = await listCharactersForDiscord(interaction.user);
         const locale = await resolveInteractionLocale(interaction);
         const listView = buildCharacterListView({ ownerDiscordId, characters, locale });
@@ -1610,11 +1560,6 @@ async function handle(interaction) {
 
         if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
             await updateActionDenied(interaction, { embeds: [], components: [] });
-            return true;
-        }
-
-        if (!interaction.inGuild()) {
-            await updateManageMessage(interaction, { content: 'Please use this command in a server (not in DMs).', flags: MessageFlags.Ephemeral });
             return true;
         }
 

@@ -551,19 +551,10 @@ function buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale }) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription(t('characters.commandDescription')),
+        .setDescription(t('characters.commandDescription'))
+        .setContexts(0, 1),  // 0 = Guild, 1 = Bot DM
     async execute(interaction) {
         await ensureLevelProgressionLoaded();
-
-        if (!interaction.inGuild()) {
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-            }
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ content: t('characters.useInServer'), components: [] });
-            }
-            return;
-        }
 
         if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
