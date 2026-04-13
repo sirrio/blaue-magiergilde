@@ -10,6 +10,7 @@ import {
   BookOpen,
   CalendarDays,
   Gavel,
+  GraduationCap,
   Map,
   MessageSquarePlus,
   Menu,
@@ -19,6 +20,7 @@ import {
   Shield,
   Sparkles,
   Store,
+  Sword,
   UserCheck,
   Users,
 } from 'lucide-react'
@@ -102,6 +104,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
       links: [
         { name: t('nav.items'), route: 'admin.items.index', method: 'get' as const, icon: Package },
         { name: t('nav.spells'), route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
+        { name: t('nav.classes'), route: 'admin.character-classes.index', method: 'get' as const, icon: GraduationCap },
+        { name: t('nav.variants'), route: 'admin.mundane-item-variants.index', method: 'get' as const, icon: Sword },
         { name: t('nav.suggestions'), route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: MessageSquarePlus },
       ],
     },

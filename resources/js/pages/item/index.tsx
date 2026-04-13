@@ -901,72 +901,59 @@ export default function Index({
             {!canManage ? <SuggestNewItemModal sources={sources} mundaneVariants={mundaneVariants} /> : null}
           </div>
         </section>
-        <div className="rounded-box border border-base-200 bg-base-100 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-xs uppercase text-base-content/50">{t('compendium.filters')}</p>
-              <h2 className="text-lg font-semibold">{t('compendium.inventoryFilters')}</h2>
-              <p className="text-xs text-base-content/70">{t('compendium.refineItems')}</p>
+        <div className="rounded-box border border-base-200 bg-base-100 p-4 space-y-3">
+          <Input type="search" placeholder={t('compendium.searchByName')} value={search} onChange={handleSearch}>
+            {t('common.search')}
+          </Input>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base-content/60">{t('compendium.source')}:</span>
+              <select
+                className="select select-xs w-56"
+                value={selectedSource}
+                onChange={(event) => handleSourceFilterChange(event.target.value)}
+              >
+                <option value="">{t('compendium.all')}</option>
+                <option value="none">{t('compendium.noSource')}</option>
+                {sources.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {formatSourceOptionLabel(source, t)}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-              <span className="rounded-full border border-base-200 px-2 py-1">{totalItems} items</span>
-              {activeFilters.length === 0 ? (
-                <span className="text-base-content/50">{t('compendium.noFilters')}</span>
-              ) : (
-                activeFilters.map((filter) => (
-                  <span key={filter} className="rounded-full border border-base-200 px-2 py-1">
-                    {filter}
-                  </span>
-                ))
-              )}
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.rarity')}:</span>
+              {renderFilterOptions('rarity', rarityFilters)}
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('characters.type')}:</span>
+              {renderFilterOptions('type', typeFilters)}
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.guild')}:</span>
+              {renderFilterOptions('guild', guildFilters)}
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.shop')}:</span>
+              {renderFilterOptions('shop', shopFilters)}
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.autoRoll')}:</span>
+              {renderFilterOptions('spell', spellFilters)}
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.ruling')}:</span>
+              {renderFilterOptions('ruling', rulingFilters)}
             </div>
           </div>
-          <div className="mt-3">
-            <Input type="search" placeholder={t('compendium.searchByName')} value={search} onChange={handleSearch}>
-              {t('common.search')}
-            </Input>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="text-base-content/60">{t('compendium.source')}:</span>
-                <select
-                  className="select select-xs w-56"
-                  value={selectedSource}
-                  onChange={(event) => handleSourceFilterChange(event.target.value)}
-                >
-                  <option value="">{t('compendium.all')}</option>
-                  <option value="none">{t('compendium.noSource')}</option>
-                  {sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {formatSourceOptionLabel(source, t)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">{t('compendium.rarity')}:</span>
-                {renderFilterOptions('rarity', rarityFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">{t('characters.type')}:</span>
-                {renderFilterOptions('type', typeFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">{t('compendium.guild')}:</span>
-                {renderFilterOptions('guild', guildFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">{t('compendium.shop')}:</span>
-                {renderFilterOptions('shop', shopFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">{t('compendium.autoRoll')}:</span>
-                {renderFilterOptions('spell', spellFilters)}
-              </div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-base-content/60">{t('compendium.ruling')}:</span>
-                {renderFilterOptions('ruling', rulingFilters)}
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/50">
+            <span>{totalItems} items</span>
+            {activeFilters.map((filter) => (
+              <span key={filter} className="rounded-full border border-base-200 px-2 py-1 text-base-content/60">
+                {filter}
+              </span>
+            ))}
           </div>
         </div>
         <Deferred
