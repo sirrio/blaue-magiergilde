@@ -16,7 +16,7 @@ class RefreshShopItemSnapshotController extends Controller
     {
         $item = Item::query()
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'ruling_changed', 'ruling_note'])
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->find($shopItem->item_id);
 
         if (! $item) {

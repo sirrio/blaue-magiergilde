@@ -127,7 +127,7 @@ class BackupController extends Controller
                 ->get(['id', 'name', 'shortcode', 'kind']),
             'mundaneVariants' => MundaneItemVariant::query()
                 ->orderBy('category')
-                ->orderBy('sort_order')
+                ->orderBy('is_placeholder', 'desc')
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug', 'category', 'is_placeholder']),
             'compendiumImportRuns' => CompendiumImportRun::query()

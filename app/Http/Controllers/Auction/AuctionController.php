@@ -63,7 +63,7 @@ class AuctionController extends Controller
             ->get();
 
         $items = Item::query()
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->orderBy('name')
             ->select(['id', 'name', 'rarity', 'type', 'cost', 'url'])
             ->get()

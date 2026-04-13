@@ -49,7 +49,7 @@ class ItemCostResolver
     private static function formatVariantLabel(Collection $variants): string
     {
         /** @var MundaneItemVariant $first */
-        $first = $variants->sortBy('sort_order')->first();
+        $first = $variants->sortBy('name')->first();
         $prefix = self::variantSourcePrefix($first->category);
 
         if ($variants->count() !== 1 || $first->is_placeholder || $first->cost_gp === null) {

@@ -34,7 +34,7 @@ class ItemController extends Controller
         $itemQuery = Item::query();
         $itemQuery->with([
             'source:id,name,shortcode,kind',
-            'mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order',
+            'mundaneVariants:id,name,slug,category,cost_gp,is_placeholder',
         ]);
 
         if (! empty($searchTerm)) {
@@ -145,7 +145,7 @@ class ItemController extends Controller
                 ->get(['id', 'name', 'shortcode', 'kind']),
             'mundaneVariants' => MundaneItemVariant::query()
                 ->orderBy('category')
-                ->orderBy('sort_order')
+                ->orderBy('is_placeholder', 'desc')
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug', 'category', 'cost_gp', 'is_placeholder'])
                 ->map(static function (MundaneItemVariant $variant): array {

@@ -30,7 +30,7 @@ class BackstockController extends Controller
             ]);
 
         $items = Item::query()
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->orderBy('name')
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
             ->get()

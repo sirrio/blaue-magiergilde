@@ -115,7 +115,7 @@ class ShopRollService
                 'default_spell_levels',
                 'default_spell_schools',
             ])
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->where('shop_enabled', true)
             ->where('rarity', $rarity);
 
@@ -256,7 +256,7 @@ class ShopRollService
                     'default_spell_schools',
                     'source_id',
                 ])
-                ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+                ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
                 ->where('shop_enabled', true)
                 ->where('rarity', $rule->rarity);
 

@@ -148,7 +148,7 @@ class CompendiumSuggestionController extends Controller
             ->map(static fn ($name): string => (string) $name);
         $variantLabels = MundaneItemVariant::query()
             ->orderBy('category')
-            ->orderBy('sort_order')
+            ->orderBy('is_placeholder', 'desc')
             ->orderBy('name')
             ->get(['id', 'name', 'category', 'is_placeholder'])
             ->mapWithKeys(static function (MundaneItemVariant $variant): array {
@@ -162,7 +162,7 @@ class CompendiumSuggestionController extends Controller
             });
         $variantMeta = MundaneItemVariant::query()
             ->orderBy('category')
-            ->orderBy('sort_order')
+            ->orderBy('is_placeholder', 'desc')
             ->orderBy('name')
             ->get(['id', 'name', 'category', 'is_placeholder'])
             ->mapWithKeys(static fn (MundaneItemVariant $variant): array => [
