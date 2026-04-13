@@ -5,6 +5,7 @@ import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/m
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
+import { FrontendErrorBoundary } from '@/components/error-boundary'
 import { reportFrontendError } from '@/lib/frontend-error-reporting'
 import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal'
 import { cn } from '@/lib/utils'
@@ -186,6 +187,23 @@ const getCompendiumChangeLabel = (field: string) => {
   }
 
   return labels[field] ?? field.replaceAll('_', ' ')
+}
+
+function ThrowOnRender() {
+  throw new Error('[test] Error boundary preview — triggered manually from admin settings.')
+}
+
+function TestErrorBoundaryButton() {
+  const [show, setShow] = useState(false)
+  return show ? (
+    <FrontendErrorBoundary>
+      <ThrowOnRender />
+    </FrontendErrorBoundary>
+  ) : (
+    <Button size="sm" variant="outline" onClick={() => setShow(true)}>
+      Preview error boundary
+    </Button>
+  )
 }
 
 export default function Settings({
@@ -2083,21 +2101,24 @@ export default function Settings({
             <h2 className="text-sm font-semibold">Monitoring</h2>
             <p className="text-xs text-base-content/60 mt-0.5">Test that the error reporting pipeline is wired up correctly.</p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              reportFrontendError({
-                source: 'window_error',
-                message: '[test] Frontend error reporting test — triggered manually from admin settings.',
-                url: window.location.href,
-                context: { manual_test: true },
-              })
-              toast.show('Test error sent — check Nightwatch.', 'info')
-            }}
-          >
-            Test frontend error reporting
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                reportFrontendError({
+                  source: 'window_error',
+                  message: '[test] Frontend error reporting test — triggered manually from admin settings.',
+                  url: window.location.href,
+                  context: { manual_test: true },
+                })
+                toast.show('Test error sent — check Nightwatch.', 'info')
+              }}
+            >
+              Test frontend error reporting
+            </Button>
+            <TestErrorBoundaryButton />
+          </div>
         </div>
       </div>
     </AppLayout>
