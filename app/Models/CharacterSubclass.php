@@ -5,14 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class CharacterClass extends Model
+class CharacterSubclass extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'source_id', 'guild_enabled'];
+    protected $fillable = ['character_class_id', 'name', 'source_id', 'guild_enabled'];
 
     protected function casts(): array
     {
@@ -21,18 +19,13 @@ class CharacterClass extends Model
         ];
     }
 
-    public function characters(): BelongsToMany
+    public function characterClass(): BelongsTo
     {
-        return $this->belongsToMany(Character::class);
+        return $this->belongsTo(CharacterClass::class);
     }
 
     public function source(): BelongsTo
     {
         return $this->belongsTo(Source::class);
-    }
-
-    public function subclasses(): HasMany
-    {
-        return $this->hasMany(CharacterSubclass::class);
     }
 }

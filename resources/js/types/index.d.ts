@@ -362,7 +362,17 @@ export interface Spell {
 export interface CharacterClass {
   id: number
   name: string
-  src: string
+  source_id?: number | null
+  source?: Source | null
+  guild_enabled?: boolean
+}
+
+export interface CharacterSubclass {
+  id: number
+  character_class_id: number
+  name: string
+  source_id?: number | null
+  source?: Source | null
 }
 
 export interface Character {
