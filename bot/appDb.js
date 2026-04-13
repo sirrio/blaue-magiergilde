@@ -343,13 +343,32 @@ async function listCharactersForDiscord(discordUser) {
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
-                    character_id,
+                    a.character_id,
                     COUNT(*) AS adventures_count,
-                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles,
-                    MAX(CASE WHEN is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
-                FROM adventures
-                WHERE deleted_at IS NULL
-                GROUP BY character_id
+                    SUM(
+                        CASE
+                            WHEN lp.id IS NULL THEN
+                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
+                            WHEN a.id = lp.id THEN
+                                COALESCE(lprog.required_bubbles, 0)
+                            WHEN a.is_pseudo = 0 AND (a.start_date > lp.start_date OR (a.start_date = lp.start_date AND a.id > lp.id)) THEN
+                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
+                            ELSE 0
+                        END
+                    ) AS adventure_bubbles,
+                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
+                FROM adventures a
+                LEFT JOIN (
+                    SELECT character_id, id, start_date, target_level,
+                           ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY start_date DESC, id DESC) AS rn
+                    FROM adventures
+                    WHERE deleted_at IS NULL AND is_pseudo = 1
+                ) lp ON lp.character_id = a.character_id AND lp.rn = 1
+                LEFT JOIN level_progressions lprog
+                    ON lprog.level = lp.target_level
+                    AND lprog.version_id = (SELECT id FROM level_progression_versions WHERE is_active = 1 LIMIT 1)
+                WHERE a.deleted_at IS NULL
+                GROUP BY a.character_id
             ) a ON a.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -491,13 +510,32 @@ async function findCharacterForDiscord(discordUser, characterId) {
             LEFT JOIN rooms r ON r.character_id = c.id
             LEFT JOIN (
                 SELECT
-                    character_id,
+                    a.character_id,
                     COUNT(*) AS adventures_count,
-                    SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END) AS adventure_bubbles,
-                    MAX(CASE WHEN is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
-                FROM adventures
-                WHERE deleted_at IS NULL
-                GROUP BY character_id
+                    SUM(
+                        CASE
+                            WHEN lp.id IS NULL THEN
+                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
+                            WHEN a.id = lp.id THEN
+                                COALESCE(lprog.required_bubbles, 0)
+                            WHEN a.is_pseudo = 0 AND (a.start_date > lp.start_date OR (a.start_date = lp.start_date AND a.id > lp.id)) THEN
+                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
+                            ELSE 0
+                        END
+                    ) AS adventure_bubbles,
+                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
+                FROM adventures a
+                LEFT JOIN (
+                    SELECT character_id, id, start_date, target_level,
+                           ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY start_date DESC, id DESC) AS rn
+                    FROM adventures
+                    WHERE deleted_at IS NULL AND is_pseudo = 1
+                ) lp ON lp.character_id = a.character_id AND lp.rn = 1
+                LEFT JOIN level_progressions lprog
+                    ON lprog.level = lp.target_level
+                    AND lprog.version_id = (SELECT id FROM level_progression_versions WHERE is_active = 1 LIMIT 1)
+                WHERE a.deleted_at IS NULL
+                GROUP BY a.character_id
             ) a ON a.character_id = c.id
             LEFT JOIN (
                 SELECT
@@ -545,7 +583,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
 
         const [[character]] = await connection.execute(
             `
-                SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler
+                SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler, simplified_tracking
                 FROM characters
                 WHERE id = ? AND user_id = ?
                 LIMIT 1
@@ -559,27 +597,24 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
         }
 
         const additional = additionalBubblesForStartTier(character.start_tier);
-        const dmBubbles = 0;
-        const bubbleSpend = 0;
 
-        const [[bubbleTotals]] = await connection.execute(
+        // Find the latest pseudo-adventure (regardless of whether it's the latest overall)
+        const [[latestPseudoRow]] = await connection.execute(
             `
-                SELECT
-                    COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS total_bubbles,
-                    COALESCE(SUM(CASE WHEN is_pseudo = 0 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS real_bubbles,
-                    COALESCE(SUM(CASE WHEN is_pseudo = 1 THEN FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS pseudo_bubbles
+                SELECT id, start_date, target_level
                 FROM adventures
                 WHERE character_id = ?
                   AND deleted_at IS NULL
+                  AND is_pseudo = 1
+                ORDER BY start_date DESC, id DESC
+                LIMIT 1
             `,
             [characterId],
         );
 
-        const realAdventureBubbles = safeInt(bubbleTotals?.real_bubbles);
-        const pseudoAdventureBubbles = safeInt(bubbleTotals?.pseudo_bubbles);
         const [[latestAdventure]] = await connection.execute(
             `
-                SELECT id, duration, has_additional_bubble, is_pseudo
+                SELECT id, is_pseudo
                 FROM adventures
                 WHERE character_id = ?
                   AND deleted_at IS NULL
@@ -588,13 +623,46 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             `,
             [characterId],
         );
-        const latestPseudo = latestAdventure && latestAdventure.is_pseudo ? latestAdventure : null;
-        const latestPseudoBubbles = latestPseudo
-            ? bubblesForDuration(latestPseudo.duration, Boolean(latestPseudo.has_additional_bubble))
-            : 0;
-        const immutableAdventureBubbles = latestPseudo
-            ? Math.max(0, realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles))
-            : Math.max(0, realAdventureBubbles + pseudoAdventureBubbles);
+
+        const latestPseudoIsLast = latestPseudoRow && latestAdventure && latestPseudoRow.id === latestAdventure.id;
+
+        // Manual level tracking is active when character has simplified_tracking
+        // or already has pseudo-adventures — in that case DM bubbles and shop
+        // spend are excluded from the minimum-level floor (matching PHP logic).
+        const usesManualTracking = Boolean(character.simplified_tracking) || Boolean(latestPseudoRow);
+        const dmBubbles = usesManualTracking ? 0 : safeInt(character.dm_bubbles);
+        const bubbleSpend = usesManualTracking ? 0 : safeInt(character.bubble_shop_spend);
+
+        let immutableAdventureBubbles;
+        if (latestPseudoRow) {
+            // Only real adventures AFTER the last pseudo count towards the
+            // immutable floor — earlier ones are superseded by the pseudo.
+            const [[afterPseudo]] = await connection.execute(
+                `
+                    SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
+                    FROM adventures
+                    WHERE character_id = ?
+                      AND deleted_at IS NULL
+                      AND is_pseudo = 0
+                      AND (start_date > ? OR (start_date = ? AND id > ?))
+                `,
+                [characterId, latestPseudoRow.start_date, latestPseudoRow.start_date, latestPseudoRow.id],
+            );
+            immutableAdventureBubbles = Math.max(0, safeInt(afterPseudo?.bubbles));
+        } else {
+            const [[allBubbles]] = await connection.execute(
+                `
+                    SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
+                    FROM adventures
+                    WHERE character_id = ?
+                      AND deleted_at IS NULL
+                      AND is_pseudo = 0
+                `,
+                [characterId],
+            );
+            immutableAdventureBubbles = Math.max(0, safeInt(allBubbles?.bubbles));
+        }
+
         const minAllowedLevel = calculateMinAllowedLevel({
             immutableAdventureBubbles,
             dmBubbles,
@@ -607,30 +675,26 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
         }
 
-        const requiredAdventureBubbles = calculateRequiredAdventureBubbles({
-            level,
-            dmBubbles,
-            additionalBubbles: additional,
-            bubbleSpend,
-        });
-        const desiredLatestPseudoBubbles = Math.max(0, requiredAdventureBubbles - immutableAdventureBubbles);
+        // Pseudo-adventures use target_level directly — no duration needed.
+        const editablePseudo = latestPseudoIsLast ? latestPseudoRow : null;
+        const needsPseudo = level > minAllowedLevel || latestPseudoRow;
 
-        if (desiredLatestPseudoBubbles === 0) {
-            if (latestPseudo) {
+        if (needsPseudo && level <= minAllowedLevel) {
+            if (editablePseudo) {
                 const now = nowSql();
                 await connection.execute(
                     'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
-                    [now, now, latestPseudo.id],
+                    [now, now, editablePseudo.id],
                 );
             }
-        } else if (latestPseudo) {
-            const now = nowSql();
+        } else if (needsPseudo) {
+            if (editablePseudo) {
+                const now = nowSql();
                 await connection.execute(
-                    'UPDATE adventures SET duration = ?, has_additional_bubble = 0, target_level = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
-                    [desiredLatestPseudoBubbles * 10800, level, activeVersionId, now, latestPseudo.id],
+                    'UPDATE adventures SET duration = 0, has_additional_bubble = 0, target_level = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
+                    [level, activeVersionId, now, editablePseudo.id],
                 );
             } else {
-                const duration = desiredLatestPseudoBubbles * 10800;
                 const now = nowSql();
                 await connection.execute(
                 `
@@ -651,7 +715,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
                     [
-                        duration,
+                        0,
                         todaySqlDate(),
                         0,
                         1,
@@ -661,10 +725,11 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                         'Level tracking adjustment',
                         'Level tracking',
                         'Auto-generated to align the level tracking value.',
-                    now,
-                    now,
-                ],
-            );
+                        now,
+                        now,
+                    ],
+                );
+            }
         }
 
         await connection.commit();

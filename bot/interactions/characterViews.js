@@ -1796,7 +1796,13 @@ function buildAdventureManageEmbed(adventure, participants) {
         .setColor(0x4f46e5)
         .addFields(
             { name: t('characters.dateField', {}, locale), value: formatIsoDate(adventure.start_date), inline: true },
-            { name: t('characters.durationField', {}, locale), value: formatDurationSeconds(adventure.duration), inline: true },
+            {
+                name: t('characters.durationField', {}, locale),
+                value: adventure.is_pseudo && Number.isFinite(Number(adventure.target_level))
+                    ? t('characters.levelTrackingAnchorWithLevel', { level: Number(adventure.target_level) }, locale)
+                    : formatDurationSeconds(adventure.duration),
+                inline: true,
+            },
             { name: t('characters.characterQuestField', {}, locale), value: questValue, inline: true },
             { name: t('characters.titleField', {}, locale), value: titleValue, inline: false },
             { name: t('characters.gameMasterField', {}, locale), value: gameMasterValue, inline: false },
@@ -1991,12 +1997,16 @@ function buildDowntimeTypeManageView({ downtime, ownerDiscordId, characterId }) 
 
 function buildAdventureEmbed(adventure, title, participants = []) {
     const extra = adventure.has_additional_bubble ? ' +1' : '';
+    const isPseudoWithLevel = adventure.is_pseudo && Number.isFinite(Number(adventure.target_level));
+    const durationValue = isPseudoWithLevel
+        ? t('characters.levelTrackingAnchorWithLevel', { level: Number(adventure.target_level) })
+        : `${formatDurationSeconds(adventure.duration)}${extra}`;
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
             { name: t('characters.dateField'), value: formatIsoDate(adventure.start_date), inline: true },
-            { name: t('characters.durationField'), value: `${formatDurationSeconds(adventure.duration)}${extra}`, inline: true },
+            { name: t('characters.durationField'), value: durationValue, inline: true },
             { name: t('characters.idField'), value: String(adventure.id), inline: true },
         );
 
@@ -2007,15 +2017,6 @@ function buildAdventureEmbed(adventure, title, participants = []) {
     if (adventure.title) embed.addFields({ name: t('characters.titleField'), value: String(adventure.title).slice(0, 1024), inline: false });
     if (adventure.game_master) embed.addFields({ name: t('characters.gameMasterField'), value: String(adventure.game_master).slice(0, 1024), inline: false });
     if (adventure.notes) embed.addFields({ name: t('characters.notesField'), value: String(adventure.notes).slice(0, 1024), inline: false });
-    if (adventure.is_pseudo && Number.isFinite(Number(adventure.target_level))) {
-        embed.addFields({
-            name: t('characters.levelTrackingAnchor'),
-            value: t('characters.levelTrackingAnchorWithLevel', {
-                level: Number(adventure.target_level),
-            }),
-            inline: false,
-        });
-    }
     return embed;
 }
 

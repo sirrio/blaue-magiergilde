@@ -25,7 +25,7 @@ it('updates the latest pseudo adventure when it is the most recent adventure', f
 
     expect($result['ok'])->toBeTrue();
     expect(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(1);
-    expect($pseudo->fresh()->duration)->toBe(6 * 10800);
+    expect($pseudo->fresh()->duration)->toBe(0);
     expect($pseudo->fresh()->target_level)->toBe(4);
     expect($pseudo->fresh()->progression_version_id)->toBe(LevelProgression::activeVersionId());
 });
@@ -86,6 +86,6 @@ it('ignores dm bubbles and bubble shop spend when setting levels in level tracki
         ->first();
 
     expect($pseudo)->not->toBeNull()
-        ->and($pseudo?->duration)->toBe(6 * 10800)
+        ->and($pseudo?->duration)->toBe(0)
         ->and($pseudo?->target_level)->toBe(4);
 });

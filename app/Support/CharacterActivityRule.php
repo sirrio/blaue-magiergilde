@@ -178,12 +178,34 @@ class CharacterActivityRule
 
     private function calculateAdventureBubbles(Character $character): int
     {
-        return $this->adventures($character)->reduce(function (int $bubble, Adventure $adventure): int {
-            $duration = $this->safeInt($adventure->duration);
-            $bonus = $adventure->has_additional_bubble ? 1 : 0;
+        $adventures = $this->adventures($character)
+            ->sortBy([['start_date', 'asc'], ['id', 'asc']])
+            ->values();
 
-            return $bubble + (int) floor($duration / self::MIN_BUBBLE_DURATION) + $bonus;
-        }, 0);
+        $lastPseudoIndex = $adventures->reverse()->search(
+            fn (Adventure $a): bool => (bool) $a->is_pseudo,
+        );
+
+        if ($lastPseudoIndex === false) {
+            return $adventures->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);
+        }
+
+        $lastPseudo = $adventures->get($lastPseudoIndex);
+        $pseudoBubbles = LevelProgression::bubblesRequiredForLevel(
+            max(1, min(20, $this->safeInt($lastPseudo->target_level, 1))),
+        );
+        $realBubblesAfter = $adventures->slice($lastPseudoIndex + 1)
+            ->filter(fn (Adventure $a): bool => ! $a->is_pseudo)
+            ->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);
+
+        return $pseudoBubbles + $realBubblesAfter;
+    }
+
+    private function realBubblesFor(Adventure $adventure): int
+    {
+        $duration = $this->safeInt($adventure->duration);
+
+        return (int) floor($duration / self::MIN_BUBBLE_DURATION) + ($adventure->has_additional_bubble ? 1 : 0);
     }
 
     private function adventures(Character $character): Collection

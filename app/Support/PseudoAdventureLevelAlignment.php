@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Adventure;
 use App\Models\Character;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
@@ -10,6 +11,10 @@ class PseudoAdventureLevelAlignment
     public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
 
     /**
+     * Backfill pseudo-adventures that were created before the target_level
+     * column existed.  Their target_level is inferred from the cumulative
+     * adventure bubbles at that point.
+     *
      * @return array{pseudo_adventures_backfilled: int, characters_affected: int}
      */
     public function backfillMissingMetadata(int $versionId): array
@@ -53,35 +58,38 @@ class PseudoAdventureLevelAlignment
     }
 
     /**
+     * Update the progression_version_id on all pseudo-adventures to the new
+     * version.  Since target_level is the source of truth (not duration),
+     * no bubble recalculation is needed when the curve changes.
+     *
      * @return array{pseudo_adventures_realigned: int, characters_affected: int}
      */
     public function realignAllToVersion(int $versionId): array
     {
-        $pseudoAdventuresRealigned = 0;
-        $charactersAffected = 0;
+        $affected = Adventure::query()
+            ->whereNull('deleted_at')
+            ->where('is_pseudo', true)
+            ->where(function ($q) use ($versionId): void {
+                $q->where('progression_version_id', '!=', $versionId)
+                    ->orWhereNull('progression_version_id');
+            })
+            ->update([
+                'progression_version_id' => $versionId,
+                'duration' => 0,
+                'has_additional_bubble' => false,
+            ]);
 
-        Character::query()
-            ->without(['allies.linkedCharacter', 'downtimes', 'characterClasses'])
-            ->whereHas('adventures', fn ($query) => $query->whereNull('deleted_at')->where('is_pseudo', true))
-            ->with([
-                'adventures' => fn ($query) => $query
-                    ->whereNull('deleted_at')
-                    ->orderBy('start_date')
-                    ->orderBy('id'),
-            ])
-            ->chunkById(50, function (EloquentCollection $characters) use ($versionId, &$pseudoAdventuresRealigned, &$charactersAffected): void {
-                foreach ($characters as $character) {
-                    $result = $this->realignCharacter($character, $versionId);
-
-                    if ($result['pseudo_adventures_realigned'] > 0) {
-                        $charactersAffected++;
-                        $pseudoAdventuresRealigned += $result['pseudo_adventures_realigned'];
-                    }
-                }
-            });
+        $charactersAffected = $affected > 0
+            ? Adventure::query()
+                ->whereNull('deleted_at')
+                ->where('is_pseudo', true)
+                ->where('progression_version_id', $versionId)
+                ->distinct()
+                ->count('character_id')
+            : 0;
 
         return [
-            'pseudo_adventures_realigned' => $pseudoAdventuresRealigned,
+            'pseudo_adventures_realigned' => $affected,
             'characters_affected' => $charactersAffected,
         ];
     }
@@ -91,52 +99,15 @@ class PseudoAdventureLevelAlignment
      */
     private function backfillCharacter(Character $character, int $versionId): array
     {
-        $runningAdventureBubbles = 0;
+        $runningRealBubbles = 0;
         $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
         $bubbleSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
         $backfilledCount = 0;
 
         foreach ($character->adventures as $adventure) {
-            $runningAdventureBubbles += $this->bubblesForAdventure(
-                $this->safeInt($adventure->duration),
-                (bool) $adventure->has_additional_bubble,
-            );
-
             if (! $adventure->is_pseudo) {
-                continue;
-            }
-
-            $availableBubbles = max(
-                0,
-                $runningAdventureBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend,
-            );
-
-            $adventure->forceFill([
-                'target_level' => LevelProgression::levelFromAvailableBubbles($availableBubbles, $versionId),
-                'progression_version_id' => $versionId,
-            ])->save();
-
-            $backfilledCount++;
-        }
-
-        return ['pseudo_adventures_backfilled' => $backfilledCount];
-    }
-
-    /**
-     * @return array{pseudo_adventures_realigned: int}
-     */
-    private function realignCharacter(Character $character, int $versionId): array
-    {
-        $runningAdventureBubbles = 0;
-        $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
-        $bubbleSpend = $this->progressionState->bubbleShopSpendForProgression($character);
-        $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
-        $realignedCount = 0;
-
-        foreach ($character->adventures as $adventure) {
-            if (! $adventure->is_pseudo) {
-                $runningAdventureBubbles += $this->bubblesForAdventure(
+                $runningRealBubbles += $this->bubblesForAdventure(
                     $this->safeInt($adventure->duration),
                     (bool) $adventure->has_additional_bubble,
                 );
@@ -144,40 +115,30 @@ class PseudoAdventureLevelAlignment
                 continue;
             }
 
-            $targetLevel = max(
-                1,
-                min(
-                    20,
-                    $this->safeInt(
-                        $adventure->target_level,
-                        LevelProgression::levelFromAvailableBubbles(
-                            max(0, $runningAdventureBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend),
-                            $adventure->progression_version_id ?: $versionId,
-                        ),
-                    ),
-                ),
+            // Legacy pseudo — infer target_level from the duration-based bubbles.
+            $pseudoBubbles = $this->bubblesForAdventure(
+                $this->safeInt($adventure->duration),
+                (bool) $adventure->has_additional_bubble,
             );
-            $requiredAdventureBubbles = max(
+            $availableBubbles = max(
                 0,
-                LevelProgression::bubblesRequiredForLevel($targetLevel, $versionId)
-                    - $dmBubbles
-                    - $additionalBubbles
-                    + $bubbleSpend,
+                $runningRealBubbles + $pseudoBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend,
             );
-            $desiredPseudoBubbles = max(0, $requiredAdventureBubbles - $runningAdventureBubbles);
+            $targetLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $versionId);
 
             $adventure->forceFill([
-                'duration' => $desiredPseudoBubbles * 10800,
-                'has_additional_bubble' => false,
                 'target_level' => $targetLevel,
                 'progression_version_id' => $versionId,
+                'duration' => 0,
+                'has_additional_bubble' => false,
             ])->save();
 
-            $runningAdventureBubbles += $desiredPseudoBubbles;
-            $realignedCount++;
+            // Reset running total — the pseudo overrides the level at this point.
+            $runningRealBubbles = 0;
+            $backfilledCount++;
         }
 
-        return ['pseudo_adventures_realigned' => $realignedCount];
+        return ['pseudo_adventures_backfilled' => $backfilledCount];
     }
 
     private function bubblesForAdventure(int $duration, bool $hasAdditionalBubble): int

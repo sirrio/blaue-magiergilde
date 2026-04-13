@@ -22,18 +22,13 @@ class SetQuickLevel
 
             $durationBubbleSql = $this->durationBubbleSql();
 
-            $totals = Adventure::query()
+            $latestPseudo = Adventure::query()
                 ->where('character_id', $character->id)
                 ->whereNull('deleted_at')
-                ->selectRaw('
-                    COALESCE(SUM('.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS total_bubbles,
-                    COALESCE(SUM(CASE WHEN is_pseudo = 0 THEN '.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS real_bubbles,
-                    COALESCE(SUM(CASE WHEN is_pseudo = 1 THEN '.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END ELSE 0 END), 0) AS pseudo_bubbles
-                ')
+                ->where('is_pseudo', true)
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
                 ->first();
-
-            $realAdventureBubbles = $this->safeInt($totals?->real_bubbles);
-            $pseudoAdventureBubbles = $this->safeInt($totals?->pseudo_bubbles);
 
             $latestAdventure = Adventure::query()
                 ->where('character_id', $character->id)
@@ -42,44 +37,74 @@ class SetQuickLevel
                 ->orderByDesc('id')
                 ->first();
 
-            $latestPseudo = ($latestAdventure && $latestAdventure->is_pseudo) ? $latestAdventure : null;
-            $latestPseudoBubbles = $latestPseudo
-                ? $this->bubblesForAdventure($latestPseudo->duration, (bool) $latestPseudo->has_additional_bubble)
+            $latestPseudoIsLast = $latestPseudo && $latestAdventure && $latestPseudo->id === $latestAdventure->id;
+
+            // Only real adventures AFTER the last pseudo count towards the
+            // immutable floor — the pseudo overrides everything before it.
+            $realBubblesAfterLastPseudo = $latestPseudo
+                ? $this->safeInt(
+                    Adventure::query()
+                        ->where('character_id', $character->id)
+                        ->whereNull('deleted_at')
+                        ->where('is_pseudo', false)
+                        ->where(function ($q) use ($latestPseudo) {
+                            $q->where('start_date', '>', $latestPseudo->start_date)
+                                ->orWhere(function ($q2) use ($latestPseudo) {
+                                    $q2->where('start_date', $latestPseudo->start_date)
+                                        ->where('id', '>', $latestPseudo->id);
+                                });
+                        })
+                        ->selectRaw('COALESCE(SUM('.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles')
+                        ->value('bubbles')
+                )
                 : 0;
 
-            $immutableAdventureBubbles = $latestPseudo
-                ? max(0, $realAdventureBubbles + max(0, $pseudoAdventureBubbles - $latestPseudoBubbles))
-                : max(0, $realAdventureBubbles + $pseudoAdventureBubbles);
-            $minAllowedLevel = $this->calculateLevelFromBubbles(
-                $immutableAdventureBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend,
+            if (! $latestPseudo) {
+                $allBubbles = $this->safeInt(
+                    Adventure::query()
+                        ->where('character_id', $character->id)
+                        ->whereNull('deleted_at')
+                        ->selectRaw('COALESCE(SUM('.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles')
+                        ->value('bubbles')
+                );
+                $immutableBubbles = max(0, $allBubbles);
+            } else {
+                $immutableBubbles = max(0, $realBubblesAfterLastPseudo);
+            }
+
+            $minAllowedLevel = LevelProgression::levelFromAvailableBubbles(
+                $immutableBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend,
             );
 
             if (! $character->is_filler && $level < $minAllowedLevel) {
                 return ['ok' => false, 'reason' => 'below_real', 'minLevel' => $minAllowedLevel];
             }
 
-            $requiredAdventureBubbles = $this->calculateRequiredAdventureBubbles(
-                $level,
-                $dmBubbles,
-                $additionalBubbles,
-                $bubbleSpend,
-            );
+            // The pseudo-adventure uses target_level directly — no duration needed.
+            $editablePseudo = $latestPseudoIsLast ? $latestPseudo : null;
+            $needsPseudo = $level > $minAllowedLevel || $latestPseudo;
 
-            $desiredLatestPseudoBubbles = max(0, $requiredAdventureBubbles - $immutableAdventureBubbles);
+            if (! $needsPseudo) {
+                return ['ok' => true];
+            }
 
-            if ($desiredLatestPseudoBubbles === 0) {
-                if ($latestPseudo) {
-                    $latestPseudo->delete();
+            if ($level <= $minAllowedLevel) {
+                if ($editablePseudo) {
+                    $editablePseudo->delete();
                 }
-            } elseif ($latestPseudo) {
-                $latestPseudo->duration = $desiredLatestPseudoBubbles * 10800;
-                $latestPseudo->has_additional_bubble = false;
-                $latestPseudo->target_level = $level;
-                $latestPseudo->progression_version_id = $activeVersionId;
-                $latestPseudo->save();
+
+                return ['ok' => true];
+            }
+
+            if ($editablePseudo) {
+                $editablePseudo->duration = 0;
+                $editablePseudo->has_additional_bubble = false;
+                $editablePseudo->target_level = $level;
+                $editablePseudo->progression_version_id = $activeVersionId;
+                $editablePseudo->save();
             } else {
                 $adventure = new Adventure;
-                $adventure->duration = $desiredLatestPseudoBubbles * 10800;
+                $adventure->duration = 0;
                 $adventure->start_date = now()->toDateString();
                 $adventure->has_additional_bubble = false;
                 $adventure->is_pseudo = true;
@@ -94,29 +119,6 @@ class SetQuickLevel
 
             return ['ok' => true];
         });
-    }
-
-    private function bubblesForAdventure(int $duration, bool $hasAdditionalBubble): int
-    {
-        return (int) floor($duration / 10800) + ($hasAdditionalBubble ? 1 : 0);
-    }
-
-    private function calculateLevelFromBubbles(int $availableBubbles): int
-    {
-        return LevelProgression::levelFromAvailableBubbles($availableBubbles);
-    }
-
-    private function calculateRequiredAdventureBubbles(
-        int $level,
-        int $dmBubbles,
-        int $additionalBubbles,
-        int $bubbleSpend,
-    ): int {
-        $normalizedLevel = min(20, max(1, $level));
-        $targetAvailableBubbles = LevelProgression::bubblesRequiredForLevel($normalizedLevel);
-        $required = $targetAvailableBubbles - $dmBubbles - $additionalBubbles + $bubbleSpend;
-
-        return max(0, $required);
     }
 
     private function additionalBubblesForStartTier(?string $startTier): int

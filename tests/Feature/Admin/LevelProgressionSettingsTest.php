@@ -88,7 +88,7 @@ it('updates the stored level progression and uses it for the shared calculation'
         ->and(LevelProgression::levelFromAvailableBubbles(70))->toBe(12)
         ->and($updatedPseudoAdventure?->target_level)->toBe(12)
         ->and($updatedPseudoAdventure?->progression_version_id)->toBe($activeVersionId)
-        ->and($updatedPseudoAdventure?->duration)->toBe(70 * 10800);
+        ->and($updatedPseudoAdventure?->duration)->toBe(0);
 });
 
 it('realigns mixed real and pseudo adventures to keep the stored target level on curve changes', function () {
@@ -142,7 +142,7 @@ it('realigns mixed real and pseudo adventures to keep the stored target level on
     expect($realAdventure?->duration)->toBe(10800)
         ->and($updatedPseudoAdventure?->target_level)->toBe(3)
         ->and($updatedPseudoAdventure?->progression_version_id)->toBe(LevelProgression::activeVersionId())
-        ->and($updatedPseudoAdventure?->duration)->toBe(32400)
+        ->and($updatedPseudoAdventure?->duration)->toBe(0)
         ->and(LevelProgression::levelFromAvailableBubbles(4))->toBe(3);
 });
 

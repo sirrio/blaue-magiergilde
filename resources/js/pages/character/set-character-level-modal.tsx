@@ -49,19 +49,25 @@ const SetCharacterLevelModal = ({
     }
     return b.id - a.id
   })
-  const latestAdventure = adventuresSorted[0]
-  const latestPseudo = latestAdventure?.is_pseudo ? latestAdventure : null
-  const realAdventureBubbles = character.adventures
-    .filter((adventure) => !adventure.is_pseudo)
-    .reduce((sum, adventure) => sum + bubblesForAdventure(adventure.duration, adventure.has_additional_bubble), 0)
-  const pseudoAdventureBubbles = character.adventures
-    .filter((adventure) => Boolean(adventure.is_pseudo))
-    .reduce((sum, adventure) => sum + bubblesForAdventure(adventure.duration, adventure.has_additional_bubble), 0)
-  const latestPseudoBubbles = latestPseudo ? bubblesForAdventure(latestPseudo.duration, latestPseudo.has_additional_bubble) : 0
+  const latestPseudoAdventure = adventuresSorted.find((a) => a.is_pseudo) ?? null
   const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
-  const immutableAdventureBubbles = latestPseudo
-    ? Math.max(0, realAdventureBubbles + Math.max(0, pseudoAdventureBubbles - latestPseudoBubbles))
-    : Math.max(0, realAdventureBubbles + pseudoAdventureBubbles)
+
+  // Only real adventures AFTER the last pseudo count towards the immutable
+  // floor — earlier ones are superseded by the pseudo level override.
+  const immutableAdventureBubbles = latestPseudoAdventure
+    ? Math.max(
+        0,
+        character.adventures
+          .filter((a) => !a.is_pseudo && (
+            String(a.start_date) > String(latestPseudoAdventure.start_date)
+            || (String(a.start_date) === String(latestPseudoAdventure.start_date) && a.id > latestPseudoAdventure.id)
+          ))
+          .reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
+      )
+    : Math.max(
+        0,
+        character.adventures.reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
+      )
   const minAllowedLevel = levelFromAvailableBubbles(
     immutableAdventureBubbles
       + (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0)

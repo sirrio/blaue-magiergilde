@@ -315,7 +315,7 @@ export default function Show({
   }
 
   const adventureTotalDuration = useMemo(
-    () => character.adventures.reduce((total, adv) => total + adv.duration, 0),
+    () => character.adventures.filter((adv) => !adv.is_pseudo).reduce((total, adv) => total + adv.duration, 0),
     [character.adventures],
   )
   const downtimeTotalDuration = useMemo(
@@ -680,14 +680,9 @@ export default function Show({
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
-                                    {adv.is_pseudo ? (
-                                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                        {pseudoAnchorLabel}
-                                      </span>
-                                    ) : null}
                                 <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
                                 <span className="badge badge-ghost badge-sm font-medium">
-                                  {secondsToHourMinuteString(adv.duration)}
+                                  {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   {adv.is_pseudo ? (
@@ -787,11 +782,6 @@ export default function Show({
                                         <ScrollText size={14} />
                                       </Button>
                                     </div>
-                                      {adv.is_pseudo ? (
-                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                          {pseudoAnchorLabel}
-                                        </span>
-                                      ) : null}
                                     </div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                                     <span>DM: {gameMasterName}</span>
@@ -799,7 +789,7 @@ export default function Show({
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">
-                                  {secondsToHourMinuteString(adv.duration)}
+                                  {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
                                 </p>
                                 <div className="self-center text-right text-xs text-base-content/70">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
