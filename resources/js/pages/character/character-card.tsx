@@ -289,6 +289,10 @@ function SubmitForApprovalModal({
 }
 
 function getCharacterStatusSummary(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+  if (guildStatus === 'draft') {
+    return t('characters.statusDraftSummary')
+  }
+
   if (guildStatus === 'pending') {
     return t('characters.statusPendingSummary')
   }
@@ -337,6 +341,7 @@ export function CharacterCard({
   const privateMode = character.private_mode ?? false
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
+  const isMaxLevel = level >= 20 || progressMax === 0
   const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
   const earnedBubbles = calculateBubble(character) + additionalBubbles
   const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
@@ -389,25 +394,11 @@ export function CharacterCard({
     }
 
     if (guildStatus === 'declined') {
-      const parts = [t('characters.statusDeclinedHint')]
-      if (reviewedByHint) {
-        parts.push(reviewedByHint)
-      }
-      if (reviewNote) {
-        parts.push(`${t('common.note')}: ${reviewNote}`)
-      }
-      return parts.join(' · ')
+      return t('characters.statusDeclinedHint')
     }
 
     if (guildStatus === 'needs_changes') {
-      const parts = [t('characters.statusNeedsChangesHint')]
-      if (reviewedByHint) {
-        parts.push(reviewedByHint)
-      }
-      if (reviewNote) {
-        parts.push(`${t('common.note')}: ${reviewNote}`)
-      }
-      return parts.join(' · ')
+      return t('characters.statusNeedsChangesHint')
     }
 
     if (guildStatus === 'pending') {
@@ -422,7 +413,7 @@ export function CharacterCard({
   })()
   const statusHint = getCharacterStatusSummary(guildStatus, t)
   const statusHintClass = guildStatus === 'draft'
-    ? 'border-base-300 bg-base-100 text-base-content/80'
+    ? 'border-base-300 bg-base-200/50 text-base-content/70'
     : guildStatus === 'pending'
     ? 'border-warning/25 bg-warning/10 text-warning'
     : guildStatus === 'needs_changes'
@@ -555,7 +546,7 @@ export function CharacterCard({
   }
 
   return (
-    <div ref={setNodeRef} style={dragStyle}>
+    <div ref={setNodeRef} style={dragStyle} className="break-inside-avoid mb-4">
       <Card className={cn('group')}>
         <CardBody>
           <CardAction className={cn('absolute top-2 right-2 hidden gap-1 md:group-hover:flex')}>
@@ -659,7 +650,11 @@ export function CharacterCard({
                 </Button>
               </DestroyCharacterModal>
             </div>
-            <CharacterImage className="mx-auto mb-2 mt-3 w-full max-w-44 sm:max-w-56" character={character} masked={avatarMasked} />
+            <CharacterImage
+              className={cn('mb-2 mt-3 w-full', !avatarMasked && 'rounded-lg')}
+              character={character}
+              masked={avatarMasked}
+            />
             {!character.is_filler ? (
               <>
                 <div
@@ -681,9 +676,11 @@ export function CharacterCard({
                   </div>
                   {!simplifiedTracking ? (
                     <>
-                      <Progress className="block h-2" value={progressValue} max={progressMax} />
+                      <Progress className="block h-2" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
                       <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
-                        {isBubbleOverspent ? (
+                        {isMaxLevel ? (
+                          <span className="text-base-content/45">{t('characters.maxLevelReached')}</span>
+                        ) : isBubbleOverspent ? (
                           <span className="text-error/80">{t('characters.overspentBubbles')}</span>
                         ) : (
                           <span>
@@ -710,7 +707,7 @@ export function CharacterCard({
                       {t('characters.played')}:{' '}
                       {usesManualDerivedValues ? (
                         <span className="inline-flex items-center gap-1 leading-none align-middle">
-                          <span className={manualAdventuresCount === null ? 'text-warning' : ''}>
+                          <span className={manualAdventuresCount === null ? 'text-base-content/40' : ''}>
                             {manualAdventuresCount ?? t('characters.autoDisabledShort')}
                           </span>
                           <CharacterManualOverrideModal character={character} field="adventures" value={manualAdventuresCount}>
@@ -747,7 +744,7 @@ export function CharacterCard({
                       {t('characters.levelLabel')}:{' '}
                       {usesManualDerivedValues ? (
                         <span className="inline-flex items-center gap-1 leading-none align-middle">
-                          <span className={manualFactionRank === null ? 'text-warning' : ''}>
+                          <span className={manualFactionRank === null ? 'text-base-content/40' : ''}>
                             {manualFactionRank ?? t('characters.autoDisabledShort')}
                           </span>
                           <CharacterManualOverrideModal character={character} field="factionRank" value={manualFactionRank}>
@@ -776,7 +773,7 @@ export function CharacterCard({
                       {t('characters.total')}:{' '}
                       {usesManualDerivedValues ? (
                         <span className="inline-flex items-center gap-1 leading-none align-middle">
-                          <span className={manualTotalDowntimeSeconds === null ? 'text-warning' : ''}>
+                          <span className={manualTotalDowntimeSeconds === null ? 'text-base-content/40' : ''}>
                             {totalDowntimeDisplay}
                           </span>
                           <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
@@ -827,12 +824,12 @@ export function CharacterCard({
                 </div>
               </>
             ) : (
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center whitespace-pre-wrap">
+              <div className="mt-3 flex items-center justify-between rounded-lg border border-base-300 px-3 py-2 text-sm text-base-content/60">
+                <div className="flex items-center gap-1.5 font-medium text-base-content/70">
                   <LogoFiller /> {t('characters.fillerCharacter')}
                 </div>
-                <div className="mt-1 flex items-center whitespace-pre-wrap">
-                  <Swords size={15} /> {t('characters.adventures')}: {character.adventures.length}
+                <div className="flex items-center gap-1 text-xs text-base-content/55">
+                  <Swords size={13} /> {character.adventures.length}
                 </div>
               </div>
             )}
@@ -841,6 +838,14 @@ export function CharacterCard({
                 {statusHint ? (
                   <div className={cn('rounded-md border px-2 py-1.5 text-xs font-medium', statusHintClass)}>
                     {statusHint}
+                    {reviewedByHint ? (
+                      <span className="ml-1 font-normal opacity-70"> · {reviewedByHint}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {reviewNote && (guildStatus === 'declined' || guildStatus === 'needs_changes') ? (
+                  <div className={cn('rounded-md border px-2 py-1.5 text-xs', statusHintClass, 'font-normal opacity-80')}>
+                    <span className="font-medium">{t('common.note')}:</span> {reviewNote}
                   </div>
                 ) : null}
                 {registrationSupportHint ? (

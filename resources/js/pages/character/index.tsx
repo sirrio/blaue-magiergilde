@@ -229,7 +229,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             </div>
           </div>
         ) : (
-          <div className={cn('grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
+          <div className={cn('columns-1 gap-4 sm:columns-2 md:columns-3 lg:columns-4')}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (

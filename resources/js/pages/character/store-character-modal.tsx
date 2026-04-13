@@ -5,7 +5,6 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { useTranslate } from '@/lib/i18n'
-import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import LogoFiller from '@/components/logo-filler'
 import { PageProps } from '@/types'
@@ -123,33 +122,50 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className={cn('grid grid-cols-2 gap-2')}>
-            <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-              {t('characters.dmBubbles')}
-            </Input>
-            <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-              {t('characters.dmCoins')}
-            </Input>
-          </div>
-          <Input
-            errors={errors.bubble_shop_spend}
-            type="number"
-            min={0}
-            max={1024}
-            value={data.bubble_shop_spend}
-            onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-          >
-                {t('characters.bubbleShopSpend')}
-              </Input>
-              <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
-                {t('characters.notesLabel')}
-              </TextArea>
-              <Checkbox errors={errors.is_filler} checked={data.is_filler} onChange={(e) => setData('is_filler', e.target.checked)}>
+              <Checkbox
+                errors={errors.is_filler}
+                checked={data.is_filler}
+                onChange={(e) => {
+                  const isFiller = e.target.checked
+                  setData((prev) => ({
+                    ...prev,
+                    is_filler: isFiller,
+                    dm_bubbles: isFiller ? 0 : prev.dm_bubbles,
+                    dm_coins: isFiller ? 0 : prev.dm_coins,
+                    bubble_shop_spend: isFiller ? 0 : prev.bubble_shop_spend,
+                  }))
+                }}
+              >
                 <span className="flex items-center gap-2">
                   <LogoFiller width={14} />
                   {t('characters.fillerLabel')}
                 </span>
               </Checkbox>
+              {!data.is_filler && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
+                      {t('characters.dmBubbles')}
+                    </Input>
+                    <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
+                      {t('characters.dmCoins')}
+                    </Input>
+                  </div>
+                  <Input
+                    errors={errors.bubble_shop_spend}
+                    type="number"
+                    min={0}
+                    max={1024}
+                    value={data.bubble_shop_spend}
+                    onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
+                  >
+                    {t('characters.bubbleShopSpend')}
+                  </Input>
+                </>
+              )}
+              <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
+                {t('characters.notesLabel')}
+              </TextArea>
             </div>
           )}
         </form>

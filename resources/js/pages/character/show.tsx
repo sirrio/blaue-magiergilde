@@ -471,10 +471,12 @@ export default function Show({
               <InfoBoxLine>
                 {t('characters.startedIn')}: <LogoTier width={13} tier={character.start_tier} />
               </InfoBoxLine>
-              <InfoBoxLine>
-                {t('characters.bubbleShop')}: {character.bubble_shop_spend}
-                <Droplets size={13} />
-              </InfoBoxLine>
+              {!character.is_filler && (
+                <InfoBoxLine>
+                  {t('characters.bubbleShop')}: {character.bubble_shop_spend}
+                  <Droplets size={13} />
+                </InfoBoxLine>
+              )}
             </InfoBox>
             <InfoBox>
               <InfoBoxTitle>
@@ -543,19 +545,21 @@ export default function Show({
                 </span>
               </InfoBoxLine>
             </InfoBox>
-            <InfoBox>
-              <InfoBoxTitle>
-                <Crown size={15} /> {t('characters.gameMaster')}
-              </InfoBoxTitle>
-              <InfoBoxLine>
-                {t('characters.bubbles')}: {character.dm_bubbles}
-                <Droplets size={13} />
-              </InfoBoxLine>
-              <InfoBoxLine>
-                {t('characters.coins')}: {character.dm_coins}
-                <Coins size={13} />
-              </InfoBoxLine>
-            </InfoBox>
+            {!character.is_filler && (
+              <InfoBox>
+                <InfoBoxTitle>
+                  <Crown size={15} /> {t('characters.gameMaster')}
+                </InfoBoxTitle>
+                <InfoBoxLine>
+                  {t('characters.bubbles')}: {character.dm_bubbles}
+                  <Droplets size={13} />
+                </InfoBoxLine>
+                <InfoBoxLine>
+                  {t('characters.coins')}: {character.dm_coins}
+                  <Coins size={13} />
+                </InfoBoxLine>
+              </InfoBox>
+            )}
           </div>
         </div>
 
