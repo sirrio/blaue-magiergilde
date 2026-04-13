@@ -2,6 +2,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 const { token } = require('./config');
+const { reportBotError } = require('./utils/reportError');
+
+process.on('uncaughtException', (error) => {
+    console.error('[bot] Uncaught exception:', error);
+    reportBotError(error, 'uncaught_exception').finally(() => process.exit(1));
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[bot] Unhandled rejection:', reason);
+    const error = reason instanceof Error ? reason : new Error(String(reason ?? 'Unhandled rejection'));
+    void reportBotError(error, 'unhandled_rejection');
+});
 
 if (!token) {
      
@@ -50,5 +62,10 @@ for (const file of eventFiles) {
         client.on(event.name, (...args) => event.execute(...args));
     }
 }
+
+client.on('error', (error) => {
+    console.error('[bot] Discord client error:', error);
+    void reportBotError(error, 'discord_client_error');
+});
 
 client.login(token);

@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance']);
         $middleware->validateCsrfTokens(except: [
             'monitoring/frontend-errors',
+            'monitoring/bot-errors',
         ]);
 
         $middleware->web(append: [
@@ -35,5 +36,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Prevent sensitive fields from appearing in session flash data on errors.
+        $exceptions->dontFlash([
+            'password',
+            'password_confirmation',
+            'current_password',
+        ]);
+        // FrontendErrorReportedException and BotErrorReportedException are reported
+        // via report() in their respective controllers. Each carries a context()
+        // payload that Nightwatch picks up automatically through the exception handler.
+        // No custom callbacks needed — the default pipeline handles them correctly.
     })->create();

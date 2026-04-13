@@ -1,4 +1,5 @@
 const { Events } = require('discord.js');
+const { reportBotError } = require('../utils/reportError');
 
 function isUnknownInteractionError(error) {
     return error?.code === 10062 || error?.rawError?.code === 10062;
@@ -47,8 +48,14 @@ module.exports = {
             if (await newGame.handle(interaction)) return;
             if (await reactionDraw.handle(interaction)) return;
         } catch (error) {
-             
             console.error(error);
+            void reportBotError(error, 'interaction_error', {
+                command: interaction.isChatInputCommand() ? interaction.commandName : null,
+                interaction_type: interaction.type,
+                custom_id: interaction.isMessageComponent() ? interaction.customId : null,
+                user_id: interaction.user?.id ?? null,
+                guild_id: interaction.guildId ?? null,
+            });
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
             try {
                 if (!interaction.deferred && !interaction.replied) {
