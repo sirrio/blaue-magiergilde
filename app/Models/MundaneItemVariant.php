@@ -16,7 +16,7 @@ class MundaneItemVariant extends Model
         'category',
         'cost_gp',
         'is_placeholder',
-        'sort_order',
+        'guild_enabled',
     ];
 
     protected function casts(): array
@@ -24,7 +24,7 @@ class MundaneItemVariant extends Model
         return [
             'cost_gp' => 'decimal:2',
             'is_placeholder' => 'boolean',
-            'sort_order' => 'integer',
+            'guild_enabled' => 'boolean',
         ];
     }
 

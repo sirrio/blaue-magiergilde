@@ -21,7 +21,7 @@ class UpdateMundaneItemVariantRequest extends FormRequest
             'category' => 'required|in:weapon,armor',
             'cost_gp' => 'nullable|numeric|min:0',
             'is_placeholder' => 'boolean',
-            'sort_order' => 'integer|min:0',
+            'guild_enabled' => 'boolean',
         ];
     }
 }

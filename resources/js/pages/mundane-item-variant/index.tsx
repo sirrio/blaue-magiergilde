@@ -16,7 +16,7 @@ const VariantForm = ({
   setData,
   errors,
 }: {
-  data: { name: string; slug: string; category: string; cost_gp: string; is_placeholder: boolean; sort_order: number }
+  data: { name: string; slug: string; category: string; cost_gp: string; is_placeholder: boolean; guild_enabled: boolean }
   setData: (key: string, value: unknown) => void
   errors: Partial<Record<string, string>>
 }) => {
@@ -31,14 +31,14 @@ const VariantForm = ({
           Slug
         </Input>
       </div>
-      <Select errors={errors.category} value={data.category} onChange={(e) => setData('category', e.target.value)}>
-        <SelectLabel>{t('compendium.variantCategory')}</SelectLabel>
-        <SelectOptions>
-          <option value="weapon">{t('compendium.weapon')}</option>
-          <option value="armor">{t('compendium.armor')}</option>
-        </SelectOptions>
-      </Select>
       <div className="grid grid-cols-2 gap-3">
+        <Select errors={errors.category} value={data.category} onChange={(e) => setData('category', e.target.value)}>
+          <SelectLabel>{t('compendium.variantCategory')}</SelectLabel>
+          <SelectOptions>
+            <option value="weapon">{t('compendium.weapon')}</option>
+            <option value="armor">{t('compendium.armor')}</option>
+          </SelectOptions>
+        </Select>
         <Input
           errors={errors.cost_gp}
           placeholder="15"
@@ -50,17 +50,16 @@ const VariantForm = ({
         >
           {t('compendium.variantCostGp')}
         </Input>
-        <Input
-          errors={errors.sort_order}
-          placeholder="0"
-          type="number"
-          min={0}
-          value={data.sort_order}
-          onChange={(e) => setData('sort_order', Number(e.target.value))}
-        >
-          {t('compendium.variantSortOrder')}
-        </Input>
       </div>
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="checkbox checkbox-sm"
+          checked={data.guild_enabled}
+          onChange={(e) => setData('guild_enabled', e.target.checked)}
+        />
+        {t('compendium.allowedInGuild')}
+      </label>
       <Checkbox
         errors={errors.is_placeholder}
         checked={data.is_placeholder}
@@ -81,13 +80,14 @@ const StoreVariantModal = ({ onSuccess }: { onSuccess: () => void }) => {
     category: 'weapon',
     cost_gp: '',
     is_placeholder: false,
-    sort_order: 0,
+    guild_enabled: true,
   })
 
   useEffect(() => {
     if (!isOpen) return
     reset()
     setData('category', 'weapon')
+    setData('guild_enabled', true)
   }, [isOpen, reset, setData])
 
   const handleSubmit = () => {
@@ -128,7 +128,7 @@ const UpdateVariantModal = ({ variant, onSuccess }: { variant: MundaneItemVarian
     category: variant.category,
     cost_gp: variant.cost_gp != null ? String(variant.cost_gp) : '',
     is_placeholder: variant.is_placeholder ?? false,
-    sort_order: variant.sort_order ?? 0,
+    guild_enabled: variant.guild_enabled ?? true,
     _method: 'put',
   })
 
@@ -140,7 +140,7 @@ const UpdateVariantModal = ({ variant, onSuccess }: { variant: MundaneItemVarian
     setData('category', variant.category)
     setData('cost_gp', variant.cost_gp != null ? String(variant.cost_gp) : '')
     setData('is_placeholder', variant.is_placeholder ?? false)
-    setData('sort_order', variant.sort_order ?? 0)
+    setData('guild_enabled', variant.guild_enabled ?? true)
   }, [isOpen, reset, variant, setData])
 
   const handleSubmit = () => {
@@ -219,11 +219,11 @@ export default function Index({
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    router.get(route('admin.mundane-item-variants.index'), { ...currentParams, search: value }, { preserveState: true, preserveScroll: true })
+    navigate({ search: value || undefined })
   }
 
-  const navigateCategory = (category: string | null) => {
-    router.get(route('admin.mundane-item-variants.index'), { ...currentParams, category: category ?? undefined }, { preserveState: true, preserveScroll: true })
+  const navigate = (params: Record<string, string | undefined>) => {
+    router.get(route('admin.mundane-item-variants.index'), { ...currentParams, ...params }, { preserveState: true, preserveScroll: true })
   }
 
   const weapons = variants?.filter((v) => v.category === 'weapon') ?? []
@@ -251,15 +251,28 @@ export default function Index({
           <Input type="search" placeholder={t('compendium.searchByName')} value={search} onChange={handleSearch}>
             {t('common.search')}
           </Input>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-base-content/60">{t('compendium.variantCategory')}:</span>
-            <div className="filter">
-              <input className="btn btn-xs filter-reset" type="radio" name="category" aria-label="All"
-                defaultChecked={!currentParams.category} onClick={() => navigateCategory(null)} />
-              <input className="btn btn-xs" type="radio" name="category" aria-label={t('compendium.weapon')}
-                defaultChecked={currentParams.category === 'weapon'} onClick={() => navigateCategory('weapon')} />
-              <input className="btn btn-xs" type="radio" name="category" aria-label={t('compendium.armor')}
-                defaultChecked={currentParams.category === 'armor'} onClick={() => navigateCategory('armor')} />
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.variantCategory')}:</span>
+              <div className="filter">
+                <input className="btn btn-xs filter-reset" type="radio" name="category" aria-label="All"
+                  defaultChecked={!currentParams.category} onClick={() => navigate({ category: undefined })} />
+                <input className="btn btn-xs" type="radio" name="category" aria-label={t('compendium.weapon')}
+                  defaultChecked={currentParams.category === 'weapon'} onClick={() => navigate({ category: 'weapon' })} />
+                <input className="btn btn-xs" type="radio" name="category" aria-label={t('compendium.armor')}
+                  defaultChecked={currentParams.category === 'armor'} onClick={() => navigate({ category: 'armor' })} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">{t('compendium.guild')}:</span>
+              <div className="filter">
+                <input className="btn btn-xs filter-reset" type="radio" name="guild" aria-label="All"
+                  defaultChecked={!currentParams.guild} onClick={() => navigate({ guild: undefined })} />
+                <input className="btn btn-xs" type="radio" name="guild" aria-label="Allowed"
+                  defaultChecked={currentParams.guild === 'allowed'} onClick={() => navigate({ guild: 'allowed' })} />
+                <input className="btn btn-xs" type="radio" name="guild" aria-label="Blocked"
+                  defaultChecked={currentParams.guild === 'blocked'} onClick={() => navigate({ guild: 'blocked' })} />
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/50">
@@ -299,6 +312,16 @@ export default function Index({
                 <span className="text-sm text-base-content/60">
                   {variant.cost_gp != null ? `${variant.cost_gp} GP` : '—'}
                 </span>
+                <div className="flex items-center justify-center">
+                  {variant.guild_enabled ?? true ? (
+                    <Shield className="h-4 w-4 text-success" aria-label="Allowed in guild" />
+                  ) : (
+                    <span className="relative inline-flex h-4 w-4 items-center justify-center" title="Not allowed in guild" aria-label="Not allowed in guild">
+                      <Shield className="h-4 w-4 text-base-content/40" />
+                      <span className="absolute h-0.5 w-5 rotate-45 bg-error" />
+                    </span>
+                  )}
+                </div>
                 {canManage ? (
                   <div className="flex items-center gap-1">
                     <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />

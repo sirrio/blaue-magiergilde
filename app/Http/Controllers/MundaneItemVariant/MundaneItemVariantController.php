@@ -15,6 +15,7 @@ class MundaneItemVariantController extends Controller
     {
         $search = request('search', '');
         $category = request('category', null);
+        $guild = request('guild', null);
 
         $query = MundaneItemVariant::query();
         if (!empty($search)) {
@@ -23,12 +24,17 @@ class MundaneItemVariantController extends Controller
         if (!empty($category)) {
             $query->where('category', $category);
         }
+        if ($guild === 'allowed') {
+            $query->where('guild_enabled', true);
+        } elseif ($guild === 'blocked') {
+            $query->where('guild_enabled', false);
+        }
 
         $variants = $query
             ->orderBy('category')
-            ->orderBy('sort_order')
+            ->orderBy('is_placeholder', 'desc')
             ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'category', 'cost_gp', 'is_placeholder', 'sort_order']);
+            ->get(['id', 'name', 'slug', 'category', 'cost_gp', 'is_placeholder', 'guild_enabled']);
 
         return Inertia::render('mundane-item-variant/index', [
             'variants' => Inertia::defer(fn () => $variants),
@@ -44,7 +50,7 @@ class MundaneItemVariantController extends Controller
         $variant->category = $request->input('category');
         $variant->cost_gp = $request->input('cost_gp');
         $variant->is_placeholder = $request->boolean('is_placeholder', false);
-        $variant->sort_order = (int) $request->input('sort_order', 0);
+        $variant->guild_enabled = $request->boolean('guild_enabled', true);
         $variant->save();
         return redirect()->back();
     }
@@ -56,7 +62,7 @@ class MundaneItemVariantController extends Controller
         $mundaneItemVariant->category = $request->input('category');
         $mundaneItemVariant->cost_gp = $request->input('cost_gp');
         $mundaneItemVariant->is_placeholder = $request->boolean('is_placeholder', false);
-        $mundaneItemVariant->sort_order = (int) $request->input('sort_order', 0);
+        $mundaneItemVariant->guild_enabled = $request->boolean('guild_enabled', true);
         $mundaneItemVariant->save();
         return redirect()->back();
     }

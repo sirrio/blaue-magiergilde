@@ -275,7 +275,7 @@ export interface MundaneItemVariant {
   category: 'weapon' | 'armor'
   cost_gp?: number | null
   is_placeholder?: boolean
-  sort_order?: number
+  guild_enabled?: boolean
 }
 
 export interface CompendiumImportRun {
