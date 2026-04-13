@@ -430,6 +430,13 @@ module.exports = {
         ticketReopened: '↩️ Inbox reopened.',
         ticketClosed: '🔒 Inbox closed.',
         unknownTicketAction: '❌ Unknown inbox action.',
+        confirmTitle: '📬 Send message to the orga?',
+        confirmBody: 'Do you really want to send this message to the orga team?',
+        confirmPreviewLabel: 'Your message',
+        confirmSend: 'Yes, send',
+        confirmCancel: 'Cancel',
+        confirmCancelledTitle: 'Cancelled',
+        confirmCancelledBody: '↩️ The message was not sent.',
     },
     hiddenBid: {
         commandDescription: 'Set your hidden max bid for auction items.',

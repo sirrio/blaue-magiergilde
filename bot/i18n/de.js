@@ -430,6 +430,13 @@ module.exports = {
         ticketReopened: '↩️ Briefkasten wieder geöffnet.',
         ticketClosed: '🔒 Briefkasten geschlossen.',
         unknownTicketAction: '❌ Unbekannte Briefkasten-Aktion.',
+        confirmTitle: '📬 Nachricht an die Orga senden?',
+        confirmBody: 'Möchtest du diese Nachricht wirklich an das Orga-Team schicken?',
+        confirmPreviewLabel: 'Deine Nachricht',
+        confirmSend: 'Ja, senden',
+        confirmCancel: 'Abbrechen',
+        confirmCancelledTitle: 'Abgebrochen',
+        confirmCancelledBody: '↩️ Die Nachricht wurde nicht gesendet.',
     },
     hiddenBid: {
         commandDescription: 'Setze dein verborgenes Maximalgebot für Auktionsitems.',

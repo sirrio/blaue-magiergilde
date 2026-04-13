@@ -29,6 +29,9 @@ const NOTICE_COLORS = {
 let cachedSupportTicketChannelId = '';
 let settingsLoadedAt = 0;
 
+const PENDING_CONFIRMATION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const pendingConfirmations = new Map(); // userId -> { message, expiresAt }
+
 function getDb() {
     return require('./db');
 }
@@ -178,6 +181,47 @@ function parseTicketControlCustomId(customId) {
         action,
         ticketId: Math.floor(ticketId),
     };
+}
+
+function parsePendingConfirmCustomId(customId) {
+    const parts = String(customId || '').split(':');
+    if (parts.length !== 3 || parts[0] !== 'support-pending') {
+        return null;
+    }
+
+    const action = String(parts[1] || '').trim().toLowerCase();
+    if (!['confirm', 'cancel'].includes(action)) {
+        return null;
+    }
+
+    const userId = String(parts[2] || '').trim();
+    if (!userId) {
+        return null;
+    }
+
+    return { action, userId };
+}
+
+function buildPendingConfirmationMessage(userId, messagePreview, locale) {
+    const previewText = truncateText(messagePreview, 200);
+    const embed = new EmbedBuilder()
+        .setColor(NOTICE_COLORS.info)
+        .setTitle(t('support.confirmTitle', {}, locale))
+        .setDescription(t('support.confirmBody', {}, locale))
+        .addFields({ name: t('support.confirmPreviewLabel', {}, locale), value: previewText || t('support.relayNoText', {}, locale) });
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`support-pending:confirm:${userId}`)
+            .setLabel(t('support.confirmSend', {}, locale))
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`support-pending:cancel:${userId}`)
+            .setLabel(t('support.confirmCancel', {}, locale))
+            .setStyle(ButtonStyle.Secondary),
+    );
+
+    return { embeds: [embed], components: [row] };
 }
 
 function buildTicketThreadName(user) {
@@ -854,19 +898,15 @@ async function handleSupportTicketDirectMessage(message) {
     let ticket = existingTicket;
     let thread = null;
     if (!ticket) {
-        const created = await createTicketForUser(message);
-        if (!created.ok) {
-            const locale = await resolveLocaleForDiscordId(message.author.id);
-            await sendTemporaryDm(
-                message.author,
-                supportDmNotice(t('support.noticeTitle', {}, locale), t('support.createFailed', {}, locale)),
-                locale,
-            );
-            return true;
-        }
-
-        ticket = created.ticket;
-        thread = created.thread;
+        // No open ticket yet — ask for confirmation before creating one.
+        const locale = await resolveLocaleForDiscordId(message.author.id);
+        const preview = normalizeMessageText(message.content) || (attachmentUrlsFromMessage(message).length > 0 ? `[${attachmentUrlsFromMessage(message).length}x Anhang]` : '');
+        pendingConfirmations.set(String(message.author.id), {
+            message,
+            expiresAt: Date.now() + PENDING_CONFIRMATION_TTL_MS,
+        });
+        await message.author.send(buildPendingConfirmationMessage(message.author.id, preview, locale)).catch(() => undefined);
+        return true;
     }
 
     const relayed = await relayUserMessageToThread(ticket, message, thread);
@@ -1078,6 +1118,82 @@ async function replyInteractionNotice(interaction, content, locale = null) {
 async function handleSupportTicketInteraction(interaction) {
     if (!interaction?.isButton?.()) {
         return false;
+    }
+
+    // Handle pending confirmation buttons (triggered in DMs)
+    const pendingParsed = parsePendingConfirmCustomId(interaction.customId);
+    if (pendingParsed) {
+        const { action, userId } = pendingParsed;
+        const locale = await resolveLocaleForDiscordId(interaction.user.id);
+
+        // Only the owner of the confirmation can act on it
+        if (String(interaction.user.id) !== userId) {
+            await interaction.reply({ content: t('support.noticeTitle', {}, locale), flags: 64 }).catch(() => undefined);
+            return true;
+        }
+
+        const pending = pendingConfirmations.get(userId);
+        pendingConfirmations.delete(userId);
+
+        if (action === 'cancel' || !pending || Date.now() > pending.expiresAt) {
+            await interaction.update({
+                embeds: [new EmbedBuilder()
+                    .setColor(NOTICE_COLORS.warning)
+                    .setTitle(t('support.confirmCancelledTitle', {}, locale))
+                    .setDescription(t('support.confirmCancelledBody', {}, locale))],
+                components: [],
+            }).catch(() => undefined);
+            return true;
+        }
+
+        // Confirm: create ticket and relay the stored message
+        await interaction.deferUpdate().catch(() => undefined);
+
+        const existingTicket = await findOpenTicketByUserId(userId);
+        let ticket = existingTicket;
+        let thread = null;
+
+        if (!ticket) {
+            const created = await createTicketForUser(pending.message);
+            if (!created.ok) {
+                await interaction.editReply({
+                    embeds: [new EmbedBuilder()
+                        .setColor(NOTICE_COLORS.error)
+                        .setTitle(t('support.noticeTitle', {}, locale))
+                        .setDescription(t('support.createFailed', {}, locale))],
+                    components: [],
+                }).catch(() => undefined);
+                return true;
+            }
+            ticket = created.ticket;
+            thread = created.thread;
+        }
+
+        const relayed = await relayUserMessageToThread(ticket, pending.message, thread);
+        if (!relayed.ok) {
+            await interaction.editReply({
+                embeds: [new EmbedBuilder()
+                    .setColor(NOTICE_COLORS.error)
+                    .setTitle(t('support.noticeTitle', {}, locale))
+                    .setDescription(t('support.threadUnavailable', {}, ticket.locale || locale))],
+                components: [],
+            }).catch(() => undefined);
+            return true;
+        }
+
+        await markUserActivity(ticket.id);
+        ticket.status = 'pending_staff';
+        markTicketUpdated(ticket);
+        await syncTicketHeader(ticket, interaction.client, relayed.thread);
+
+        await interaction.editReply({
+            embeds: [new EmbedBuilder()
+                .setColor(NOTICE_COLORS.success)
+                .setTitle(t('support.openedTitle', {}, ticket.locale || locale))
+                .setDescription(t('support.openedBody', { id: ticket.id }, ticket.locale || locale))],
+            components: [],
+        }).catch(() => undefined);
+        return true;
     }
 
     const parsed = parseTicketControlCustomId(interaction.customId);
