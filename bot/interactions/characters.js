@@ -49,7 +49,7 @@ const {
 const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateLevel } = require('../utils/characterTier');
-const { ensureLevelProgressionLoaded } = require('../utils/levelProgression');
+const { bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -2456,7 +2456,10 @@ async function handle(interaction) {
             return true;
         }
 
-        const result = await updateCharacterManualLevelForDiscord(interaction.user, characterId, level);
+        const rawBubbles = interaction.fields.getTextInputValue('manualBubblesInLevel');
+        const bubblesInLevel = rawBubbles.trim() === '' ? 0 : Math.max(0, Math.floor(Number(rawBubbles) || 0));
+
+        const result = await updateCharacterManualLevelForDiscord(interaction.user, characterId, level, bubblesInLevel);
         if (!result.ok) {
             if (result.reason === 'below_real' && result.minLevel) {
                 await updateManageMessage(interaction, {
@@ -2910,6 +2913,7 @@ async function handle(interaction) {
                 .setTitle('Set level');
 
             const currentLevel = calculateLevel(character);
+            const maxBubblesForCurrent = Math.max(0, bubblesRequiredForLevel(Math.min(20, currentLevel + 1)) - bubblesRequiredForLevel(currentLevel));
             const manualInput = new TextInputBuilder()
                 .setCustomId('manualLevel')
                 .setLabel('Level (1-20)')
@@ -2917,7 +2921,17 @@ async function handle(interaction) {
                 .setRequired(true)
                 .setValue(safeModalValue(String(currentLevel)));
 
-            modal.addComponents(new ActionRowBuilder().addComponents(manualInput));
+            const bubblesInput = new TextInputBuilder()
+                .setCustomId('manualBubblesInLevel')
+                .setLabel(`Bubbles im Level (0-${Math.max(0, maxBubblesForCurrent - 1)}, optional)`)
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setValue('0');
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(manualInput),
+                new ActionRowBuilder().addComponents(bubblesInput),
+            );
             await interaction.showModal(modal);
             return true;
         }

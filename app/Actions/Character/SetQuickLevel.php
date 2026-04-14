@@ -12,7 +12,7 @@ class SetQuickLevel
 {
     public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
 
-    public function handle(Character $character, int $level): array
+    public function handle(Character $character, int $level, int $bubblesInLevel = 0): array
     {
         return DB::transaction(function () use ($character, $level): array {
             $activeVersionId = LevelProgression::activeVersionId();
@@ -96,12 +96,12 @@ class SetQuickLevel
                 return ['ok' => true];
             }
 
-            // target_bubbles = exact bubble floor for the chosen level.  The user
-            // explicitly selected $level, so we start precisely at its threshold.
-            // dm, start_tier and shop-spend are NOT added here: in the new system
-            // those adjustments are ignored for pseudo-chars (they were baked into
-            // the old-style pseudo's duration and are irrelevant going forward).
-            $targetBubbles = LevelProgression::bubblesRequiredForLevel($level);
+            // target_bubbles = level floor + any explicitly chosen bubbles-in-level.
+            // dm, start_tier and shop-spend are NOT added: in the new system those
+            // adjustments are ignored for pseudo-chars.
+            $maxBubblesInLevel = max(0, LevelProgression::bubblesRequiredForLevel(min(20, $level + 1)) - LevelProgression::bubblesRequiredForLevel($level));
+            $clampedBubblesInLevel = max(0, min($bubblesInLevel, $maxBubblesInLevel - 1));
+            $targetBubbles = LevelProgression::bubblesRequiredForLevel($level) + $clampedBubblesInLevel;
 
             if ($editablePseudo) {
                 $editablePseudo->duration = 0;

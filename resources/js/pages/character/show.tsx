@@ -18,6 +18,7 @@ import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
 import { calculateLevel } from '@/helper/calculateLevel'
+import { bubblesRequiredForLevel } from '@/helper/levelProgression'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
@@ -216,6 +217,17 @@ export default function Show({
       return (aDate - bDate) * direction
     })
   }, [character.adventures, adventureSortDir])
+
+  const supersededAdventureIds = useMemo(() => {
+    const chronological = [...character.adventures].sort((a, b) => {
+      const aDate = new Date(a.start_date).getTime()
+      const bDate = new Date(b.start_date).getTime()
+      return aDate !== bDate ? aDate - bDate : a.id - b.id
+    })
+    const lastPseudoIdx = chronological.reduceRight((found, adv, i) => found === -1 && adv.is_pseudo ? i : found, -1)
+    if (lastPseudoIdx === -1) return new Set<number>()
+    return new Set(chronological.slice(0, lastPseudoIdx).filter(a => !a.is_pseudo).map(a => a.id))
+  }, [character.adventures])
 
   const sortedDowntimes = useMemo(() => {
     const direction = downtimeSortDir === 'desc' ? -1 : 1
@@ -650,14 +662,22 @@ export default function Show({
                           const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                           const gameMasterName = adv.game_master?.trim() || '-'
                           const adventureTitle = adv.title || 'Adventure'
-                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
-                            ? t('characters.levelTrackingAnchorWithLevel', {
-                                level: adv.target_level,
-                              })
-                            : t('characters.levelTrackingAnchor')
+                          const pseudoBubblesInLevel =
+                            adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
+                              ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
+                              : 0
+                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
+                            <>
+                              {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
+                              {pseudoBubblesInLevel > 0 && (
+                                <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">(+{pseudoBubblesInLevel} <Droplets size={11} />)</span>
+                              )}
+                            </>
+                          ) : t('characters.levelTrackingAnchor')
+                          const isSuperseded = supersededAdventureIds.has(adv.id)
                           return (
                             <ListRow key={adv.id} className="block">
-                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
+                            <div className={`space-y-3 rounded-box border bg-base-100 p-3.5 ${isSuperseded ? 'border-base-200 opacity-50' : 'border-base-200'}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex min-w-0 items-center gap-1">
@@ -679,6 +699,9 @@ export default function Show({
                                     <p className="text-xs text-base-content/50">{t('characters.playedWith')}: {participantSummary}</p>
                                   ) : null}
                                   <p className="text-xs text-base-content/50">DM: {gameMasterName}</p>
+                                  {isSuperseded && (
+                                    <p className="mt-0.5 text-xs text-base-content/40 italic">{t('characters.supersededByPseudo')}</p>
+                                  )}
                                 </div>
                                 <span className="badge badge-ghost badge-sm shrink-0 font-normal">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
@@ -757,15 +780,23 @@ export default function Show({
                               const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                               const gameMasterName = adv.game_master?.trim() || '-'
                               const adventureTitle = adv.title || 'Adventure'
-                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
-                                ? t('characters.levelTrackingAnchorWithLevel', {
-                                    level: adv.target_level,
-                                  })
-                                : t('characters.levelTrackingAnchor')
+                              const pseudoBubblesInLevel =
+                                adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
+                                  ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
+                                  : 0
+                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
+                                <>
+                                  {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
+                                  {pseudoBubblesInLevel > 0 && (
+                                    <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">(+{pseudoBubblesInLevel} <Droplets size={11} />)</span>
+                                  )}
+                                </>
+                              ) : t('characters.levelTrackingAnchor')
+                              const isSuperseded = supersededAdventureIds.has(adv.id)
                               return (
                               <ListRow
                                 key={adv.id}
-                                className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
+                                className={`grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4 ${isSuperseded ? 'opacity-50' : ''}`}
                               >
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -790,6 +821,9 @@ export default function Show({
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                                     <span>DM: {gameMasterName}</span>
                                     {participantSummary ? <span>{t('characters.playedWith')}: {participantSummary}</span> : null}
+                                    {isSuperseded && (
+                                      <span className="italic text-base-content/40">{t('characters.supersededByPseudo')}</span>
+                                    )}
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">

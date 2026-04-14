@@ -570,7 +570,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
     return rows[0] ?? null;
 }
 
-async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel) {
+async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel, bubblesInLevel = 0) {
     await ensureLevelProgressionLoaded();
 
     const userId = await getLinkedUserIdForDiscord(discordUser);
@@ -682,6 +682,9 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
         }
 
         // Pseudo-adventures use target_level directly — no duration needed.
+        const maxBubblesInLevel = Math.max(0, bubblesRequiredForLevel(Math.min(20, level + 1)) - bubblesRequiredForLevel(level));
+        const clampedBubblesInLevel = Math.max(0, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel - 1));
+        const targetBubbles = bubblesRequiredForLevel(level) + clampedBubblesInLevel;
         const editablePseudo = latestPseudoIsLast ? latestPseudoRow : null;
         const needsPseudo = level > minAllowedLevel || latestPseudoRow;
 
@@ -698,7 +701,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                 const now = nowSql();
                 await connection.execute(
                     'UPDATE adventures SET duration = 0, has_additional_bubble = 0, target_level = ?, target_bubbles = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
-                    [level, bubblesRequiredForLevel(level), activeVersionId, now, editablePseudo.id],
+                    [level, targetBubbles, activeVersionId, now, editablePseudo.id],
                 );
             } else {
                 const now = nowSql();
@@ -727,7 +730,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                         0,
                         1,
                         level,
-                        bubblesRequiredForLevel(level),
+                        targetBubbles,
                         activeVersionId,
                         characterId,
                         'Level tracking adjustment',
