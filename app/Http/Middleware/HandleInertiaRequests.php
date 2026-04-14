@@ -9,6 +9,7 @@ use App\Support\LevelProgression;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Lab404\Impersonate\Services\ImpersonateManager;
 use Tighten\Ziggy\Ziggy;
 
 class HandleInertiaRequests extends Middleware
@@ -41,6 +42,7 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        /** @var \App\Models\User|null $user */
         $user = $request->user();
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
         $handbookChannels = collect();
@@ -78,6 +80,17 @@ class HandleInertiaRequests extends Middleware
                     ]
                     : null,
             ],
+            'impersonating' => (function () use ($user) {
+                if (! $user) {
+                    return null;
+                }
+                $manager = app(ImpersonateManager::class);
+                if (! $manager->isImpersonating()) {
+                    return null;
+                }
+
+                return ['name' => $manager->getImpersonator()?->name];
+            })(),
             'features' => config('features'),
             'botChannelOverride' => [
                 'active' => filled(config('services.bot.channel_override_id')),

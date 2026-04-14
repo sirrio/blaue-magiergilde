@@ -14,6 +14,7 @@ export interface PageProps {
   features: { games_calendar: boolean; rooms: boolean; character_status_switch: boolean }
   botChannelOverride?: { active: boolean; channel_id?: string | null }
   discordConnected: boolean
+  impersonating?: { name: string } | null
   handbookChannels?: { id: string; name: string }[]
   levelProgressionTotals?: Record<number, number>
   activeChannelId?: string | null
