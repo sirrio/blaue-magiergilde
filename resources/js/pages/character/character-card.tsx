@@ -546,7 +546,7 @@ export function CharacterCard({
   }
 
   return (
-    <div ref={setNodeRef} style={dragStyle} className="break-inside-avoid mb-4">
+    <div ref={setNodeRef} style={dragStyle}>
       <Card className={cn('group')}>
         <CardBody>
           <CardAction className={cn('absolute top-2 right-2 hidden gap-1 md:group-hover:flex')}>
@@ -597,7 +597,7 @@ export function CharacterCard({
               </Button>
             </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:transition-[padding] md:duration-150 md:group-hover:pr-28')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0')}>
             <span
               className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
               data-tip={statusTooltip}
@@ -608,14 +608,14 @@ export function CharacterCard({
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
           </CardTitle>
           <CardContent>
-            <div className={cn('flex items-center gap-1 text-xs')}>
+            <div className={cn('flex h-5 items-center gap-1 text-xs leading-none')}>
               <LogoTier tier={tier} width={12} />
               <span>
                 Level {level} {calculateClassString(character)}
               </span>
               {hasRoom ? (
                 <span
-                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] text-primary/75"
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] leading-none text-primary/75"
                   title={t('characters.roomAssigned')}
                   aria-label={t('characters.roomAssigned')}
                 >

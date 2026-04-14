@@ -14,6 +14,7 @@ import { Head, router } from '@inertiajs/react'
 import { Archive, BookUser, Copy, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 
+
 export default function Index({ characters, guildCharacters }: { characters: Character[]; guildCharacters: Character[] }) {
   const t = useTranslate()
   const [updatingTrackingIds, setUpdatingTrackingIds] = useState<number[]>([])
@@ -25,7 +26,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
   useEffect(() => {
     setChars([...visibleCharacters])
   }, [visibleCharacters])
-  const sensors = useSensors(useSensor(PointerSensor))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -229,7 +230,7 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
             </div>
           </div>
         ) : (
-          <div className={cn('columns-1 gap-4 sm:columns-2 md:columns-3 lg:columns-4')}>
+          <div className={cn('grid grid-cols-1 items-start gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4')}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={chars} strategy={rectSortingStrategy}>
                 {chars.map((char: Character) => (
