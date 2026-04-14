@@ -96,10 +96,18 @@ class SetQuickLevel
                 return ['ok' => true];
             }
 
+            // target_bubbles = exact bubble floor for the chosen level.  The user
+            // explicitly selected $level, so we start precisely at its threshold.
+            // dm, start_tier and shop-spend are NOT added here: in the new system
+            // those adjustments are ignored for pseudo-chars (they were baked into
+            // the old-style pseudo's duration and are irrelevant going forward).
+            $targetBubbles = LevelProgression::bubblesRequiredForLevel($level);
+
             if ($editablePseudo) {
                 $editablePseudo->duration = 0;
                 $editablePseudo->has_additional_bubble = false;
                 $editablePseudo->target_level = $level;
+                $editablePseudo->target_bubbles = $targetBubbles;
                 $editablePseudo->progression_version_id = $activeVersionId;
                 $editablePseudo->save();
             } else {
@@ -109,6 +117,7 @@ class SetQuickLevel
                 $adventure->has_additional_bubble = false;
                 $adventure->is_pseudo = true;
                 $adventure->target_level = $level;
+                $adventure->target_bubbles = $targetBubbles;
                 $adventure->progression_version_id = $activeVersionId;
                 $adventure->character_id = $character->id;
                 $adventure->title = 'Level tracking adjustment';

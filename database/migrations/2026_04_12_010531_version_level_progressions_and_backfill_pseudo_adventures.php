@@ -37,7 +37,8 @@ return new class extends Migration
 
         Schema::table('adventures', function (Blueprint $table) {
             $table->unsignedTinyInteger('target_level')->nullable()->after('is_pseudo');
-            $table->foreignId('progression_version_id')->nullable()->after('target_level')->constrained('level_progression_versions');
+            $table->unsignedSmallInteger('target_bubbles')->nullable()->after('target_level');
+            $table->foreignId('progression_version_id')->nullable()->after('target_bubbles')->constrained('level_progression_versions');
         });
 
         $totals = DB::table('level_progressions')
@@ -89,6 +90,7 @@ return new class extends Migration
                             ->where('id', $adventure->id)
                             ->update([
                                 'target_level' => $this->levelFromAvailableBubbles($availableBubbles, $totals),
+                                'target_bubbles' => $availableBubbles,
                                 'progression_version_id' => $versionId,
                             ]);
                     }
@@ -100,7 +102,7 @@ return new class extends Migration
     {
         Schema::table('adventures', function (Blueprint $table) {
             $table->dropConstrainedForeignId('progression_version_id');
-            $table->dropColumn('target_level');
+            $table->dropColumn(['target_level', 'target_bubbles']);
         });
 
         Schema::table('level_progressions', function (Blueprint $table) {

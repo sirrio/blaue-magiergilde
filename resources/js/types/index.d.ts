@@ -518,6 +518,7 @@ export interface Adventure {
   has_additional_bubble: boolean
   is_pseudo?: boolean
   target_level?: number | null
+  target_bubbles?: number | null
   progression_version_id?: number | null
   notes: string
   game_master: string
