@@ -77,6 +77,8 @@ class ShopRollService
             return [$spellId, $spellSnapshot];
         }
 
+        $sourceKind = $pickedItem['roll_source_kind'] ?? 'all';
+
         $query = Spell::query()
             ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school', 'ruling_changed', 'ruling_note'])
             ->whereIn('spell_level', $normalizedLevels);
@@ -84,7 +86,18 @@ class ShopRollService
             $query->whereIn('spell_school', $normalizedSchools);
         }
 
-        $spellSnapshot = $query->inRandomOrder()->first();
+        if ($sourceKind === 'official' || $sourceKind === 'third_party') {
+            $spellSnapshot = (clone $query)
+                ->whereHas('source', fn ($q) => $q->where('kind', $sourceKind))
+                ->inRandomOrder()
+                ->first();
+            if ($spellSnapshot === null) {
+                $spellSnapshot = $query->inRandomOrder()->first();
+            }
+        } else {
+            $spellSnapshot = $query->inRandomOrder()->first();
+        }
+
         $spellId = $spellSnapshot?->id;
 
         return [$spellId, $spellSnapshot];
@@ -119,13 +132,19 @@ class ShopRollService
             ->where('shop_enabled', true)
             ->where('rarity', $rarity);
 
-        if ($sourceKind === 'official' || $sourceKind === 'third_party') {
-            $query->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $sourceKind));
-        }
-
         $query->whereIn('type', $normalizedSelectionTypes);
 
-        $candidates = $query->get();
+        if ($sourceKind === 'official' || $sourceKind === 'third_party') {
+            $candidates = (clone $query)
+                ->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $sourceKind))
+                ->get();
+            if ($candidates->isEmpty()) {
+                $candidates = $query->get();
+            }
+        } else {
+            $candidates = $query->get();
+        }
+
         if ($candidates->isEmpty()) {
             return null;
         }
@@ -260,10 +279,6 @@ class ShopRollService
                 ->where('shop_enabled', true)
                 ->where('rarity', $rule->rarity);
 
-            if ($rule->source_kind === 'official' || $rule->source_kind === 'third_party') {
-                $query->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $rule->source_kind));
-            }
-
             $selectionTypes = array_values(array_unique(array_filter(
                 array_map(static fn (mixed $type): string => (string) $type, $rule->selection_types ?? []),
                 static fn (string $type): bool => $type !== '',
@@ -279,7 +294,16 @@ class ShopRollService
                 $query->whereNotIn('id', $pickedItemIds);
             }
 
-            $candidatePool = $query->get()
+            if ($rule->source_kind === 'official' || $rule->source_kind === 'third_party') {
+                $sourceFiltered = (clone $query)
+                    ->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $rule->source_kind))
+                    ->get();
+                $results = $sourceFiltered->isNotEmpty() ? $sourceFiltered : $query->get();
+            } else {
+                $results = $query->get();
+            }
+
+            $candidatePool = $results
                 ->map(function (Item $item) use ($rule): array {
                     $payload = $item->toArray();
                     $payload['display_cost'] = ItemCostResolver::resolveForItem($item);
