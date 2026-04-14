@@ -29,6 +29,7 @@ async function run() {
         isRoleSelectMenu: () => false,
         isMentionableSelectMenu: () => false,
         isChannelSelectMenu: () => false,
+        isMessageComponent: () => false,
         isChatInputCommand: () => true,
         isRepliable: () => true,
         deferReply: async () => {
