@@ -552,7 +552,8 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
         .setDescription(t('characters.commandDescription'))
-        .setContexts(0, 1),  // 0 = Guild, 1 = Bot DM
+        // 0 = Guild, 1 = Bot DM
+        .setContexts(0, 1),
     async execute(interaction) {
         await ensureLevelProgressionLoaded();
 

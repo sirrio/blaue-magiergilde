@@ -29,8 +29,10 @@ const NOTICE_COLORS = {
 let cachedSupportTicketChannelId = '';
 let settingsLoadedAt = 0;
 
-const PENDING_CONFIRMATION_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const pendingConfirmations = new Map(); // userId -> { message, expiresAt }
+// 5 minutes
+const PENDING_CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+// userId -> { message, expiresAt }
+const pendingConfirmations = new Map();
 
 function getDb() {
     return require('./db');
@@ -895,8 +897,8 @@ async function handleSupportTicketDirectMessage(message) {
         return true;
     }
 
-    let ticket = existingTicket;
-    let thread = null;
+    const ticket = existingTicket;
+    const thread = null;
     if (!ticket) {
         // No open ticket yet — ask for confirmation before creating one.
         const locale = await resolveLocaleForDiscordId(message.author.id);
