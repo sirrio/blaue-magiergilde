@@ -26,6 +26,8 @@ require __DIR__.'/web/game.php';
 require __DIR__.'/web/games.php';
 require __DIR__.'/web/item.php';
 require __DIR__.'/web/spell.php';
+require __DIR__.'/web/character-class.php';
+require __DIR__.'/web/mundane-item-variant.php';
 require __DIR__.'/web/compendium.php';
 require __DIR__.'/web/monitoring.php';
 require __DIR__.'/web/shop.php';

@@ -20,7 +20,7 @@ class BackstockItemController extends Controller
 
         $item = Item::query()
             ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->find($payload['item_id']);
 
         $payload['item_name'] = $item?->name;

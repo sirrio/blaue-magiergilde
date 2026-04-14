@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { MessageType } = require('discord.js');
 const { parseAnnouncement } = require('../discordGameScanner');
 
 const makeMessage = (content, createdAt = new Date('2026-01-22T12:00:00Z'), reactions = []) => ({
@@ -106,5 +107,101 @@ const cancelledReactionCheck = parseAnnouncement(
     ),
 );
 assert.equal(cancelledReactionCheck.cancelled, true);
+
+// HH.MM Uhr time format must not be stripped as a date
+const dotTimeUhrCheck = parseAnnouncement(
+    makeMessage(':MG_BT: 27.03.26 - 20.30 Uhr', new Date('2026-03-25T17:52:00Z')),
+);
+assert.equal(dotTimeUhrCheck.starts_at, '2026-03-27 20:30:00');
+
+// HH.MM without Uhr after a date
+const dotTimeNoUhrCheck = parseAnnouncement(
+    makeMessage(':MG_BT: Sa. 14.03.26 - 19.30 "Tavernenabend"', new Date('2026-03-14T16:00:00Z')),
+);
+assert.equal(dotTimeNoUhrCheck.starts_at, '2026-03-14 19:30:00');
+
+// // separator time format
+const slashSepTimeCheck = parseAnnouncement(
+    makeMessage(':MG_LT: 16.01.26 // 18.00 // D HARD', new Date('2026-01-16T10:00:00Z')),
+);
+assert.equal(slashSepTimeCheck.starts_at, '2026-01-16 18:00:00');
+
+// HH:MM-HH:MM range must not be broken by date stripping
+const timeRangeCheck = parseAnnouncement(
+    makeMessage(':MG_LT: -07.11.2025- 22:00-22:30 je nach', new Date('2025-11-07T20:00:00Z')),
+);
+assert.equal(timeRangeCheck.starts_at, '2025-11-07 22:00:00');
+
+// DD.MM - HH:MM with space-dash-space separator
+const dateDashTimeCheck = parseAnnouncement(
+    makeMessage(':MG_LT: 16.01 - 20:15', new Date('2026-01-16T10:00:00Z')),
+);
+assert.equal(dateDashTimeCheck.starts_at, '2026-01-16 20:15:00');
+
+// Cancellation via "absagen"
+const cancelAbsagenCheck = parseAnnouncement(
+    makeMessage(
+        ':MG_BT: 06.03.2026 19:00 Uhr - Ich muss die Runde absagen',
+        new Date('2026-03-06T12:00:00Z'),
+    ),
+);
+assert.equal(cancelAbsagenCheck.cancelled, true);
+
+// Cancellation via "findet nicht statt"
+const cancelFindetNichtStattCheck = parseAnnouncement(
+    makeMessage(
+        ':MG_LT: 10.03.2026 - 19:00 Uhr - runde findet leider nicht statt',
+        new Date('2026-03-10T12:00:00Z'),
+    ),
+);
+assert.equal(cancelFindetNichtStattCheck.cancelled, true);
+
+// Interest-check posts without date/time should return null
+const interestCheckNull = parseAnnouncement(
+    makeMessage('Gibt es interesse für eine :MG_BT: Runde?', new Date('2026-03-21T15:00:00Z')),
+);
+assert.equal(interestCheckNull, null);
+
+// Tier-only message without any content should return null
+const tierOnlyNull = parseAnnouncement(
+    makeMessage(':MG_HT:', new Date('2026-01-29T22:58:00Z')),
+);
+assert.equal(tierOnlyNull, null);
+
+// Bold title extraction
+const boldTitleCheck = parseAnnouncement(
+    makeMessage(':MG_LT: 09.03.2026 19:00 - **Der Spiegel der den Himmel versagt** - Mehrteiler', new Date('2026-03-09T12:00:00Z')),
+);
+assert.equal(boldTitleCheck.title, 'Der Spiegel der den Himmel versagt');
+
+// Quoted title still takes priority over bold
+const quotedOverBoldCheck = parseAnnouncement(
+    makeMessage(':MG_BT: 10.03.2026 20:00 - \u201EQuoted Title\u201C and **Bold Title**', new Date('2026-03-10T12:00:00Z')),
+);
+assert.equal(quotedOverBoldCheck.title, 'Quoted Title');
+
+// Date separator must not greedily consume time as year (16.01 - 20:15)
+const dateSepCheck = parseAnnouncement(
+    makeMessage(':MG_LT: 16.01 - 20:15', new Date('2026-01-16T10:00:00Z')),
+);
+assert.equal(dateSepCheck.starts_at, '2026-01-16 20:15:00');
+assert.equal(dateSepCheck.confidence, 0.55);
+
+const threadStarterTypeCheck = parseAnnouncement({
+    ...makeMessage(
+        'sirrio hat einen Thread begonnen: :MG_LT: 03/4.04.26 - 0.00 Uhr - "Alle Threads..."',
+        new Date('2026-04-03T12:00:00Z'),
+    ),
+    type: MessageType.ThreadStarterMessage,
+});
+assert.equal(threadStarterTypeCheck, null);
+
+const threadStarterTextFallbackCheck = parseAnnouncement(
+    makeMessage(
+        'sirrio has started a thread: :MG_LT: 03/4.04.26 - 0.00 Uhr - "All Threads..."',
+        new Date('2026-04-03T12:00:00Z'),
+    ),
+);
+assert.equal(threadStarterTextFallbackCheck, null);
 
 console.log('discord-game-scanner.test.js passed');

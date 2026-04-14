@@ -1,48 +1,71 @@
 const { Events } = require('discord.js');
-
-const appJoin = require('../interactions/appJoin');
-const characterApproval = require('../interactions/characterApproval');
-const characters = require('../interactions/characters');
-const hiddenBid = require('../interactions/hiddenBid');
-const newGame = require('../interactions/newGame');
-const reactionDraw = require('../interactions/reactionDraw');
-const { handleSupportTicketInteraction } = require('../supportTickets');
-const { buildErrorEmbed } = require('../utils/noticeEmbeds');
+const { reportBotError } = require('../utils/reportError');
 
 function isUnknownInteractionError(error) {
     return error?.code === 10062 || error?.rawError?.code === 10062;
+}
+
+function interactionModules() {
+    return {
+        appJoin: require('../interactions/appJoin'),
+        characterApproval: require('../interactions/characterApproval'),
+        characters: require('../interactions/characters'),
+        hiddenBid: require('../interactions/hiddenBid'),
+        newGame: require('../interactions/newGame'),
+        reactionDraw: require('../interactions/reactionDraw'),
+        supportTickets: require('../supportTickets'),
+        noticeEmbeds: require('../utils/noticeEmbeds'),
+    };
 }
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
         try {
-            if (await handleSupportTicketInteraction(interaction)) return;
+            if (interaction.isChatInputCommand()) {
+                const command = interaction.client.commands.get(interaction.commandName);
+                if (!command) return;
+
+                await command.execute(interaction);
+                return;
+            }
+
+            const {
+                appJoin,
+                characterApproval,
+                characters,
+                hiddenBid,
+                newGame,
+                reactionDraw,
+                supportTickets,
+            } = interactionModules();
+
+            if (await supportTickets.handleSupportTicketInteraction(interaction)) return;
             if (await appJoin.handle(interaction)) return;
             if (await characterApproval.handle(interaction)) return;
             if (await characters.handle(interaction)) return;
             if (await hiddenBid.handle(interaction)) return;
             if (await newGame.handle(interaction)) return;
             if (await reactionDraw.handle(interaction)) return;
-
-            if (!interaction.isChatInputCommand()) return;
-
-            const command = interaction.client.commands.get(interaction.commandName);
-            if (!command) return;
-
-            await command.execute(interaction);
         } catch (error) {
-             
             console.error(error);
+            void reportBotError(error, 'interaction_error', {
+                command: interaction.isChatInputCommand() ? interaction.commandName : null,
+                interaction_type: interaction.type,
+                custom_id: interaction.isMessageComponent() ? interaction.customId : null,
+                user_id: interaction.user?.id ?? null,
+                guild_id: interaction.guildId ?? null,
+            });
             if (!interaction.isRepliable || !interaction.isRepliable()) return;
             try {
                 if (!interaction.deferred && !interaction.replied) {
                     await interaction.deferReply({ flags: 64 });
                 }
                 if (interaction.deferred || interaction.replied) {
+                    const { noticeEmbeds } = interactionModules();
                     await interaction.editReply({
                         content: '',
-                        embeds: [buildErrorEmbed('Unexpected error', 'An error occurred.')],
+                        embeds: [noticeEmbeds.buildErrorEmbed('Unexpected error', 'An error occurred.')],
                         components: [],
                     });
                 }

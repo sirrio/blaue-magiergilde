@@ -10,7 +10,10 @@ use App\Models\DiscordChannel;
 use App\Models\DiscordMessage;
 use App\Models\DiscordMessageAttachment;
 use App\Models\LegacyCharacterApproval;
+use App\Models\LevelProgressionVersion;
+use App\Models\MundaneItemVariant;
 use App\Models\Source;
+use App\Support\LevelProgression;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,6 +28,55 @@ class BackupController extends Controller
 
         abort_unless($user && $user->is_admin, 403);
         $botSettings = DiscordBotSetting::current();
+        $levelProgressionVersions = LevelProgressionVersion::query()
+            ->with(['entries' => fn ($query) => $query->orderBy('level')])
+            ->orderByDesc('id')
+            ->limit(6)
+            ->get();
+        $levelProgressionVersionSummaries = $levelProgressionVersions
+            ->values()
+            ->map(function (LevelProgressionVersion $version, int $index) use ($levelProgressionVersions): array {
+                /** @var LevelProgressionVersion|null $previousVersion */
+                $previousVersion = $levelProgressionVersions->get($index + 1);
+                $currentEntries = $version->entries
+                    ->sortBy('level')
+                    ->mapWithKeys(fn ($entry) => [(int) $entry->level => (int) $entry->required_bubbles]);
+                $previousEntries = $previousVersion
+                    ? $previousVersion->entries
+                        ->sortBy('level')
+                        ->mapWithKeys(fn ($entry) => [(int) $entry->level => (int) $entry->required_bubbles])
+                    : collect();
+
+                $changes = $currentEntries
+                    ->map(function (int $requiredBubbles, int $level) use ($previousEntries): ?array {
+                        if (! $previousEntries->has($level)) {
+                            return null;
+                        }
+
+                        $previousRequiredBubbles = (int) $previousEntries->get($level);
+                        $delta = $requiredBubbles - $previousRequiredBubbles;
+
+                        if ($delta === 0) {
+                            return null;
+                        }
+
+                        return [
+                            'level' => $level,
+                            'delta' => $delta,
+                        ];
+                    })
+                    ->filter()
+                    ->values();
+
+                return [
+                    'id' => $version->id,
+                    'is_active' => (bool) $version->is_active,
+                    'created_at' => $version->created_at,
+                    'changed_levels_count' => $changes->count(),
+                    'change_samples' => $changes->take(4)->all(),
+                ];
+            })
+            ->all();
 
         return Inertia::render('admin/settings', [
             'discordBackup' => [
@@ -72,7 +124,12 @@ class BackupController extends Controller
             'sources' => Source::query()
                 ->orderBy('shortcode')
                 ->orderBy('name')
-                ->get(['id', 'name', 'shortcode']),
+                ->get(['id', 'name', 'shortcode', 'kind']),
+            'mundaneVariants' => MundaneItemVariant::query()
+                ->orderBy('category')
+                ->orderBy('is_placeholder', 'desc')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'category', 'is_placeholder']),
             'compendiumImportRuns' => CompendiumImportRun::query()
                 ->with('user:id,name')
                 ->orderByDesc('applied_at')
@@ -86,6 +143,7 @@ class BackupController extends Controller
                     'total_rows',
                     'new_rows',
                     'updated_rows',
+                    'deleted_rows',
                     'unchanged_rows',
                     'invalid_rows',
                     'error_samples',
@@ -95,6 +153,16 @@ class BackupController extends Controller
                 'total_rows' => LegacyCharacterApproval::query()->count(),
                 'last_imported_at' => LegacyCharacterApproval::query()->max('updated_at'),
             ],
+            'levelProgression' => collect(LevelProgression::totals())
+                ->map(function (int $requiredBubbles, int $level): array {
+                    return [
+                        'level' => $level,
+                        'required_bubbles' => $requiredBubbles,
+                    ];
+                })
+                ->values(),
+            'levelProgressionVersions' => $levelProgressionVersionSummaries,
+            'levelProgressionUpdateReport' => request()->session()->get('level_progression_update'),
         ]);
     }
 }

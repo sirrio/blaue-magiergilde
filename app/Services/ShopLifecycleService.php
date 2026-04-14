@@ -67,7 +67,8 @@ class ShopLifecycleService
         }
 
         $this->notifyStep($onStep, 'rotating_pointers');
-        $newDraftShopId = $this->shopRollService->roll()->id;
+        $autoRoll = (bool) ($settings->auto_roll_after_publish ?? true);
+        $newDraftShopId = $autoRoll ? $this->shopRollService->roll()->id : null;
         $updatePayload = [
             'current_shop_id' => $draftShopId,
             'draft_shop_id' => $newDraftShopId,

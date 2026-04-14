@@ -20,7 +20,7 @@ class MundaneItemVariantFactory extends Factory
             'category' => $this->faker->randomElement(['weapon', 'armor']),
             'cost_gp' => $this->faker->randomElement([0.10, 1.00, 5.00, 10.00, 50.00]),
             'is_placeholder' => false,
-            'sort_order' => $this->faker->numberBetween(1, 1000),
+            'guild_enabled' => true,
         ];
     }
 }

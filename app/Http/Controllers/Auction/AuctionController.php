@@ -50,9 +50,6 @@ class AuctionController extends Controller
                         'sold_bid_id',
                     ])
                     ->orderBy('id'),
-                'auctionItems.item' => fn ($query) => $query
-                    ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
-                    ->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
                 'auctionItems.bids' => fn ($query) => $query
                     ->select(['id', 'auction_item_id', 'bidder_name', 'bidder_discord_id', 'amount', 'created_at'])
                     ->orderByDesc('amount')
@@ -63,19 +60,10 @@ class AuctionController extends Controller
             ])
             ->orderByDesc('created_at')
             ->select(['id', 'title', 'status', 'currency', 'created_at', 'posted_at'])
-            ->get()
-            ->map(function (Auction $auction): Auction {
-                $auction->auctionItems->each(function ($auctionItem): void {
-                    if ($auctionItem->item) {
-                        $auctionItem->item->setAttribute('display_cost', ItemCostResolver::resolveForItem($auctionItem->item));
-                    }
-                });
-
-                return $auction;
-            });
+            ->get();
 
         $items = Item::query()
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->orderBy('name')
             ->select(['id', 'name', 'rarity', 'type', 'cost', 'url'])
             ->get()

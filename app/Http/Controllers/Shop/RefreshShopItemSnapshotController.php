@@ -15,8 +15,8 @@ class RefreshShopItemSnapshotController extends Controller
     public function __invoke(ShopItem $shopItem): RedirectResponse
     {
         $item = Item::query()
-            ->select(['id', 'name', 'url', 'cost', 'rarity', 'type'])
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'ruling_changed', 'ruling_note'])
+            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
             ->find($shopItem->item_id);
 
         if (! $item) {
@@ -30,10 +30,12 @@ class RefreshShopItemSnapshotController extends Controller
         $shopItem->item_cost = ItemCostResolver::resolveForItem($item);
         $shopItem->item_rarity = $item->rarity;
         $shopItem->item_type = $item->type;
+        $shopItem->item_ruling_changed = (bool) $item->ruling_changed;
+        $shopItem->item_ruling_note = $item->ruling_note;
 
         if ($shopItem->spell_id) {
             $spell = Spell::query()
-                ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school'])
+                ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school', 'ruling_changed', 'ruling_note'])
                 ->find($shopItem->spell_id);
 
             if ($spell) {
@@ -42,6 +44,8 @@ class RefreshShopItemSnapshotController extends Controller
                 $shopItem->spell_legacy_url = $spell->legacy_url;
                 $shopItem->spell_level = $spell->spell_level;
                 $shopItem->spell_school = $spell->spell_school;
+                $shopItem->spell_ruling_changed = (bool) $spell->ruling_changed;
+                $shopItem->spell_ruling_note = $spell->ruling_note;
             }
         }
 

@@ -15,6 +15,7 @@ test('admin can create and update sources from settings', function () {
         ->post(route('admin.settings.sources.store'), [
             'name' => "Player's Handbook",
             'shortcode' => 'phb',
+            'kind' => 'official',
         ])
         ->assertRedirect();
 
@@ -24,18 +25,35 @@ test('admin can create and update sources from settings', function () {
 
     expect($source)->not->toBeNull()
         ->and($source?->shortcode)->toBe('PHB')
-        ->and($source?->name)->toBe("Player's Handbook");
+        ->and($source?->name)->toBe("Player's Handbook")
+        ->and($source?->kind)->toBe('official');
 
     $this->actingAs($admin)
         ->patch(route('admin.settings.sources.update', $source), [
             'name' => "Dungeon Master's Guide",
             'shortcode' => 'dmg',
+            'kind' => 'partnered',
         ])
         ->assertRedirect();
 
     expect($source->fresh())
         ->shortcode->toBe('DMG')
-        ->name->toBe("Dungeon Master's Guide");
+        ->name->toBe("Dungeon Master's Guide")
+        ->kind->toBe('partnered');
+});
+
+test('admin source creation defaults kind to third party when omitted', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.settings.sources.store'), [
+            'name' => 'Exploring Eberron',
+            'shortcode' => 'exeb',
+        ])
+        ->assertRedirect();
+
+    expect(Source::query()->where('shortcode', 'EXEB')->value('kind'))
+        ->toBe('partnered');
 });
 
 test('deleting a source nulls source references on items and spells', function () {

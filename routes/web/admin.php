@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use App\Http\Controllers\Admin\DiscordLinePostController;
 use App\Http\Controllers\Admin\GameSettingsController;
 use App\Http\Controllers\Admin\LegacyCharacterApprovalImportController;
+use App\Http\Controllers\Admin\LevelProgressionController;
 use App\Http\Controllers\Admin\SourceController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +40,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('/admin/settings/discord/bot', [DiscordBotSettingsController::class, 'update'])
         ->name('admin.settings.bot.update');
 
+    Route::patch('/admin/settings/level-progression', [LevelProgressionController::class, 'update'])
+        ->name('admin.settings.level-progression.update');
+
     Route::post('/admin/settings/discord/line-post', DiscordLinePostController::class)
         ->name('admin.settings.discord.line-post');
 
@@ -53,6 +57,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
     Route::get('/admin/settings/compendium/template', [CompendiumImportController::class, 'template'])
         ->name('admin.settings.compendium.template');
+
+    Route::get('/admin/settings/compendium/export', [CompendiumImportController::class, 'export'])
+        ->name('admin.settings.compendium.export');
 
     Route::post('/admin/settings/compendium/preview', [CompendiumImportController::class, 'preview'])
         ->name('admin.settings.compendium.preview');

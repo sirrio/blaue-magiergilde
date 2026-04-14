@@ -14,7 +14,15 @@ class Source extends Model
     protected $fillable = [
         'name',
         'shortcode',
+        'kind',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'kind' => 'string',
+        ];
+    }
 
     public function items(): HasMany
     {

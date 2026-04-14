@@ -1,9 +1,16 @@
 const assert = require('node:assert/strict');
+const { setLevelProgressionTotals } = require('../utils/levelProgression');
 const { buildCharacterEmbed } = require('../commands/game/characters');
 
 const originalBaseUrl = process.env.BOT_PUBLIC_APP_URL;
 
 process.env.BOT_PUBLIC_APP_URL = 'https://example.test';
+setLevelProgressionTotals({
+    1: 0, 2: 1, 3: 3, 4: 6, 5: 10,
+    6: 15, 7: 21, 8: 28, 9: 36, 10: 45,
+    11: 55, 12: 66, 13: 78, 14: 91, 15: 105,
+    16: 120, 17: 136, 18: 153, 19: 171, 20: 190,
+});
 
 const character = {
     id: 42,
@@ -43,17 +50,23 @@ const simpleModeEmbed = buildCharacterEmbed({
     has_pseudo_adventure: 1,
     faction: 'bibliothekare',
     adventures_count: 12,
+    manual_adventures_count: 9,
     faction_downtime: 360000,
     total_downtime: 400000,
+    manual_faction_rank: 4,
+    manual_total_downtime_seconds: 428800,
 }, { thumbnailUrlOrAttachment: null }).toJSON();
 
 const simpleModeAdventures = simpleModeEmbed.fields.find((field) => field.name === 'Adventures');
 const simpleModeFactions = simpleModeEmbed.fields.find((field) => field.name === 'Factions');
 const simpleModeDowntime = simpleModeEmbed.fields.find((field) => field.name === 'Downtime');
+const simpleModeProgress = simpleModeEmbed.fields.find((field) => field.name === 'Progress');
 
-assert.equal(simpleModeAdventures?.value.includes('Played: **?**'), true);
-assert.equal(simpleModeFactions?.value.includes('Level: **?**'), true);
-assert.equal(simpleModeDowntime?.value, 'Cannot calculate downtime while level tracking entries exist.');
+assert.equal(simpleModeAdventures?.value.includes('Played: **9**'), true);
+assert.equal(simpleModeFactions?.value.includes('Level: **4**'), true);
+assert.equal(simpleModeDowntime?.value.includes('Total: **119h 6m**'), true);
+assert.equal(simpleModeDowntime?.value.includes('Remaining: **8h 0m**'), true);
+assert.equal(simpleModeProgress?.value.includes('Remaining: **1** Bubble(s)'), true);
 
 if (originalBaseUrl === undefined) {
     delete process.env.BOT_PUBLIC_APP_URL;

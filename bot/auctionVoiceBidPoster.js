@@ -54,13 +54,12 @@ async function fetchAuctionItemInfo(auctionItemId) {
                 ai.id,
                 ai.notes,
                 a.currency,
-                i.name,
+                ai.item_name AS name,
                 sb.bidder_discord_id AS sold_bidder_discord_id,
                 sb.bidder_name AS sold_bidder_name,
                 sb.amount AS sold_amount
             FROM auction_items ai
             INNER JOIN auctions a ON a.id = ai.auction_id
-            INNER JOIN items i ON i.id = ai.item_id
             LEFT JOIN auction_bids sb ON sb.id = ai.sold_bid_id
             WHERE ai.id = ?
             LIMIT 1
@@ -323,6 +322,7 @@ async function postVoiceHighestBid({
 }
 
 module.exports = {
+    fetchAuctionItemInfo,
     formatAuctionVoiceLine,
     postVoiceHighestBid,
 };

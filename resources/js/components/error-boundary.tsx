@@ -1,5 +1,5 @@
 import { reportFrontendError } from '@/lib/frontend-error-reporting'
-import { AlertTriangle, ArrowLeft, RefreshCcw, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, RefreshCcw } from 'lucide-react'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface FrontendErrorBoundaryProps {
@@ -29,10 +29,6 @@ export class FrontendErrorBoundary extends Component<FrontendErrorBoundaryProps,
         componentStack: errorInfo.componentStack,
       },
     })
-  }
-
-  private retryView = (): void => {
-    this.setState({ hasError: false })
   }
 
   private goBack = (): void => {
@@ -72,12 +68,12 @@ export class FrontendErrorBoundary extends Component<FrontendErrorBoundaryProps,
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="btn btn-outline btn-sm"
-                  onClick={this.retryView}
+                  className="btn btn-error btn-sm"
+                  onClick={() => window.location.reload()}
                   type="button"
                 >
-                  <RotateCcw className="h-4 w-4" />
-                  Try view again
+                  <RefreshCcw className="h-4 w-4" />
+                  Reload page
                 </button>
                 <button
                   className="btn btn-ghost btn-sm"
@@ -86,14 +82,6 @@ export class FrontendErrorBoundary extends Component<FrontendErrorBoundaryProps,
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Go back
-                </button>
-                <button
-                  className="btn btn-error btn-sm"
-                  onClick={() => window.location.reload()}
-                  type="button"
-                >
-                  <RefreshCcw className="h-4 w-4" />
-                  Reload page
                 </button>
               </div>
             </div>

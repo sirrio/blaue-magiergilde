@@ -5,6 +5,7 @@ import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
 import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
 import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
+import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import { AlliesModal } from '@/pages/character/allies-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
@@ -21,7 +22,8 @@ import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { calculateTier } from '@/helper/calculateTier'
-import { getAllyDisplayName, getAllyOwnerName } from '@/helper/allyDisplay'
+import { usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
+import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { Progress } from '@/components/ui/progress'
 import { Character, Ally, PageProps } from '@/types'
 import { Head, Link, router, usePage } from '@inertiajs/react'
@@ -313,7 +315,7 @@ export default function Show({
   }
 
   const adventureTotalDuration = useMemo(
-    () => character.adventures.reduce((total, adv) => total + adv.duration, 0),
+    () => character.adventures.filter((adv) => !adv.is_pseudo).reduce((total, adv) => total + adv.duration, 0),
     [character.adventures],
   )
   const downtimeTotalDuration = useMemo(
@@ -325,9 +327,25 @@ export default function Show({
   const factionLevel = useMemo(() => character.faction_rank ?? calculateFactionLevel(character), [character])
   const remainingDowntimeDuration = useMemo(() => Math.max(0, calculateRemainingDowntime(character)), [character])
   const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
-  const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
-  const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
+  const usesManualDerivedValues = usesManualLevelTracking(character)
+  const pseudoAdventureCount = useMemo(
+    () => character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length,
+    [character.adventures],
+  )
+  const realAdventureCount = character.adventures.length - pseudoAdventureCount
+  const manualAdventuresCount = character.manual_adventures_count ?? null
+  const manualFactionRank = character.manual_faction_rank ?? null
+  const manualTotalDowntimeSeconds = character.manual_total_downtime_seconds ?? null
+  const hasDerivedRemainingDowntime = !usesManualDerivedValues || manualTotalDowntimeSeconds !== null
+  const totalDowntimeDisplay = usesManualDerivedValues
+    ? (manualTotalDowntimeSeconds === null ? t('characters.autoDisabledShort') : secondsToHourMinuteString(manualTotalDowntimeSeconds))
+    : secondsToHourMinuteString(totalDowntimeDuration)
+  const remainingDowntimeDisplay = usesManualDerivedValues
+    ? (hasDerivedRemainingDowntime ? secondsToHourMinuteString(remainingDowntimeDuration) : '?')
+    : secondsToHourMinuteString(remainingDowntimeDuration)
+  const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
   const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
+  const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
   const statusIcon = guildStatus === 'approved'
     ? <CheckCircle2 size={12} />
@@ -426,14 +444,39 @@ export default function Show({
               <InfoBoxTitle>
                 <Swords size={15} /> {t('characters.adventures')}
               </InfoBoxTitle>
-              <InfoBoxLine>{t('characters.played')}: {character.adventures.length}</InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.played')}:{' '}
+                {usesManualDerivedValues ? (
+                  <span className="inline-flex items-center gap-1 leading-none align-middle">
+                    <span className={manualAdventuresCount === null ? 'text-warning' : ''}>
+                      {manualAdventuresCount ?? t('characters.autoDisabledShort')}
+                    </span>
+                    <CharacterManualOverrideModal character={character} field="adventures" value={manualAdventuresCount}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        modifier="square"
+                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                        aria-label={t('characters.manualAdventuresCountLabel')}
+                        title={adventuresDisabledReason}
+                      >
+                        <Pencil size={10} />
+                      </Button>
+                    </CharacterManualOverrideModal>
+                  </span>
+                ) : (
+                  realAdventureCount
+                )}
+              </InfoBoxLine>
               <InfoBoxLine>
                 {t('characters.startedIn')}: <LogoTier width={13} tier={character.start_tier} />
               </InfoBoxLine>
-              <InfoBoxLine>
-                {t('characters.bubbleShop')}: {character.bubble_shop_spend}
-                <Droplets size={13} />
-              </InfoBoxLine>
+              {!character.is_filler && (
+                <InfoBoxLine>
+                  {t('characters.bubbleShop')}: {character.bubble_shop_spend}
+                  <Droplets size={13} />
+                </InfoBoxLine>
+              )}
             </InfoBox>
             <InfoBox>
               <InfoBoxTitle>
@@ -441,31 +484,82 @@ export default function Show({
               </InfoBoxTitle>
               <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
               <InfoBoxLine>
-                {t('characters.levelLabel')}: {factionLevel}
+                {t('characters.levelLabel')}:{' '}
+                {usesManualDerivedValues ? (
+                  <span className="inline-flex items-center gap-1 leading-none align-middle">
+                    <span className={manualFactionRank === null ? 'text-warning' : ''}>
+                      {manualFactionRank ?? t('characters.autoDisabledShort')}
+                    </span>
+                    <CharacterManualOverrideModal character={character} field="factionRank" value={manualFactionRank}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        modifier="square"
+                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                        aria-label={t('characters.manualFactionRankLabel')}
+                        title={factionLevelWarningReason}
+                      >
+                        <Pencil size={10} />
+                      </Button>
+                    </CharacterManualOverrideModal>
+                  </span>
+                ) : (
+                  factionLevel
+                )}
               </InfoBoxLine>
             </InfoBox>
             <InfoBox>
               <InfoBoxTitle>
                 <FlameKindling size={15} /> {t('characters.downtime')}
               </InfoBoxTitle>
-              <InfoBoxLine>{t('characters.total')}: {secondsToHourMinuteString(totalDowntimeDuration)}</InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.total')}:{' '}
+                {usesManualDerivedValues ? (
+                  <span className="inline-flex items-center gap-1 leading-none align-middle">
+                    <span className={manualTotalDowntimeSeconds === null ? 'text-warning' : ''}>
+                      {totalDowntimeDisplay}
+                    </span>
+                    <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        modifier="square"
+                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                        aria-label={t('characters.manualTotalDowntimeLabel')}
+                        title={downtimeDisabledReason}
+                      >
+                        <Pencil size={10} />
+                      </Button>
+                    </CharacterManualOverrideModal>
+                  </span>
+                ) : (
+                  totalDowntimeDisplay
+                )}
+              </InfoBoxLine>
               <InfoBoxLine>Faction: {secondsToHourMinuteString(factionDowntimeDuration)}</InfoBoxLine>
               <InfoBoxLine>{t('characters.other')}: {secondsToHourMinuteString(otherDowntimeDuration)}</InfoBoxLine>
-              <InfoBoxLine className="font-semibold">{t('characters.remaining')}: {secondsToHourMinuteString(remainingDowntimeDuration)}</InfoBoxLine>
-            </InfoBox>
-            <InfoBox>
-              <InfoBoxTitle>
-                <Crown size={15} /> {t('characters.gameMaster')}
-              </InfoBoxTitle>
-              <InfoBoxLine>
-                {t('characters.bubbles')}: {character.dm_bubbles}
-                <Droplets size={13} />
-              </InfoBoxLine>
-              <InfoBoxLine>
-                {t('characters.coins')}: {character.dm_coins}
-                <Coins size={13} />
+              <InfoBoxLine className="font-semibold">
+                {t('characters.remaining')}:{' '}
+                <span className={usesManualDerivedValues && !hasDerivedRemainingDowntime ? 'text-warning' : ''}>
+                  {remainingDowntimeDisplay}
+                </span>
               </InfoBoxLine>
             </InfoBox>
+            {!character.is_filler && (
+              <InfoBox>
+                <InfoBoxTitle>
+                  <Crown size={15} /> {t('characters.gameMaster')}
+                </InfoBoxTitle>
+                <InfoBoxLine>
+                  {t('characters.bubbles')}: {character.dm_bubbles}
+                  <Droplets size={13} />
+                </InfoBoxLine>
+                <InfoBoxLine>
+                  {t('characters.coins')}: {character.dm_coins}
+                  <Coins size={13} />
+                </InfoBoxLine>
+              </InfoBox>
+            )}
           </div>
         </div>
 
@@ -550,14 +644,19 @@ export default function Show({
                         {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
-                    <List className="md:hidden shadow-none">
-                      {sortedAdventures.map((adv) => {
-                        const notes = adventureNotesMap.get(adv.id) ?? ''
-                        const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
-                        const gameMasterName = adv.game_master?.trim() || '-'
-                        const adventureTitle = adv.title || 'Adventure'
-                        return (
-                          <ListRow key={adv.id} className="block">
+                      <List className="md:hidden shadow-none">
+                        {sortedAdventures.map((adv) => {
+                          const notes = adventureNotesMap.get(adv.id) ?? ''
+                          const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                          const gameMasterName = adv.game_master?.trim() || '-'
+                          const adventureTitle = adv.title || 'Adventure'
+                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
+                            ? t('characters.levelTrackingAnchorWithLevel', {
+                                level: adv.target_level,
+                              })
+                            : t('characters.levelTrackingAnchor')
+                          return (
+                            <ListRow key={adv.id} className="block">
                             <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -585,14 +684,9 @@ export default function Show({
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
-                              {adv.is_pseudo ? (
-                                    <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                      {t('characters.levelTracking')}
-                                    </span>
-                                  ) : null}
-                              <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
+                                <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
                                 <span className="badge badge-ghost badge-sm font-medium">
-                                  {secondsToHourMinuteString(adv.duration)}
+                                  {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   {adv.is_pseudo ? (
@@ -657,13 +751,18 @@ export default function Show({
                           </button>
                           <span className="text-right">{t('characters.actions')}</span>
                         </div>
-                        <List className="shadow-none">
-                          {sortedAdventures.map((adv) => {
-                            const notes = adventureNotesMap.get(adv.id) ?? ''
-                            const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
-                            const gameMasterName = adv.game_master?.trim() || '-'
-                            const adventureTitle = adv.title || 'Adventure'
-                            return (
+                          <List className="shadow-none">
+                            {sortedAdventures.map((adv) => {
+                              const notes = adventureNotesMap.get(adv.id) ?? ''
+                              const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                              const gameMasterName = adv.game_master?.trim() || '-'
+                              const adventureTitle = adv.title || 'Adventure'
+                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
+                                ? t('characters.levelTrackingAnchorWithLevel', {
+                                    level: adv.target_level,
+                                  })
+                                : t('characters.levelTrackingAnchor')
+                              return (
                               <ListRow
                                 key={adv.id}
                                 className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
@@ -687,19 +786,14 @@ export default function Show({
                                         <ScrollText size={14} />
                                       </Button>
                                     </div>
-                                    {adv.is_pseudo ? (
-                                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                                        {t('characters.levelTracking')}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                                     <span>DM: {gameMasterName}</span>
                                     {participantSummary ? <span>{t('characters.playedWith')}: {participantSummary}</span> : null}
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">
-                                  {secondsToHourMinuteString(adv.duration)}
+                                  {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
                                 </p>
                                 <div className="self-center text-right text-xs text-base-content/70">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
@@ -779,9 +873,9 @@ export default function Show({
                         ? t('characters.noDowntimesRecorded')
                         : t('characters.downtimeEntriesTotal', {
                             count: character.downtimes.length,
-                            total: secondsToHourMinuteString(totalDowntimeDuration),
+                            total: totalDowntimeDisplay,
                             used: secondsToHourMinuteString(downtimeTotalDuration),
-                            remaining: secondsToHourMinuteString(remainingDowntimeDuration),
+                            remaining: remainingDowntimeDisplay,
                           })}
                     </p>
                   </div>
@@ -805,30 +899,12 @@ export default function Show({
                     </Button>
                   </div>
                 ) : canLogActivity ? (
-                  downtimeDisabledInSimpleMode ? (
-                    <div
-                      className="tooltip tooltip-left shrink-0"
-                      data-tip={downtimeDisabledReason}
-                      aria-label={downtimeDisabledReason}
-                    >
-                      <Button
-                        size="sm"
-                        className="shrink-0 gap-1"
-                        disabled
-                        aria-label={t('characters.addDowntimeDisabled')}
-                      >
-                        <FlameKindling size={14} />
-                        <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
-                      </Button>
-                    </div>
-                  ) : (
-                    <StoreDowntimeModal
-                      character={character}
-                      triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
-                      showLabel
-                      labelClassName="hidden sm:inline"
-                    />
-                  )
+                  <StoreDowntimeModal
+                    character={character}
+                    triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                    showLabel
+                    labelClassName="hidden sm:inline"
+                  />
                 ) : null
               ) : null}
             </div>
@@ -1114,6 +1190,7 @@ export default function Show({
                       {sortedAllies.map((ally) => {
                         const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
                         const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
+                        const deletedLinked = isDeletedLinkedAlly(ally)
 
                         return (
                           <ListRow key={ally.id} className="block">
@@ -1124,12 +1201,16 @@ export default function Show({
                                   <div className="flex min-w-0 items-center gap-2">
                                     <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
                                     <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                      {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                      {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                     </span>
                                   </div>
                                   {getAllyOwnerName(ally) ? (
                                     <span className="truncate text-xs text-base-content/50">
                                       {t('characters.owner')}: {getAllyOwnerName(ally)}
+                                    </span>
+                                  ) : deletedLinked ? (
+                                    <span className="truncate text-xs text-base-content/50">
+                                      {t('characters.allyDeletedLinkedCharacter')}
                                     </span>
                                   ) : null}
                                   <button
@@ -1214,6 +1295,7 @@ export default function Show({
                           {sortedAllies.map((ally) => {
                             const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
                             const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
+                            const deletedLinked = isDeletedLinkedAlly(ally)
 
                             return (
                               <ListRow
@@ -1228,7 +1310,7 @@ export default function Show({
                                         {getAllyDisplayName(ally)}
                                       </span>
                                       <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                        {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                        {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
                                       </span>
                                     </div>
                                     <span className="truncate text-xs text-base-content/50">
@@ -1238,7 +1320,7 @@ export default function Show({
                                 </div>
                                 <div className="min-w-0 space-y-0.5">
                                   <span className="block truncate text-sm text-base-content/70">
-                                    {getAllyOwnerName(ally) || '-'}
+                                    {getAllyOwnerName(ally) || (deletedLinked ? t('characters.allyDeletedLinkedCharacter') : '-')}
                                   </span>
                                 </div>
                                 <RatingHearts rating={ally.rating} />

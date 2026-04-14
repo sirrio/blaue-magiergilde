@@ -23,7 +23,12 @@ const {
     additionalBubblesForStartTier,
     calculateLevel,
     calculateTierFromLevel,
+    countsBubbleAdjustmentsForProgression,
 } = require('../../utils/characterTier');
+const {
+    bubblesRequiredForLevel,
+    ensureLevelProgressionLoaded,
+} = require('../../utils/levelProgression');
 const { formatDurationSeconds } = require('../../utils/time');
 
 function isHttpUrl(urlString) {
@@ -80,22 +85,32 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+function nullableInt(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
 function secondsToHourMinuteString(seconds) {
     return formatDurationSeconds(safeInt(seconds, 0));
 }
 
 function calculateTotalBubblesToNextLevel(character, level) {
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const currentTotal = ((level - 1) * level) / 2 - additional;
-    const nextTotal = (level * (level + 1)) / 2 - additional;
+    const currentTotal = bubblesRequiredForLevel(level) - additional;
+    const nextTotal = bubblesRequiredForLevel(level + 1) - additional;
     return Math.max(0, nextTotal - currentTotal);
 }
 
 function calculateBubblesInCurrentLevel(character, level) {
-    const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const spend = safeInt(character.bubble_shop_spend);
-    const currentTotal = ((level - 1) * level) / 2 - additional;
+    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
+    const currentTotal = bubblesRequiredForLevel(level) - additional;
     return Math.max(0, bubbles - currentTotal - spend);
 }
 
@@ -246,9 +261,13 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const hasRoom = safeInt(character.has_room) > 0;
     const simplifiedTracking = Boolean(character.simplified_tracking);
     const hasAutoLevelAdventure = Boolean(safeInt(character.has_pseudo_adventure));
-    const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure;
+    const usesManualDerivedValues = simplifiedTracking || hasAutoLevelAdventure;
+    const manualAdventuresCount = nullableInt(character.manual_adventures_count);
+    const manualFactionRank = nullableInt(character.manual_faction_rank);
+    const manualTotalDowntime = nullableInt(character.manual_total_downtime_seconds);
 
-    const totalBubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
     const inCurrent = calculateBubblesInCurrentLevel(character, level);
     const toNext = Math.max(0, toNextTotal - inCurrent);
@@ -257,19 +276,19 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const downtimeFaction = safeInt(character.faction_downtime);
     const downtimeOther = safeInt(character.other_downtime);
     const downtimeAllowed = totalBubbles * 8 * 60 * 60;
-    const downtimeRemaining = downtimeAllowed - downtimeTotal;
+    const downtimeRemaining = usesManualDerivedValues && manualTotalDowntime !== null
+        ? manualTotalDowntime - downtimeTotal
+        : downtimeAllowed - downtimeTotal;
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
-    const adventuresValue = downtimeDisabledInSimpleMode
-        ? `Played: **?**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`
+    const adventuresValue = usesManualDerivedValues
+        ? `Played: **${manualAdventuresCount ?? 'Manual'}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`
         : `Played: **${safeInt(character.adventures_count)}**\nStarted in: **${String(character.start_tier || '').toUpperCase()}**`;
-    const factionsValue = downtimeDisabledInSimpleMode
-        ? `${factionName}\nLevel: **?**`
+    const factionsValue = usesManualDerivedValues
+        ? `${factionName}\nLevel: **${manualFactionRank ?? 'Manual'}**`
         : `${factionName}\nLevel: **${factionLevel}**`;
-    const downtimeValue = downtimeDisabledInSimpleMode
-        ? 'Cannot calculate downtime while level tracking entries exist.'
-        : `Total: **${secondsToHourMinuteString(downtimeTotal)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(downtimeRemaining)}**`;
+    const downtimeValue = `Total: **${usesManualDerivedValues ? (manualTotalDowntime === null ? 'Manual' : secondsToHourMinuteString(manualTotalDowntime)) : secondsToHourMinuteString(downtimeAllowed)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${usesManualDerivedValues ? (manualTotalDowntime === null ? 'Manual' : secondsToHourMinuteString(Math.max(0, downtimeRemaining))) : secondsToHourMinuteString(Math.max(0, downtimeRemaining))}**`;
 
     const titleParts = [
         String(character.name || `Character ${character.id}`),
@@ -532,17 +551,11 @@ function buildDeleteAccountConfirmView({ ownerDiscordId, characters, locale }) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('characters'))
-        .setDescription(t('characters.commandDescription')),
+        .setDescription(t('characters.commandDescription'))
+        // 0 = Guild, 1 = Bot DM
+        .setContexts(0, 1),
     async execute(interaction) {
-        if (!interaction.inGuild()) {
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-            }
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ content: t('characters.useInServer'), components: [] });
-            }
-            return;
-        }
+        await ensureLevelProgressionLoaded();
 
         if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });

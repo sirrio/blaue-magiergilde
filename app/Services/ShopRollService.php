@@ -5,25 +5,13 @@ namespace App\Services;
 use App\Models\Item;
 use App\Models\Shop;
 use App\Models\ShopItem;
+use App\Models\ShopRollRule;
 use App\Models\Spell;
 use App\Support\ItemCostResolver;
 use Illuminate\Support\Facades\DB;
 
 class ShopRollService
 {
-    private function normalizeSelectionType(string $rarity, string $type): string
-    {
-        if (in_array($type, ['weapon', 'armor'], true)) {
-            return 'item';
-        }
-
-        if (in_array($rarity, ['rare', 'very_rare', 'legendary', 'artifact'], true) && in_array($type, ['consumable', 'spellscroll'], true)) {
-            return 'consumable';
-        }
-
-        return $type;
-    }
-
     private function calculateWeight(float $alpha, int $input, int $minPickCount): float
     {
         return exp(-$alpha * ($input - $minPickCount));
@@ -89,22 +77,42 @@ class ShopRollService
             return [$spellId, $spellSnapshot];
         }
 
+        $sourceKind = $pickedItem['roll_source_kind'] ?? 'all';
+
         $query = Spell::query()
-            ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school'])
+            ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school', 'ruling_changed', 'ruling_note'])
+            ->where('guild_enabled', true)
             ->whereIn('spell_level', $normalizedLevels);
         if ($normalizedSchools !== []) {
             $query->whereIn('spell_school', $normalizedSchools);
         }
 
-        $spellSnapshot = $query->inRandomOrder()->first();
+        if ($sourceKind === 'official' || $sourceKind === 'partnered') {
+            $spellSnapshot = (clone $query)
+                ->whereHas('source', fn ($q) => $q->where('kind', $sourceKind))
+                ->inRandomOrder()
+                ->first();
+            if ($spellSnapshot === null) {
+                $spellSnapshot = $query->inRandomOrder()->first();
+            }
+        } else {
+            $spellSnapshot = $query->inRandomOrder()->first();
+        }
+
         $spellId = $spellSnapshot?->id;
 
         return [$spellId, $spellSnapshot];
     }
 
-    private function pickLineReplacement(string $rarity, string $type, ?int $excludeItemId = null): ?array
+    /**
+     * @param  array<int, string>  $selectionTypes
+     */
+    private function pickLineReplacement(string $rarity, array $selectionTypes, string $sourceKind = 'all', ?int $excludeItemId = null): ?array
     {
-        $selectionType = $this->normalizeSelectionType($rarity, $type);
+        $normalizedSelectionTypes = array_values(array_unique(array_filter($selectionTypes, static fn (string $type): bool => $type !== '')));
+        if ($normalizedSelectionTypes === []) {
+            return null;
+        }
 
         $query = Item::query()
             ->select([
@@ -115,23 +123,30 @@ class ShopRollService
                 'rarity',
                 'type',
                 'pick_count',
+                'ruling_changed',
+                'ruling_note',
                 'default_spell_roll_enabled',
                 'default_spell_levels',
                 'default_spell_schools',
             ])
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
+            ->with(['mundaneVariants:id,name,slug,category,cost_gp,is_placeholder', 'source:id,shortcode'])
+            ->where('guild_enabled', true)
             ->where('shop_enabled', true)
             ->where('rarity', $rarity);
 
-        if ($selectionType === 'item') {
-            $query->whereIn('type', ['weapon', 'armor', 'item']);
-        } elseif ($selectionType === 'consumable' && in_array($rarity, ['rare', 'very_rare', 'legendary', 'artifact'], true)) {
-            $query->whereIn('type', ['consumable', 'spellscroll']);
+        $query->whereIn('type', $normalizedSelectionTypes);
+
+        if ($sourceKind === 'official' || $sourceKind === 'partnered') {
+            $candidates = (clone $query)
+                ->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $sourceKind))
+                ->get();
+            if ($candidates->isEmpty()) {
+                $candidates = $query->get();
+            }
         } else {
-            $query->where('type', $selectionType);
+            $candidates = $query->get();
         }
 
-        $candidates = $query->get();
         if ($candidates->isEmpty()) {
             return null;
         }
@@ -172,7 +187,8 @@ class ShopRollService
             $rarity = (string) ($line->item_rarity ?: ($line->item?->rarity ?: 'common'));
             $type = (string) ($line->item_type ?: ($line->item?->type ?: 'item'));
             $oldItemId = $line->item_id ? (int) $line->item_id : null;
-            $replacement = $this->pickLineReplacement($rarity, $type, $oldItemId);
+            $sourceKind = (string) ($line->roll_source_kind ?: 'all');
+            $replacement = $this->pickLineReplacement($rarity, [$type], $sourceKind, $oldItemId);
 
             if (! $replacement) {
                 return null;
@@ -198,12 +214,18 @@ class ShopRollService
             $line->item_cost = $replacement['display_cost'] ?? ($replacement['cost'] ?? null);
             $line->item_rarity = $replacement['rarity'] ?? null;
             $line->item_type = $replacement['type'] ?? null;
+            $line->item_ruling_changed = (bool) ($replacement['ruling_changed'] ?? false);
+            $line->item_ruling_note = $replacement['ruling_note'] ?? null;
+            $line->roll_source_kind = $sourceKind;
+            $line->source_shortcode = $replacement['source']['shortcode'] ?? null;
             $line->spell_id = $spellId;
             $line->spell_name = $spellSnapshot?->name;
             $line->spell_url = $spellSnapshot?->url;
             $line->spell_legacy_url = $spellSnapshot?->legacy_url;
             $line->spell_level = $spellSnapshot?->spell_level;
             $line->spell_school = $spellSnapshot?->spell_school;
+            $line->spell_ruling_changed = $spellSnapshot?->ruling_changed ?? false;
+            $line->spell_ruling_note = $spellSnapshot?->ruling_note;
             $line->notes = null;
             $line->snapshot_custom = false;
             $line->save();
@@ -214,44 +236,107 @@ class ShopRollService
 
     public function roll(): Shop
     {
-        $items = Item::query()
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
-            ->where('shop_enabled', true)
-            ->get()
-            ->map(function (Item $item): Item {
-                $item->setAttribute('display_cost', ItemCostResolver::resolveForItem($item));
-
-                return $item;
-            })
-            ->groupBy(['rarity', function ($item) {
-                return $this->normalizeSelectionType($item->rarity, $item->type);
-            }]);
-
-        $selectionRules = [
-            'common' => ['item' => 5, 'consumable' => 1, 'spellscroll' => 1],
-            'uncommon' => ['item' => 3, 'consumable' => 1, 'spellscroll' => 1],
-            'rare' => ['item' => 2, 'consumable' => 1, 'spellscroll' => 0],
-            'very_rare' => ['item' => 1, 'consumable' => 1, 'spellscroll' => 0],
-        ];
-
         $pickedItems = [];
+        $pickedItemIds = [];
+        $orderedRules = ShopRollRule::ordered();
+        $rollRowsSnapshot = $orderedRules
+            ->map(fn (ShopRollRule $rule): array => [
+                'id' => $rule->id,
+                'row_kind' => $rule->row_kind,
+                'rarity' => $rule->rarity,
+                'selection_types' => $rule->selection_types ?? [],
+                'source_kind' => $rule->source_kind,
+                'heading_title' => $rule->heading_title,
+                'count' => $rule->count,
+                'sort_order' => $rule->sort_order,
+            ])
+            ->values()
+            ->all();
 
-        foreach ($selectionRules as $rarity => $typeRules) {
-            foreach ($typeRules as $type => $count) {
-                if (isset($items[$rarity][$type])) {
-                    $itemsArray = $items[$rarity][$type]->toArray();
-                    $picked = $this->weightedRandomSelection($itemsArray, $count);
-                    $pickedItems = array_merge($pickedItems, $picked);
-                }
+        foreach ($orderedRules as $rule) {
+            if ($rule->row_kind === 'heading') {
+                continue;
             }
+
+            if ($rule->count <= 0) {
+                continue;
+            }
+
+            $query = Item::query()
+                ->select([
+                    'id',
+                    'name',
+                    'url',
+                    'cost',
+                    'rarity',
+                    'type',
+                    'pick_count',
+                    'ruling_changed',
+                    'ruling_note',
+                    'default_spell_roll_enabled',
+                    'default_spell_levels',
+                    'default_spell_schools',
+                    'source_id',
+                ])
+                ->with(['mundaneVariants:id,name,slug,category,cost_gp,is_placeholder', 'source:id,shortcode'])
+                ->where('guild_enabled', true)
+                ->where('shop_enabled', true)
+                ->where('rarity', $rule->rarity);
+
+            $selectionTypes = array_values(array_unique(array_filter(
+                array_map(static fn (mixed $type): string => (string) $type, $rule->selection_types ?? []),
+                static fn (string $type): bool => $type !== '',
+            )));
+
+            if ($selectionTypes === []) {
+                continue;
+            }
+
+            $query->whereIn('type', $selectionTypes);
+
+            if ($pickedItemIds !== []) {
+                $query->whereNotIn('id', $pickedItemIds);
+            }
+
+            if ($rule->source_kind === 'official' || $rule->source_kind === 'partnered') {
+                $sourceFiltered = (clone $query)
+                    ->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $rule->source_kind))
+                    ->get();
+                $results = $sourceFiltered->isNotEmpty() ? $sourceFiltered : $query->get();
+            } else {
+                $results = $query->get();
+            }
+
+            $candidatePool = $results
+                ->map(function (Item $item) use ($rule): array {
+                    $payload = $item->toArray();
+                    $payload['display_cost'] = ItemCostResolver::resolveForItem($item);
+                    $payload['roll_source_kind'] = $rule->source_kind;
+                    $payload['roll_rule_id'] = $rule->id;
+
+                    return $payload;
+                })
+                ->all();
+
+            $picked = $this->weightedRandomSelection($candidatePool, $rule->count);
+            if ($picked === []) {
+                continue;
+            }
+
+            $pickedItems = array_merge($pickedItems, $picked);
+            $pickedItemIds = array_values(array_unique([
+                ...$pickedItemIds,
+                ...array_map(static fn (array $entry): int => (int) ($entry['id'] ?? 0), $picked),
+            ]));
         }
 
-        $pickedItemIds = array_column($pickedItems, 'id');
         $shop = null;
 
-        DB::transaction(function () use (&$shop, $pickedItems, $pickedItemIds) {
+        DB::transaction(function () use (&$shop, $pickedItems, $pickedItemIds, $rollRowsSnapshot) {
             Item::query()->whereIn('id', $pickedItemIds)->increment('pick_count');
             $shop = Shop::query()->create();
+            $shop->roll_rows_snapshot = $rollRowsSnapshot;
+            $shop->save();
 
             foreach ($pickedItems as $pickedItem) {
                 [$spellId, $spellSnapshot] = $this->resolveSpellSnapshot($pickedItem);
@@ -264,6 +349,11 @@ class ShopRollService
                     'item_cost' => $pickedItem['display_cost'] ?? ($pickedItem['cost'] ?? null),
                     'item_rarity' => $pickedItem['rarity'] ?? null,
                     'item_type' => $pickedItem['type'] ?? null,
+                    'item_ruling_changed' => (bool) ($pickedItem['ruling_changed'] ?? false),
+                    'item_ruling_note' => $pickedItem['ruling_note'] ?? null,
+                    'roll_source_kind' => $pickedItem['roll_source_kind'] ?? 'all',
+                    'roll_rule_id' => $pickedItem['roll_rule_id'] ?? null,
+                    'source_shortcode' => $pickedItem['source']['shortcode'] ?? null,
                     'snapshot_custom' => false,
                     'spell_id' => $spellId,
                     'spell_name' => $spellSnapshot?->name,
@@ -271,6 +361,8 @@ class ShopRollService
                     'spell_legacy_url' => $spellSnapshot?->legacy_url,
                     'spell_level' => $spellSnapshot?->spell_level,
                     'spell_school' => $spellSnapshot?->spell_school,
+                    'spell_ruling_changed' => $spellSnapshot?->ruling_changed ?? false,
+                    'spell_ruling_note' => $spellSnapshot?->ruling_note,
                 ]);
             }
         });

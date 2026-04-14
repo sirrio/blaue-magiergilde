@@ -17,5 +17,11 @@ test('missing compendium sources are seeded by migration', function () {
         ->and(Source::query()->where('shortcode', 'GSB2')->value('name'))
         ->toBe("The Griffon's Saddlebag: Book Two")
         ->and(Source::query()->where('shortcode', 'DSDQ')->value('name'))
-        ->toBe('Dragonlance: Shadow of the Dragon Queen');
+        ->toBe('Dragonlance: Shadow of the Dragon Queen')
+        ->and(Source::query()->where('shortcode', 'DSDQ')->value('kind'))
+        ->toBe('official')
+        ->and(Source::query()->where('shortcode', 'GSB2')->value('kind'))
+        ->toBe('partnered')
+        ->and(Source::query()->where('shortcode', 'WGE')->value('kind'))
+        ->toBe('official');
 });

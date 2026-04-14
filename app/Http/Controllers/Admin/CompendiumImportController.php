@@ -35,17 +35,48 @@ class CompendiumImportController extends Controller
         ]);
     }
 
+    public function export(Request $request, CompendiumImportService $service): StreamedResponse
+    {
+        $entityType = (string) $request->query('entity_type', '');
+        if (! in_array($entityType, $service->supportedEntityTypes(), true)) {
+            throw new HttpException(422, 'Invalid entity type.');
+        }
+
+        $filename = $entityType.'-export.csv';
+        $columns = $service->columnsFor($entityType);
+        $rows = $service->exportRowsFor($entityType);
+
+        return response()->streamDownload(function () use ($columns, $rows): void {
+            $handle = fopen('php://output', 'wb');
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, $columns);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function preview(PreviewCompendiumImportRequest $request, CompendiumImportService $service): JsonResponse
     {
         $data = $request->validated();
         $entityType = (string) $data['entity_type'];
+        $overrideMissing = $request->boolean('override_missing');
         $file = $request->file('file');
 
-        $preview = $service->preview($entityType, $file);
+        $preview = $service->preview($entityType, $file, $overrideMissing);
         $token = (string) Str::uuid();
 
         Cache::put(self::CACHE_PREFIX.$token, [
             'entity_type' => $entityType,
+            'override_missing' => $overrideMissing,
             'filename' => $file->getClientOriginalName(),
             'summary' => $preview['summary'],
             'rows' => $preview['import_rows'],
@@ -55,6 +86,7 @@ class CompendiumImportController extends Controller
         return response()->json([
             'preview_token' => $token,
             'entity_type' => $entityType,
+            'override_missing' => $overrideMissing,
             'filename' => $file->getClientOriginalName(),
             'summary' => $preview['summary'],
             'row_samples' => $preview['row_samples'],
@@ -73,12 +105,17 @@ class CompendiumImportController extends Controller
         }
 
         $entityType = (string) ($cached['entity_type'] ?? '');
+        $overrideMissing = (bool) ($cached['override_missing'] ?? false);
         $rows = is_array($cached['rows'] ?? null) ? $cached['rows'] : [];
         $filename = (string) ($cached['filename'] ?? 'import.csv');
         $summaryFromPreview = is_array($cached['summary'] ?? null) ? $cached['summary'] : [];
         $errorSamples = is_array($cached['error_samples'] ?? null) ? $cached['error_samples'] : [];
 
-        $result = $service->apply($entityType, $rows);
+        if ($overrideMissing && (int) ($summaryFromPreview['invalid_rows'] ?? 0) > 0) {
+            throw new HttpException(422, 'Override import cannot be applied while invalid rows are present.');
+        }
+
+        $result = $service->apply($entityType, $rows, $overrideMissing);
         $invalidRows = (int) ($summaryFromPreview['invalid_rows'] ?? 0);
         $totalRows = (int) ($summaryFromPreview['total_rows'] ?? ($result['total_rows'] + $invalidRows));
 
@@ -89,6 +126,7 @@ class CompendiumImportController extends Controller
             'total_rows' => $totalRows,
             'new_rows' => $result['new_rows'],
             'updated_rows' => $result['updated_rows'],
+            'deleted_rows' => $result['deleted_rows'],
             'unchanged_rows' => $result['unchanged_rows'],
             'invalid_rows' => $invalidRows,
             'error_samples' => array_slice($errorSamples, 0, 20),
@@ -101,6 +139,7 @@ class CompendiumImportController extends Controller
                 'total_rows' => $totalRows,
                 'new_rows' => $result['new_rows'],
                 'updated_rows' => $result['updated_rows'],
+                'deleted_rows' => $result['deleted_rows'],
                 'unchanged_rows' => $result['unchanged_rows'],
                 'invalid_rows' => $invalidRows,
             ],

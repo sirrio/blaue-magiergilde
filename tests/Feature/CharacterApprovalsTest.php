@@ -55,8 +55,8 @@ it('includes simplified tracking flag for character approvals', function () {
 
 it('marks first submitted characters in character approvals', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $firstUser = User::factory()->create();
-    $secondUser = User::factory()->create();
+    $firstUser = User::factory()->create(['name' => 'Alpha User']);
+    $secondUser = User::factory()->create(['name' => 'Bravo User']);
 
     Character::factory()->for($firstUser)->create(['guild_status' => 'pending']);
     Character::factory()->for($secondUser)->create(['guild_status' => 'pending']);
@@ -119,6 +119,41 @@ it('does not include empty users when status filter is active', function () {
         ->get('/admin/character-approvals?status=pending')
         ->assertInertia(fn (Assert $page) => $page
             ->has('emptyUsers', 0));
+});
+
+it('paginates character approvals by user', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $approvalUsers = collect(range(1, 11))
+        ->map(fn (int $index) => User::factory()->create([
+            'name' => sprintf('Approval User %02d', $index),
+        ]));
+
+    $approvalUsers->each(function (User $approvalUser, int $index) {
+        Character::factory()->for($approvalUser)->create([
+            'name' => sprintf('Character %02d', $index + 1),
+            'guild_status' => 'pending',
+        ]);
+    });
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals?status=pending')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('pagination.currentPage', 1)
+            ->where('pagination.lastPage', 2)
+            ->where('pagination.perPage', 10)
+            ->where('pagination.total', 11)
+            ->has('userOrder', 10)
+            ->has('characters', 10));
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals?status=pending&page=2')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('pagination.currentPage', 2)
+            ->where('pagination.lastPage', 2)
+            ->has('userOrder', 1)
+            ->has('characters', 1)
+            ->where('characters.0.user.name', 'Approval User 11'));
 });
 
 it('requires review note when marking a character as needs changes', function () {

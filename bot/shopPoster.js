@@ -22,66 +22,57 @@ function formatPermissionList(perms) {
     return perms.map(p => `- ${names[p] || p}`).join('\n');
 }
 
-function rarityDisplayName(rarity) {
-    switch (rarity) {
-        case 'unknown_rarity':
-            return 'Unknown rarity';
-        case 'artifact':
-            return 'Artifact';
-        case 'legendary':
-            return 'Legendary';
-        case 'very_rare':
-            return 'Very Rare';
-        case 'rare':
-            return 'Rare';
-        case 'uncommon':
-            return 'Uncommon';
-        case 'common':
-        default:
-            return 'Common';
-    }
-}
-
-function tierRequirementForRarity(rarity) {
-    switch (rarity) {
-        case 'common':
-        case 'uncommon':
-            return 'Ab Low Tier';
-        case 'rare':
-            return 'Ab High Tier';
-        case 'very_rare':
-        case 'legendary':
-        case 'artifact':
-            return 'Ab Epic Tier';
-        default:
-            return '';
-    }
-}
-
 function formatLink(name, url) {
     if (!url) return String(name ?? '');
     return `[${name}](<${url}>)`;
 }
 
-function formatItemLine(row) {
+const DEFAULT_LINE_TEMPLATE = '{item_link}{spell_part}{legacy_part}: {item_cost}';
+
+function formatItemLine(row, template) {
+    const tpl = (typeof template === 'string' && template.trim()) ? template : DEFAULT_LINE_TEMPLATE;
+
     const notes = typeof row.notes === 'string' ? row.notes.trim() : '';
-    const itemName = notes ? `${row.name} - ${notes}` : row.name;
+    const itemName = notes ? `${row.name} - ${notes}` : String(row.name ?? '');
     const itemLink = formatLink(itemName, row.url);
-    const parts = [itemLink];
+    const cost = row.cost ?? '';
+
+    let spellLink = '';
+    let spellPart = '';
+    let spellLegacyLink = '';
+    let legacyPart = '';
 
     if (row.spell_id) {
         const spellPrimaryUrl = row.spell_url || row.spell_legacy_url;
-        const spellLink = formatLink(row.spell_name, spellPrimaryUrl);
-        parts.push(spellLink);
+        spellLink = formatLink(row.spell_name, spellPrimaryUrl);
+        spellPart = ` - ${spellLink}`;
 
         if (row.spell_legacy_url && row.spell_legacy_url !== spellPrimaryUrl) {
-            parts.push(formatLink('Legacy', row.spell_legacy_url));
+            spellLegacyLink = formatLink('Legacy', row.spell_legacy_url);
+            legacyPart = ` - ${spellLegacyLink}`;
         }
     }
 
-    const prefix = parts.join(' - ');
-    const cost = row.cost ? `: ${row.cost}` : '';
-    return `${prefix}${cost}`;
+    const sourceKind = typeof row.roll_source_kind === 'string' ? row.roll_source_kind : '';
+    const sourceLabel = sourceKind === 'official' ? 'Official' : sourceKind === 'partnered' ? 'Partnered' : '';
+    const sourceShortcode = typeof row.source_shortcode === 'string' ? row.source_shortcode : '';
+
+    return tpl
+        .replaceAll('{item_link}', itemLink)
+        .replaceAll('{item_name}', itemName)
+        .replaceAll('{item_cost}', cost)
+        .replaceAll('{notes}', notes)
+        .replaceAll('{spell_link}', spellLink)
+        .replaceAll('{spell_name}', row.spell_name ?? '')
+        .replaceAll('{spell_legacy_link}', spellLegacyLink)
+        .replaceAll('{spell_part}', spellPart)
+        .replaceAll('{legacy_part}', legacyPart)
+        .replaceAll('{source_label}', sourceLabel)
+        .replaceAll('{source_shortcode}', sourceShortcode);
+}
+
+function formatHeadingLine(title) {
+    return String(title ?? '').trim();
 }
 
 function normalizeMessageId(value) {
@@ -93,8 +84,7 @@ function normalizeMessageId(value) {
 function parsePostPayload(value) {
     if (!value) {
         return {
-            legacyMessageIds: [],
-            headerMessageIds: [],
+            headingLineMessageIds: [],
             itemMessageIds: {},
             shopId: null,
         };
@@ -109,26 +99,16 @@ function parsePostPayload(value) {
         }
     }
 
-    if (Array.isArray(parsed)) {
-        return {
-            legacyMessageIds: parsed.filter(Boolean).map(String),
-            headerMessageIds: [],
-            itemMessageIds: {},
-            shopId: null,
-        };
-    }
-
     if (!parsed || typeof parsed !== 'object') {
         return {
-            legacyMessageIds: [],
-            headerMessageIds: [],
+            headingLineMessageIds: [],
             itemMessageIds: {},
             shopId: null,
         };
     }
 
-    const headerMessageIds = Array.isArray(parsed.header_message_ids)
-        ? parsed.header_message_ids.map(normalizeMessageId).filter(Boolean)
+    const headingLineMessageIds = Array.isArray(parsed.heading_line_message_ids)
+        ? parsed.heading_line_message_ids.map(normalizeMessageId).filter(Boolean)
         : [];
 
     const itemMessageIds = {};
@@ -144,8 +124,7 @@ function parsePostPayload(value) {
     const shopId = Number(parsed.shop_id || 0) || null;
 
     return {
-        legacyMessageIds: [],
-        headerMessageIds,
+        headingLineMessageIds,
         itemMessageIds,
         shopId,
     };
@@ -153,24 +132,24 @@ function parsePostPayload(value) {
 
 async function fetchShopPostState() {
     const [rows] = await db.execute(
-        'SELECT id, last_post_channel_id, last_post_message_ids FROM shop_settings ORDER BY id ASC LIMIT 1',
+        'SELECT id, last_post_channel_id, last_post_message_ids, keep_previous_post FROM shop_settings ORDER BY id ASC LIMIT 1',
     );
     if (!rows[0]) return null;
     const parsed = parsePostPayload(rows[0].last_post_message_ids);
     return {
         id: rows[0].id,
         lastPostChannelId: rows[0].last_post_channel_id,
-        legacyMessageIds: parsed.legacyMessageIds,
-        headerMessageIds: parsed.headerMessageIds,
+        headingLineMessageIds: parsed.headingLineMessageIds,
         itemMessageIds: parsed.itemMessageIds,
         shopId: parsed.shopId,
+        keepPreviousPost: rows[0].keep_previous_post === 1 || rows[0].keep_previous_post === true,
     };
 }
 
-async function saveShopPostState({ settingsId, channelId, shopId, headerMessageIds, itemMessageIds }) {
+async function saveShopPostState({ settingsId, channelId, shopId, headingLineMessageIds, itemMessageIds }) {
     const payload = JSON.stringify({
         shop_id: shopId,
-        header_message_ids: headerMessageIds ?? [],
+        heading_line_message_ids: headingLineMessageIds ?? [],
         item_message_ids: itemMessageIds ?? {},
     });
     const timestamp = nowSql();
@@ -194,8 +173,7 @@ async function deletePreviousPosts({ client, settings, onProgress }) {
 
     const allMessageIds = new Set(
         [
-            ...(settings.legacyMessageIds || []),
-            ...(settings.headerMessageIds || []),
+            ...(settings.headingLineMessageIds || []),
             ...Object.values(settings.itemMessageIds || {}),
         ].filter(Boolean),
     );
@@ -232,8 +210,42 @@ async function deletePreviousPosts({ client, settings, onProgress }) {
 }
 
 async function fetchShop(shopId) {
-    const [rows] = await db.execute('SELECT id, created_at FROM shops WHERE id = ? LIMIT 1', [shopId]);
+    const [rows] = await db.execute(
+        `SELECT s.id, s.created_at, s.roll_rows_snapshot, ss.line_template
+         FROM shops s
+         LEFT JOIN shop_settings ss ON 1=1
+         WHERE s.id = ? LIMIT 1`,
+        [shopId],
+    );
     return rows[0] ?? null;
+}
+
+function parseRollRowsSnapshot(value) {
+    if (!value) {
+        return [];
+    }
+
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        } catch {
+            return [];
+        }
+    }
+
+    if (!Array.isArray(parsed)) {
+        return [];
+    }
+
+    return parsed
+        .filter((row) => row && typeof row === 'object')
+        .map((row) => ({
+            id: Number(row.id || 0),
+            row_kind: row.row_kind === 'heading' ? 'heading' : 'rule',
+            heading_title: typeof row.heading_title === 'string' ? row.heading_title : '',
+            sort_order: Number(row.sort_order || 0),
+        }));
 }
 
 async function fetchShopItems(shopId) {
@@ -242,22 +254,23 @@ async function fetchShopItems(shopId) {
             SELECT
                 si.id AS shop_item_id,
                 si.item_id,
-                COALESCE(si.item_name, i.name) AS name,
-                COALESCE(si.item_url, i.url) AS url,
-                COALESCE(si.item_cost, i.cost) AS cost,
-                COALESCE(si.item_rarity, i.rarity) AS rarity,
-                COALESCE(si.item_type, i.type) AS type,
+                si.item_name AS name,
+                si.item_url AS url,
+                si.item_cost AS cost,
+                si.item_rarity AS rarity,
+                si.item_type AS type,
+                si.roll_rule_id,
                 si.notes,
                 si.spell_id,
-                COALESCE(si.spell_name, s.name) AS spell_name,
-                COALESCE(si.spell_url, s.url) AS spell_url,
-                COALESCE(si.spell_legacy_url, s.legacy_url) AS spell_legacy_url,
-                COALESCE(si.spell_level, s.spell_level) AS spell_level
+                si.spell_name AS spell_name,
+                si.spell_url AS spell_url,
+                si.spell_legacy_url AS spell_legacy_url,
+                si.spell_level AS spell_level,
+                si.roll_source_kind,
+                si.source_shortcode
             FROM item_shop si
-            LEFT JOIN items i ON i.id = si.item_id
-            LEFT JOIN spells s ON s.id = si.spell_id
             WHERE si.shop_id = ?
-            ORDER BY COALESCE(si.item_name, i.name) ASC
+            ORDER BY si.id ASC
         `,
         [shopId],
     );
@@ -272,20 +285,21 @@ async function fetchShopItemById(shopItemId) {
                 si.id AS shop_item_id,
                 si.shop_id,
                 si.item_id,
-                COALESCE(si.item_name, i.name) AS name,
-                COALESCE(si.item_url, i.url) AS url,
-                COALESCE(si.item_cost, i.cost) AS cost,
-                COALESCE(si.item_rarity, i.rarity) AS rarity,
-                COALESCE(si.item_type, i.type) AS type,
+                si.item_name AS name,
+                si.item_url AS url,
+                si.item_cost AS cost,
+                si.item_rarity AS rarity,
+                si.item_type AS type,
+                si.roll_rule_id,
                 si.notes,
                 si.spell_id,
-                COALESCE(si.spell_name, s.name) AS spell_name,
-                COALESCE(si.spell_url, s.url) AS spell_url,
-                COALESCE(si.spell_legacy_url, s.legacy_url) AS spell_legacy_url,
-                COALESCE(si.spell_level, s.spell_level) AS spell_level
+                si.spell_name AS spell_name,
+                si.spell_url AS spell_url,
+                si.spell_legacy_url AS spell_legacy_url,
+                si.spell_level AS spell_level,
+                si.roll_source_kind,
+                si.source_shortcode
             FROM item_shop si
-            LEFT JOIN items i ON i.id = si.item_id
-            LEFT JOIN spells s ON s.id = si.spell_id
             WHERE si.id = ?
             LIMIT 1
         `,
@@ -293,6 +307,38 @@ async function fetchShopItemById(shopItemId) {
     );
 
     return rows[0] ?? null;
+}
+
+function buildShopPostRows(ruleRows, shopItems) {
+    const itemsByRuleId = new Map();
+
+    for (const row of shopItems) {
+        const rollRuleId = Number(row.roll_rule_id || 0);
+        if (!rollRuleId) {
+            continue;
+        }
+
+        const existingRows = itemsByRuleId.get(rollRuleId) || [];
+        existingRows.push(row);
+        itemsByRuleId.set(rollRuleId, existingRows);
+    }
+
+    return ruleRows.flatMap((rule) => {
+        if (rule.row_kind === 'heading') {
+            return [{
+                type: 'heading',
+                id: Number(rule.id),
+                title: typeof rule.heading_title === 'string' ? rule.heading_title.trim() : '',
+            }];
+        }
+
+        const ruleId = Number(rule.id || 0);
+
+        return (itemsByRuleId.get(ruleId) || []).map((row) => ({
+            type: 'item',
+            row,
+        }));
+    });
 }
 
 async function resolveDestination({ client, channelId, shop, threadName }) {
@@ -379,32 +425,13 @@ async function sendOneLine(destination, line) {
     return message?.id ?? null;
 }
 
-function countPlannedShopLines(grouped, rarityOrder) {
-    // Top header line.
+function countPlannedShopLines(postRows) {
+    // Top shop title line.
     let total = 1;
-    const itemLikeTypes = ['weapon', 'armor', 'item'];
 
-    for (const rarity of rarityOrder) {
-        const byType = grouped.get(rarity);
-        if (!byType) continue;
-
-        // Rarity section header.
-        total += 1;
-        for (const type of itemLikeTypes) {
-            total += (byType.get(type) || []).length;
-        }
-
-        if (rarity === 'common' || rarity === 'uncommon') {
-            // Consumable header.
+    for (const row of postRows) {
+        if (row.type === 'heading' || row.type === 'item') {
             total += 1;
-            total += (byType.get('consumable') || []).length;
-            // Spell scroll header.
-            total += 1;
-            total += (byType.get('spellscroll') || []).length;
-        } else {
-            // Mixed header.
-            total += 1;
-            total += (byType.get('consumable') || []).length + (byType.get('spellscroll') || []).length;
         }
     }
 
@@ -435,32 +462,19 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
     }
 
     const destination = destinationResult.destination;
-    const headerMessageIds = [];
+    const headingLineMessageIds = [];
     const itemMessageIds = {};
-
-    const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'];
-    const typeOrder = ['weapon', 'armor', 'item', 'consumable', 'spellscroll'];
-    const itemLikeTypes = ['weapon', 'armor', 'item'];
-    const grouped = new Map();
-
-    for (const row of items) {
-        const rarity = row.rarity ?? 'common';
-        const type = row.type ?? 'item';
-        if (!grouped.has(rarity)) grouped.set(rarity, new Map());
-        const byType = grouped.get(rarity);
-        if (!byType.has(type)) byType.set(type, []);
-        byType.get(type).push(row);
-    }
+    const ruleRows = parseRollRowsSnapshot(shop.roll_rows_snapshot);
+    const postRows = buildShopPostRows(ruleRows, items);
 
     const previousMessageIds = new Set(
         [
-            ...(postState?.legacyMessageIds || []),
-            ...(postState?.headerMessageIds || []),
+            ...(postState?.headingLineMessageIds || []),
             ...Object.values(postState?.itemMessageIds || {}),
         ].filter(Boolean),
     );
     const deleteCount = previousMessageIds.size;
-    const postCount = countPlannedShopLines(grouped, rarityOrder);
+    const postCount = countPlannedShopLines(postRows);
     const totalLines = Math.max(1, deleteCount + postCount);
     let postedLines = 0;
     await updateOperationProgress(resolvedOperationId, {
@@ -469,7 +483,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
         lastLine: `Preparing shop #${String(shop.id).padStart(3, '0')}`,
     });
 
-    if (deleteCount > 0) {
+    if (deleteCount > 0 && !postState?.keepPreviousPost) {
         await updateOperationProgress(resolvedOperationId, {
             totalLines,
             postedLines,
@@ -477,19 +491,21 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
         });
     }
 
-    const deleteResult = await deletePreviousPosts({
-        client,
-        settings: postState,
-        onProgress: async ({ processed, total }) => {
-            postedLines = Math.min(totalLines, processed);
-            await updateOperationProgress(resolvedOperationId, {
-                totalLines,
-                postedLines,
-                lastLine: `Deleting old shop messages (${processed}/${total})`,
-            });
-        },
-    });
-    if (deleteCount > 0 && postedLines < deleteCount) {
+    const deleteResult = postState?.keepPreviousPost
+        ? { total: 0, processed: 0 }
+        : await deletePreviousPosts({
+            client,
+            settings: postState,
+            onProgress: async ({ processed, total }) => {
+                postedLines = Math.min(totalLines, processed);
+                await updateOperationProgress(resolvedOperationId, {
+                    totalLines,
+                    postedLines,
+                    lastLine: `Deleting old shop messages (${processed}/${total})`,
+                });
+            },
+        });
+    if (deleteCount > 0 && !postState?.keepPreviousPost && postedLines < deleteCount) {
         postedLines = Math.min(totalLines, deleteCount);
         await updateOperationProgress(resolvedOperationId, {
             totalLines,
@@ -511,78 +527,32 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
 
     const createdAtUnix = Math.floor(new Date(shop.created_at).getTime() / 1000);
     const createdAtText = Number.isFinite(createdAtUnix) ? `<t:${createdAtUnix}:f>` : String(shop.created_at);
-    const headerId = await sendTrackedLine(
+    const shopTitleMessageId = await sendTrackedLine(
         `**Shop #${String(shop.id).padStart(3, '0')}** - Rolled: ${createdAtText}`,
-        `Header: Shop #${String(shop.id).padStart(3, '0')}`,
+        `Shop line: #${String(shop.id).padStart(3, '0')}`,
     );
-    if (headerId) headerMessageIds.push(headerId);
+    if (shopTitleMessageId) headingLineMessageIds.push(shopTitleMessageId);
 
-    for (const rarity of rarityOrder) {
-        const byType = grouped.get(rarity);
-        if (!byType) continue;
+    for (const postRow of postRows) {
+        if (postRow.type === 'heading') {
+            const headingId = await sendTrackedLine(
+                formatHeadingLine(postRow.title),
+                formatHeadingLine(postRow.title),
+            );
+            if (headingId) headingLineMessageIds.push(headingId);
 
-        const rarityLabel = rarityDisplayName(rarity);
-        const tierText = tierRequirementForRarity(rarity);
-
-        for (const type of typeOrder) {
-            const rows = byType.get(type);
-            if (rows) rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+            continue;
         }
 
-        const title = tierText
-            ? `## ***:crossed_swords: ${rarityLabel} Magic Items (${tierText}):***`
-            : `## ***:crossed_swords: ${rarityLabel} Magic Items:***`;
-        const sectionId = await sendTrackedLine(title, `${rarityLabel} section`);
-        if (sectionId) headerMessageIds.push(sectionId);
-        for (const type of itemLikeTypes) {
-            for (const row of byType.get(type) ?? []) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Item');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-        }
-
-        if (rarity === 'common' || rarity === 'uncommon') {
-            const consumableHeaderId = await sendTrackedLine(
-                `### ${rarityLabel} Consumable`,
-                `${rarityLabel} consumables`,
-            );
-            if (consumableHeaderId) headerMessageIds.push(consumableHeaderId);
-            for (const row of byType.get('consumable') ?? []) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Consumable');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-
-            const scrollHeaderId = await sendTrackedLine(
-                `### ${rarityLabel} Spell Scroll`,
-                `${rarityLabel} spell scrolls`,
-            );
-            if (scrollHeaderId) headerMessageIds.push(scrollHeaderId);
-            for (const row of byType.get('spellscroll') ?? []) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Spell scroll');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-        } else {
-            const mixedHeaderId = await sendTrackedLine(
-                `### ${rarityLabel} Consumable/Spell Scroll`,
-                `${rarityLabel} mixed`,
-            );
-            if (mixedHeaderId) headerMessageIds.push(mixedHeaderId);
-            for (const row of [...(byType.get('consumable') ?? []), ...(byType.get('spellscroll') ?? [])]) {
-                 
-                const messageId = await sendTrackedLine(formatItemLine(row), row.name || 'Consumable/Scroll');
-                if (messageId) itemMessageIds[String(row.shop_item_id)] = messageId;
-            }
-        }
+        const messageId = await sendTrackedLine(formatItemLine(postRow.row, shop.line_template), postRow.row.name || 'Item');
+        if (messageId) itemMessageIds[String(postRow.row.shop_item_id)] = messageId;
     }
 
     await saveShopPostState({
         settingsId: postState?.id ?? null,
         channelId: destination.id,
         shopId: shop.id,
-        headerMessageIds,
+        headingLineMessageIds,
         itemMessageIds,
     });
 
@@ -646,7 +616,7 @@ async function updateShopPost({ client, shopId, operationId }) {
 
     for (const row of items) {
         const messageId = updatedItemMessageIds[String(row.shop_item_id)];
-        const content = formatItemLine(row);
+        const content = formatItemLine(row, shop.line_template);
 
         if (!messageId) {
              
@@ -687,7 +657,7 @@ async function updateShopPost({ client, shopId, operationId }) {
         settingsId: postState.id ?? null,
         channelId: postState.lastPostChannelId,
         shopId: shop.id,
-        headerMessageIds: postState.headerMessageIds ?? [],
+        headingLineMessageIds: postState.headingLineMessageIds ?? [],
         itemMessageIds: updatedItemMessageIds,
     });
 
@@ -719,6 +689,8 @@ async function updateShopItemPost({ client, shopItemId }) {
         return { ok: false, status: 409, error: `Last posted shop is #${postState.shopId}.` };
     }
 
+    const shop = await fetchShop(row.shop_id);
+
     const messageId = postState.itemMessageIds[String(shopItemId)];
     if (!messageId) {
         return { ok: false, status: 404, error: 'Posted line for this shop entry was not found.' };
@@ -737,7 +709,7 @@ async function updateShopItemPost({ client, shopItemId }) {
     }
 
     const updatedItemMessageIds = { ...postState.itemMessageIds };
-    const content = formatItemLine(row);
+    const content = formatItemLine(row, shop?.line_template);
     try {
         await waitForDiscordRateLimit(client);
         await destination.messages.edit(messageId, content);
@@ -753,7 +725,7 @@ async function updateShopItemPost({ client, shopItemId }) {
         settingsId: postState.id ?? null,
         channelId: postState.lastPostChannelId,
         shopId: postState.shopId || row.shop_id || null,
-        headerMessageIds: postState.headerMessageIds ?? [],
+        headingLineMessageIds: postState.headingLineMessageIds ?? [],
         itemMessageIds: updatedItemMessageIds,
     });
 
@@ -767,6 +739,9 @@ async function updateShopItemPost({ client, shopItemId }) {
 }
 
 module.exports = {
+    buildShopPostRows,
+    formatHeadingLine,
+    parseRollRowsSnapshot,
     postShopToChannel,
     updateShopPost,
     updateShopItemPost,

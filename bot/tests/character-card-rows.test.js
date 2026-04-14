@@ -69,6 +69,24 @@ assert.equal(labels.includes('Downtime'), true);
 assert.ok(registerButton);
 assert.equal(registerButton.disabled, true);
 
+buildCharacterCardRows = loadBuildCharacterCardRows('true');
+rows = buildCharacterCardRows({
+    characterId: 14,
+    ownerDiscordId: '123',
+    isFiller: false,
+    simplifiedTracking: false,
+    guildStatus: 'draft',
+    registrationBlockedReason: 'active_limit',
+    registrationCounts: { consumedGeneralSlots: 8 },
+});
+const blockedRegisterButton = rows[0]
+    .toJSON()
+    .components
+    .find(component => component.label === 'Bei der Magiergilde registrieren');
+
+assert.ok(blockedRegisterButton);
+assert.equal(blockedRegisterButton.disabled, true);
+
 if (originalFlag === undefined) {
     delete process.env.FEATURE_CHARACTER_STATUS_SWITCH;
 } else {

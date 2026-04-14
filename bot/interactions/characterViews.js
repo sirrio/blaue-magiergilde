@@ -310,7 +310,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
     };
 }
 
-function buildCharacterCardPayload({ character, ownerDiscordId }) {
+function buildCharacterCardPayload({ character, ownerDiscordId, registrationBlockedReason = null, registrationCounts = null }) {
     const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
         ? true
         : Boolean(character.avatar_masked);
@@ -333,6 +333,8 @@ function buildCharacterCardPayload({ character, ownerDiscordId }) {
             isFiller: character.is_filler,
             simplifiedTracking,
             guildStatus: character.guild_status,
+            registrationBlockedReason,
+            registrationCounts,
         }),
         files,
     };
@@ -1220,7 +1222,7 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus }) {
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus, registrationBlockedReason = null, registrationCounts = null }) {
     const primaryRow = new ActionRowBuilder();
     const normalizedStatus = String(guildStatus || '').trim().toLowerCase();
     const canRegister = normalizedStatus === 'draft' || normalizedStatus === 'needs_changes';
@@ -1231,7 +1233,7 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
                 .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.registerWithMagiergilde'))
                 .setStyle(ButtonStyle.Success)
-                .setDisabled(!isCharacterStatusSwitchEnabled),
+                .setDisabled(!isCharacterStatusSwitchEnabled || Boolean(registrationBlockedReason)),
         );
     }
     if (!simplifiedTracking && canLogActivity) {
@@ -1306,6 +1308,20 @@ function buildCharacterRegisterConfirmView({ character, ownerDiscordId }) {
         embeds: [embed],
         components: [buildCharacterRegisterConfirmRow({ characterId: character.id, ownerDiscordId })],
     };
+}
+
+function buildCharacterRegistrationBlockedContent(blockedReason, counts = null, locale = null) {
+    if (blockedReason === 'active_limit') {
+        return t('characters.submitBlockedActiveLimit', {
+            count: counts?.consumedGeneralSlots ?? 8,
+        }, locale);
+    }
+
+    if (blockedReason === 'filler_limit') {
+        return t('characters.submitBlockedFillerLimit', {}, locale);
+    }
+
+    return t('characters.registerFailed', {}, locale);
 }
 
 function buildCharacterRegisterNoteModal({ characterId, ownerDiscordId, initialNote = '' }) {
@@ -1780,7 +1796,13 @@ function buildAdventureManageEmbed(adventure, participants) {
         .setColor(0x4f46e5)
         .addFields(
             { name: t('characters.dateField', {}, locale), value: formatIsoDate(adventure.start_date), inline: true },
-            { name: t('characters.durationField', {}, locale), value: formatDurationSeconds(adventure.duration), inline: true },
+            {
+                name: t('characters.durationField', {}, locale),
+                value: adventure.is_pseudo && Number.isFinite(Number(adventure.target_level))
+                    ? t('characters.levelTrackingAnchorWithLevel', { level: Number(adventure.target_level) }, locale)
+                    : formatDurationSeconds(adventure.duration),
+                inline: true,
+            },
             { name: t('characters.characterQuestField', {}, locale), value: questValue, inline: true },
             { name: t('characters.titleField', {}, locale), value: titleValue, inline: false },
             { name: t('characters.gameMasterField', {}, locale), value: gameMasterValue, inline: false },
@@ -1789,7 +1811,15 @@ function buildAdventureManageEmbed(adventure, participants) {
         );
 
     if (adventure.is_pseudo) {
-        embed.setDescription(t('characters.pseudoAdventureNotEditable', {}, locale));
+        const anchorDetails = Number.isFinite(Number(adventure.target_level))
+            ? t('characters.levelTrackingAnchorWithLevel', {
+                level: Number(adventure.target_level),
+            }, locale)
+            : null;
+        embed.setDescription([
+            t('characters.pseudoAdventureNotEditable', {}, locale),
+            anchorDetails,
+        ].filter(Boolean).join('\n'));
     }
 
     return embed;
@@ -1967,12 +1997,16 @@ function buildDowntimeTypeManageView({ downtime, ownerDiscordId, characterId }) 
 
 function buildAdventureEmbed(adventure, title, participants = []) {
     const extra = adventure.has_additional_bubble ? ' +1' : '';
+    const isPseudoWithLevel = adventure.is_pseudo && Number.isFinite(Number(adventure.target_level));
+    const durationValue = isPseudoWithLevel
+        ? t('characters.levelTrackingAnchorWithLevel', { level: Number(adventure.target_level) })
+        : `${formatDurationSeconds(adventure.duration)}${extra}`;
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(0x4f46e5)
         .addFields(
             { name: t('characters.dateField'), value: formatIsoDate(adventure.start_date), inline: true },
-            { name: t('characters.durationField'), value: `${formatDurationSeconds(adventure.duration)}${extra}`, inline: true },
+            { name: t('characters.durationField'), value: durationValue, inline: true },
             { name: t('characters.idField'), value: String(adventure.id), inline: true },
         );
 
@@ -2199,6 +2233,7 @@ module.exports = {
     buildCharacterCardRows,
     buildCharacterRegisterConfirmRow,
     buildCharacterRegisterConfirmView,
+    buildCharacterRegistrationBlockedContent,
     buildCharacterRegisterNoteModal,
     buildAdventureListRows,
     buildDowntimeStepEmbed,

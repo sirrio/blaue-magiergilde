@@ -5,6 +5,9 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
+import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
+import { useTranslate } from '@/lib/i18n'
+import { renderDiscordLine } from '@/lib/shopLineTemplate'
 import { cn } from '@/lib/utils'
 import { Item, MundaneItemVariant, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
@@ -39,20 +42,18 @@ const renderIcon = (type: string): ReactElement | null => {
 
 const getShopSpellSnapshot = (shopItem?: ShopItem): Spell | null => {
   if (!shopItem) return null
-  if (shopItem.spell_name) {
+  if (shopItem.spell_name || shopItem.spell_id) {
     return {
-      id: 0,
+      id: shopItem.spell?.id ?? 0,
       name: shopItem.spell_name ?? 'Unknown spell',
       url: shopItem.spell_url ?? '',
       legacy_url: shopItem.spell_legacy_url ?? '',
       spell_level: shopItem.spell_level ?? 0,
       spell_school: (shopItem.spell_school ?? 'abjuration') as Spell['spell_school'],
-      guild_enabled: shopItem.spell ? shopItem.spell.guild_enabled : undefined,
-      ruling_changed: shopItem.spell ? shopItem.spell.ruling_changed : undefined,
-      ruling_note: shopItem.spell ? shopItem.spell.ruling_note : undefined,
+      ruling_changed: shopItem.spell_ruling_changed ?? false,
+      ruling_note: shopItem.spell_ruling_note ?? null,
     }
   }
-  if (shopItem.spell) return shopItem.spell
   return null
 }
 
@@ -498,6 +499,7 @@ const ShopItemSnapshotModal = ({ shopItem, item }: { shopItem: ShopItem; item: I
 }
 
 const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item; sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
+  const t = useTranslate()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({})
@@ -734,7 +736,7 @@ const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item
               <option value="">No source</option>
               {sources.map((source) => (
                 <option key={source.id} value={source.id}>
-                  {source.shortcode} - {source.name}
+                  {formatSourceOptionLabel(source, t)}
                 </option>
               ))}
             </SelectOptions>
@@ -754,11 +756,13 @@ const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item
   )
 }
 
+
 export default function ItemRow({
   item,
   shopItem,
   sources = [],
   mundaneVariants = [],
+  lineTemplate = null,
   canUpdatePostLine = false,
   canManage = true,
 }: {
@@ -766,9 +770,11 @@ export default function ItemRow({
   shopItem?: ShopItem
   sources?: Source[]
   mundaneVariants?: MundaneItemVariant[]
+  lineTemplate?: string | null
   canUpdatePostLine?: boolean
   canManage?: boolean
 }) {
+  const t = useTranslate()
   const formData = {
     id: item.id,
     name: item.name,
@@ -894,11 +900,19 @@ export default function ItemRow({
   const dndBeyondLink = `https://www.dndbeyond.com/magic-items?filter-type=0&filter-search=${item.name}&filter-partnered-content=t`
   const spellUrl = spell?.url || shopItem?.spell_url || ''
   const spellLegacyUrl = spell?.legacy_url || shopItem?.spell_legacy_url || ''
-  const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
   const isCustomListing = Boolean(shopItem?.snapshot_custom)
-  const discordLineText = spell
-    ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${resolvedCost ?? ''}`
-    : `[${baseName}](<${item.url}>): ${resolvedCost ?? ''}`
+  const discordLineText = renderDiscordLine(lineTemplate, {
+    itemName: item.name,
+    notes: shopNotes,
+    itemUrl: item.url ?? '',
+    itemCost: resolvedCost ?? '',
+    spellId: shopItem?.spell_id ?? null,
+    spellName: spell?.name ?? shopItem?.spell_name ?? '',
+    spellUrl,
+    spellLegacyUrl,
+    sourceKind: shopItem?.roll_source_kind ?? null,
+    sourceShortcode: shopItem?.source_shortcode ?? null,
+  })
 
   const handleSnapshotRefresh = () => {
     if (!shopItem) return
@@ -1010,12 +1024,17 @@ export default function ItemRow({
           ) : (
             <span>{displayName}</span>
           )}{' '}
-          <span className={'text-xs font-light italic'}>({item.pick_count})</span>
-          {item.source?.shortcode ? (
-            <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
-              {item.source.shortcode}
-            </span>
-          ) : null}
+            <span className={'text-xs font-light italic'}>({item.pick_count})</span>
+            {item.source?.shortcode ? (
+              <>
+                <span className="ml-2 rounded-full border border-base-300 px-2 py-0.5 text-[9px] uppercase text-base-content/70">
+                  {item.source.shortcode}
+                </span>
+                <span className={cn('ml-1 rounded-full border px-2 py-0.5 text-[9px] uppercase', sourceKindBadgeClass(item.source.kind))}>
+                  {formatSourceKindShortLabel(item.source.kind, t)}
+                </span>
+              </>
+            ) : null}
           {item.mundane_variants?.length ? (
             <span className="ml-2 rounded-full border border-info/40 px-2 py-0.5 text-[9px] uppercase text-info">
               {item.mundane_variants.length} variant{item.mundane_variants.length === 1 ? '' : 's'}
@@ -1027,6 +1046,9 @@ export default function ItemRow({
             </span>
           ) : null}
         </span>
+        {shopItem ? (
+          <span className="mt-0.5 font-mono text-[10px] text-base-content/40 break-all">{discordLineText}</span>
+        ) : null}
         {autoRollSummary ? (
           <span className="text-[11px] text-base-content/60">{autoRollSummary}</span>
         ) : null}
@@ -1166,7 +1188,7 @@ export default function ItemRow({
                         <option value="">No source</option>
                         {sources.map((source) => (
                           <option key={source.id} value={source.id}>
-                            {source.shortcode} - {source.name}
+                              {formatSourceOptionLabel(source, t)}
                           </option>
                         ))}
                       </SelectOptions>

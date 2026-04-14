@@ -26,6 +26,7 @@ class StoreSourceRequest extends FormRequest
         $this->merge([
             'name' => $name,
             'shortcode' => $shortcode,
+            'kind' => trim((string) $this->input('kind', 'partnered')),
         ]);
     }
 
@@ -45,6 +46,7 @@ class StoreSourceRequest extends FormRequest
                 'regex:/^[A-Z0-9_-]+$/',
                 Rule::unique('sources', 'shortcode'),
             ],
+            'kind' => ['required', Rule::in(['official', 'partnered'])],
         ];
     }
 }

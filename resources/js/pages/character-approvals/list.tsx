@@ -8,15 +8,15 @@ import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
+import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
+import { levelFromAvailableBubbles } from '@/helper/levelProgression'
 import AppLayout from '@/layouts/app-layout'
-import { calculateTier } from '@/helper/calculateTier'
-import { calculateLevel } from '@/helper/calculateLevel'
 import { cn } from '@/lib/utils'
 import { Character, PageProps, User } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { AlertTriangle, Archive, CheckCircle2, Clock, Coins, Droplets, ExternalLink, Gauge, MapPin, Pencil, Plus, Shield, Sparkles, StickyNote, UserX, XCircle } from 'lucide-react'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface FilterOption {
   label: string
@@ -37,7 +37,6 @@ type AdminCharacter = Pick<
   | 'admin_notes'
   | 'admin_managed'
   | 'notes'
-  | 'adventures'
   | 'dm_bubbles'
   | 'dm_coins'
   | 'bubble_shop_spend'
@@ -49,6 +48,9 @@ type AdminCharacter = Pick<
   | 'avatar'
   | 'simplified_tracking'
 > & {
+  total_adventure_duration?: number | null
+  adventure_additional_bubbles_count?: number | null
+  pseudo_adventures_count?: number | null
   dndbeyond_character_id?: number | null
   has_legacy_approval?: boolean
   is_first_submission?: boolean
@@ -64,6 +66,60 @@ type AdminCharacter = Pick<
     source_row?: number | null
     source_column?: string | null
   } | null
+}
+
+const resolveApprovalLevel = (character: AdminCharacter): number => {
+  if (character.is_filler) {
+    return 3
+  }
+
+  const totalAdventureDuration = Number(character.total_adventure_duration ?? 0)
+  const normalizedAdventureDuration = Number.isFinite(totalAdventureDuration) ? totalAdventureDuration : 0
+  const additionalAdventureBubbles = Number(character.adventure_additional_bubbles_count ?? 0)
+  const normalizedAdditionalAdventureBubbles = Number.isFinite(additionalAdventureBubbles) ? additionalAdventureBubbles : 0
+  const progressionUsesBubbleAdjustments = character.simplified_tracking !== true
+    && Number(character.pseudo_adventures_count ?? 0) === 0
+  const dmBubbles = progressionUsesBubbleAdjustments
+    ? Number(character.dm_bubbles ?? 0)
+    : 0
+  const normalizedDmBubbles = Number.isFinite(dmBubbles) ? dmBubbles : 0
+  const bubbleShopSpend = progressionUsesBubbleAdjustments
+    ? Number(character.bubble_shop_spend ?? 0)
+    : 0
+  const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
+
+  const bubblesFromAdventures = Math.floor(normalizedAdventureDuration / 10800) + normalizedAdditionalAdventureBubbles
+  const availableBubbles = Math.max(
+    0,
+    bubblesFromAdventures
+      + normalizedDmBubbles
+      + additionalBubblesForStartTier(character.start_tier)
+      - normalizedBubbleShopSpend,
+  )
+
+  return levelFromAvailableBubbles(availableBubbles)
+}
+
+const resolveApprovalTier = (character: AdminCharacter): string => {
+  if (character.is_filler) {
+    return 'filler'
+  }
+
+  const level = resolveApprovalLevel(character)
+
+  if (level <= 4) {
+    return 'bt'
+  }
+
+  if (level <= 10) {
+    return 'lt'
+  }
+
+  if (level <= 16) {
+    return 'ht'
+  }
+
+  return 'et'
 }
 
 type CharacterGroup = {
@@ -88,51 +144,14 @@ type EmptyApprovalUser = Pick<
   | 'simplified_tracking'
 >
 
-const DebouncedSearchInput = ({
-  initialValue,
-  onSearch,
-}: {
-  initialValue: string
-  onSearch: (value: string) => void
-}) => {
-  const [value, setValue] = useState(initialValue)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+const approvalDataOnlyProps = ['characters', 'emptyUsers', 'userOrder', 'pagination'] as const
 
-  useEffect(() => {
-    setValue(initialValue)
-  }, [initialValue])
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-    }
-  }, [])
-
-  const handleChange = ({ target: { value: nextValue } }: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(nextValue)
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-
-    debounceRef.current = setTimeout(() => {
-      onSearch(nextValue)
-      debounceRef.current = null
-    }, 250)
-  }
-
-  return (
-    <Input
-      type="search"
-      placeholder="Search by character or user..."
-      value={value}
-      onChange={handleChange}
-    >
-      Search
-    </Input>
-  )
+const sanitizeQueryParams = (
+  params: Record<string, string | number | null | undefined>,
+): Record<string, string | number | undefined> => {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== null && value !== undefined),
+  ) as Record<string, string | number | undefined>
 }
 
 const getStatusLabel = (status?: string | null) => {
@@ -810,38 +829,54 @@ const AdminQuickLevelModal = ({
 export default function CharacterApprovals({
   characters,
   emptyUsers = [],
+  userOrder = [],
+  pagination,
 }: {
   characters: AdminCharacter[]
   emptyUsers?: EmptyApprovalUser[]
+  userOrder?: number[]
+  pagination: {
+    currentPage: number
+    lastPage: number
+    perPage: number
+    total: number
+    hasMorePages: boolean
+  }
 }) {
-  const currentQueryParams = route().params as Record<string, string | number | undefined>
-  const navOptions = { preserveState: true, preserveScroll: true }
+  const currentQueryParams = route().params as Record<string, string | number | null | undefined>
   const searchQuery = String(currentQueryParams.search ?? '')
-  const normalizedParams: Record<string, string | number | undefined> = {
+  const [searchValue, setSearchValue] = useState(searchQuery)
+  const normalizedParams = sanitizeQueryParams({
     ...currentQueryParams,
     discord:
       currentQueryParams.discord ??
       (currentQueryParams.no_discord === '1' ? 'none' : undefined),
-  }
+  })
 
-  const navigateTo = (href: string) => {
-    router.get(href, {}, navOptions)
-  }
+  useEffect(() => {
+    setSearchValue(searchQuery)
+  }, [searchQuery])
 
-  const handleSearch = (value: string) => {
-    const nextSearch = value.trim() !== '' ? value : undefined
-    const currentSearch = searchQuery.trim() !== '' ? searchQuery : undefined
-    if (nextSearch === currentSearch) {
-      return
-    }
+  const navigateTo = useCallback((
+    params: Record<string, string | number | undefined>,
+    options?: {
+      replace?: boolean
+    },
+  ) => {
+    router.get(route('admin.character-approvals.index'), params, {
+      preserveState: true,
+      preserveScroll: true,
+      only: [...approvalDataOnlyProps],
+      replace: options?.replace ?? false,
+    })
+  }, [])
 
-    navigateTo(
-      route('admin.character-approvals.index', {
-        ...normalizedParams,
-        search: nextSearch,
-        no_discord: undefined,
-      }),
-    )
+  const navigateToPage = (page: number) => {
+    navigateTo({
+      ...normalizedParams,
+      page,
+      no_discord: undefined,
+    })
   }
 
   const statusFilters: FilterOption[] = [
@@ -871,9 +906,9 @@ export default function CharacterApprovals({
   ]
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
-    const buildHref = (filterValue: string | null): string =>
-      route('admin.character-approvals.index', {
+    const buildParams = (filterValue: string | null): Record<string, string | number | undefined> => sanitizeQueryParams({
         ...normalizedParams,
+        page: undefined,
         [filterKey]: filterValue,
         no_discord: undefined,
       })
@@ -886,7 +921,7 @@ export default function CharacterApprovals({
           name={filterKey}
           aria-label="All"
           defaultChecked={!normalizedParams[filterKey]}
-          onClick={() => navigateTo(buildHref(null))}
+          onClick={() => navigateTo(buildParams(null))}
         />
         {filters.map(({ label, value }) => (
           <input
@@ -896,15 +931,41 @@ export default function CharacterApprovals({
             name={filterKey}
             aria-label={label}
             defaultChecked={normalizedParams[filterKey] === value}
-            onClick={() => navigateTo(buildHref(value))}
+            onClick={() => navigateTo(buildParams(value))}
           />
         ))}
       </div>
     )
   }
 
+  useEffect(() => {
+    const nextSearch = searchValue.trim() !== '' ? searchValue : undefined
+    const currentSearch = searchQuery.trim() !== '' ? searchQuery : undefined
+
+    if (nextSearch === currentSearch) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      navigateTo(
+        {
+          ...normalizedParams,
+          search: nextSearch,
+          page: undefined,
+          no_discord: undefined,
+        },
+        { replace: true },
+      )
+    }, 300)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [navigateTo, normalizedParams, searchQuery, searchValue])
+
   const groups = useMemo<CharacterGroup[]>(() => {
     const grouped = new Map<string, CharacterGroup>()
+    const userPosition = new Map(userOrder.map((userId, index) => [userId, index]))
 
     characters.forEach((character) => {
       const userId = typeof character.user_id === 'number' ? character.user_id : null
@@ -964,11 +1025,28 @@ export default function CharacterApprovals({
       })
     })
 
-    return Array.from(grouped.values())
-  }, [characters, emptyUsers])
+    return Array.from(grouped.values()).sort((left, right) => {
+      if (left.userId === null && right.userId === null) {
+        return left.label.localeCompare(right.label)
+      }
+
+      if (left.userId === null) {
+        return 1
+      }
+
+      if (right.userId === null) {
+        return -1
+      }
+
+      const leftPosition = userPosition.get(left.userId) ?? Number.MAX_SAFE_INTEGER
+      const rightPosition = userPosition.get(right.userId) ?? Number.MAX_SAFE_INTEGER
+
+      return leftPosition - rightPosition
+    })
+  }, [characters, emptyUsers, userOrder])
 
   const totalCharacters = characters.length
-  const totalUsers = groups.length
+  const totalUsers = pagination.total
   const statusLabelMap: Record<string, string> = {
     pending: 'Pending',
     draft: 'Draft',
@@ -1033,9 +1111,10 @@ const tierTextClassMap: Record<string, string> = {
             <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
               <span className="rounded-full border border-base-200 px-2 py-1">
                 {totalUsers} {totalUsers === 1 ? 'User' : 'Users'}
+                {pagination.lastPage > 1 ? ` · Page ${pagination.currentPage}/${pagination.lastPage}` : ''}
               </span>
               <span className="rounded-full border border-base-200 px-2 py-1">
-                {totalCharacters} {totalCharacters === 1 ? 'Character' : 'Characters'}
+                {totalCharacters} {totalCharacters === 1 ? 'Character' : 'Characters'} on this page
               </span>
               {activeFilters.length === 0 ? (
                 <span className="text-base-content/50">No filters</span>
@@ -1049,7 +1128,14 @@ const tierTextClassMap: Record<string, string> = {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-3">
-            <DebouncedSearchInput initialValue={searchQuery} onSearch={handleSearch} />
+            <Input
+              type="search"
+              placeholder="Search by character or user..."
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+            >
+              Search
+            </Input>
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-base-content/60">Status:</span>
@@ -1142,8 +1228,8 @@ const tierTextClassMap: Record<string, string> = {
                     const status = character.guild_status ?? 'pending'
                     const statusLabel = getStatusLabel(status)
                     const isDraft = status === 'draft'
-                    const currentTier = calculateTier(character)
-                    const currentLevel = calculateLevel(character)
+                    const currentTier = resolveApprovalTier(character)
+                    const currentLevel = resolveApprovalLevel(character)
                     const isAdminManaged = Boolean(character.admin_managed)
                     const characterNotes = character.notes?.trim()
                     const registrationNote = character.registration_note?.trim()
@@ -1303,6 +1389,29 @@ const tierTextClassMap: Record<string, string> = {
                 </List>
               </div>
             ))}
+            {pagination.lastPage > 1 ? (
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-base-200 pt-4">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  disabled={pagination.currentPage <= 1}
+                  onClick={() => navigateToPage(pagination.currentPage - 1)}
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-base-content/60">
+                  Page {pagination.currentPage} / {pagination.lastPage}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  disabled={!pagination.hasMorePages}
+                  onClick={() => navigateToPage(pagination.currentPage + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>

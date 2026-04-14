@@ -57,16 +57,15 @@ const buildBackstockAddItemLabel = (item: Item): string => {
 }
 
 const getBackstockItemSnapshot = (entry: BackstockItem): Item => {
-  const item = entry.item ?? ({} as Item)
-  return {
-    id: item.id ?? 0,
-    name: entry.item_name ?? item.name ?? 'Unknown item',
-    url: entry.item_url ?? item.url ?? '',
-    cost: entry.item_cost ?? item.display_cost ?? item.cost ?? '',
-    rarity: (entry.item_rarity ?? item.rarity ?? 'common') as Item['rarity'],
-    type: (entry.item_type ?? item.type ?? 'item') as Item['type'],
-    pick_count: item.pick_count ?? 0,
-  }
+    return {
+      id: entry.item_id ?? 0,
+      name: entry.item_name ?? 'Unknown item',
+      url: entry.item_url ?? '',
+      cost: entry.item_cost ?? '',
+      rarity: (entry.item_rarity ?? 'common') as Item['rarity'],
+      type: (entry.item_type ?? 'item') as Item['type'],
+      pick_count: 0,
+    }
 }
 
 type BackstockGroup = {

@@ -7,7 +7,9 @@ const { t } = require('../../i18n');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName(commandName('hiddenbid'))
-        .setDescription(t('hiddenBid.commandDescription')),
+        .setDescription(t('hiddenBid.commandDescription'))
+        // 0 = Guild, 1 = Bot DM
+        .setContexts(0, 1),
     async execute(interaction) {
         try {
             await hiddenBid.showCommandPicker(interaction);

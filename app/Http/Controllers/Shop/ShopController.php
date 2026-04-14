@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Shop;
+use App\Models\ShopRollRule;
 use App\Services\ShopLifecycleService;
-use App\Support\ItemCostResolver;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,24 +22,10 @@ class ShopController extends Controller
         $shopSettings = $shopLifecycleService->ensureInitialized();
 
         $shops = Shop::query()
-            ->with([
-                'shopItems.item' => fn ($query) => $query
-                    ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder,sort_order')
-                    ->select(['id', 'name', 'url', 'cost', 'rarity', 'type', 'pick_count']),
-                'shopItems.spell' => fn ($query) => $query->select(['id', 'name', 'url', 'legacy_url', 'spell_level']),
-            ])
+            ->with(['shopItems'])
             ->orderByDesc('created_at')
-            ->select(['shops.id', 'created_at'])
-            ->get()
-            ->map(function (Shop $shop): Shop {
-                $shop->shopItems->each(function ($shopItem): void {
-                    if ($shopItem->item) {
-                        $shopItem->item->setAttribute('display_cost', ItemCostResolver::resolveForItem($shopItem->item));
-                    }
-                });
-
-                return $shop;
-            });
+            ->select(['shops.id', 'created_at', 'roll_rows_snapshot'])
+            ->get();
 
         return Inertia::render('shop/index', [
             'shops' => $shops,
@@ -56,7 +42,21 @@ class ShopController extends Controller
                 'last_auto_posted_at',
                 'current_shop_id',
                 'draft_shop_id',
-            ]),
+                'line_template',
+                'auto_roll_after_publish',
+                'keep_previous_post',
+            ]) + [
+                'roll_rules' => ShopRollRule::ordered()->map(fn (ShopRollRule $rule): array => [
+                    'id' => $rule->id,
+                    'row_kind' => $rule->row_kind,
+                    'rarity' => $rule->rarity,
+                    'selection_types' => $rule->selection_types ?? [],
+                    'source_kind' => $rule->source_kind,
+                    'heading_title' => $rule->heading_title,
+                    'count' => $rule->count,
+                    'sort_order' => $rule->sort_order,
+                ])->all(),
+            ],
         ]);
     }
 
@@ -97,9 +97,12 @@ class ShopController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateShopRequest $request, Shop $shop)
+    public function update(UpdateShopRequest $request, Shop $shop): RedirectResponse
     {
-        //
+        $shop->line_template = $request->filled('line_template') ? $request->string('line_template')->trim()->value() : null;
+        $shop->save();
+
+        return redirect()->back();
     }
 
     /**

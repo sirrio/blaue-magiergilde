@@ -52,11 +52,11 @@ test('legacy weapon and armor placeholder costs are backfilled', function () {
 
 test('any placeholder labels are normalized to non-legacy names', function () {
     expect(DB::table('mundane_item_variants')
-        ->where('slug', 'any-weapon-price-legacy')
+        ->where('slug', 'any-weapon')
         ->value('name'))->toBe('Any weapon');
 
     expect(DB::table('mundane_item_variants')
-        ->where('slug', 'any-armor-price-legacy')
+        ->where('slug', 'any-armor')
         ->value('name'))->toBe('Any armor');
 });
 
@@ -167,7 +167,7 @@ test('weapon any variant is exclusive and cannot be mixed with specific variants
     ]);
 
     $anyWeaponId = (int) DB::table('mundane_item_variants')
-        ->where('slug', 'any-weapon-price-legacy')
+        ->where('slug', 'any-weapon')
         ->value('id');
     $longswordId = (int) DB::table('mundane_item_variants')
         ->where('slug', 'longsword')
@@ -210,7 +210,7 @@ test('weapon any variant is exclusive and cannot be mixed with specific variants
     $item->refresh();
 
     expect($item->mundaneVariants()->pluck('slug')->all())
-        ->toBe(['any-weapon-price-legacy']);
+        ->toBe(['any-weapon']);
 });
 
 test('spell scroll can store extra cost note and rejects mundane variants', function () {
@@ -392,10 +392,10 @@ test('legacy price markers and placeholders backfill item types', function () {
     ]);
 
     $weaponPlaceholderId = DB::table('mundane_item_variants')
-        ->where('slug', 'any-weapon-price-legacy')
+        ->where('slug', 'any-weapon')
         ->value('id');
     $armorPlaceholderId = DB::table('mundane_item_variants')
-        ->where('slug', 'any-armor-price-legacy')
+        ->where('slug', 'any-armor')
         ->value('id');
 
     DB::table('item_mundane_variant')->insert([
@@ -412,6 +412,14 @@ test('legacy price markers and placeholders backfill item types', function () {
             'updated_at' => now(),
         ],
     ]);
+
+    DB::table('mundane_item_variants')
+        ->where('slug', 'any-weapon')
+        ->update(['slug' => 'any-weapon-price-legacy']);
+
+    DB::table('mundane_item_variants')
+        ->where('slug', 'any-armor')
+        ->update(['slug' => 'any-armor-price-legacy']);
 
     /** @var \Illuminate\Database\Migrations\Migration $migration */
     $migration = require database_path('migrations/2026_02_26_162306_backfill_item_type_from_legacy_price_markers.php');

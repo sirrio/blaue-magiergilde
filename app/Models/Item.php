@@ -36,7 +36,7 @@ class Item extends Model
     public function mundaneVariants(): BelongsToMany
     {
         return $this->belongsToMany(MundaneItemVariant::class, 'item_mundane_variant')
-            ->orderBy('sort_order')
+            ->orderBy('is_placeholder', 'desc')
             ->orderBy('name');
     }
 }

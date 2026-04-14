@@ -5,14 +5,19 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { useTranslate } from '@/lib/i18n'
-import { cn } from '@/lib/utils'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Pencil } from 'lucide-react'
 import React, { useState } from 'react'
 
-const UpdateCharacterModal = ({ character, children }: { character: Character; children?: React.ReactNode }) => {
+const UpdateCharacterModal = ({
+  character,
+  children,
+}: {
+  character: Character
+  children?: React.ReactNode
+}) => {
   const t = useTranslate()
   const { classes, factions, versions, errors } = usePage<PageProps>().props
   const formData = {
@@ -117,24 +122,28 @@ const UpdateCharacterModal = ({ character, children }: { character: Character; c
             </div>
           ) : (
             <div className="space-y-3">
-              <div className={cn('grid grid-cols-2 gap-2')}>
-            <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-              {t('characters.dmBubbles')}
-            </Input>
-            <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-              {t('characters.dmCoins')}
-            </Input>
-          </div>
-          <Input
-            errors={errors.bubble_shop_spend}
-            type="number"
-            min={0}
-            max={1024}
-            value={data.bubble_shop_spend}
-            onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-          >
-                {t('characters.bubbleShopSpend')}
-              </Input>
+              {!character.is_filler && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
+                      {t('characters.dmBubbles')}
+                    </Input>
+                    <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
+                      {t('characters.dmCoins')}
+                    </Input>
+                  </div>
+                  <Input
+                    errors={errors.bubble_shop_spend}
+                    type="number"
+                    min={0}
+                    max={1024}
+                    value={data.bubble_shop_spend}
+                    onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
+                  >
+                    {t('characters.bubbleShopSpend')}
+                  </Input>
+                </>
+              )}
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
                 {t('characters.notesLabel')}
               </TextArea>

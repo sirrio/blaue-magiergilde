@@ -16,7 +16,6 @@ class CharacterClassFactory extends Factory
     {
         return [
             'name' => $this->faker->word(),
-            'src' => $this->faker->imageUrl(300, 300, 'fantasy'),
         ];
     }
 }

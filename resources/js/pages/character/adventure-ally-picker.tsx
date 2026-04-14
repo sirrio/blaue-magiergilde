@@ -1,5 +1,5 @@
 import { Input } from '@/components/ui/input'
-import { getAllyDisplayName, getAllyOwnerName, getCharacterOwnerName, getGuildCharacterOptionLabel } from '@/helper/allyDisplay'
+import { getAllyDisplayName, getAllyOwnerName, getCharacterOwnerName, getGuildCharacterOptionLabel, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { cn } from '@/lib/utils'
 import { Ally, Character } from '@/types'
 import { User } from 'lucide-react'
@@ -47,12 +47,17 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
     const query = search.trim().toLowerCase()
     const allyOptions = allies.map((ally) => {
       const ownerName = getAllyOwnerName(ally)
+      const deletedLinked = isDeletedLinkedAlly(ally)
       return {
         key: `ally-${ally.id}`,
         type: 'ally' as const,
         id: ally.id,
         label: getAllyDisplayName(ally),
-        sublabel: ally.linked_character ? (ownerName ? `Linked • ${ownerName}` : 'Linked guild member') : 'Custom ally',
+        sublabel: deletedLinked
+          ? 'Deleted linked character'
+          : ally.linked_character
+            ? (ownerName ? `Linked • ${ownerName}` : 'Linked guild member')
+            : 'Custom ally',
         ownerName,
       }
     })

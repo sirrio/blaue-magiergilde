@@ -3,7 +3,7 @@ import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
-import { getAllyDisplayName, getAllyOwnerName, getGuildCharacterOptionLabel } from '@/helper/allyDisplay'
+import { getAllyDisplayName, getAllyOwnerName, getGuildCharacterOptionLabel, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import createRandomString from '@/helper/createRandomString'
 import { useTranslate } from '@/lib/i18n'
 import { Ally, Character, CharacterClass, PageProps } from '@/types'
@@ -223,6 +223,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
   if (!isEditing) {
     const displayName = getAllyDisplayName(ally)
     const ownerName = getAllyOwnerName(ally)
+    const deletedLinked = isDeletedLinkedAlly(ally)
     return (
       <div
         className={`card bg-base-100 cursor-pointer border p-2 shadow-sm hover:shadow-md ${ally.notes && ally.notes.trim() !== '' ? 'tooltip tooltip-info' : ''}`}
@@ -249,7 +250,7 @@ const AllyCard: React.FC<AllyCardProps> = ({
               </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
                 {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
-                {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
               </span>
             </div>
             <p className="text-base-content text-xs">
@@ -258,6 +259,8 @@ const AllyCard: React.FC<AllyCardProps> = ({
             </p>
             {ownerName ? (
               <p className="text-xs text-base-content/50">{t('characters.owner')}: {ownerName}</p>
+            ) : deletedLinked ? (
+              <p className="text-xs text-base-content/50">{t('characters.allyDeletedLinkedCharacter')}</p>
             ) : null}
             <RatingHearts rating={ally.rating} />
           </div>
@@ -307,6 +310,9 @@ const AllyCard: React.FC<AllyCardProps> = ({
           className="input input-bordered input-sm mb-2 w-full md:input-xs"
         >
           <option value="">{t('characters.allyCustomNoLink')}</option>
+          {editData.linked_character_id && !linkedCharacterLookup.has(editData.linked_character_id) ? (
+            <option value={editData.linked_character_id}>{t('characters.allyDeletedLinkedCharacter')}</option>
+          ) : null}
           {linkedOptions.map((character) => (
             <option key={character.id} value={character.id}>
               {getGuildCharacterOptionLabel(character)}
@@ -406,6 +412,7 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
   }, [ally])
   const displayName = getAllyDisplayName(ally)
   const ownerName = getAllyOwnerName(ally)
+  const deletedLinked = isDeletedLinkedAlly(ally)
 
   return (
     <button
@@ -438,13 +445,15 @@ const AllyRow: React.FC<AllyRowProps> = ({ ally, isSelected, onSelect }) => {
           </p>
           {ownerName ? (
             <p className="truncate text-xs text-base-content/50">{t('characters.owner')}: {ownerName}</p>
+          ) : deletedLinked ? (
+            <p className="truncate text-xs text-base-content/50">{t('characters.allyDeletedLinkedCharacter')}</p>
           ) : null}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1">
         <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
           {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
-          {ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+          {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
         </span>
         <RatingHearts rating={ally.rating} />
       </div>
@@ -537,6 +546,9 @@ const NewAllyCard: React.FC<NewAllyCardProps> = ({
           className="input input-bordered input-sm mb-2 w-full md:input-xs"
         >
           <option value="">{t('characters.allyCustomNoLink')}</option>
+          {editData.linked_character_id && !linkedOptions.some((character) => character.id === editData.linked_character_id) ? (
+            <option value={editData.linked_character_id}>{t('characters.allyDeletedLinkedCharacter')}</option>
+          ) : null}
           {linkedOptions.map((character) => (
             <option key={character.id} value={character.id}>
               {character.name}

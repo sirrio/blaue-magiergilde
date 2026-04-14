@@ -9,7 +9,6 @@ import { TextArea } from '@/components/ui/text-area'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
-import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
@@ -17,6 +16,7 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
+import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -25,6 +25,7 @@ import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
+import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import { Character } from '@/types'
 import { PageProps } from '@/types'
@@ -287,21 +288,21 @@ function SubmitForApprovalModal({
   )
 }
 
-function getCharacterStatusHint(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+function getCharacterStatusSummary(guildStatus: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (guildStatus === 'draft') {
-    return t('characters.statusDraftHint')
+    return t('characters.statusDraftSummary')
   }
 
   if (guildStatus === 'pending') {
-    return t('characters.statusPendingHint')
+    return t('characters.statusPendingSummary')
   }
 
   if (guildStatus === 'needs_changes') {
-    return t('characters.statusNeedsChangesHint')
+    return t('characters.statusNeedsChangesSummary')
   }
 
   if (guildStatus === 'declined') {
-    return t('characters.statusDeclinedHint')
+    return t('characters.statusDeclinedSummary')
   }
 
   return ''
@@ -309,6 +310,7 @@ function getCharacterStatusHint(guildStatus: string, t: (key: string, params?: R
 
 export function CharacterCard({
   character,
+  allCharacters = [],
   guildCharacters = [],
   onTrackingModeChange,
   isTrackingModeUpdating = false,
@@ -318,6 +320,7 @@ export function CharacterCard({
   isPrivateModeUpdating = false,
 }: {
   character: Character
+  allCharacters?: Character[]
   guildCharacters?: Character[]
   onTrackingModeChange?: (value: boolean) => void
   isTrackingModeUpdating?: boolean
@@ -338,10 +341,11 @@ export function CharacterCard({
   const privateMode = character.private_mode ?? false
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
-  const bubblesToNextLevel = calculateBubblesToNextLevel(character)
+  const isMaxLevel = level >= 20 || progressMax === 0
   const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
   const earnedBubbles = calculateBubble(character) + additionalBubbles
-  const isBubbleOverspent = character.bubble_shop_spend > earnedBubbles
+  const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
+  const isBubbleOverspent = bubbleAdjustmentsCount && character.bubble_shop_spend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
   const reviewedByName = character.reviewed_by_name?.trim() ?? ''
@@ -390,25 +394,11 @@ export function CharacterCard({
     }
 
     if (guildStatus === 'declined') {
-      const parts = [t('characters.statusDeclinedHint')]
-      if (reviewedByHint) {
-        parts.push(reviewedByHint)
-      }
-      if (reviewNote) {
-        parts.push(`${t('common.note')}: ${reviewNote}`)
-      }
-      return parts.join(' · ')
+      return t('characters.statusDeclinedHint')
     }
 
     if (guildStatus === 'needs_changes') {
-      const parts = [t('characters.statusNeedsChangesHint')]
-      if (reviewedByHint) {
-        parts.push(reviewedByHint)
-      }
-      if (reviewNote) {
-        parts.push(`${t('common.note')}: ${reviewNote}`)
-      }
-      return parts.join(' · ')
+      return t('characters.statusNeedsChangesHint')
     }
 
     if (guildStatus === 'pending') {
@@ -421,9 +411,52 @@ export function CharacterCard({
 
     return statusLabel
   })()
-  const statusHint = getCharacterStatusHint(guildStatus, t)
+  const statusHint = getCharacterStatusSummary(guildStatus, t)
+  const statusHintClass = guildStatus === 'draft'
+    ? 'border-base-300 bg-base-200/50 text-base-content/70'
+    : guildStatus === 'pending'
+    ? 'border-warning/25 bg-warning/10 text-warning'
+    : guildStatus === 'needs_changes'
+      ? 'border-warning/30 bg-warning/12 text-warning'
+      : guildStatus === 'declined'
+        ? 'border-error/25 bg-error/10 text-error'
+        : 'border-base-200 bg-base-200/35 text-base-content/75'
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
+  const submittedLowAndBaseTierCount = allCharacters.filter((candidate) => {
+    if (candidate.id === character.id) return false
+    if (candidate.deleted_at) return false
+    if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
+    if (candidate.is_filler) return false
+    return ['bt', 'lt'].includes(calculateTier(candidate))
+  }).length
+  const submittedHighTierCount = allCharacters.filter((candidate) => {
+    if (candidate.id === character.id) return false
+    if (candidate.deleted_at) return false
+    if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
+    if (candidate.is_filler) return false
+    return calculateTier(candidate) === 'ht'
+  }).length
+  const submittedGeneralSlotCount = submittedLowAndBaseTierCount + Math.max(0, submittedHighTierCount - 2)
+  const otherSubmittedFillerCount = allCharacters.filter((candidate) => {
+    if (candidate.id === character.id) return false
+    if (candidate.deleted_at) return false
+    if (!['approved', 'pending'].includes(candidate.guild_status ?? 'pending')) return false
+    return Boolean(candidate.is_filler)
+  }).length
+  const candidateGeneralSlotCost = character.is_filler
+    ? 0
+    : tier === 'ht'
+      ? (submittedHighTierCount >= 2 ? 1 : 0)
+      : (['bt', 'lt'].includes(tier) ? 1 : 0)
+  const submissionBlockedReason = !canSubmitForApproval
+    ? null
+    : character.is_filler
+      ? (otherSubmittedFillerCount >= 1 ? t('characters.submitBlockedFillerLimit') : null)
+      : (submittedGeneralSlotCount + candidateGeneralSlotCost > 8 ? t('characters.submitBlockedActiveLimit', { count: 8 }) : null)
+  const registrationSupportHint = canSubmitForApproval && !submissionBlockedReason
+    ? t(guildStatus === 'needs_changes' ? 'characters.registrationActionHintNeedsChanges' : 'characters.registrationActionHintDraft')
+    : ''
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
   const [, startNavigationTransition] = useTransition()
 
@@ -443,11 +476,35 @@ export function CharacterCard({
     remaining: secondsToHourMinuteString(remainingDowntimeSeconds),
   }
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
-  const hasAutoLevelAdventure = character.adventures.some((adventure) => Boolean(adventure.is_pseudo))
-  const downtimeDisabledInSimpleMode = simplifiedTracking && hasAutoLevelAdventure
+  const pseudoAdventureCount = character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length
+  const realAdventureCount = character.adventures.length - pseudoAdventureCount
+  const hasLevelAnchors = pseudoAdventureCount > 0
+  const usesManualDerivedValues = usesManualLevelTracking(character)
+  const isMixedTrackingHistory = hasLevelAnchors && realAdventureCount > 0
+  const trackingModeLabel = simplifiedTracking
+    ? t('characters.levelTrackingBadge')
+    : t('characters.adventureTrackingBadge')
+  const trackingHistoryLabel = isMixedTrackingHistory
+    ? t('characters.mixedTrackingHistory')
+    : ''
+  const trackingSummaryTooltip = isMixedTrackingHistory
+    ? t('characters.mixedTrackingHistoryHint')
+    : hasLevelAnchors
+      ? t('characters.levelAnchorHistoryHint')
+      : trackingModeLabel
+  const manualAdventuresCount = character.manual_adventures_count ?? null
+  const manualFactionRank = character.manual_faction_rank ?? null
+  const manualTotalDowntimeSeconds = character.manual_total_downtime_seconds ?? null
+  const hasDerivedRemainingDowntime = !usesManualDerivedValues || manualTotalDowntimeSeconds !== null
+  const totalDowntimeDisplay = usesManualDerivedValues
+    ? (manualTotalDowntimeSeconds === null ? t('characters.autoDisabledShort') : secondsToHourMinuteString(manualTotalDowntimeSeconds))
+    : formattedDowntimes.total
+  const remainingDowntimeDisplay = usesManualDerivedValues
+    ? (hasDerivedRemainingDowntime ? formattedDowntimes.remaining : '?')
+    : formattedDowntimes.remaining
+  const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
   const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
-  const adventuresCountWarningReason = t('characters.adventuresSimpleModeBlocked')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
 
   const submitForApproval = (
@@ -540,7 +597,7 @@ export function CharacterCard({
               </Button>
             </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0 md:transition-[padding] md:duration-150 md:group-hover:pr-28')}>
+          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0')}>
             <span
               className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
               data-tip={statusTooltip}
@@ -551,14 +608,14 @@ export function CharacterCard({
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
           </CardTitle>
           <CardContent>
-            <div className={cn('flex items-center gap-1 text-xs')}>
+            <div className={cn('flex h-5 items-center gap-1 text-xs leading-none')}>
               <LogoTier tier={tier} width={12} />
               <span>
                 Level {level} {calculateClassString(character)}
               </span>
               {hasRoom ? (
                 <span
-                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] text-primary/75"
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] leading-none text-primary/75"
                   title={t('characters.roomAssigned')}
                   aria-label={t('characters.roomAssigned')}
                 >
@@ -566,7 +623,6 @@ export function CharacterCard({
                 </span>
               ) : null}
             </div>
-            {statusHint ? <p className="mt-1 text-xs text-base-content/60">{statusHint}</p> : null}
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
               <CharacterSettingsModal
                 simplifiedTracking={simplifiedTracking}
@@ -594,25 +650,54 @@ export function CharacterCard({
                 </Button>
               </DestroyCharacterModal>
             </div>
-            <CharacterImage className="mx-auto mb-2 mt-3 w-full max-w-44 sm:max-w-56" character={character} masked={avatarMasked} />
+            <CharacterImage
+              className={cn('mb-2 mt-3 w-full', !avatarMasked && 'rounded-lg')}
+              character={character}
+              masked={avatarMasked}
+            />
             {!character.is_filler ? (
               <>
-                {!simplifiedTracking ? (
-                  <>
-                    <Progress value={progressValue} max={progressMax} />
-                      <div className="flex items-center justify-end text-xs">
-                        {isBubbleOverspent ? (
-                        <span className="text-error/80">{t('characters.overspentBubbles')}</span>
-                      ) : (
-                        <>
-                          <span>{bubblesToNextLevel}</span>
-                          <Droplets size={13} />
-                          <span> {t('characters.toNextLevel')}</span>
-                        </>
-                      )}
+                <div
+                  className="mt-2.5 space-y-0.5"
+                  title={trackingSummaryTooltip}
+                  aria-label={trackingSummaryTooltip}
+                >
+                  <div className="flex items-center justify-between gap-2 leading-none">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-medium text-base-content/70">
+                        {trackingModeLabel}
+                      </span>
+                      {trackingHistoryLabel ? (
+                        <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-medium text-base-content/55">
+                          {trackingHistoryLabel}
+                        </span>
+                      ) : null}
                     </div>
-                  </>
-                ) : null}
+                  </div>
+                  {!simplifiedTracking ? (
+                    <>
+                      <Progress className="block h-2" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
+                      <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
+                        {isMaxLevel ? (
+                          <span className="text-base-content/45">{t('characters.maxLevelReached')}</span>
+                        ) : isBubbleOverspent ? (
+                          <span className="text-error/80">{t('characters.overspentBubbles')}</span>
+                        ) : (
+                          <span>
+                            {progressValue}/{progressMax}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Progress className="block h-2 opacity-45" value={0} max={1} />
+                      <div className="flex min-h-4 items-center justify-end text-xs text-base-content/45">
+                        {t('characters.directlyTrackedShort')}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   <InfoBox>
                     <InfoBoxTitle>
@@ -620,12 +705,26 @@ export function CharacterCard({
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.played')}:{' '}
-                      {downtimeDisabledInSimpleMode ? (
-                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={adventuresCountWarningReason} aria-label={adventuresCountWarningReason}>
-                          <span className="cursor-help font-semibold text-warning">?</span>
+                      {usesManualDerivedValues ? (
+                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                          <span className={manualAdventuresCount === null ? 'text-base-content/40' : ''}>
+                            {manualAdventuresCount ?? t('characters.autoDisabledShort')}
+                          </span>
+                          <CharacterManualOverrideModal character={character} field="adventures" value={manualAdventuresCount}>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              aria-label={t('characters.manualAdventuresCountLabel')}
+                              title={adventuresDisabledReason}
+                            >
+                              <Pencil size={10} />
+                            </Button>
+                          </CharacterManualOverrideModal>
                         </span>
                       ) : (
-                        character.adventures.length
+                        realAdventureCount
                       )}
                     </InfoBoxLine>
                     <InfoBoxLine>
@@ -643,9 +742,23 @@ export function CharacterCard({
                     <InfoBoxLine className="capitalize">{character.faction}</InfoBoxLine>
                     <InfoBoxLine>
                       {t('characters.levelLabel')}:{' '}
-                      {downtimeDisabledInSimpleMode ? (
-                        <span className="tooltip tooltip-warning tooltip-bottom" data-tip={factionLevelWarningReason} aria-label={factionLevelWarningReason}>
-                          <span className="cursor-help font-semibold text-warning">?</span>
+                      {usesManualDerivedValues ? (
+                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                          <span className={manualFactionRank === null ? 'text-base-content/40' : ''}>
+                            {manualFactionRank ?? t('characters.autoDisabledShort')}
+                          </span>
+                          <CharacterManualOverrideModal character={character} field="factionRank" value={manualFactionRank}>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              aria-label={t('characters.manualFactionRankLabel')}
+                              title={factionLevelWarningReason}
+                            >
+                              <Pencil size={10} />
+                            </Button>
+                          </CharacterManualOverrideModal>
                         </span>
                       ) : (
                         factionLevel
@@ -656,17 +769,43 @@ export function CharacterCard({
                     <InfoBoxTitle>
                       <FlameKindling size={15} /> {t('characters.downtime')}
                     </InfoBoxTitle>
-                    {downtimeDisabledInSimpleMode ? (
-                      <InfoBoxLine className="text-warning">{t('characters.cannotCalculateDowntime')}</InfoBoxLine>
+                    <InfoBoxLine>
+                      {t('characters.total')}:{' '}
+                      {usesManualDerivedValues ? (
+                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                          <span className={manualTotalDowntimeSeconds === null ? 'text-base-content/40' : ''}>
+                            {totalDowntimeDisplay}
+                          </span>
+                          <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              modifier="square"
+                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              aria-label={t('characters.manualTotalDowntimeLabel')}
+                              title={downtimeDisabledReason}
+                            >
+                              <Pencil size={10} />
+                            </Button>
+                          </CharacterManualOverrideModal>
+                        </span>
+                      ) : (
+                        totalDowntimeDisplay
+                      )}
+                    </InfoBoxLine>
+                    <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
+                    <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
+                    {hasDerivedRemainingDowntime ? (
+                      <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
+                        <InfoBoxLine className="font-semibold cursor-help">
+                          {t('characters.remaining')}: {remainingDowntimeDisplay}
+                        </InfoBoxLine>
+                      </div>
                     ) : (
-                      <>
-                        <InfoBoxLine>{t('characters.total')}: {formattedDowntimes.total}</InfoBoxLine>
-                        <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
-                        <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
-                        <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
-                          <InfoBoxLine className="font-semibold cursor-help">{t('characters.remaining')}: {formattedDowntimes.remaining}</InfoBoxLine>
-                        </div>
-                      </>
+                      <InfoBoxLine className="font-semibold">
+                        {t('characters.remaining')}:{' '}
+                        <span className="text-warning">{remainingDowntimeDisplay}</span>
+                      </InfoBoxLine>
                     )}
                   </InfoBox>
                   <InfoBox>
@@ -685,23 +824,70 @@ export function CharacterCard({
                 </div>
               </>
             ) : (
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center whitespace-pre-wrap">
+              <div className="mt-3 flex items-center justify-between rounded-lg border border-base-300 px-3 py-2 text-sm text-base-content/60">
+                <div className="flex items-center gap-1.5 font-medium text-base-content/70">
                   <LogoFiller /> {t('characters.fillerCharacter')}
                 </div>
-                <div className="mt-1 flex items-center whitespace-pre-wrap">
-                  <Swords size={15} /> {t('characters.adventures')}: {character.adventures.length}
+                <div className="flex items-center gap-1 text-xs text-base-content/55">
+                  <Swords size={13} /> {character.adventures.length}
                 </div>
               </div>
             )}
+            {statusHint || registrationSupportHint || submissionBlockedReason ? (
+              <div className="mt-3 space-y-2">
+                {statusHint ? (
+                  <div className={cn('rounded-md border px-2 py-1.5 text-xs font-medium', statusHintClass)}>
+                    {statusHint}
+                    {reviewedByHint ? (
+                      <span className="ml-1 font-normal opacity-70"> · {reviewedByHint}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {reviewNote && (guildStatus === 'declined' || guildStatus === 'needs_changes') ? (
+                  <div className={cn('rounded-md border px-2 py-1.5 text-xs', statusHintClass, 'font-normal opacity-80')}>
+                    <span className="font-medium">{t('common.note')}:</span> {reviewNote}
+                  </div>
+                ) : null}
+                {registrationSupportHint ? (
+                  <div className="rounded-md border border-info/20 bg-info/6 px-2 py-1.5 text-xs text-base-content/70">
+                    {registrationSupportHint}
+                  </div>
+                ) : null}
+                {submissionBlockedReason ? (
+                  <div className="rounded-md border border-warning/25 bg-warning/10 px-2 py-1.5 text-xs text-warning">
+                    {submissionBlockedReason}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
               {canSubmitForApproval ? (
                 <div className="col-span-2 sm:col-span-4">
-                  <SubmitForApprovalModal
-                    character={character}
-                    processing={isSubmittingForApproval}
-                    onSubmit={submitForApproval}
-                  />
+                  {submissionBlockedReason ? (
+                    <div
+                      className="tooltip tooltip-bottom w-full"
+                      data-tip={submissionBlockedReason}
+                      aria-label={submissionBlockedReason}
+                    >
+                      <Button
+                        size="sm"
+                        color="warning"
+                        className="w-full justify-center"
+                        disabled
+                        aria-label={t('characters.registerWithMagiergilde')}
+                        title={submissionBlockedReason}
+                      >
+                        <Clock size={14} />
+                        <span>{t('characters.registerWithMagiergilde')}</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <SubmitForApprovalModal
+                      character={character}
+                      processing={isSubmittingForApproval}
+                      onSubmit={submitForApproval}
+                    />
+                  )}
                 </div>
               ) : (
                 <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
@@ -747,21 +933,7 @@ export function CharacterCard({
                   </Button>
                 </div>
               ) : canLogActivity ? (
-                downtimeDisabledInSimpleMode ? (
-                  <div className="tooltip tooltip-bottom w-full" data-tip={downtimeDisabledReason} aria-label={downtimeDisabledReason}>
-                    <Button
-                      size="sm"
-                      className="w-full justify-center gap-1"
-                      disabled
-                      aria-label={t('characters.addDowntimeDisabled')}
-                    >
-                      <FlameKindling size={14} />
-                      <span className="md:hidden">{t('characters.downtime')}</span>
-                    </Button>
-                  </div>
-                ) : (
-                  <StoreDowntimeModal character={character}></StoreDowntimeModal>
-                )
+                <StoreDowntimeModal character={character}></StoreDowntimeModal>
               ) : null}
               {requiresSubmissionBeforeDowntime ? (
                 <div

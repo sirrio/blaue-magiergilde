@@ -15,6 +15,7 @@ export interface PageProps {
   botChannelOverride?: { active: boolean; channel_id?: string | null }
   discordConnected: boolean
   handbookChannels?: { id: string; name: string }[]
+  levelProgressionTotals?: Record<number, number>
   activeChannelId?: string | null
   ziggy: Config & { location: string }
 
@@ -47,30 +48,41 @@ export interface User {
 
 export interface ShopItem {
   id: number
+  item_id?: number | null
   item?: Item | null
   item_name?: string | null
   item_url?: string | null
   item_cost?: string | null
   item_rarity?: Item['rarity'] | string | null
   item_type?: Item['type'] | string | null
+  item_ruling_changed?: boolean | null
+  item_ruling_note?: string | null
+  roll_source_kind?: ShopRollRule['source_kind'] | null
+  roll_rule_id?: number | null
+  source_shortcode?: string | null
   snapshot_custom?: boolean | null
+  spell_id?: number | null
   spell?: Spell | null
   spell_name?: string | null
   spell_url?: string | null
   spell_legacy_url?: string | null
   spell_level?: number | null
   spell_school?: Spell['spell_school'] | string | null
+  spell_ruling_changed?: boolean | null
+  spell_ruling_note?: string | null
   notes?: string | null
 }
 
 export interface Shop {
   id: number
   created_at: string
+  roll_rows_snapshot?: ShopRollRule[] | null
   shop_items: ShopItem[]
 }
 
 export interface BackstockItem {
   id: number
+  item_id?: number | null
   item?: Item | null
   item_name?: string | null
   item_url?: string | null
@@ -100,6 +112,7 @@ export interface AuctionHiddenBid {
 
 export interface AuctionItem {
   id: number
+  item_id?: number | null
   item?: Item | null
   item_name?: string | null
   item_url?: string | null
@@ -136,6 +149,21 @@ export interface ShopSettings {
   last_auto_posted_at?: string | null
   current_shop_id?: number | null
   draft_shop_id?: number | null
+  line_template?: string | null
+  auto_roll_after_publish?: boolean | null
+  keep_previous_post?: boolean | null
+  roll_rules?: ShopRollRule[]
+}
+
+export interface ShopRollRule {
+  id?: number
+  row_kind: 'heading' | 'rule'
+  rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
+  selection_types: Array<'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'>
+  source_kind: 'all' | 'official' | 'partnered'
+  heading_title: string
+  count: number
+  sort_order?: number
 }
 
 export interface BotOperation {
@@ -241,6 +269,7 @@ export interface Source {
   id: number
   name: string
   shortcode: string
+  kind: 'official' | 'partnered'
 }
 
 export interface MundaneItemVariant {
@@ -250,15 +279,17 @@ export interface MundaneItemVariant {
   category: 'weapon' | 'armor'
   cost_gp?: number | null
   is_placeholder?: boolean
+  guild_enabled?: boolean
 }
 
 export interface CompendiumImportRun {
   id: number
-  entity_type: 'items' | 'spells'
+  entity_type: 'items' | 'spells' | 'sources'
   filename: string
   total_rows: number
   new_rows: number
   updated_rows: number
+  deleted_rows: number
   unchanged_rows: number
   invalid_rows: number
   error_samples?: Array<{ line?: number; message?: string }> | null
@@ -335,7 +366,17 @@ export interface Spell {
 export interface CharacterClass {
   id: number
   name: string
-  src: string
+  source_id?: number | null
+  source?: Source | null
+  guild_enabled?: boolean
+}
+
+export interface CharacterSubclass {
+  id: number
+  character_class_id: number
+  name: string
+  source_id?: number | null
+  source?: Source | null
 }
 
 export interface Character {
@@ -378,6 +419,9 @@ export interface Character {
   is_filler: boolean
   bubble_shop_spend: number
   faction_rank?: number
+  manual_adventures_count?: number | null
+  manual_faction_rank?: number | null
+  manual_total_downtime_seconds?: number | null
   simplified_tracking?: boolean
   avatar_masked?: boolean
   private_mode?: boolean
@@ -472,6 +516,8 @@ export interface Adventure {
   start_date: string
   has_additional_bubble: boolean
   is_pseudo?: boolean
+  target_level?: number | null
+  progression_version_id?: number | null
   notes: string
   game_master: string
   character_id: number

@@ -15,6 +15,8 @@ class FactionRankCalculator
 
     private const RANK_FIVE_DOWNTIME = 1800000;
 
+    public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+
     public function calculate(Character $character): int
     {
         $faction = (string) ($character->faction ?? 'none');
@@ -53,28 +55,49 @@ class FactionRankCalculator
 
         $bubbles = $this->calculateBubbles($character);
         $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
-        $bubbleShopSpend = $this->safeInt($character->bubble_shop_spend);
+        $bubbleShopSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
-        $level = (int) floor(1 + (sqrt(8 * $availableBubbles + 1) - 1) / 2);
 
-        return min(20, max(1, $level));
+        return LevelProgression::levelFromAvailableBubbles($availableBubbles);
     }
 
     private function calculateBubbles(Character $character): int
     {
-        $dmBubbles = $this->safeInt($character->dm_bubbles);
+        $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
 
         return $dmBubbles + $this->calculateAdventureBubbles($character);
     }
 
     private function calculateAdventureBubbles(Character $character): int
     {
-        return $this->adventures($character)->reduce(function (int $bubble, Adventure $adventure): int {
-            $duration = $this->safeInt($adventure->duration);
-            $bonus = $adventure->has_additional_bubble ? 1 : 0;
+        $adventures = $this->adventures($character)
+            ->sortBy([['start_date', 'asc'], ['id', 'asc']])
+            ->values();
 
-            return $bubble + (int) floor($duration / self::MIN_BUBBLE_DURATION) + $bonus;
-        }, 0);
+        $lastPseudoIndex = $adventures->reverse()->search(
+            fn (Adventure $a): bool => (bool) $a->is_pseudo,
+        );
+
+        if ($lastPseudoIndex === false) {
+            return $adventures->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);
+        }
+
+        $lastPseudo = $adventures->get($lastPseudoIndex);
+        $pseudoBubbles = LevelProgression::bubblesRequiredForLevel(
+            max(1, min(20, $this->safeInt($lastPseudo->target_level, 1))),
+        );
+        $realBubblesAfter = $adventures->slice($lastPseudoIndex + 1)
+            ->filter(fn (Adventure $a): bool => ! $a->is_pseudo)
+            ->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);
+
+        return $pseudoBubbles + $realBubblesAfter;
+    }
+
+    private function realBubblesFor(Adventure $adventure): int
+    {
+        $duration = $this->safeInt($adventure->duration);
+
+        return (int) floor($duration / self::MIN_BUBBLE_DURATION) + ($adventure->has_additional_bubble ? 1 : 0);
     }
 
     private function calculateFactionDowntimeSeconds(Character $character): int

@@ -153,10 +153,30 @@ const RoomFormModal = ({
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false)
   const [activeCharacterIndex, setActiveCharacterIndex] = useState(0)
   const characterInputRef = useRef<HTMLInputElement | null>(null)
+  const initializedFormKeyRef = useRef<string | null>(null)
   const { data, setData, processing, reset } = useForm<RoomFormData>(initialValues)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      initializedFormKeyRef.current = null
+      return
+    }
+
+    const initializationKey = JSON.stringify({
+      name: initialValues.name,
+      character_id: initialValues.character_id,
+      grid_x: initialValues.grid_x,
+      grid_y: initialValues.grid_y,
+      grid_w: initialValues.grid_w,
+      grid_h: initialValues.grid_h,
+    })
+
+    if (initializedFormKeyRef.current === initializationKey) {
+      return
+    }
+
+    initializedFormKeyRef.current = initializationKey
+
     reset()
     setData({ ...initialValues })
     const selected = characters.find((character) => character.id === initialValues.character_id) ?? null
@@ -355,6 +375,7 @@ const RoomMapFormModal = ({
 }) => {
   const t = useTranslate()
   const { errors } = usePage<PageProps>().props
+  const initializedFormKeyRef = useRef<string | null>(null)
   const { data, setData, processing, reset, post, patch } = useForm<RoomMapFormData>({
     name: '',
     grid_columns: 38,
@@ -363,7 +384,19 @@ const RoomMapFormModal = ({
   })
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      initializedFormKeyRef.current = null
+      return
+    }
+
+    const initializationKey = `${mode}:${map?.id ?? 'new'}`
+
+    if (initializedFormKeyRef.current === initializationKey) {
+      return
+    }
+
+    initializedFormKeyRef.current = initializationKey
+
     reset()
     setData({
       name: mode === 'copy' ? buildCopiedMapName(map?.name, t('admin.copySuffix')) : (map?.name ?? ''),
@@ -371,7 +404,7 @@ const RoomMapFormModal = ({
       grid_rows: map?.grid_rows ?? 38,
       image: null,
     })
-  }, [map, mode, open, reset, setData, t])
+  }, [map?.grid_columns, map?.grid_rows, map?.id, map?.name, mode, open, reset, setData, t])
 
   const handleSubmit = () => {
     if (mode === 'create') {

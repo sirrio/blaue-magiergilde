@@ -3,10 +3,13 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+const {
+    bubblesRequiredForLevel,
+    levelFromAvailableBubbles,
+} = require('./levelProgression');
+
 function calculateLevelFromBubbles(availableBubbles) {
-    const effective = Math.max(0, safeInt(availableBubbles));
-    const level = Math.floor(1 + (Math.sqrt(8 * effective + 1) - 1) / 2);
-    return Math.min(20, Math.max(1, level));
+    return levelFromAvailableBubbles(Math.max(0, safeInt(availableBubbles)));
 }
 
 function calculateMinAllowedLevel({
@@ -29,7 +32,7 @@ function calculateRequiredAdventureBubbles({
     bubbleSpend,
 }) {
     const normalizedLevel = Math.min(20, Math.max(1, safeInt(level, 1)));
-    const targetAvailableBubbles = (normalizedLevel - 1) * normalizedLevel / 2;
+    const targetAvailableBubbles = bubblesRequiredForLevel(normalizedLevel);
     const required = targetAvailableBubbles
         - safeInt(dmBubbles)
         - safeInt(additionalBubbles)

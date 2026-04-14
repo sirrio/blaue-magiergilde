@@ -3,6 +3,8 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+const { levelFromAvailableBubbles } = require('./levelProgression');
+
 function additionalBubblesForStartTier(startTier) {
     switch (String(startTier || '').toLowerCase()) {
         case 'lt':
@@ -15,17 +17,21 @@ function additionalBubblesForStartTier(startTier) {
     }
 }
 
+function countsBubbleAdjustmentsForProgression(character) {
+    return !character.simplified_tracking && !safeInt(character.has_pseudo_adventure);
+}
+
 function calculateLevel(character) {
     const isFiller = Boolean(character.is_filler);
     if (isFiller) return 3;
 
-    const bubbles = safeInt(character.adventure_bubbles) + safeInt(character.dm_bubbles);
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const spend = safeInt(character.bubble_shop_spend);
+    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
 
     const effective = Math.max(0, bubbles + additional - spend);
-    const level = Math.floor(1 + (Math.sqrt(8 * effective + 1) - 1) / 2);
-    return Math.min(20, Math.max(1, level));
+    return levelFromAvailableBubbles(effective);
 }
 
 function calculateTierFromLevel(level) {
@@ -39,4 +45,5 @@ module.exports = {
     additionalBubblesForStartTier,
     calculateLevel,
     calculateTierFromLevel,
+    countsBubbleAdjustmentsForProgression,
 };
