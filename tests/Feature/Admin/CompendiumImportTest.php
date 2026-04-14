@@ -386,7 +386,7 @@ test('admin can preview and apply source compendium import', function () {
     $csv = implode("\n", [
         'shortcode,name,kind',
         'PHB,Players Handbook,official',
-        'EXEB,Exploring Eberron,third_party',
+        'EXEB,Exploring Eberron,partnered',
     ]);
 
     $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
@@ -412,7 +412,7 @@ test('admin can preview and apply source compendium import', function () {
     $this->assertDatabaseHas('sources', [
         'shortcode' => 'EXEB',
         'name' => 'Exploring Eberron',
-        'kind' => 'third_party',
+        'kind' => 'partnered',
     ]);
 });
 
@@ -456,7 +456,7 @@ test('source compendium import preview and apply can override missing rows', fun
     Source::factory()->create([
         'name' => 'Test Source Two',
         'shortcode' => 'TST2',
-        'kind' => 'third_party',
+        'kind' => 'partnered',
     ]);
 
     $csv = implode("\n", [

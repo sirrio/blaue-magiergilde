@@ -7,6 +7,7 @@ import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
 import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
+import { renderDiscordLine, DEFAULT_LINE_TEMPLATE } from '@/lib/shopLineTemplate'
 import { cn } from '@/lib/utils'
 import { Item, MundaneItemVariant, PageProps, ShopItem, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
@@ -755,11 +756,13 @@ const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item
   )
 }
 
+
 export default function ItemRow({
   item,
   shopItem,
   sources = [],
   mundaneVariants = [],
+  lineTemplate = null,
   canUpdatePostLine = false,
   canManage = true,
 }: {
@@ -767,6 +770,7 @@ export default function ItemRow({
   shopItem?: ShopItem
   sources?: Source[]
   mundaneVariants?: MundaneItemVariant[]
+  lineTemplate?: string | null
   canUpdatePostLine?: boolean
   canManage?: boolean
 }) {
@@ -896,11 +900,19 @@ export default function ItemRow({
   const dndBeyondLink = `https://www.dndbeyond.com/magic-items?filter-type=0&filter-search=${item.name}&filter-partnered-content=t`
   const spellUrl = spell?.url || shopItem?.spell_url || ''
   const spellLegacyUrl = spell?.legacy_url || shopItem?.spell_legacy_url || ''
-  const spellLegacyPart = spellLegacyUrl ? ` - [Legacy](<${spellLegacyUrl}>)` : ''
   const isCustomListing = Boolean(shopItem?.snapshot_custom)
-  const discordLineText = spell
-    ? `[${baseName}](<${item.url}>) - [${spell.name}](<${spellUrl}>)${spellLegacyPart}: ${resolvedCost ?? ''}`
-    : `[${baseName}](<${item.url}>): ${resolvedCost ?? ''}`
+  const discordLineText = renderDiscordLine(lineTemplate, {
+    itemName: item.name,
+    notes: shopNotes,
+    itemUrl: item.url ?? '',
+    itemCost: resolvedCost ?? '',
+    spellId: shopItem?.spell_id ?? null,
+    spellName: spell?.name ?? shopItem?.spell_name ?? '',
+    spellUrl,
+    spellLegacyUrl,
+    sourceKind: shopItem?.roll_source_kind ?? null,
+    sourceShortcode: shopItem?.source_shortcode ?? null,
+  })
 
   const handleSnapshotRefresh = () => {
     if (!shopItem) return
@@ -1034,6 +1046,9 @@ export default function ItemRow({
             </span>
           ) : null}
         </span>
+        {shopItem ? (
+          <span className="mt-0.5 font-mono text-[10px] text-base-content/40 break-all">{discordLineText}</span>
+        ) : null}
         {autoRollSummary ? (
           <span className="text-[11px] text-base-content/60">{autoRollSummary}</span>
         ) : null}

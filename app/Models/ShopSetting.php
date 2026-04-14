@@ -21,6 +21,9 @@ class ShopSetting extends Model
         'last_auto_posted_at',
         'current_shop_id',
         'draft_shop_id',
+        'line_template',
+        'auto_roll_after_publish',
+        'keep_previous_post',
     ];
 
     protected $casts = [
@@ -28,6 +31,8 @@ class ShopSetting extends Model
         'last_post_message_ids' => 'array',
         'auto_post_enabled' => 'boolean',
         'auto_post_weekday' => 'integer',
+        'auto_roll_after_publish' => 'boolean',
+        'keep_previous_post' => 'boolean',
         'last_auto_posted_at' => 'datetime',
         'current_shop_id' => 'integer',
         'draft_shop_id' => 'integer',

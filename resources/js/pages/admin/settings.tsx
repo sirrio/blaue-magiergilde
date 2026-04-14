@@ -257,7 +257,7 @@ export default function Settings({
   const createSourceForm = useForm({
     name: '',
     shortcode: '',
-    kind: 'third_party' as Source['kind'],
+    kind: 'partnered' as Source['kind'],
   })
   const levelProgressionForm = useForm({
     entries: levelProgression.map((entry) => ({
@@ -269,7 +269,7 @@ export default function Settings({
     id: 0,
     name: '',
     shortcode: '',
-    kind: 'third_party' as Source['kind'],
+    kind: 'partnered' as Source['kind'],
   })
   const [selectedByGuild, setSelectedByGuild] = useState<Record<string, string[]>>(
     discordBackup.selected_channels ?? {}
@@ -1408,7 +1408,7 @@ export default function Settings({
                     <SelectLabel>{t('compendium.sourceKind')}</SelectLabel>
                     <SelectOptions>
                       <option value="official">{t('compendium.officialSource')}</option>
-                      <option value="third_party">{t('compendium.thirdPartySource')}</option>
+                      <option value="partnered">{t('compendium.thirdPartySource')}</option>
                     </SelectOptions>
                   </Select>
                   <div className="flex items-center justify-end gap-2">

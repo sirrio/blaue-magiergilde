@@ -32,14 +32,14 @@ test('admin can create and update sources from settings', function () {
         ->patch(route('admin.settings.sources.update', $source), [
             'name' => "Dungeon Master's Guide",
             'shortcode' => 'dmg',
-            'kind' => 'third_party',
+            'kind' => 'partnered',
         ])
         ->assertRedirect();
 
     expect($source->fresh())
         ->shortcode->toBe('DMG')
         ->name->toBe("Dungeon Master's Guide")
-        ->kind->toBe('third_party');
+        ->kind->toBe('partnered');
 });
 
 test('admin source creation defaults kind to third party when omitted', function () {
@@ -53,7 +53,7 @@ test('admin source creation defaults kind to third party when omitted', function
         ->assertRedirect();
 
     expect(Source::query()->where('shortcode', 'EXEB')->value('kind'))
-        ->toBe('third_party');
+        ->toBe('partnered');
 });
 
 test('deleting a source nulls source references on items and spells', function () {

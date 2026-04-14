@@ -8,6 +8,7 @@ import DiscordChannelPickerModal from '@/components/discord-channel-picker-modal
 import AppLayout from '@/layouts/app-layout'
 import ItemRow from '@/pages/item/item-row'
 import { cn } from '@/lib/utils'
+import { renderDiscordLine, DEFAULT_LINE_TEMPLATE, LINE_TEMPLATE_VARIABLES } from '@/lib/shopLineTemplate'
 import { BotOperation, DiscordBackupChannel, Item, PageProps, Shop, ShopItem, ShopRollRule, ShopSettings } from '@/types'
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -37,8 +38,8 @@ const itemTypeOptions: Array<{ value: ShopRollRule['selection_types'][number]; l
 
 const sourceKindOptions: Array<{ value: ShopRollRule['source_kind']; label: string }> = [
   { value: 'all', label: 'All' },
-  { value: 'official', label: 'WotC' },
-  { value: 'third_party', label: '3rd' },
+  { value: 'official', label: 'Official' },
+  { value: 'partnered', label: 'Partnered' },
 ]
 
 const itemTypeBadgeLabels: Record<ShopRollRule['selection_types'][number], string> = {
@@ -307,11 +308,16 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
   const [isSavingChannel, setIsSavingChannel] = useState(false)
   const [isSavingSchedule, setIsSavingSchedule] = useState(false)
   const [isSavingRules, setIsSavingRules] = useState(false)
+  const [lineTemplate, setLineTemplate] = useState<string>(shopSettings?.line_template ?? '')
+  const [isSavingLineTemplate, setIsSavingLineTemplate] = useState(false)
+  const lineTemplateInputRef = useRef<HTMLInputElement>(null)
   const [activeOperation, setActiveOperation] = useState<BotOperation | null>(null)
   const [settings, setSettings] = useState<ShopSettings>(shopSettings ?? {})
   const [autoPostEnabled, setAutoPostEnabled] = useState(Boolean(shopSettings?.auto_post_enabled))
   const [autoPostWeekday, setAutoPostWeekday] = useState<number>(shopSettings?.auto_post_weekday ?? 0)
   const [autoPostTime, setAutoPostTime] = useState<string>(shopSettings?.auto_post_time ?? '09:00')
+  const [autoRollAfterPublish, setAutoRollAfterPublish] = useState(shopSettings?.auto_roll_after_publish !== false)
+  const [keepPreviousPost, setKeepPreviousPost] = useState(Boolean(shopSettings?.keep_previous_post))
   const rollRuleKeyCounterRef = useRef(0)
   const createRuleClientKey = useCallback(() => {
     rollRuleKeyCounterRef.current += 1
@@ -348,6 +354,9 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     setAutoPostEnabled(Boolean(shopSettings?.auto_post_enabled))
     setAutoPostWeekday(shopSettings?.auto_post_weekday ?? 0)
     setAutoPostTime(shopSettings?.auto_post_time ?? '09:00')
+    setAutoRollAfterPublish(shopSettings?.auto_roll_after_publish !== false)
+    setKeepPreviousPost(Boolean(shopSettings?.keep_previous_post))
+    setLineTemplate(shopSettings?.line_template ?? '')
   }, [shopSettings])
 
   useEffect(() => {
@@ -517,6 +526,8 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
       auto_post_enabled: autoPostEnabled,
       auto_post_weekday: autoPostWeekday,
       auto_post_time: autoPostTime,
+      auto_roll_after_publish: autoRollAfterPublish,
+      keep_previous_post: keepPreviousPost,
     }
 
     try {
@@ -547,7 +558,64 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
     } finally {
       setIsSavingSchedule(false)
     }
-  }, [autoPostEnabled, autoPostTime, autoPostWeekday, getCsrfToken, isSavingSchedule])
+  }, [autoPostEnabled, autoPostTime, autoPostWeekday, autoRollAfterPublish, getCsrfToken, isSavingSchedule, keepPreviousPost])
+
+  const handleLineTemplateSave = useCallback(async () => {
+    if (isSavingLineTemplate) return
+    const csrfToken = getCsrfToken()
+    if (!csrfToken) return
+    setIsSavingLineTemplate(true)
+    try {
+      const response = await fetch(route('admin.shop-settings.update'), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ line_template: lineTemplate.trim() || null }),
+      })
+      if (response.ok) {
+        toast.show('Line template saved.', 'success')
+      } else {
+        toast.show('Could not save line template.', 'error')
+      }
+    } finally {
+      setIsSavingLineTemplate(false)
+    }
+  }, [getCsrfToken, isSavingLineTemplate, lineTemplate])
+
+  const insertTemplateVariable = useCallback((variable: string) => {
+    const input = lineTemplateInputRef.current
+    if (!input) {
+      setLineTemplate((prev) => prev + variable)
+      return
+    }
+    const start = input.selectionStart ?? lineTemplate.length
+    const end = input.selectionEnd ?? lineTemplate.length
+    const newValue = lineTemplate.slice(0, start) + variable + lineTemplate.slice(end)
+    setLineTemplate(newValue)
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(start + variable.length, start + variable.length)
+    })
+  }, [lineTemplate])
+
+  const templatePreview = React.useMemo(() => {
+    return renderDiscordLine(lineTemplate || null, {
+      itemName: 'Wand of Example',
+      notes: 'Variant',
+      itemUrl: 'https://www.dndbeyond.com/magic-items/example',
+      itemCost: '500 gp',
+      spellId: 1,
+      spellName: 'Fireball',
+      spellUrl: 'https://www.dndbeyond.com/spells/fireball',
+      spellLegacyUrl: 'https://www.dndbeyond.com/legacy/spells/fireball',
+      sourceKind: 'partnered',
+      sourceShortcode: 'XGE',
+    })
+  }, [lineTemplate])
 
   const handleRollRuleChange = useCallback(<K extends keyof ShopRollRule>(index: number, key: K, value: ShopRollRule[K]) => {
     setRollRules((current) => current.map((rule, ruleIndex) => (
@@ -990,13 +1058,64 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                           value={autoPostTime}
                           onChange={(event) => setAutoPostTime(event.target.value)}
                         />
-                        <Button size="sm" variant="outline" onClick={handleScheduleSave} disabled={isSavingSchedule}>
-                          Save schedule
-                        </Button>
                       </div>
                       <p className="text-[11px] text-base-content/60">
                         Uses Europe/Berlin time.
                       </p>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-xs"
+                          checked={autoRollAfterPublish}
+                          onChange={(event) => setAutoRollAfterPublish(event.target.checked)}
+                        />
+                        Auto-roll new draft after publishing
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-xs"
+                          checked={keepPreviousPost}
+                          onChange={(event) => setKeepPreviousPost(event.target.checked)}
+                        />
+                        Keep old shop post in Discord when publishing
+                      </label>
+                      <Button size="sm" variant="outline" onClick={handleScheduleSave} disabled={isSavingSchedule}>
+                        Save
+                      </Button>
+                    </div>
+                    <div className="space-y-2 border-t border-base-200 pt-3">
+                      <p className="text-xs text-base-content/70">Line template</p>
+                      <div className="flex flex-wrap gap-1">
+                        {LINE_TEMPLATE_VARIABLES.map((variable) => (
+                          <button
+                            key={variable}
+                            type="button"
+                            className="rounded border border-base-300 bg-base-200/60 px-1.5 py-0.5 font-mono text-[10px] text-base-content/70 transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary active:scale-95"
+                            title={`Insert ${variable}`}
+                            onClick={() => insertTemplateVariable(variable)}
+                          >
+                            {variable}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        ref={lineTemplateInputRef}
+                        type="text"
+                        className="input input-sm w-full font-mono text-xs"
+                        placeholder={DEFAULT_LINE_TEMPLATE}
+                        value={lineTemplate}
+                        onChange={(e) => setLineTemplate(e.target.value)}
+                      />
+                      {templatePreview !== null ? (
+                        <div className="rounded border border-base-200 bg-base-200/30 px-2 py-1.5">
+                          <p className="mb-1 text-[10px] text-base-content/50">Preview (first item)</p>
+                          <p className="font-mono text-[11px] text-base-content/80 break-all">{templatePreview}</p>
+                        </div>
+                      ) : null}
+                      <Button size="sm" variant="outline" onClick={handleLineTemplateSave} disabled={isSavingLineTemplate}>
+                        Save template
+                      </Button>
                     </div>
                   </div>
                 </ModalContent>
@@ -1122,6 +1241,7 @@ export default function Index({ shops, shopSettings }: { shops: Shop[]; shopSett
                 key={row.key}
                 item={getShopItemSnapshot(row.item)}
                 shopItem={row.item}
+                lineTemplate={lineTemplate || null}
                 canUpdatePostLine={canUpdateSelectedShopLine}
               />
               )

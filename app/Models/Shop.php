@@ -13,6 +13,8 @@ class Shop extends Model
     /** @use HasFactory<ShopFactory> */
     use HasFactory;
 
+    protected $fillable = ['name', 'line_template'];
+
     protected function casts(): array
     {
         return [

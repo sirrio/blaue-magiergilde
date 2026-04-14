@@ -59,6 +59,7 @@ export interface ShopItem {
   item_ruling_note?: string | null
   roll_source_kind?: ShopRollRule['source_kind'] | null
   roll_rule_id?: number | null
+  source_shortcode?: string | null
   snapshot_custom?: boolean | null
   spell_id?: number | null
   spell?: Spell | null
@@ -148,6 +149,9 @@ export interface ShopSettings {
   last_auto_posted_at?: string | null
   current_shop_id?: number | null
   draft_shop_id?: number | null
+  line_template?: string | null
+  auto_roll_after_publish?: boolean | null
+  keep_previous_post?: boolean | null
   roll_rules?: ShopRollRule[]
 }
 
@@ -156,7 +160,7 @@ export interface ShopRollRule {
   row_kind: 'heading' | 'rule'
   rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | 'unknown_rarity'
   selection_types: Array<'weapon' | 'armor' | 'item' | 'consumable' | 'spellscroll'>
-  source_kind: 'all' | 'official' | 'third_party'
+  source_kind: 'all' | 'official' | 'partnered'
   heading_title: string
   count: number
   sort_order?: number
@@ -265,7 +269,7 @@ export interface Source {
   id: number
   name: string
   shortcode: string
-  kind: 'official' | 'third_party'
+  kind: 'official' | 'partnered'
 }
 
 export interface MundaneItemVariant {

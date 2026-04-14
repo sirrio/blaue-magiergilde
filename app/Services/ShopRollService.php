@@ -81,12 +81,13 @@ class ShopRollService
 
         $query = Spell::query()
             ->select(['id', 'name', 'url', 'legacy_url', 'spell_level', 'spell_school', 'ruling_changed', 'ruling_note'])
+            ->where('guild_enabled', true)
             ->whereIn('spell_level', $normalizedLevels);
         if ($normalizedSchools !== []) {
             $query->whereIn('spell_school', $normalizedSchools);
         }
 
-        if ($sourceKind === 'official' || $sourceKind === 'third_party') {
+        if ($sourceKind === 'official' || $sourceKind === 'partnered') {
             $spellSnapshot = (clone $query)
                 ->whereHas('source', fn ($q) => $q->where('kind', $sourceKind))
                 ->inRandomOrder()
@@ -128,13 +129,14 @@ class ShopRollService
                 'default_spell_levels',
                 'default_spell_schools',
             ])
-            ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
+            ->with(['mundaneVariants:id,name,slug,category,cost_gp,is_placeholder', 'source:id,shortcode'])
+            ->where('guild_enabled', true)
             ->where('shop_enabled', true)
             ->where('rarity', $rarity);
 
         $query->whereIn('type', $normalizedSelectionTypes);
 
-        if ($sourceKind === 'official' || $sourceKind === 'third_party') {
+        if ($sourceKind === 'official' || $sourceKind === 'partnered') {
             $candidates = (clone $query)
                 ->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $sourceKind))
                 ->get();
@@ -215,6 +217,7 @@ class ShopRollService
             $line->item_ruling_changed = (bool) ($replacement['ruling_changed'] ?? false);
             $line->item_ruling_note = $replacement['ruling_note'] ?? null;
             $line->roll_source_kind = $sourceKind;
+            $line->source_shortcode = $replacement['source']['shortcode'] ?? null;
             $line->spell_id = $spellId;
             $line->spell_name = $spellSnapshot?->name;
             $line->spell_url = $spellSnapshot?->url;
@@ -275,8 +278,9 @@ class ShopRollService
                     'default_spell_schools',
                     'source_id',
                 ])
-                ->with('mundaneVariants:id,name,slug,category,cost_gp,is_placeholder')
-                ->where('shop_enabled', true)
+                ->with(['mundaneVariants:id,name,slug,category,cost_gp,is_placeholder', 'source:id,shortcode'])
+                ->where('guild_enabled', true)
+            ->where('shop_enabled', true)
                 ->where('rarity', $rule->rarity);
 
             $selectionTypes = array_values(array_unique(array_filter(
@@ -294,7 +298,7 @@ class ShopRollService
                 $query->whereNotIn('id', $pickedItemIds);
             }
 
-            if ($rule->source_kind === 'official' || $rule->source_kind === 'third_party') {
+            if ($rule->source_kind === 'official' || $rule->source_kind === 'partnered') {
                 $sourceFiltered = (clone $query)
                     ->whereHas('source', fn ($sourceQuery) => $sourceQuery->where('kind', $rule->source_kind))
                     ->get();
@@ -349,6 +353,7 @@ class ShopRollService
                     'item_ruling_note' => $pickedItem['ruling_note'] ?? null,
                     'roll_source_kind' => $pickedItem['roll_source_kind'] ?? 'all',
                     'roll_rule_id' => $pickedItem['roll_rule_id'] ?? null,
+                    'source_shortcode' => $pickedItem['source']['shortcode'] ?? null,
                     'snapshot_custom' => false,
                     'spell_id' => $spellId,
                     'spell_name' => $spellSnapshot?->name,

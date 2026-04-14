@@ -27,25 +27,48 @@ function formatLink(name, url) {
     return `[${name}](<${url}>)`;
 }
 
-function formatItemLine(row) {
+const DEFAULT_LINE_TEMPLATE = '{item_link}{spell_part}{legacy_part}: {item_cost}';
+
+function formatItemLine(row, template) {
+    const tpl = (typeof template === 'string' && template.trim()) ? template : DEFAULT_LINE_TEMPLATE;
+
     const notes = typeof row.notes === 'string' ? row.notes.trim() : '';
-    const itemName = notes ? `${row.name} - ${notes}` : row.name;
+    const itemName = notes ? `${row.name} - ${notes}` : String(row.name ?? '');
     const itemLink = formatLink(itemName, row.url);
-    const parts = [itemLink];
+    const cost = row.cost ?? '';
+
+    let spellLink = '';
+    let spellPart = '';
+    let spellLegacyLink = '';
+    let legacyPart = '';
 
     if (row.spell_id) {
         const spellPrimaryUrl = row.spell_url || row.spell_legacy_url;
-        const spellLink = formatLink(row.spell_name, spellPrimaryUrl);
-        parts.push(spellLink);
+        spellLink = formatLink(row.spell_name, spellPrimaryUrl);
+        spellPart = ` - ${spellLink}`;
 
         if (row.spell_legacy_url && row.spell_legacy_url !== spellPrimaryUrl) {
-            parts.push(formatLink('Legacy', row.spell_legacy_url));
+            spellLegacyLink = formatLink('Legacy', row.spell_legacy_url);
+            legacyPart = ` - ${spellLegacyLink}`;
         }
     }
 
-    const prefix = parts.join(' - ');
-    const cost = row.cost ? `: ${row.cost}` : '';
-    return `${prefix}${cost}`;
+    const sourceKind = typeof row.roll_source_kind === 'string' ? row.roll_source_kind : '';
+    const sourceLabel = sourceKind === 'official' ? 'Official' : sourceKind === 'partnered' ? 'Partnered' : '';
+    const sourceShortcode = typeof row.source_shortcode === 'string' ? row.source_shortcode : '';
+
+    return tpl
+        .replaceAll('{item_link}', itemLink)
+        .replaceAll('{item_name}', itemName)
+        .replaceAll('{item_cost}', cost)
+        .replaceAll('{notes}', notes)
+        .replaceAll('{spell_link}', spellLink)
+        .replaceAll('{spell_name}', row.spell_name ?? '')
+        .replaceAll('{spell_legacy_link}', spellLegacyLink)
+        .replaceAll('{spell_part}', spellPart)
+        .replaceAll('{legacy_part}', legacyPart)
+        .replaceAll('{source_label}', sourceLabel)
+        .replaceAll('{source_shortcode}', sourceShortcode);
 }
 
 function formatHeadingLine(title) {
@@ -109,7 +132,7 @@ function parsePostPayload(value) {
 
 async function fetchShopPostState() {
     const [rows] = await db.execute(
-        'SELECT id, last_post_channel_id, last_post_message_ids FROM shop_settings ORDER BY id ASC LIMIT 1',
+        'SELECT id, last_post_channel_id, last_post_message_ids, keep_previous_post FROM shop_settings ORDER BY id ASC LIMIT 1',
     );
     if (!rows[0]) return null;
     const parsed = parsePostPayload(rows[0].last_post_message_ids);
@@ -119,6 +142,7 @@ async function fetchShopPostState() {
         headingLineMessageIds: parsed.headingLineMessageIds,
         itemMessageIds: parsed.itemMessageIds,
         shopId: parsed.shopId,
+        keepPreviousPost: rows[0].keep_previous_post === 1 || rows[0].keep_previous_post === true,
     };
 }
 
@@ -186,7 +210,13 @@ async function deletePreviousPosts({ client, settings, onProgress }) {
 }
 
 async function fetchShop(shopId) {
-    const [rows] = await db.execute('SELECT id, created_at, roll_rows_snapshot FROM shops WHERE id = ? LIMIT 1', [shopId]);
+    const [rows] = await db.execute(
+        `SELECT s.id, s.created_at, s.roll_rows_snapshot, ss.line_template
+         FROM shops s
+         LEFT JOIN shop_settings ss ON 1=1
+         WHERE s.id = ? LIMIT 1`,
+        [shopId],
+    );
     return rows[0] ?? null;
 }
 
@@ -235,7 +265,9 @@ async function fetchShopItems(shopId) {
                 si.spell_name AS spell_name,
                 si.spell_url AS spell_url,
                 si.spell_legacy_url AS spell_legacy_url,
-                si.spell_level AS spell_level
+                si.spell_level AS spell_level,
+                si.roll_source_kind,
+                si.source_shortcode
             FROM item_shop si
             WHERE si.shop_id = ?
             ORDER BY si.id ASC
@@ -264,7 +296,9 @@ async function fetchShopItemById(shopItemId) {
                 si.spell_name AS spell_name,
                 si.spell_url AS spell_url,
                 si.spell_legacy_url AS spell_legacy_url,
-                si.spell_level AS spell_level
+                si.spell_level AS spell_level,
+                si.roll_source_kind,
+                si.source_shortcode
             FROM item_shop si
             WHERE si.id = ?
             LIMIT 1
@@ -449,7 +483,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
         lastLine: `Preparing shop #${String(shop.id).padStart(3, '0')}`,
     });
 
-    if (deleteCount > 0) {
+    if (deleteCount > 0 && !postState?.keepPreviousPost) {
         await updateOperationProgress(resolvedOperationId, {
             totalLines,
             postedLines,
@@ -457,19 +491,21 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
         });
     }
 
-    const deleteResult = await deletePreviousPosts({
-        client,
-        settings: postState,
-        onProgress: async ({ processed, total }) => {
-            postedLines = Math.min(totalLines, processed);
-            await updateOperationProgress(resolvedOperationId, {
-                totalLines,
-                postedLines,
-                lastLine: `Deleting old shop messages (${processed}/${total})`,
-            });
-        },
-    });
-    if (deleteCount > 0 && postedLines < deleteCount) {
+    const deleteResult = postState?.keepPreviousPost
+        ? { total: 0, processed: 0 }
+        : await deletePreviousPosts({
+            client,
+            settings: postState,
+            onProgress: async ({ processed, total }) => {
+                postedLines = Math.min(totalLines, processed);
+                await updateOperationProgress(resolvedOperationId, {
+                    totalLines,
+                    postedLines,
+                    lastLine: `Deleting old shop messages (${processed}/${total})`,
+                });
+            },
+        });
+    if (deleteCount > 0 && !postState?.keepPreviousPost && postedLines < deleteCount) {
         postedLines = Math.min(totalLines, deleteCount);
         await updateOperationProgress(resolvedOperationId, {
             totalLines,
@@ -508,7 +544,7 @@ async function postShopToChannel({ client, channelId, shopId, operationId, threa
             continue;
         }
 
-        const messageId = await sendTrackedLine(formatItemLine(postRow.row), postRow.row.name || 'Item');
+        const messageId = await sendTrackedLine(formatItemLine(postRow.row, shop.line_template), postRow.row.name || 'Item');
         if (messageId) itemMessageIds[String(postRow.row.shop_item_id)] = messageId;
     }
 
@@ -580,7 +616,7 @@ async function updateShopPost({ client, shopId, operationId }) {
 
     for (const row of items) {
         const messageId = updatedItemMessageIds[String(row.shop_item_id)];
-        const content = formatItemLine(row);
+        const content = formatItemLine(row, shop.line_template);
 
         if (!messageId) {
              
@@ -653,6 +689,8 @@ async function updateShopItemPost({ client, shopItemId }) {
         return { ok: false, status: 409, error: `Last posted shop is #${postState.shopId}.` };
     }
 
+    const shop = await fetchShop(row.shop_id);
+
     const messageId = postState.itemMessageIds[String(shopItemId)];
     if (!messageId) {
         return { ok: false, status: 404, error: 'Posted line for this shop entry was not found.' };
@@ -671,7 +709,7 @@ async function updateShopItemPost({ client, shopItemId }) {
     }
 
     const updatedItemMessageIds = { ...postState.itemMessageIds };
-    const content = formatItemLine(row);
+    const content = formatItemLine(row, shop?.line_template);
     try {
         await waitForDiscordRateLimit(client);
         await destination.messages.edit(messageId, content);

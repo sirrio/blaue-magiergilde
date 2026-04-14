@@ -83,6 +83,9 @@ class ShopSettingController extends Controller
                 'last_auto_posted_at',
                 'current_shop_id',
                 'draft_shop_id',
+                'line_template',
+                'auto_roll_after_publish',
+                'keep_previous_post',
             ]) + [
                 'roll_rules' => $rollRules->map(fn (ShopRollRule $rule): array => [
                     'id' => $rule->id,

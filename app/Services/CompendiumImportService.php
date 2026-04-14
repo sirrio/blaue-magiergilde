@@ -752,8 +752,8 @@ class CompendiumImportService
             $errors[] = 'name is required';
         }
 
-        if (! in_array($kind, ['official', 'third_party'], true)) {
-            $errors[] = 'kind must be official|third_party';
+        if (! in_array($kind, ['official', 'partnered'], true)) {
+            $errors[] = 'kind must be official|partnered';
         }
 
         if ($errors !== []) {

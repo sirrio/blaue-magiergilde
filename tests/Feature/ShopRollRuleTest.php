@@ -61,7 +61,7 @@ it('lets admins update shop roll rows without recreating existing row ids', func
                     'row_kind' => 'rule',
                     'rarity' => 'common',
                     'selection_types' => ['consumable'],
-                    'source_kind' => 'third_party',
+                    'source_kind' => 'partnered',
                     'heading_title' => '',
                     'count' => 1,
                     'sort_order' => 30,
@@ -75,7 +75,7 @@ it('lets admins update shop roll rows without recreating existing row ids', func
         ->assertJsonPath('shop_settings.roll_rules.1.id', $existingRule->id)
         ->assertJsonPath('shop_settings.roll_rules.1.count', 5)
         ->assertJsonPath('shop_settings.roll_rules.2.row_kind', 'rule')
-        ->assertJsonPath('shop_settings.roll_rules.2.source_kind', 'third_party');
+        ->assertJsonPath('shop_settings.roll_rules.2.source_kind', 'partnered');
 
     expect(ShopRollRule::query()->count())->toBe(3)
         ->and($existingHeading->fresh()?->heading_title)->toBe('## ***:crossed_swords: Common WotC Picks:***')
@@ -118,7 +118,7 @@ it('stores the rule row id on rolled shop items', function () {
     $thirdPartySource = Source::factory()->create([
         'name' => 'Kobold Press',
         'shortcode' => 'KP',
-        'kind' => 'third_party',
+        'kind' => 'partnered',
     ]);
 
     $officialItem = Item::factory()->create([
@@ -220,7 +220,7 @@ it('rolls third-party items only for third-party rules', function () {
         'row_kind' => 'rule',
         'rarity' => 'common',
         'selection_types' => ['weapon', 'armor', 'item'],
-        'source_kind' => 'third_party',
+        'source_kind' => 'partnered',
         'heading_title' => '',
         'count' => 1,
         'sort_order' => 20,
@@ -234,7 +234,7 @@ it('rolls third-party items only for third-party rules', function () {
     $thirdPartySource = Source::factory()->create([
         'name' => 'The Griffon\'s Saddlebag',
         'shortcode' => 'GSB',
-        'kind' => 'third_party',
+        'kind' => 'partnered',
     ]);
 
     Item::factory()->create([
@@ -260,7 +260,7 @@ it('rolls third-party items only for third-party rules', function () {
 
     expect($rolledLine)->not->toBeNull()
         ->and($rolledLine?->item_id)->toBe($thirdPartyItem->id)
-        ->and($rolledLine?->roll_source_kind)->toBe('third_party')
+        ->and($rolledLine?->roll_source_kind)->toBe('partnered')
         ->and($rolledLine?->roll_rule_id)->toBe($rule->id);
 });
 

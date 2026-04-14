@@ -52,10 +52,13 @@ class UpdateShopSettingRequest extends FormRequest
             'roll_rules.*.rarity' => ['required_with:roll_rules', Rule::in(['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact', 'unknown_rarity'])],
             'roll_rules.*.selection_types' => ['required_with:roll_rules', 'array', 'min:1'],
             'roll_rules.*.selection_types.*' => ['required_with:roll_rules', Rule::in(['weapon', 'armor', 'item', 'consumable', 'spellscroll'])],
-            'roll_rules.*.source_kind' => ['required_with:roll_rules', Rule::in(['all', 'official', 'third_party'])],
+            'roll_rules.*.source_kind' => ['required_with:roll_rules', Rule::in(['all', 'official', 'partnered'])],
             'roll_rules.*.heading_title' => ['nullable', 'string', 'max:255'],
             'roll_rules.*.count' => ['required_with:roll_rules', 'integer', 'min:0', 'max:50'],
             'roll_rules.*.sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'line_template' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'auto_roll_after_publish' => ['sometimes', 'boolean'],
+            'keep_previous_post' => ['sometimes', 'boolean'],
         ];
     }
 

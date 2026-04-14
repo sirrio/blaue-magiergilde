@@ -17,22 +17,23 @@ Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::resource('shops', ShopController::class)->only([
-            'index',
-            'store',
-        ]);
-
         Route::post('shops/publish-draft', ShopPostController::class)
             ->name('shops.post');
 
         Route::post('shops/update-post', ShopUpdatePostController::class)
             ->name('shops.update-post');
 
-        Route::get('bot-operations/{botOperation}', BotOperationStatusController::class)
-            ->name('bot-operations.show');
-
         Route::patch('shops/settings', ShopSettingController::class)
             ->name('shop-settings.update');
+
+        Route::resource('shops', ShopController::class)->only([
+            'index',
+            'store',
+            'update',
+        ]);
+
+        Route::get('bot-operations/{botOperation}', BotOperationStatusController::class)
+            ->name('bot-operations.show');
 
         Route::post('shop-items/{shopItem}/add-spell', AddSpellToItemController::class)
             ->name('shop-items.add-spell');

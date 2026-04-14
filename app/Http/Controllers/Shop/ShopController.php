@@ -42,6 +42,9 @@ class ShopController extends Controller
                 'last_auto_posted_at',
                 'current_shop_id',
                 'draft_shop_id',
+                'line_template',
+                'auto_roll_after_publish',
+                'keep_previous_post',
             ]) + [
                 'roll_rules' => ShopRollRule::ordered()->map(fn (ShopRollRule $rule): array => [
                     'id' => $rule->id,
@@ -94,9 +97,12 @@ class ShopController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateShopRequest $request, Shop $shop)
+    public function update(UpdateShopRequest $request, Shop $shop): RedirectResponse
     {
-        //
+        $shop->line_template = $request->filled('line_template') ? $request->string('line_template')->trim()->value() : null;
+        $shop->save();
+
+        return redirect()->back();
     }
 
     /**

@@ -21,6 +21,7 @@ class ShopItem extends Model
         'item_ruling_note',
         'roll_source_kind',
         'roll_rule_id',
+        'source_shortcode',
         'snapshot_custom',
         'spell_id',
         'spell_name',

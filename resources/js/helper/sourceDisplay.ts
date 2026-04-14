@@ -3,15 +3,15 @@ import { Source } from '@/types'
 type Translate = (key: string) => string
 
 export const sourceKindKey = (kind: Source['kind']): string => {
-  return kind === 'third_party' ? 'compendium.thirdPartySource' : 'compendium.officialSource'
+  return kind === 'partnered' ? 'compendium.thirdPartySource' : 'compendium.officialSource'
 }
 
 export const sourceKindShortKey = (kind: Source['kind']): string => {
-  return kind === 'third_party' ? 'compendium.thirdPartySourceShort' : 'compendium.officialSourceShort'
+  return kind === 'partnered' ? 'compendium.thirdPartySourceShort' : 'compendium.officialSourceShort'
 }
 
 export const sourceKindBadgeClass = (kind: Source['kind']): string => {
-  return kind === 'third_party'
+  return kind === 'partnered'
     ? 'border-secondary/40 bg-secondary/10 text-secondary'
     : 'border-success/40 bg-success/10 text-success'
 }
