@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Head } from '@inertiajs/react'
-import { BookOpen, CalendarCheck2, Compass, Crown, ScrollText, Skull, Sparkles, Users } from 'lucide-react'
+import { BookOpen, CalendarCheck2, Compass, Crown, ScrollText, Sparkles, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 const FAQ_URL = 'https://docs.google.com/document/d/13J4LiV4o2RygG2j35LLQC4Dyh_-B94om7EiSAl_I15c'

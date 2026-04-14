@@ -13,26 +13,25 @@ class CharacterClassSeeder extends Seeder
     public function run(): void
     {
         $classes = [
-            'Artificer' => '/images/artificer.jpeg',
-            'Barbarian' => '/images/barbarian.jpeg',
-            'Bard' => '/images/bard.jpeg',
-            'Blood Hunter' => '/images/bloodhunter.jpeg',
-            'Cleric' => '/images/cleric.jpeg',
-            'Druid' => '/images/druid.jpeg',
-            'Fighter' => '/images/fighter.jpeg',
-            'Monk' => '/images/monk.jpeg',
-            'Paladin' => '/images/paladin.jpeg',
-            'Pugilist' => '/images/no-avatar.svg',
-            'Ranger' => '/images/ranger.jpeg',
-            'Rogue' => '/images/rogue.jpeg',
-            'Sorcerer' => '/images/sorcerer.jpeg',
-            'Warlock' => '/images/warlock.jpeg',
-            'Wizard' => '/images/wizard.jpeg',
+            'Artificer',
+            'Barbarian',
+            'Bard',
+            'Blood Hunter',
+            'Cleric',
+            'Druid',
+            'Fighter',
+            'Monk',
+            'Paladin',
+            'Pugilist',
+            'Ranger',
+            'Rogue',
+            'Sorcerer',
+            'Warlock',
+            'Wizard',
         ];
-        foreach ($classes as $class => $src) {
+        foreach ($classes as $class) {
             CharacterClass::query()->updateOrCreate(
                 ['name' => $class],
-                ['src' => $src],
             );
         }
     }

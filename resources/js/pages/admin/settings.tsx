@@ -189,7 +189,7 @@ const getCompendiumChangeLabel = (field: string) => {
   return labels[field] ?? field.replaceAll('_', ' ')
 }
 
-function ThrowOnRender() {
+function ThrowOnRender(): never {
   throw new Error('[test] Error boundary preview — triggered manually from admin settings.')
 }
 

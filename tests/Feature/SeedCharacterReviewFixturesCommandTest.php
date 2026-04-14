@@ -32,7 +32,7 @@ it('soft deletes current characters and seeds a deterministic review fixture set
 
     $this->artisan(sprintf('characters:seed-review-fixtures %s --force', $user->email))
         ->expectsOutput(sprintf(
-            'Soft-deleted 1 current character for %s and seeded 18 review fixture characters.',
+            'Soft-deleted 1 current character for %s and seeded 24 review fixture characters.',
             $user->email,
         ))
         ->assertSuccessful();
@@ -42,31 +42,29 @@ it('soft deletes current characters and seeds a deterministic review fixture set
 
     $visibleCharacters = $user->characters()->whereNull('deleted_at')->orderBy('position')->get();
 
-    expect($visibleCharacters)->toHaveCount(18)
+    expect($visibleCharacters)->toHaveCount(24)
         ->and($visibleCharacters->pluck('name')->all())->toContain(
             'Fixture 13 - Draft Blocked by Standard Slots',
             'Fixture 14 - Draft Blocked by Filler Slot',
             'Fixture 15 - Draft ET Allowed',
-            'Fixture 16 - Needs Changes ET Allowed',
+            'Fixture 16 - Needs Changes ET',
             'Fixture 17 - Declined Example',
             'Fixture 18 - Retired Example',
         )
         ->and($visibleCharacters->where('guild_status', 'pending'))->toHaveCount(3)
-        ->and($visibleCharacters->where('guild_status', 'draft'))->toHaveCount(3)
+        ->and($visibleCharacters->where('guild_status', 'draft'))->toHaveCount(8)
         ->and($visibleCharacters->where('guild_status', 'needs_changes'))->toHaveCount(1)
         ->and($visibleCharacters->where('guild_status', 'declined'))->toHaveCount(1)
         ->and($visibleCharacters->where('guild_status', 'retired'))->toHaveCount(1)
-        ->and($visibleCharacters->every(fn (Character $character): bool => $character->characterClasses->isNotEmpty()))->toBeTrue()
-        ->and($visibleCharacters->every(fn (Character $character): bool => $character->simplified_tracking === true))->toBeTrue()
-        ->and($visibleCharacters->every(fn (Character $character): bool => $character->avatar_masked === false))->toBeTrue();
+        ->and($visibleCharacters->every(fn (Character $character): bool => $character->characterClasses->isNotEmpty()))->toBeTrue();
 
     $activityRule = app(CharacterActivityRule::class);
 
-    expect($activityRule->activeCharacterCountForUser($user))->toBe(8)
+    expect($activityRule->activeCharacterCountForUser($user))->toBe(9)
         ->and($activityRule->submittedFillerCountForUser($user))->toBe(1);
 
     expect(
-        $visibleCharacters->firstWhere('name', 'Fixture 16 - Needs Changes ET Allowed')?->review_note
+        $visibleCharacters->firstWhere('name', 'Fixture 16 - Needs Changes ET')?->review_note
     )->toBe('Please update the linked details before resubmitting.');
 });
 

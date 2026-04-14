@@ -44,7 +44,7 @@ const VariantForm = ({
           placeholder="15"
           type="number"
           min={0}
-          step="0.01"
+          step={0.01}
           value={data.cost_gp}
           onChange={(e) => setData('cost_gp', e.target.value)}
         >
@@ -197,7 +197,7 @@ const DestroyVariantModal = ({ variant, onSuccess }: { variant: MundaneItemVaria
       <ModalContent>
         <p>{t('compendium.deleteVariantConfirm', { name: variant.name })}</p>
       </ModalContent>
-      <ModalAction onClick={handleSubmit} disabled={processing} color="error">
+      <ModalAction onClick={handleSubmit} disabled={processing} variant="error">
         {t('common.delete')}
       </ModalAction>
     </Modal>

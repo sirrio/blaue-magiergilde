@@ -77,7 +77,6 @@ class SeedCharacterReviewFixturesCommand extends Command
                 if (! $characterClass instanceof CharacterClass) {
                     $characterClass = new CharacterClass;
                     $characterClass->name = $fixture['class_name'];
-                    $characterClass->src = sprintf('https://fixtures.example/classes/%s.png', strtolower(str_replace(' ', '-', $fixture['class_name'])));
                     $characterClass->save();
                 }
 

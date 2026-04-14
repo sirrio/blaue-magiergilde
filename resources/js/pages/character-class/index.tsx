@@ -236,7 +236,7 @@ const DestroyCharacterClassModal = ({
       <ModalContent>
         <p>{t('compendium.deleteClassConfirm', { name: characterClass.name })}</p>
       </ModalContent>
-      <ModalAction onClick={handleSubmit} disabled={processing} color="error">
+      <ModalAction onClick={handleSubmit} disabled={processing} variant="error">
         {t('common.delete')}
       </ModalAction>
     </Modal>
@@ -459,7 +459,7 @@ const DestroyCharacterSubclassModal = ({
       <ModalContent>
         <p>{t('compendium.deleteSubclassConfirm', { name: subclass.name })}</p>
       </ModalContent>
-      <ModalAction onClick={handleSubmit} disabled={processing} color="error">
+      <ModalAction onClick={handleSubmit} disabled={processing} variant="error">
         {t('common.delete')}
       </ModalAction>
     </Modal>

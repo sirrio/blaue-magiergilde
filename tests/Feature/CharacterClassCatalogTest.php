@@ -11,8 +11,7 @@ test('pugilist character class exists after migrations', function () {
         ->where('name', 'Pugilist')
         ->first();
 
-    expect($class)->not->toBeNull()
-        ->and($class?->src)->toBe('/images/no-avatar.svg');
+    expect($class)->not->toBeNull();
 });
 
 test('character class seeder keeps pugilist unique', function () {
