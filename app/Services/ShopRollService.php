@@ -280,7 +280,7 @@ class ShopRollService
                 ])
                 ->with(['mundaneVariants:id,name,slug,category,cost_gp,is_placeholder', 'source:id,shortcode'])
                 ->where('guild_enabled', true)
-            ->where('shop_enabled', true)
+                ->where('shop_enabled', true)
                 ->where('rarity', $rule->rarity);
 
             $selectionTypes = array_values(array_unique(array_filter(

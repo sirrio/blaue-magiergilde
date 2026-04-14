@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Shop;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateShopRequest extends FormRequest

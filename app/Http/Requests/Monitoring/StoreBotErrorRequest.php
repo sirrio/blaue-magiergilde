@@ -32,7 +32,7 @@ class StoreBotErrorRequest extends FormRequest
                 'operation_error',
             ])],
             'message' => ['required', 'string', 'max:2000'],
-            'stack'   => ['nullable', 'string', 'max:20000'],
+            'stack' => ['nullable', 'string', 'max:20000'],
             'context' => ['nullable', 'array'],
         ];
     }

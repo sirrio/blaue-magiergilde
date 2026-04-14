@@ -66,17 +66,17 @@ class ShopLineRenderer
         $sourceShortcode = (string) ($item['source_shortcode'] ?? '');
 
         return strtr($template, [
-            '{item_link}'         => $itemLink,
-            '{item_name}'         => $itemName,
-            '{item_cost}'         => $cost,
-            '{notes}'             => $notes,
-            '{spell_link}'        => $spellLink,
-            '{spell_name}'        => $spellName,
+            '{item_link}' => $itemLink,
+            '{item_name}' => $itemName,
+            '{item_cost}' => $cost,
+            '{notes}' => $notes,
+            '{spell_link}' => $spellLink,
+            '{spell_name}' => $spellName,
             '{spell_legacy_link}' => $spellLegacyLink,
-            '{spell_part}'        => $spellPart,
-            '{legacy_part}'       => $legacyPart,
-            '{source_label}'      => $sourceLabel,
-            '{source_shortcode}'  => $sourceShortcode,
+            '{spell_part}' => $spellPart,
+            '{legacy_part}' => $legacyPart,
+            '{source_label}' => $sourceLabel,
+            '{source_shortcode}' => $sourceShortcode,
         ]);
     }
 }

@@ -18,10 +18,10 @@ class MundaneItemVariantController extends Controller
         $guild = request('guild', null);
 
         $query = MundaneItemVariant::query();
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where('name', 'LIKE', "%{$search}%");
         }
-        if (!empty($category)) {
+        if (! empty($category)) {
             $query->where('category', $category);
         }
         if ($guild === 'allowed') {
@@ -52,6 +52,7 @@ class MundaneItemVariantController extends Controller
         $variant->is_placeholder = $request->boolean('is_placeholder', false);
         $variant->guild_enabled = $request->boolean('guild_enabled', true);
         $variant->save();
+
         return redirect()->back();
     }
 
@@ -64,12 +65,14 @@ class MundaneItemVariantController extends Controller
         $mundaneItemVariant->is_placeholder = $request->boolean('is_placeholder', false);
         $mundaneItemVariant->guild_enabled = $request->boolean('guild_enabled', true);
         $mundaneItemVariant->save();
+
         return redirect()->back();
     }
 
     public function destroy(MundaneItemVariant $mundaneItemVariant): RedirectResponse
     {
         $mundaneItemVariant->delete();
+
         return redirect()->back();
     }
 }

@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\DB;
  *     title?: string|null,
  *     game_master?: string|null
  * }
- *
  * @phpstan-type CharacterFixture array{
  *     name: string,
  *     class_name: string,

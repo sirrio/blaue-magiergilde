@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\Downtime;
-use App\Support\LevelProgression;
 use Illuminate\Support\Collection;
 
 class FactionRankCalculator

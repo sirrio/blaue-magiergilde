@@ -19,7 +19,7 @@ class CharacterClassController extends Controller
 
         $query = CharacterClass::query()->with(['source:id,name,shortcode,kind', 'subclasses.source:id,name,shortcode,kind']);
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where('name', 'LIKE', "%{$search}%");
         }
         if ($guild === 'allowed') {
@@ -46,6 +46,7 @@ class CharacterClassController extends Controller
         $class->source_id = $request->input('source_id') ?: null;
         $class->guild_enabled = $request->boolean('guild_enabled', true);
         $class->save();
+
         return redirect()->back();
     }
 
@@ -55,12 +56,14 @@ class CharacterClassController extends Controller
         $characterClass->source_id = $request->input('source_id') ?: null;
         $characterClass->guild_enabled = $request->boolean('guild_enabled', true);
         $characterClass->save();
+
         return redirect()->back();
     }
 
     public function destroy(CharacterClass $characterClass): RedirectResponse
     {
         $characterClass->delete();
+
         return redirect()->back();
     }
 }

@@ -15,8 +15,8 @@ class StoreCharacterClassRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'          => 'required|string|max:255',
-            'source_id'     => 'nullable|integer|exists:sources,id',
+            'name' => 'required|string|max:255',
+            'source_id' => 'nullable|integer|exists:sources,id',
             'guild_enabled' => 'boolean',
         ];
     }
