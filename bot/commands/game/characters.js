@@ -108,7 +108,9 @@ function calculateTotalBubblesToNextLevel(character, level) {
 function calculateBubblesInCurrentLevel(character, level) {
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    const additional = additionalBubblesForStartTier(character.start_tier);
+    // Pseudo chars: adventure_bubbles already reflects bubblesRequiredForLevel(target_level)
+    // with no start_tier offset, so the threshold must also be computed without it.
+    const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
     const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
     const currentTotal = bubblesRequiredForLevel(level) - additional;
     return Math.max(0, bubbles - currentTotal - spend);

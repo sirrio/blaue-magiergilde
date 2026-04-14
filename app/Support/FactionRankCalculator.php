@@ -54,7 +54,11 @@ class FactionRankCalculator
         }
 
         $bubbles = $this->calculateBubbles($character);
-        $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
+        // Pseudo-adventures encode the level directly via target_level — start_tier
+        // is already accounted for in that stored value and must not be added again.
+        $additionalBubbles = $this->progressionState->hasPseudoAdventures($character)
+            ? 0
+            : $this->additionalBubblesForStartTier($character->start_tier);
         $bubbleShopSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
 

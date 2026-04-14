@@ -27,7 +27,9 @@ function calculateLevel(character) {
 
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    const additional = additionalBubblesForStartTier(character.start_tier);
+    // Pseudo-adventures encode the level directly via target_level — start_tier
+    // is already accounted for in that stored value and must not be added again.
+    const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
     const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
 
     const effective = Math.max(0, bubbles + additional - spend);

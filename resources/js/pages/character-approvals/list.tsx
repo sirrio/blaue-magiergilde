@@ -88,12 +88,15 @@ const resolveApprovalLevel = (character: AdminCharacter): number => {
     : 0
   const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
 
+  const hasPseudo = Number(character.pseudo_adventures_count ?? 0) > 0
   const bubblesFromAdventures = Math.floor(normalizedAdventureDuration / 10800) + normalizedAdditionalAdventureBubbles
   const availableBubbles = Math.max(
     0,
     bubblesFromAdventures
       + normalizedDmBubbles
-      + additionalBubblesForStartTier(character.start_tier)
+      // Pseudo-adventures encode the level directly via target_level — start_tier
+      // is already accounted for in that stored value and must not be added again.
+      + (hasPseudo ? 0 : additionalBubblesForStartTier(character.start_tier))
       - normalizedBubbleShopSpend,
   )
 
