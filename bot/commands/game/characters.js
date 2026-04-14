@@ -266,8 +266,6 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const usesManualDerivedValues = simplifiedTracking || hasAutoLevelAdventure;
     const manualAdventuresCount = nullableInt(character.manual_adventures_count);
     const manualFactionRank = nullableInt(character.manual_faction_rank);
-    const manualTotalDowntime = nullableInt(character.manual_total_downtime_seconds);
-
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -278,9 +276,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const downtimeFaction = safeInt(character.faction_downtime);
     const downtimeOther = safeInt(character.other_downtime);
     const downtimeAllowed = totalBubbles * 8 * 60 * 60;
-    const downtimeRemaining = usesManualDerivedValues && manualTotalDowntime !== null
-        ? manualTotalDowntime - downtimeTotal
-        : downtimeAllowed - downtimeTotal;
+    const downtimeRemaining = downtimeAllowed - downtimeTotal;
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
@@ -290,7 +286,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const factionsValue = usesManualDerivedValues
         ? `${factionName}\nLevel: **${manualFactionRank ?? 'Manual'}**`
         : `${factionName}\nLevel: **${factionLevel}**`;
-    const downtimeValue = `Total: **${usesManualDerivedValues ? (manualTotalDowntime === null ? 'Manual' : secondsToHourMinuteString(manualTotalDowntime)) : secondsToHourMinuteString(downtimeAllowed)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${usesManualDerivedValues ? (manualTotalDowntime === null ? 'Manual' : secondsToHourMinuteString(Math.max(0, downtimeRemaining))) : secondsToHourMinuteString(Math.max(0, downtimeRemaining))}**`;
+    const downtimeValue = `Total: **${secondsToHourMinuteString(downtimeAllowed)}**\nFaction: ${secondsToHourMinuteString(downtimeFaction)} - Other: ${secondsToHourMinuteString(downtimeOther)}\nRemaining: **${secondsToHourMinuteString(Math.max(0, downtimeRemaining))}**`;
 
     const titleParts = [
         String(character.name || `Character ${character.id}`),

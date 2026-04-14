@@ -422,7 +422,6 @@ export interface Character {
   faction_rank?: number
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
-  manual_total_downtime_seconds?: number | null
   simplified_tracking?: boolean
   avatar_masked?: boolean
   private_mode?: boolean

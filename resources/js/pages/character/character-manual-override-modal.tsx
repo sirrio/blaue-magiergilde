@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button'
-import DurationInputStack from '@/components/duration-input-stack'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalAction, ModalContent, ModalTitle } from '@/components/ui/modal'
 import { useTranslate } from '@/lib/i18n'
@@ -9,15 +8,13 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Pencil } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 
-type ManualOverrideField = 'adventures' | 'factionRank' | 'totalDowntime'
+type ManualOverrideField = 'adventures' | 'factionRank'
 
 type ManualOverridePayload = {
   manual_adventures_count_enabled?: boolean
   manual_adventures_count?: number
   manual_faction_rank_enabled?: boolean
   manual_faction_rank?: number
-  manual_total_downtime_enabled?: boolean
-  manual_total_downtime_seconds?: number
 }
 
 function manualOverrideConfig(field: ManualOverrideField, t: (key: string) => string) {
@@ -32,24 +29,13 @@ function manualOverrideConfig(field: ManualOverrideField, t: (key: string) => st
     }
   }
 
-  if (field === 'factionRank') {
-    return {
-      enabledKey: 'manual_faction_rank_enabled' as const,
-      valueKey: 'manual_faction_rank' as const,
-      title: t('characters.manualFactionRankLabel'),
-      inputLabel: t('characters.manualFactionRankLabel'),
-      min: 0,
-      max: 5,
-    }
-  }
-
   return {
-    enabledKey: 'manual_total_downtime_enabled' as const,
-    valueKey: 'manual_total_downtime_seconds' as const,
-    title: t('characters.manualTotalDowntimeLabel'),
-    inputLabel: t('characters.manualTotalDowntimeLabel'),
+    enabledKey: 'manual_faction_rank_enabled' as const,
+    valueKey: 'manual_faction_rank' as const,
+    title: t('characters.manualFactionRankLabel'),
+    inputLabel: t('characters.manualFactionRankLabel'),
     min: 0,
-    max: 315360000,
+    max: 5,
   }
 }
 
@@ -81,8 +67,6 @@ export default function CharacterManualOverrideModal({
     manual_adventures_count: 0,
     manual_faction_rank_enabled: false,
     manual_faction_rank: 0,
-    manual_total_downtime_enabled: false,
-    manual_total_downtime_seconds: 0,
   })
 
   const buildPayload = (enabled: boolean): ManualOverridePayload => {
@@ -93,16 +77,9 @@ export default function CharacterManualOverrideModal({
       }
     }
 
-    if (field === 'factionRank') {
-      return {
-        manual_faction_rank_enabled: enabled,
-        manual_faction_rank: Number(form.data.manual_faction_rank),
-      }
-    }
-
     return {
-      manual_total_downtime_enabled: enabled,
-      manual_total_downtime_seconds: Number(form.data.manual_total_downtime_seconds),
+      manual_faction_rank_enabled: enabled,
+      manual_faction_rank: Number(form.data.manual_faction_rank),
     }
   }
 
@@ -113,8 +90,6 @@ export default function CharacterManualOverrideModal({
         manual_adventures_count: field === 'adventures' ? (value ?? 0) : 0,
         manual_faction_rank_enabled: field === 'factionRank' && value !== null,
         manual_faction_rank: field === 'factionRank' ? (value ?? 0) : 0,
-        manual_total_downtime_enabled: field === 'totalDowntime' && value !== null,
-        manual_total_downtime_seconds: field === 'totalDowntime' ? (value ?? 0) : 0,
       })
       form.clearErrors()
     }
@@ -182,17 +157,7 @@ export default function CharacterManualOverrideModal({
       <ModalContent>
         <div className="space-y-3">
           <p className="text-xs text-base-content/60">{t('characters.manualOverrideHint')}</p>
-          {field === 'totalDowntime' ? (
-            <DurationInputStack
-              mode="downtime"
-              value={Number(form.data.manual_total_downtime_seconds ?? 0)}
-              onChange={(next) => {
-                form.setData('manual_total_downtime_enabled', true)
-                form.setData('manual_total_downtime_seconds', next)
-              }}
-              errors={errors.manual_total_downtime_seconds}
-            />
-          ) : field === 'factionRank' ? (
+          {field === 'factionRank' ? (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-base-content/50">{config.inputLabel}</p>
               <div className="grid grid-cols-5 gap-1">

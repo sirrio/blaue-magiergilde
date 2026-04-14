@@ -35,8 +35,6 @@ class UpdateCharacterManualOverridesRequest extends FormRequest
             'manual_adventures_count' => 'nullable|required_if:manual_adventures_count_enabled,1|integer|min:0|max:1024',
             'manual_faction_rank_enabled' => 'sometimes|boolean',
             'manual_faction_rank' => 'nullable|required_if:manual_faction_rank_enabled,1|integer|min:0|max:5',
-            'manual_total_downtime_enabled' => 'sometimes|boolean',
-            'manual_total_downtime_seconds' => 'nullable|required_if:manual_total_downtime_enabled,1|integer|min:0|max:315360000',
         ];
     }
 }

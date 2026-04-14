@@ -13,7 +13,6 @@ import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import AppLayout from '@/layouts/app-layout'
 import { useTranslate } from '@/lib/i18n'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
-import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
@@ -157,7 +156,6 @@ export default function Show({
   const level = calculateLevel(character)
   const tier = calculateTier(character)
   const classString = calculateClassString(character)
-  const bubblesToNextLevel = calculateBubblesToNextLevel(character)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const guildStatus = character.guild_status ?? 'pending'
@@ -347,14 +345,8 @@ export default function Show({
   const realAdventureCount = character.adventures.length - pseudoAdventureCount
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
-  const manualTotalDowntimeSeconds = character.manual_total_downtime_seconds ?? null
-  const hasDerivedRemainingDowntime = !usesManualDerivedValues || manualTotalDowntimeSeconds !== null
-  const totalDowntimeDisplay = usesManualDerivedValues
-    ? (manualTotalDowntimeSeconds === null ? t('characters.autoDisabledShort') : secondsToHourMinuteString(manualTotalDowntimeSeconds))
-    : secondsToHourMinuteString(totalDowntimeDuration)
-  const remainingDowntimeDisplay = usesManualDerivedValues
-    ? (hasDerivedRemainingDowntime ? secondsToHourMinuteString(remainingDowntimeDuration) : '?')
-    : secondsToHourMinuteString(remainingDowntimeDuration)
+  const totalDowntimeDisplay = secondsToHourMinuteString(totalDowntimeDuration)
+  const remainingDowntimeDisplay = secondsToHourMinuteString(remainingDowntimeDuration)
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
   const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
@@ -440,10 +432,9 @@ export default function Show({
               {statusSummary ? <p className="text-xs text-base-content/70">{statusSummary}</p> : null}
               <div className="space-y-1">
                 <Progress className="h-2 w-full" value={progressValue} max={progressMax} />
-                <p className="flex items-center justify-end gap-1 text-xs">
-                  <span className="font-semibold">{bubblesToNextLevel}</span>
+                <p className="flex items-center justify-end gap-1 text-xs text-base-content/70">
+                  <span className="font-semibold">{progressValue}/{progressMax}</span>
                   <Droplets size={13} />
-                  <span>{t('characters.toNextLevel')}</span>
                 </p>
               </div>
             </div>
@@ -526,35 +517,13 @@ export default function Show({
               </InfoBoxTitle>
               <InfoBoxLine>
                 {t('characters.total')}:{' '}
-                {usesManualDerivedValues ? (
-                  <span className="inline-flex items-center gap-1 leading-none align-middle">
-                    <span className={manualTotalDowntimeSeconds === null ? 'text-warning' : ''}>
-                      {totalDowntimeDisplay}
-                    </span>
-                    <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        modifier="square"
-                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
-                        aria-label={t('characters.manualTotalDowntimeLabel')}
-                        title={downtimeDisabledReason}
-                      >
-                        <Pencil size={10} />
-                      </Button>
-                    </CharacterManualOverrideModal>
-                  </span>
-                ) : (
-                  totalDowntimeDisplay
-                )}
+                {totalDowntimeDisplay}
               </InfoBoxLine>
               <InfoBoxLine>Faction: {secondsToHourMinuteString(factionDowntimeDuration)}</InfoBoxLine>
               <InfoBoxLine>{t('characters.other')}: {secondsToHourMinuteString(otherDowntimeDuration)}</InfoBoxLine>
               <InfoBoxLine className="font-semibold">
                 {t('characters.remaining')}:{' '}
-                <span className={usesManualDerivedValues && !hasDerivedRemainingDowntime ? 'text-warning' : ''}>
-                  {remainingDowntimeDisplay}
-                </span>
+                {remainingDowntimeDisplay}
               </InfoBoxLine>
             </InfoBox>
             {!character.is_filler && (
