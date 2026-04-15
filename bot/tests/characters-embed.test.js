@@ -38,7 +38,8 @@ assert.equal(embedData.url, 'https://example.test/characters/42');
 assert.equal(embedData.description, '[Open sheet](https://www.dndbeyond.com/characters/42)');
 
 const nextStepField = embedData.fields.find((field) => field.name === 'Next step');
-assert.equal(nextStepField, undefined); // approved status has no "Next step"
+// approved status has no "Next step"
+assert.equal(nextStepField, undefined);
 
 const draftEmbed = buildCharacterEmbed({ ...character, guild_status: 'draft' }, { thumbnailUrlOrAttachment: null }).toJSON();
 const draftNextStep = draftEmbed.fields.find((field) => field.name === 'Next step');
