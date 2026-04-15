@@ -22,7 +22,7 @@ function countsBubbleAdjustmentsForProgression(character) {
 }
 
 function calculateAvailableBubbles(character) {
-    if (Boolean(character.is_filler)) return 0;
+    if (character.is_filler) return 0;
 
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
@@ -44,7 +44,7 @@ function calculateBubblesInCurrentLevel(character, level) {
 }
 
 function calculateLevel(character) {
-    if (Boolean(character.is_filler)) return 3;
+    if (character.is_filler) return 3;
     return levelFromAvailableBubbles(calculateAvailableBubbles(character));
 }
 
