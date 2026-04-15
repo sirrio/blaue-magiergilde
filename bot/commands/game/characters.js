@@ -99,6 +99,10 @@ function secondsToHourMinuteString(seconds) {
     return formatDurationSeconds(safeInt(seconds, 0));
 }
 
+function hoursOnly(seconds) {
+    return `${Math.floor(safeInt(seconds, 0) / 3600)}h`;
+}
+
 function calculateTotalBubblesToNextLevel(character, level) {
     const additional = additionalBubblesForStartTier(character.start_tier);
     const currentTotal = bubblesRequiredForLevel(level) - additional;
@@ -122,16 +126,16 @@ function buildCharacterSummaryLine(character) {
     const downtimeMax = downtimeBubbles * 8 * 60 * 60;
     const downtimeUsed = safeInt(character.total_downtime);
 
-    const name = String(character.name || `Character ${character.id}`);
-    const tierPart = character.is_filler ? 'Filler' : tier;
-    const bubblePart = character.is_filler
+    const name = String(character.name || `Character ${character.id}`).slice(0, 16).padEnd(16);
+    const tierPart = (character.is_filler ? 'Filler' : tier).padEnd(6);
+    const bubblePart = (character.is_filler
         ? 'Lv 3'
         : isMaxLevel
-            ? `Lv 20 +${inCurrent}🫧`
-            : `Lv ${level} ${inCurrent}/${toNextTotal}🫧`;
-    const downtimePart = `⏱ ${secondsToHourMinuteString(downtimeUsed)}/${secondsToHourMinuteString(downtimeMax)}`;
+            ? `Lv20 +${inCurrent}`
+            : `Lv${level} ${inCurrent}/${toNextTotal}`).padEnd(11);
+    const downtimePart = `${hoursOnly(downtimeUsed)}/${hoursOnly(downtimeMax)}`;
 
-    return `**${name}** · ${tierPart} · ${bubblePart} · ${downtimePart}`;
+    return `${name} ${tierPart} ${bubblePart} ${downtimePart}`;
 }
 
 function buildProgressBar(current, total, width = 10) {
@@ -386,7 +390,7 @@ function buildCharacterListView({ ownerDiscordId, characters, locale }) {
         ? t('characters.dashboardDescription', { count: characters.length }, locale)
         : t('characters.dashboardDescriptionEmpty', {}, locale);
     const description = characters.length > 0
-        ? `${descriptionHeader}\n\n${characterLines}`
+        ? `${descriptionHeader}\n\`\`\`\n${characterLines}\n\`\`\``
         : descriptionHeader;
 
     const summary = new EmbedBuilder()
