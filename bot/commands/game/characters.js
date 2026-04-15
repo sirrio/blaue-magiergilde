@@ -133,9 +133,17 @@ function buildCharacterSummaryLine(character) {
         : isMaxLevel
             ? `Lv20 +${inCurrent}`
             : `Lv${level} ${inCurrent}/${toNextTotal}`).padEnd(11);
-    const downtimePart = `${hoursOnly(downtimeUsed)}/${hoursOnly(downtimeMax)}`;
+    const downtimePart = `${hoursOnly(downtimeUsed)}/${hoursOnly(downtimeMax)}`.padEnd(10);
+    const statusLabels = {
+        approved: 'ok',
+        pending: 'pend',
+        draft: 'draft',
+        declined: 'decl',
+        needs_changes: 'chgs',
+    };
+    const statusPart = statusLabels[character.guild_status] ?? character.guild_status ?? '?';
 
-    return `${name} ${tierPart} ${bubblePart} ${downtimePart}`;
+    return `${name} ${tierPart} ${bubblePart} ${downtimePart} ${statusPart}`;
 }
 
 function buildProgressBar(current, total, width = 10) {
