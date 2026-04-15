@@ -670,7 +670,14 @@ export function CharacterCard({
                   <Progress className="block h-2" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
                   <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
                     {isMaxLevel ? (
-                      <span className="text-base-content/45">{t('characters.maxLevelReached')}</span>
+                      <span className="inline-flex flex-wrap items-center gap-x-1 text-base-content/45">
+                        <span className="whitespace-nowrap">{t('characters.maxLevelReached')}</span>
+                        {progressValue > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-base-content/35">
+                            (+{progressValue} <Droplets size={10} />)
+                          </span>
+                        ) : null}
+                      </span>
                     ) : isBubbleOverspent ? (
                       <span className="text-error/80">{t('characters.overspentBubbles')}</span>
                     ) : (
@@ -684,6 +691,15 @@ export function CharacterCard({
                   <InfoBox>
                     <InfoBoxTitle>
                       <Swords size={15} /> {t('characters.adventures')}
+                      {!bubbleAdjustmentsCount ? (
+                        <span
+                          className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                          data-tip={t('characters.bubbleShopNotCountedHint')}
+                          aria-label={t('characters.bubbleShopNotCountedHint')}
+                        >
+                          <AlertTriangle size={11} />
+                        </span>
+                      ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.played')}:{' '}
@@ -766,6 +782,15 @@ export function CharacterCard({
                   <InfoBox>
                     <InfoBoxTitle>
                       <Crown size={15} /> {t('characters.gameMaster')}
+                      {!bubbleAdjustmentsCount ? (
+                        <span
+                          className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                          data-tip={t('characters.gmBubblesNotCountedHint')}
+                          aria-label={t('characters.gmBubblesNotCountedHint')}
+                        >
+                          <AlertTriangle size={11} />
+                        </span>
+                      ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.bubbles')}: {character.dm_bubbles}
