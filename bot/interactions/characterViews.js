@@ -165,7 +165,36 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, avatarMasked, privateMode, locale = null }) {
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, hasPseudoAdventure = false, avatarMasked, privateMode, locale = null }) {
+    const showManualOverrideButtons = simplifiedTracking || hasPseudoAdventure;
+
+    const dmRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterManage_dm_bubbles_${characterId}_${ownerDiscordId}`)
+            .setLabel(t('characters.manageDmBubbles', {}, locale))
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_dm_coins_${characterId}_${ownerDiscordId}`)
+            .setLabel(t('characters.manageDmCoins', {}, locale))
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
+            .setLabel(t('characters.manageBubbleShop', {}, locale))
+            .setStyle(ButtonStyle.Secondary),
+    );
+    if (showManualOverrideButtons) {
+        dmRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterManage_manual_adventures_${characterId}_${ownerDiscordId}`)
+                .setLabel('Abenteuer (manuell)')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`characterManage_manual_faction_${characterId}_${ownerDiscordId}`)
+                .setLabel('Fraktion (manuell)')
+                .setStyle(ButtonStyle.Secondary),
+        );
+    }
+
     const rows = [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -185,20 +214,7 @@ function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTrack
                 .setLabel(t('characters.manageFaction', {}, locale))
                 .setStyle(ButtonStyle.Secondary),
         ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`characterManage_dm_bubbles_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.manageDmBubbles', {}, locale))
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`characterManage_dm_coins_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.manageDmCoins', {}, locale))
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`characterManage_bubble_spend_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.manageBubbleShop', {}, locale))
-                .setStyle(ButtonStyle.Secondary),
-        ),
+        dmRow,
     ];
 
     rows.push(new ActionRowBuilder().addComponents(
@@ -303,6 +319,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
             characterId: character.id,
             ownerDiscordId,
             simplifiedTracking,
+            hasPseudoAdventure: Boolean(character.has_pseudo_adventure),
             avatarMasked,
             privateMode,
             locale,
@@ -332,6 +349,8 @@ function buildCharacterCardPayload({ character, ownerDiscordId, registrationBloc
             characterId: character.id,
             isFiller: character.is_filler,
             simplifiedTracking,
+            hasPseudoAdventure: Boolean(character.has_pseudo_adventure),
+            hasRealAdventure: Boolean(character.has_real_adventure),
             guildStatus: character.guild_status,
             registrationBlockedReason,
             registrationCounts,
@@ -1222,11 +1241,12 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus, registrationBlockedReason = null, registrationCounts = null }) {
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, hasPseudoAdventure = false, hasRealAdventure = false, guildStatus, registrationBlockedReason = null, registrationCounts = null }) {
     const primaryRow = new ActionRowBuilder();
     const normalizedStatus = String(guildStatus || '').trim().toLowerCase();
     const canRegister = normalizedStatus === 'draft' || normalizedStatus === 'needs_changes';
     const canLogActivity = !canRegister || !isCharacterStatusSwitchEnabled;
+    const isMixed = !simplifiedTracking && hasPseudoAdventure && hasRealAdventure;
     if (canRegister) {
         primaryRow.addComponents(
             new ButtonBuilder()
@@ -1268,15 +1288,16 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
             .setStyle(ButtonStyle.Danger),
     );
 
-    return [
-        primaryRow,
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.backToList'))
-                .setStyle(ButtonStyle.Secondary),
-        ),
-    ];
+    const rows = [primaryRow];
+
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
+            .setLabel(t('characters.backToList'))
+            .setStyle(ButtonStyle.Secondary),
+    ));
+
+    return rows;
 }
 
 function buildCharacterRegisterConfirmRow({ characterId, ownerDiscordId }) {

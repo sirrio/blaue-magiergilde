@@ -334,6 +334,7 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
+                COALESCE(a.has_real_adventure, 0) AS has_real_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -358,7 +359,8 @@ async function listCharactersForDiscord(discordUser) {
                             ELSE 0
                         END
                     ) AS adventure_bubbles,
-                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
+                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure,
+                    MAX(CASE WHEN a.is_pseudo = 0 THEN 1 ELSE 0 END) AS has_real_adventure
                 FROM adventures a
                 LEFT JOIN (
                     SELECT character_id, id, start_date, target_level, target_bubbles,
@@ -503,6 +505,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
+                COALESCE(a.has_real_adventure, 0) AS has_real_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -527,7 +530,8 @@ async function findCharacterForDiscord(discordUser, characterId) {
                             ELSE 0
                         END
                     ) AS adventure_bubbles,
-                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
+                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure,
+                    MAX(CASE WHEN a.is_pseudo = 0 THEN 1 ELSE 0 END) AS has_real_adventure
                 FROM adventures a
                 LEFT JOIN (
                     SELECT character_id, id, start_date, target_level, target_bubbles,
@@ -750,6 +754,38 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
     } finally {
         connection.release();
     }
+}
+
+async function updateCharacterManualOverridesForDiscord(discordUser, characterId, { adventuresCount, factionRank }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findCharacterForDiscord(discordUser, characterId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    const now = nowSql();
+    const updates = [];
+    const values = [];
+
+    if (typeof adventuresCount !== 'undefined') {
+        updates.push('manual_adventures_count = ?');
+        values.push(adventuresCount !== null ? Math.max(0, Math.floor(Number(adventuresCount))) : null);
+    }
+    if (typeof factionRank !== 'undefined') {
+        updates.push('manual_faction_rank = ?');
+        values.push(factionRank !== null ? Math.max(0, Math.floor(Number(factionRank))) : null);
+    }
+    if (updates.length === 0) return { ok: true };
+
+    updates.push('updated_at = ?');
+    values.push(now, characterId, userId);
+
+    await db.execute(
+        `UPDATE characters SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
+        values,
+    );
+
+    return { ok: true };
 }
 
 async function createCharacterForDiscord(
@@ -1909,6 +1945,7 @@ module.exports = {
     getCharacterSubmissionStateForDiscord,
     findCharacterForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateCharacterManualOverridesForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,

@@ -22,7 +22,7 @@ import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { calculateTier } from '@/helper/calculateTier'
-import { usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
+import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { Progress } from '@/components/ui/progress'
 import { Character, Ally, PageProps } from '@/types'
@@ -158,6 +158,8 @@ export default function Show({
   const classString = calculateClassString(character)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
+  const isMaxLevel = level >= 20 || progressMax === 0
+  const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
   const statusHint = getCharacterStatusHint(guildStatus, t)
@@ -430,10 +432,23 @@ export default function Show({
               </div>
               {statusSummary ? <p className="text-xs text-base-content/70">{statusSummary}</p> : null}
               <div className="space-y-1">
-                <Progress className="h-2 w-full" value={progressValue} max={progressMax} />
+                <Progress className="h-2 w-full" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
                 <p className="flex items-center justify-end gap-1 text-xs text-base-content/70">
-                  <span className="font-semibold">{progressValue}/{progressMax}</span>
-                  <Droplets size={13} />
+                  {isMaxLevel ? (
+                    <span className="inline-flex flex-wrap items-center gap-x-1 text-base-content/45">
+                      <span className="whitespace-nowrap">{t('characters.maxLevelReached')}</span>
+                      {progressValue > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-base-content/35">
+                          (+{progressValue} <Droplets size={10} />)
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="font-semibold">{progressValue}/{progressMax}</span>
+                      <Droplets size={13} />
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -445,6 +460,15 @@ export default function Show({
             <InfoBox>
               <InfoBoxTitle>
                 <Swords size={15} /> {t('characters.adventures')}
+                {!bubbleAdjustmentsCount ? (
+                  <span
+                    className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                    data-tip={t('characters.bubbleShopNotCountedHint')}
+                    aria-label={t('characters.bubbleShopNotCountedHint')}
+                  >
+                    <AlertTriangle size={11} />
+                  </span>
+                ) : null}
               </InfoBoxTitle>
               <InfoBoxLine>
                 {t('characters.played')}:{' '}
@@ -529,6 +553,15 @@ export default function Show({
               <InfoBox>
                 <InfoBoxTitle>
                   <Crown size={15} /> {t('characters.gameMaster')}
+                  {!bubbleAdjustmentsCount ? (
+                    <span
+                      className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                      data-tip={t('characters.gmBubblesNotCountedHint')}
+                      aria-label={t('characters.gmBubblesNotCountedHint')}
+                    >
+                      <AlertTriangle size={11} />
+                    </span>
+                  ) : null}
                 </InfoBoxTitle>
                 <InfoBoxLine>
                   {t('characters.bubbles')}: {character.dm_bubbles}

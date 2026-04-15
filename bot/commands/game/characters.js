@@ -107,6 +107,33 @@ function calculateTotalBubblesToNextLevel(character, level) {
 }
 
 
+function buildCharacterSummaryLine(character) {
+    const level = calculateLevel(character);
+    const tier = calculateTierFromLevel(level).toUpperCase();
+    const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
+    const inCurrent = calculateBubblesInCurrentLevel(character, level);
+    const isMaxLevel = level >= 20 || toNextTotal === 0;
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
+    const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
+    const downtimeBubbles = isMixed
+        ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
+        : totalBubbles;
+    const downtimeMax = downtimeBubbles * 8 * 60 * 60;
+    const downtimeUsed = safeInt(character.total_downtime);
+
+    const name = String(character.name || `Character ${character.id}`);
+    const tierPart = character.is_filler ? 'Filler' : tier;
+    const bubblePart = character.is_filler
+        ? 'Lv 3'
+        : isMaxLevel
+            ? `Lv 20 +${inCurrent}🫧`
+            : `Lv ${level} ${inCurrent}/${toNextTotal}🫧`;
+    const downtimePart = `⏱ ${secondsToHourMinuteString(downtimeUsed)}/${secondsToHourMinuteString(downtimeMax)}`;
+
+    return `**${name}** · ${tierPart} · ${bubblePart} · ${downtimePart}`;
+}
+
 function buildProgressBar(current, total, width = 10) {
     if (total <= 0) return '-';
     const ratio = Math.max(0, Math.min(1, current / total));
@@ -191,9 +218,6 @@ function guildStatusNextStep(value, locale) {
     if (status === 'declined') {
         return t('characters.nextStepDeclined');
     }
-    if (status === 'approved') {
-        return t('characters.nextStepApproved');
-    }
     if (status === 'retired') {
         return t('characters.nextStepRetired');
     }
@@ -262,11 +286,19 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
     const inCurrent = calculateBubblesInCurrentLevel(character, level);
     const toNext = Math.max(0, toNextTotal - inCurrent);
+    const isMaxLevel = level >= 20 || toNextTotal === 0;
 
     const downtimeTotal = safeInt(character.total_downtime);
     const downtimeFaction = safeInt(character.faction_downtime);
     const downtimeOther = safeInt(character.other_downtime);
-    const downtimeAllowed = totalBubbles * 8 * 60 * 60;
+    // In mixed tracking mode (pseudo anchor + real adventures), target_bubbles bakes in
+    // the start-tier bonus (which was never earned through play) and deducts bubble shop
+    // spend (which was earned). Correct the downtime base accordingly.
+    const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
+    const downtimeBubbles = isMixed
+        ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
+        : totalBubbles;
+    const downtimeAllowed = downtimeBubbles * 8 * 60 * 60;
     const downtimeRemaining = downtimeAllowed - downtimeTotal;
 
     const factionLevel = calculateFactionLevel(character, level, tier);
@@ -292,7 +324,11 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
         .addFields(
             { name: 'Status', value: `${statusEmoji} ${statusLabel}`, inline: true },
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
-            { name: 'Progress', value: `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`, inline: false },
+            { name: 'Progress', value: isMaxLevel
+                ? `${buildProgressBar(1, 1)}\nMax. Level erreicht${inCurrent > 0 ? ` (+**${inCurrent}** Bubble(s))` : ''}`
+                : `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`,
+              inline: false },
+            { name: 'Tracking', value: simplifiedTracking ? 'Level-Tracking' : isMixed ? 'Gemischt' : 'Abenteuer-Tracking', inline: true },
             { name: 'Adventures', value: adventuresValue, inline: true },
             { name: 'Factions', value: factionsValue, inline: true },
             { name: 'Downtime', value: downtimeValue, inline: false },
@@ -302,6 +338,19 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
 
     if (statusNextStep) {
         embed.addFields({ name: 'Next step', value: statusNextStep, inline: false });
+    }
+
+    if (!bubbleAdjustmentsCount) {
+        const warningLines = [];
+        if (simplifiedTracking) {
+            warningLines.push('⚠️ **Level-Tracking aktiv** – DM-Bubbles und Bubble-Shop fließen nicht in die Levelberechnung ein.');
+        } else {
+            warningLines.push('⚠️ **Gemischtes Tracking** – DM-Bubbles und Bubble-Shop fließen nicht in die Levelberechnung ein.');
+        }
+        if (isMixed) {
+            warningLines.push('ℹ️ Bubble-Shop-Ausgaben werden ABER für die maximale Downtime berücksichtigt.');
+        }
+        embed.addFields({ name: 'Hinweise', value: warningLines.join('\n'), inline: false });
     }
 
     const externalLink = String(character.external_link || '').trim();
@@ -323,14 +372,18 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
 }
 
 function buildCharacterListView({ ownerDiscordId, characters, locale }) {
+    const characterLines = characters.slice(0, 25).map(buildCharacterSummaryLine).join('\n');
+    const descriptionHeader = characters.length > 0
+        ? t('characters.dashboardDescription', { count: characters.length }, locale)
+        : t('characters.dashboardDescriptionEmpty', {}, locale);
+    const description = characters.length > 0
+        ? `${descriptionHeader}\n\n${characterLines}`
+        : descriptionHeader;
+
     const summary = new EmbedBuilder()
         .setTitle(t('characters.dashboardTitle', {}, locale))
         .setColor(0x4f46e5)
-        .setDescription(
-            characters.length > 0
-                ? t('characters.dashboardDescription', { count: characters.length }, locale)
-                : t('characters.dashboardDescriptionEmpty', {}, locale),
-        );
+        .setDescription(description);
 
     const components = [];
     const selection = characters.slice(0, 25);
@@ -343,9 +396,6 @@ function buildCharacterListView({ ownerDiscordId, characters, locale }) {
                     const option = new StringSelectMenuOptionBuilder()
                         .setLabel(String(character.name || `Character ${character.id}`).slice(0, 100))
                         .setValue(String(character.id));
-                    const level = calculateLevel(character);
-                    const tier = calculateTierFromLevel(level);
-                    option.setDescription(tier);
                     return option;
                 }),
             );

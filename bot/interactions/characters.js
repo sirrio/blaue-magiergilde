@@ -23,6 +23,7 @@ const {
     listCharactersForDiscord,
     getCharacterSubmissionStateForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateCharacterManualOverridesForDiscord,
     updateLinkedUserLocaleForDiscord,
     updateLinkedUserTrackingDefaultForDiscord,
     findCharacterForDiscord,
@@ -2485,6 +2486,46 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterManualAdventuresModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        const raw = interaction.fields.getTextInputValue('manualAdventuresCount').trim();
+        const adventuresCount = raw === '' ? null : Math.max(0, Math.floor(Number(raw) || 0));
+        await updateCharacterManualOverridesForDiscord(interaction.user, characterId, { adventuresCount });
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) return true;
+        await updateManageMessage(interaction, {
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, refreshed, ownerDiscordId)),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterManualFactionModal_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) return false;
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+        const raw = interaction.fields.getTextInputValue('manualFactionRank').trim();
+        const factionRank = raw === '' ? null : Math.max(0, Math.floor(Number(raw) || 0));
+        await updateCharacterManualOverridesForDiscord(interaction.user, characterId, { factionRank });
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) return true;
+        await updateManageMessage(interaction, {
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, refreshed, ownerDiscordId)),
+            flags: MessageFlags.Ephemeral,
+        });
+        return true;
+    }
+
     if (interaction.isModalSubmit() && interaction.customId.startsWith('characterRegisterNoteModal_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -2935,6 +2976,40 @@ async function handle(interaction) {
             await interaction.showModal(modal);
             return true;
         }
+        if (action === 'manual_adventures') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterManualAdventuresModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Abenteuer-Anzahl (manuell)');
+
+            const input = new TextInputBuilder()
+                .setCustomId('manualAdventuresCount')
+                .setLabel('Anzahl (leer = deaktivieren)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setValue(safeModalValue(character.manual_adventures_count != null ? String(character.manual_adventures_count) : ''));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(input));
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        if (action === 'manual_faction') {
+            const modal = new ModalBuilder()
+                .setCustomId(`characterManualFactionModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Fraktion-Level (manuell)');
+
+            const input = new TextInputBuilder()
+                .setCustomId('manualFactionRank')
+                .setLabel('Level (leer = deaktivieren)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setValue(safeModalValue(character.manual_faction_rank != null ? String(character.manual_faction_rank) : ''));
+
+            modal.addComponents(new ActionRowBuilder().addComponents(input));
+            await interaction.showModal(modal);
+            return true;
+        }
+
         if (action === 'dm_coins') {
             const modal = new ModalBuilder()
                 .setCustomId(`characterDmCoinsModal_${character.id}_${ownerDiscordId}`)
