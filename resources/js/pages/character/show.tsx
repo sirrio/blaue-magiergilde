@@ -348,7 +348,6 @@ export default function Show({
   const totalDowntimeDisplay = secondsToHourMinuteString(totalDowntimeDuration)
   const remainingDowntimeDisplay = secondsToHourMinuteString(remainingDowntimeDuration)
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
-  const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
   const statusIcon = guildStatus === 'approved'

@@ -497,7 +497,6 @@ export function CharacterCard({
   const totalDowntimeDisplay = formattedDowntimes.total
   const remainingDowntimeDisplay = formattedDowntimes.remaining
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
-  const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
 
