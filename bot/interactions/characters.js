@@ -48,7 +48,7 @@ const {
 
 const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
-const { calculateLevel } = require('../utils/characterTier');
+const { calculateBubblesInCurrentLevel, calculateLevel } = require('../utils/characterTier');
 const { bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
@@ -2909,11 +2909,11 @@ async function handle(interaction) {
             }
 
             const modal = new ModalBuilder()
-                .setCustomId(`characterManualLevelModal_${character.id}_${ownerDiscordId}`)
+                .setCustomId(`characterManualLevelModal_${character.id}_${ownerDiscordId}_${Date.now()}`)
                 .setTitle('Set level');
 
             const currentLevel = calculateLevel(character);
-            const maxBubblesForCurrent = Math.max(0, bubblesRequiredForLevel(Math.min(20, currentLevel + 1)) - bubblesRequiredForLevel(currentLevel));
+            const currentBubblesInLevel = calculateBubblesInCurrentLevel(character, currentLevel);
             const manualInput = new TextInputBuilder()
                 .setCustomId('manualLevel')
                 .setLabel('Level (1-20)')
@@ -2923,10 +2923,10 @@ async function handle(interaction) {
 
             const bubblesInput = new TextInputBuilder()
                 .setCustomId('manualBubblesInLevel')
-                .setLabel(`Bubbles im Level (0-${Math.max(0, maxBubblesForCurrent - 1)}, optional)`)
+                .setLabel('Bubbles im Level (optional)')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(false)
-                .setValue('0');
+                .setValue(safeModalValue(String(currentBubblesInLevel)));
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(manualInput),

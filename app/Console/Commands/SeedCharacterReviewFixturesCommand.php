@@ -37,7 +37,6 @@ use Illuminate\Support\Facades\DB;
  *     notes?: string|null,
  *     manual_adventures_count?: int|null,
  *     manual_faction_rank?: int|null,
- *     manual_total_downtime_seconds?: int|null,
  *     adventures?: list<AdventureFixture>
  * }
  */
@@ -101,7 +100,6 @@ class SeedCharacterReviewFixturesCommand extends Command
                 $character->review_note = $fixture['review_note'] ?? null;
                 $character->manual_adventures_count = array_key_exists('manual_adventures_count', $fixture) ? $fixture['manual_adventures_count'] : null;
                 $character->manual_faction_rank = array_key_exists('manual_faction_rank', $fixture) ? $fixture['manual_faction_rank'] : null;
-                $character->manual_total_downtime_seconds = array_key_exists('manual_total_downtime_seconds', $fixture) ? $fixture['manual_total_downtime_seconds'] : null;
                 $character->save();
 
                 $character->characterClasses()->sync([$characterClass->getKey()]);
@@ -451,7 +449,6 @@ class SeedCharacterReviewFixturesCommand extends Command
                 'adventures' => $this->pseudoAdventure(9),
                 'manual_adventures_count' => 12,
                 'manual_faction_rank' => 2,
-                'manual_total_downtime_seconds' => 14400,
             ],
             [
                 'name' => 'Fixture 21 - Gemischtes Tracking (Pseudo + Real)',
@@ -484,7 +481,6 @@ class SeedCharacterReviewFixturesCommand extends Command
                 'adventures' => $this->pseudoAdventure(20),
                 'manual_adventures_count' => 35,
                 'manual_faction_rank' => 5,
-                'manual_total_downtime_seconds' => 108000,
             ],
             [
                 'name' => 'Fixture 23 - Token sichtbar (Abenteuer-Tracking)',

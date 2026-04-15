@@ -8,11 +8,10 @@ import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
-import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
-import { levelFromAvailableBubbles } from '@/helper/levelProgression'
+import { calculateLevel } from '@/helper/calculateLevel'
 import AppLayout from '@/layouts/app-layout'
 import { cn } from '@/lib/utils'
-import { Character, PageProps, User } from '@/types'
+import { Adventure, Character, PageProps, User } from '@/types'
 import { CharacterClassToggle } from '@/pages/character/character-class-toggle'
 import { Head, router, useForm, usePage } from '@inertiajs/react'
 import { AlertTriangle, Archive, CheckCircle2, Clock, Coins, Droplets, ExternalLink, Gauge, MapPin, Pencil, Plus, Shield, Sparkles, StickyNote, UserX, XCircle } from 'lucide-react'
@@ -48,9 +47,7 @@ type AdminCharacter = Pick<
   | 'avatar'
   | 'simplified_tracking'
 > & {
-  total_adventure_duration?: number | null
-  adventure_additional_bubbles_count?: number | null
-  pseudo_adventures_count?: number | null
+  adventures: Adventure[]
   dndbeyond_character_id?: number | null
   has_legacy_approval?: boolean
   is_first_submission?: boolean
@@ -69,38 +66,7 @@ type AdminCharacter = Pick<
 }
 
 const resolveApprovalLevel = (character: AdminCharacter): number => {
-  if (character.is_filler) {
-    return 3
-  }
-
-  const totalAdventureDuration = Number(character.total_adventure_duration ?? 0)
-  const normalizedAdventureDuration = Number.isFinite(totalAdventureDuration) ? totalAdventureDuration : 0
-  const additionalAdventureBubbles = Number(character.adventure_additional_bubbles_count ?? 0)
-  const normalizedAdditionalAdventureBubbles = Number.isFinite(additionalAdventureBubbles) ? additionalAdventureBubbles : 0
-  const progressionUsesBubbleAdjustments = character.simplified_tracking !== true
-    && Number(character.pseudo_adventures_count ?? 0) === 0
-  const dmBubbles = progressionUsesBubbleAdjustments
-    ? Number(character.dm_bubbles ?? 0)
-    : 0
-  const normalizedDmBubbles = Number.isFinite(dmBubbles) ? dmBubbles : 0
-  const bubbleShopSpend = progressionUsesBubbleAdjustments
-    ? Number(character.bubble_shop_spend ?? 0)
-    : 0
-  const normalizedBubbleShopSpend = Number.isFinite(bubbleShopSpend) ? bubbleShopSpend : 0
-
-  const hasPseudo = Number(character.pseudo_adventures_count ?? 0) > 0
-  const bubblesFromAdventures = Math.floor(normalizedAdventureDuration / 10800) + normalizedAdditionalAdventureBubbles
-  const availableBubbles = Math.max(
-    0,
-    bubblesFromAdventures
-      + normalizedDmBubbles
-      // Pseudo-adventures encode the level directly via target_level — start_tier
-      // is already accounted for in that stored value and must not be added again.
-      + (hasPseudo ? 0 : additionalBubblesForStartTier(character.start_tier))
-      - normalizedBubbleShopSpend,
-  )
-
-  return levelFromAvailableBubbles(availableBubbles)
+  return calculateLevel(character)
 }
 
 const resolveApprovalTier = (character: AdminCharacter): string => {

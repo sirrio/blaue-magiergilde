@@ -274,15 +274,10 @@ class CharacterApprovalController extends Controller
     {
         return Character::query()
             ->without(['allies', 'downtimes', 'characterClasses'])
-            ->withCount([
-                'room',
-                'adventures as adventure_additional_bubbles_count' => fn (Builder $adventureQuery) => $adventureQuery
-                    ->where('has_additional_bubble', true),
-                'adventures as pseudo_adventures_count' => fn (Builder $adventureQuery) => $adventureQuery
-                    ->where('is_pseudo', true),
-            ])
-            ->withSum('adventures as total_adventure_duration', 'duration')
+            ->withCount(['room'])
             ->with([
+                'adventures' => fn ($query) => $query
+                    ->select(['id', 'character_id', 'start_date', 'duration', 'is_pseudo', 'has_additional_bubble', 'target_level', 'target_bubbles']),
                 'user' => fn ($query) => $query
                     ->select(['id', 'name', 'discord_id', 'discord_username', 'discord_display_name', 'avatar'])
                     ->withCount([
