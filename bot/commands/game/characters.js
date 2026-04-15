@@ -283,6 +283,8 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const manualFactionRank = nullableInt(character.manual_faction_rank);
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
+    const earnedBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0) + (bubbleAdjustmentsCount ? additionalBubblesForStartTier(character.start_tier) : 0);
+    const isBubbleOverspent = bubbleAdjustmentsCount && safeInt(character.bubble_shop_spend) > earnedBubbles;
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
     const inCurrent = calculateBubblesInCurrentLevel(character, level);
     const toNext = Math.max(0, toNextTotal - inCurrent);
@@ -326,7 +328,9 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
             { name: 'Progress', value: isMaxLevel
                 ? `${buildProgressBar(1, 1)}\nMax. Level erreicht${inCurrent > 0 ? ` (+**${inCurrent}** Bubble(s))` : ''}`
-                : `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`,
+                : isBubbleOverspent
+                    ? `${buildProgressBar(inCurrent, toNextTotal)}\n⚠️ Bubble-Shop überzogen`
+                    : `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`,
               inline: false },
             { name: 'Tracking', value: simplifiedTracking ? 'Level-Tracking' : isMixed ? 'Gemischt' : 'Abenteuer-Tracking', inline: true },
             { name: 'Adventures', value: adventuresValue, inline: true },
@@ -338,6 +342,11 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
 
     if (statusNextStep) {
         embed.addFields({ name: 'Next step', value: statusNextStep, inline: false });
+    }
+
+    const reviewNote = String(character.review_note || '').trim();
+    if (reviewNote && (character.guild_status === 'declined' || character.guild_status === 'needs_changes')) {
+        embed.addFields({ name: 'Notiz', value: reviewNote, inline: false });
     }
 
     if (!bubbleAdjustmentsCount) {
