@@ -46,7 +46,6 @@ class Character extends Model
         'private_mode' => 'boolean',
         'manual_adventures_count' => 'integer',
         'manual_faction_rank' => 'integer',
-        'manual_total_downtime_seconds' => 'integer',
     ];
 
     protected $appends = ['faction_rank'];

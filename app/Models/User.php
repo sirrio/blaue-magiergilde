@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Lab404\Impersonate\Models\Impersonate;
 
 /**
  * @property mixed $is_admin
@@ -28,7 +29,17 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Impersonate, Notifiable, SoftDeletes;
+
+    public function canImpersonate(): bool
+    {
+        return (bool) $this->is_admin;
+    }
+
+    public function canBeImpersonated(): bool
+    {
+        return ! $this->is_admin && ! $this->deleted_at;
+    }
 
     /**
      * The attributes that are mass assignable.

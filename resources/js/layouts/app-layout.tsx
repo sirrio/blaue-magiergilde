@@ -34,7 +34,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales, levelProgressionTotals } =
+  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales, levelProgressionTotals, impersonating } =
     usePage<PageProps>().props
   const t = useTranslate()
   const [localeUpdating, setLocaleUpdating] = useState(false)
@@ -121,6 +121,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       label: t('nav.system'),
       links: [
         { name: t('common.settings'), route: 'admin.settings', method: 'get' as const, icon: Settings },
+        { name: t('nav.users'), route: 'admin.users', method: 'get' as const, icon: Users },
       ],
     },
   ]
@@ -563,6 +564,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {t('profile.saveTrackingDefault')}
           </ModalAction>
         </Modal>
+        {impersonating && (
+          <div className="bg-warning/15 border-b border-warning/30 px-4 py-2 text-sm text-warning-content/90">
+            <div className="container mx-auto flex max-w-7xl items-center justify-between gap-3">
+              <span>
+                <strong>Impersonation aktiv:</strong> Du siehst die App als <strong>{auth.user?.name}</strong> (Admin: {impersonating.name})
+              </span>
+              <button
+                className="btn btn-warning btn-xs"
+                onClick={() => router.post(route('impersonate.leave'))}
+              >
+                Zurück zu {impersonating.name}
+              </button>
+            </div>
+          </div>
+        )}
         {!discordConnected && (
           <div className="container mx-auto max-w-5xl px-4 pt-4">
             <div className="alert alert-warning">

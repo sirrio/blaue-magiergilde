@@ -12,9 +12,9 @@ class SetQuickLevel
 {
     public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
 
-    public function handle(Character $character, int $level): array
+    public function handle(Character $character, int $level, int $bubblesInLevel = 0): array
     {
-        return DB::transaction(function () use ($character, $level): array {
+        return DB::transaction(function () use ($character, $level, $bubblesInLevel): array {
             $activeVersionId = LevelProgression::activeVersionId();
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
             $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
@@ -96,10 +96,18 @@ class SetQuickLevel
                 return ['ok' => true];
             }
 
+            // target_bubbles = level floor + any explicitly chosen bubbles-in-level.
+            // dm, start_tier and shop-spend are NOT added: in the new system those
+            // adjustments are ignored for pseudo-chars.
+            $maxBubblesInLevel = max(0, LevelProgression::bubblesRequiredForLevel(min(20, $level + 1)) - LevelProgression::bubblesRequiredForLevel($level));
+            $clampedBubblesInLevel = max(0, min($bubblesInLevel, $maxBubblesInLevel - 1));
+            $targetBubbles = LevelProgression::bubblesRequiredForLevel($level) + $clampedBubblesInLevel;
+
             if ($editablePseudo) {
                 $editablePseudo->duration = 0;
                 $editablePseudo->has_additional_bubble = false;
                 $editablePseudo->target_level = $level;
+                $editablePseudo->target_bubbles = $targetBubbles;
                 $editablePseudo->progression_version_id = $activeVersionId;
                 $editablePseudo->save();
             } else {
@@ -109,6 +117,7 @@ class SetQuickLevel
                 $adventure->has_additional_bubble = false;
                 $adventure->is_pseudo = true;
                 $adventure->target_level = $level;
+                $adventure->target_bubbles = $targetBubbles;
                 $adventure->progression_version_id = $activeVersionId;
                 $adventure->character_id = $character->id;
                 $adventure->title = 'Level tracking adjustment';

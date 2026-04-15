@@ -5,7 +5,7 @@ const {
     calculateMinAllowedLevel,
     calculateRequiredAdventureBubbles,
 } = require('./utils/quickMode');
-const { activeLevelProgressionVersionId, ensureLevelProgressionLoaded } = require('./utils/levelProgression');
+const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('./utils/levelProgression');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -324,10 +324,10 @@ async function listCharactersForDiscord(discordUser) {
                 c.bubble_shop_spend,
                 c.manual_adventures_count,
                 c.manual_faction_rank,
-                c.manual_total_downtime_seconds,
                 c.is_filler,
                 c.guild_status,
                 c.registration_note,
+                c.review_note,
                 c.simplified_tracking,
                 c.avatar_masked,
                 c.private_mode,
@@ -335,6 +335,7 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
+                COALESCE(a.has_real_adventure, 0) AS has_real_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -350,16 +351,20 @@ async function listCharactersForDiscord(discordUser) {
                             WHEN lp.id IS NULL THEN
                                 FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
                             WHEN a.id = lp.id THEN
-                                COALESCE(lprog.required_bubbles, 0)
+                                -- target_bubbles stores the exact available-bubble count at pseudo-creation
+                                -- time (preserving fractional progress).  Fall back to the level-floor via
+                                -- level_progressions for rows that pre-date the column.
+                                COALESCE(lp.target_bubbles, lprog.required_bubbles, 0)
                             WHEN a.is_pseudo = 0 AND (a.start_date > lp.start_date OR (a.start_date = lp.start_date AND a.id > lp.id)) THEN
                                 FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
                             ELSE 0
                         END
                     ) AS adventure_bubbles,
-                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
+                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure,
+                    MAX(CASE WHEN a.is_pseudo = 0 THEN 1 ELSE 0 END) AS has_real_adventure
                 FROM adventures a
                 LEFT JOIN (
-                    SELECT character_id, id, start_date, target_level,
+                    SELECT character_id, id, start_date, target_level, target_bubbles,
                            ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY start_date DESC, id DESC) AS rn
                     FROM adventures
                     WHERE deleted_at IS NULL AND is_pseudo = 1
@@ -491,10 +496,10 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.bubble_shop_spend,
                 c.manual_adventures_count,
                 c.manual_faction_rank,
-                c.manual_total_downtime_seconds,
                 c.is_filler,
                 c.guild_status,
                 c.registration_note,
+                c.review_note,
                 c.simplified_tracking,
                 c.avatar_masked,
                 c.private_mode,
@@ -502,6 +507,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(a.adventures_count, 0) AS adventures_count,
                 COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
                 COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
+                COALESCE(a.has_real_adventure, 0) AS has_real_adventure,
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
@@ -517,16 +523,20 @@ async function findCharacterForDiscord(discordUser, characterId) {
                             WHEN lp.id IS NULL THEN
                                 FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
                             WHEN a.id = lp.id THEN
-                                COALESCE(lprog.required_bubbles, 0)
+                                -- target_bubbles stores the exact available-bubble count at pseudo-creation
+                                -- time (preserving fractional progress).  Fall back to the level-floor via
+                                -- level_progressions for rows that pre-date the column.
+                                COALESCE(lp.target_bubbles, lprog.required_bubbles, 0)
                             WHEN a.is_pseudo = 0 AND (a.start_date > lp.start_date OR (a.start_date = lp.start_date AND a.id > lp.id)) THEN
                                 FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
                             ELSE 0
                         END
                     ) AS adventure_bubbles,
-                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure
+                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure,
+                    MAX(CASE WHEN a.is_pseudo = 0 THEN 1 ELSE 0 END) AS has_real_adventure
                 FROM adventures a
                 LEFT JOIN (
-                    SELECT character_id, id, start_date, target_level,
+                    SELECT character_id, id, start_date, target_level, target_bubbles,
                            ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY start_date DESC, id DESC) AS rn
                     FROM adventures
                     WHERE deleted_at IS NULL AND is_pseudo = 1
@@ -564,7 +574,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
     return rows[0] ?? null;
 }
 
-async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel) {
+async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel, bubblesInLevel = 0) {
     await ensureLevelProgressionLoaded();
 
     const userId = await getLinkedUserIdForDiscord(discordUser);
@@ -676,6 +686,9 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
         }
 
         // Pseudo-adventures use target_level directly — no duration needed.
+        const maxBubblesInLevel = Math.max(0, bubblesRequiredForLevel(Math.min(20, level + 1)) - bubblesRequiredForLevel(level));
+        const clampedBubblesInLevel = Math.max(0, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel - 1));
+        const targetBubbles = bubblesRequiredForLevel(level) + clampedBubblesInLevel;
         const editablePseudo = latestPseudoIsLast ? latestPseudoRow : null;
         const needsPseudo = level > minAllowedLevel || latestPseudoRow;
 
@@ -691,8 +704,8 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             if (editablePseudo) {
                 const now = nowSql();
                 await connection.execute(
-                    'UPDATE adventures SET duration = 0, has_additional_bubble = 0, target_level = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
-                    [level, activeVersionId, now, editablePseudo.id],
+                    'UPDATE adventures SET duration = 0, has_additional_bubble = 0, target_level = ?, target_bubbles = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
+                    [level, targetBubbles, activeVersionId, now, editablePseudo.id],
                 );
             } else {
                 const now = nowSql();
@@ -704,6 +717,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                         has_additional_bubble,
                         is_pseudo,
                         target_level,
+                        target_bubbles,
                         progression_version_id,
                         character_id,
                         title,
@@ -712,7 +726,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                         created_at,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
                     [
                         0,
@@ -720,6 +734,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
                         0,
                         1,
                         level,
+                        targetBubbles,
                         activeVersionId,
                         characterId,
                         'Level tracking adjustment',
@@ -741,6 +756,38 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
     } finally {
         connection.release();
     }
+}
+
+async function updateCharacterManualOverridesForDiscord(discordUser, characterId, { adventuresCount, factionRank }) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) throw new DiscordNotLinkedError();
+
+    const existing = await findCharacterForDiscord(discordUser, characterId);
+    if (!existing) return { ok: false, reason: 'not_found' };
+
+    const now = nowSql();
+    const updates = [];
+    const values = [];
+
+    if (typeof adventuresCount !== 'undefined') {
+        updates.push('manual_adventures_count = ?');
+        values.push(adventuresCount !== null ? Math.max(0, Math.floor(Number(adventuresCount))) : null);
+    }
+    if (typeof factionRank !== 'undefined') {
+        updates.push('manual_faction_rank = ?');
+        values.push(factionRank !== null ? Math.max(0, Math.floor(Number(factionRank))) : null);
+    }
+    if (updates.length === 0) return { ok: true };
+
+    updates.push('updated_at = ?');
+    values.push(now, characterId, userId);
+
+    await db.execute(
+        `UPDATE characters SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
+        values,
+    );
+
+    return { ok: true };
 }
 
 async function createCharacterForDiscord(
@@ -1900,6 +1947,7 @@ module.exports = {
     getCharacterSubmissionStateForDiscord,
     findCharacterForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateCharacterManualOverridesForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,

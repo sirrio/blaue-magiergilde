@@ -3,7 +3,7 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
-const { levelFromAvailableBubbles } = require('./levelProgression');
+const { bubblesRequiredForLevel, levelFromAvailableBubbles } = require('./levelProgression');
 
 function additionalBubblesForStartTier(startTier) {
     switch (String(startTier || '').toLowerCase()) {
@@ -21,17 +21,31 @@ function countsBubbleAdjustmentsForProgression(character) {
     return !character.simplified_tracking && !safeInt(character.has_pseudo_adventure);
 }
 
-function calculateLevel(character) {
-    const isFiller = Boolean(character.is_filler);
-    if (isFiller) return 3;
+function calculateAvailableBubbles(character) {
+    if (character.is_filler) return 0;
 
     const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
     const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    const additional = additionalBubblesForStartTier(character.start_tier);
+    // Pseudo-adventures encode the level directly via target_level — start_tier
+    // is already accounted for in that stored value and must not be added again.
+    const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
     const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
 
-    const effective = Math.max(0, bubbles + additional - spend);
-    return levelFromAvailableBubbles(effective);
+    return Math.max(0, bubbles + additional - spend);
+}
+
+function calculateBubblesInCurrentLevel(character, level) {
+    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
+    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
+    const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
+    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
+    const currentTotal = bubblesRequiredForLevel(level) - additional;
+    return Math.max(0, bubbles - currentTotal - spend);
+}
+
+function calculateLevel(character) {
+    if (character.is_filler) return 3;
+    return levelFromAvailableBubbles(calculateAvailableBubbles(character));
 }
 
 function calculateTierFromLevel(level) {
@@ -43,6 +57,7 @@ function calculateTierFromLevel(level) {
 
 module.exports = {
     additionalBubblesForStartTier,
+    calculateBubblesInCurrentLevel,
     calculateLevel,
     calculateTierFromLevel,
     countsBubbleAdjustmentsForProgression,

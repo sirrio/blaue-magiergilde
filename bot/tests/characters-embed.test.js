@@ -38,7 +38,8 @@ assert.equal(embedData.url, 'https://example.test/characters/42');
 assert.equal(embedData.description, '[Open sheet](https://www.dndbeyond.com/characters/42)');
 
 const nextStepField = embedData.fields.find((field) => field.name === 'Next step');
-assert.equal(nextStepField?.value, 'Für die Magiergilde genehmigt.');
+// approved status has no "Next step"
+assert.equal(nextStepField, undefined);
 
 const draftEmbed = buildCharacterEmbed({ ...character, guild_status: 'draft' }, { thumbnailUrlOrAttachment: null }).toJSON();
 const draftNextStep = draftEmbed.fields.find((field) => field.name === 'Next step');
@@ -51,10 +52,10 @@ const simpleModeEmbed = buildCharacterEmbed({
     faction: 'bibliothekare',
     adventures_count: 12,
     manual_adventures_count: 9,
+    adventure_bubbles: 20,
     faction_downtime: 360000,
     total_downtime: 400000,
     manual_faction_rank: 4,
-    manual_total_downtime_seconds: 428800,
 }, { thumbnailUrlOrAttachment: null }).toJSON();
 
 const simpleModeAdventures = simpleModeEmbed.fields.find((field) => field.name === 'Adventures');
@@ -64,8 +65,8 @@ const simpleModeProgress = simpleModeEmbed.fields.find((field) => field.name ===
 
 assert.equal(simpleModeAdventures?.value.includes('Played: **9**'), true);
 assert.equal(simpleModeFactions?.value.includes('Level: **4**'), true);
-assert.equal(simpleModeDowntime?.value.includes('Total: **119h 6m**'), true);
-assert.equal(simpleModeDowntime?.value.includes('Remaining: **8h 0m**'), true);
+assert.equal(simpleModeDowntime?.value.includes('Total: **160h 0m**'), true);
+assert.equal(simpleModeDowntime?.value.includes('Remaining: **48h 53m**'), true);
 assert.equal(simpleModeProgress?.value.includes('Remaining: **1** Bubble(s)'), true);
 
 if (originalBaseUrl === undefined) {

@@ -75,7 +75,6 @@ module.exports = {
         nextStepPending: 'Waiting for Magiergilde review.',
         nextStepNeedsChanges: 'Apply the requested changes, then register the character again.',
         nextStepDeclined: 'Review declined. Check the review note before submitting again.',
-        nextStepApproved: 'Approved for Magiergilde.',
         nextStepRetired: 'Retired.',
         manageTitle: 'Manage character',
         manageBasic: 'Name/Link/Notes',

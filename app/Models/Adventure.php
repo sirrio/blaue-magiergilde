@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool $is_pseudo
  * @property mixed $notes
  * @property int|null $target_level
+ * @property int|null $target_bubbles
  * @property int|null $progression_version_id
  */
 class Adventure extends Model
@@ -33,6 +34,7 @@ class Adventure extends Model
         'deleted_by_character' => 'boolean',
         'is_pseudo' => 'boolean',
         'target_level' => 'integer',
+        'target_bubbles' => 'integer',
         'progression_version_id' => 'integer',
     ];
 

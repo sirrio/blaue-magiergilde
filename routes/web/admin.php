@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DiscordBackupSettingsController;
 use App\Http\Controllers\Admin\DiscordBotSettingsController;
 use App\Http\Controllers\Admin\DiscordLinePostController;
 use App\Http\Controllers\Admin\GameSettingsController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\LegacyCharacterApprovalImportController;
 use App\Http\Controllers\Admin\LevelProgressionController;
 use App\Http\Controllers\Admin\SourceController;
@@ -77,4 +78,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('/admin/games', [DiscordBotSettingsController::class, 'update'])->name('admin.games.update');
     Route::post('/admin/games/scan', [GameSettingsController::class, 'scan'])->name('admin.games.scan');
 
+    Route::get('/admin/users', [ImpersonationController::class, 'index'])->name('admin.users');
+    Route::post('/admin/users/{user}/impersonate', [ImpersonationController::class, 'take'])->name('admin.impersonate.take');
+
 });
+
+// Leave impersonation — accessible even without admin middleware (the impersonated user is not an admin)
+Route::middleware(['auth'])->post('/impersonate/leave', [ImpersonationController::class, 'leave'])->name('impersonate.leave');

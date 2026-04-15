@@ -28,12 +28,6 @@ class CharacterManualOverridesController extends Controller
                 : null;
         }
 
-        if ($request->exists('manual_total_downtime_enabled')) {
-            $character->manual_total_downtime_seconds = $request->boolean('manual_total_downtime_enabled')
-                ? $request->integer('manual_total_downtime_seconds')
-                : null;
-        }
-
         $character->save();
 
         return back();

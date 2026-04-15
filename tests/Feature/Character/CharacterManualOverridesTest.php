@@ -20,8 +20,6 @@ it('stores manual character overrides for the owner', function () {
         'manual_adventures_count' => 9,
         'manual_faction_rank_enabled' => true,
         'manual_faction_rank' => 4,
-        'manual_total_downtime_enabled' => true,
-        'manual_total_downtime_seconds' => 28800,
     ]);
 
     $response->assertRedirect();
@@ -29,8 +27,7 @@ it('stores manual character overrides for the owner', function () {
     $character->refresh();
 
     expect($character->manual_adventures_count)->toBe(9)
-        ->and($character->manual_faction_rank)->toBe(4)
-        ->and($character->manual_total_downtime_seconds)->toBe(28800);
+        ->and($character->manual_faction_rank)->toBe(4);
 });
 
 it('clears manual character overrides when disabled', function () {
@@ -38,7 +35,6 @@ it('clears manual character overrides when disabled', function () {
     $character = Character::factory()->for($user)->create([
         'manual_adventures_count' => 6,
         'manual_faction_rank' => 5,
-        'manual_total_downtime_seconds' => 14400,
     ]);
 
     $response = $this->actingAs($user)->patch(route('characters.manual-overrides', $character), [
@@ -46,8 +42,6 @@ it('clears manual character overrides when disabled', function () {
         'manual_adventures_count' => 0,
         'manual_faction_rank_enabled' => false,
         'manual_faction_rank' => 0,
-        'manual_total_downtime_enabled' => false,
-        'manual_total_downtime_seconds' => 0,
     ]);
 
     $response->assertRedirect();
@@ -55,8 +49,7 @@ it('clears manual character overrides when disabled', function () {
     $character->refresh();
 
     expect($character->manual_adventures_count)->toBeNull()
-        ->and($character->manual_faction_rank)->toBeNull()
-        ->and($character->manual_total_downtime_seconds)->toBeNull();
+        ->and($character->manual_faction_rank)->toBeNull();
 });
 
 it('forbids updating manual character overrides on foreign characters', function () {
@@ -69,8 +62,6 @@ it('forbids updating manual character overrides on foreign characters', function
         'manual_adventures_count' => 3,
         'manual_faction_rank_enabled' => true,
         'manual_faction_rank' => 3,
-        'manual_total_downtime_enabled' => true,
-        'manual_total_downtime_seconds' => 21600,
     ]);
 
     $response->assertForbidden();

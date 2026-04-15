@@ -102,12 +102,15 @@ export default function Index({ characters, guildCharacters }: { characters: Cha
     if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
     return Boolean(char.is_filler)
   }).length
-  const activeHighTierCount = characters.filter((char) => {
-    if (char.deleted_at) return false
-    if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
-    if (char.is_filler) return false
-    return calculateTier(char) === 'ht'
-  }).length
+  const activeHighTierCount = Math.min(
+    2,
+    characters.filter((char) => {
+      if (char.deleted_at) return false
+      if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false
+      if (char.is_filler) return false
+      return calculateTier(char) === 'ht'
+    }).length,
+  )
   const activeEpicCharacterCount = characters.filter((char) => {
     if (char.deleted_at) return false
     if (!['approved', 'pending'].includes(char.guild_status ?? 'pending')) return false

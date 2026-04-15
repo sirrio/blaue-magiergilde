@@ -1,6 +1,6 @@
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { calculateLevel } from '@/helper/calculateLevel'
-import { clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
+import { bubblesRequiredForLevel, bubblesRequiredForNextLevel, clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
 import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
 import { Character, PageProps } from '@/types'
@@ -8,6 +8,7 @@ import { useForm, usePage } from '@inertiajs/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Gauge } from 'lucide-react'
+import { Droplets } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
 const MAX_LEVEL = 20
@@ -36,12 +37,19 @@ const SetCharacterLevelModal = ({
   const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const initialLevel = clampLevel(calculateLevel(character))
-  const { data, setData, post, processing } = useForm({ level: initialLevel })
+  const initialBubblesInLevel = (() => {
+    const pseudo = [...character.adventures].sort((a, b) => {
+      const d = String(b.start_date).localeCompare(String(a.start_date))
+      return d !== 0 ? d : b.id - a.id
+    }).find(a => a.is_pseudo) ?? null
+    if (!pseudo || pseudo.target_bubbles == null || pseudo.target_level == null) return 0
+    return Math.max(0, pseudo.target_bubbles - bubblesRequiredForLevel(pseudo.target_level))
+  })()
+  const { data, setData, post, processing } = useForm({ level: initialLevel, bubbles_in_level: initialBubblesInLevel })
   const [isOpen, setIsOpen] = useState(false)
   const [hoveredLevel, setHoveredLevel] = useState<number | null>(null)
   const targetLevel = clampLevel(Number.isFinite(Number(data.level)) ? Number(data.level) : initialLevel)
   const levelDelta = targetLevel - initialLevel
-  const hasChanges = levelDelta !== 0
   const adventuresSorted = [...character.adventures].sort((a, b) => {
     const dateOrder = String(b.start_date).localeCompare(String(a.start_date))
     if (dateOrder !== 0) {
@@ -76,14 +84,22 @@ const SetCharacterLevelModal = ({
   )
   const minSelectableLevel = character.is_filler ? 1 : minAllowedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
+  const bubblesForTargetLevel = bubblesRequiredForNextLevel(targetLevel)
+  const canSetBubbles = targetLevel > minSelectableLevel && targetLevel < 20
+  const hasChanges = levelDelta !== 0 || (canSetBubbles && data.bubbles_in_level !== (levelDelta === 0 ? initialBubblesInLevel : 0))
 
   useEffect(() => {
     if (!isOpen) {
       return
     }
 
-    setData('level', Math.max(initialLevel, minSelectableLevel))
-  }, [initialLevel, isOpen, minSelectableLevel, setData])
+    const newLevel = Math.max(initialLevel, minSelectableLevel)
+    setData(prev => ({
+      ...prev,
+      level: newLevel,
+      bubbles_in_level: newLevel === initialLevel ? initialBubblesInLevel : 0,
+    }))
+  }, [initialLevel, initialBubblesInLevel, isOpen, minSelectableLevel, setData])
 
   useEffect(() => {
     if (!isOpen) {
@@ -92,7 +108,12 @@ const SetCharacterLevelModal = ({
   }, [isOpen])
 
   const setLevel = (value: number) => {
-    setData('level', clampLevel(value))
+    const clamped = clampLevel(value)
+    setData(prev => ({
+      ...prev,
+      level: clamped,
+      bubbles_in_level: clamped === initialLevel ? initialBubblesInLevel : 0,
+    }))
   }
 
   const handleSubmit = () => {
@@ -180,6 +201,37 @@ const SetCharacterLevelModal = ({
               })}
             </div>
           </div>
+          {canSetBubbles && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-base-content/50">
+                {t('characters.selectBubblesInLevel')}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: bubblesForTargetLevel }, (_, i) => {
+                  const bubbleIndex = i + 1
+                  const isSelected = bubbleIndex <= data.bubbles_in_level
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={processing}
+                      onClick={() => setData('bubbles_in_level', data.bubbles_in_level === bubbleIndex ? bubbleIndex - 1 : bubbleIndex)}
+                      className={cn(
+                        'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                        isSelected
+                          ? 'text-primary'
+                          : 'text-base-content/25 hover:text-base-content/50',
+                      )}
+                      title={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
+                    >
+                      <Droplets size={14} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {errors.level ? <p className="text-xs text-error">{errors.level}</p> : null}
 
           <div className="rounded-box border border-warning/30 bg-warning/10 p-3 text-xs text-warning">

@@ -23,7 +23,7 @@ class QuickLevelController extends Controller
             ]);
         }
 
-        $result = $this->setQuickLevel->handle($character, $request->integer('level'));
+        $result = $this->setQuickLevel->handle($character, $request->integer('level'), $request->integer('bubbles_in_level', 0));
 
         if (! $result['ok']) {
             $minLevel = $result['minLevel'] ?? null;

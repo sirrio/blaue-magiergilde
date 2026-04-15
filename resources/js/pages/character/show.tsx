@@ -13,16 +13,16 @@ import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import AppLayout from '@/layouts/app-layout'
 import { useTranslate } from '@/lib/i18n'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
-import { calculateBubblesToNextLevel } from '@/helper/calculateBubblesToNextLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
 import { calculateLevel } from '@/helper/calculateLevel'
+import { bubblesRequiredForLevel } from '@/helper/levelProgression'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { calculateTier } from '@/helper/calculateTier'
-import { usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
+import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { Progress } from '@/components/ui/progress'
 import { Character, Ally, PageProps } from '@/types'
@@ -156,9 +156,10 @@ export default function Show({
   const level = calculateLevel(character)
   const tier = calculateTier(character)
   const classString = calculateClassString(character)
-  const bubblesToNextLevel = calculateBubblesToNextLevel(character)
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
+  const isMaxLevel = level >= 20 || progressMax === 0
+  const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
   const statusHint = getCharacterStatusHint(guildStatus, t)
@@ -216,6 +217,17 @@ export default function Show({
       return (aDate - bDate) * direction
     })
   }, [character.adventures, adventureSortDir])
+
+  const supersededAdventureIds = useMemo(() => {
+    const chronological = [...character.adventures].sort((a, b) => {
+      const aDate = new Date(a.start_date).getTime()
+      const bDate = new Date(b.start_date).getTime()
+      return aDate !== bDate ? aDate - bDate : a.id - b.id
+    })
+    const lastPseudoIdx = chronological.reduceRight((found, adv, i) => found === -1 && adv.is_pseudo ? i : found, -1)
+    if (lastPseudoIdx === -1) return new Set<number>()
+    return new Set(chronological.slice(0, lastPseudoIdx).filter(a => !a.is_pseudo).map(a => a.id))
+  }, [character.adventures])
 
   const sortedDowntimes = useMemo(() => {
     const direction = downtimeSortDir === 'desc' ? -1 : 1
@@ -335,16 +347,9 @@ export default function Show({
   const realAdventureCount = character.adventures.length - pseudoAdventureCount
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
-  const manualTotalDowntimeSeconds = character.manual_total_downtime_seconds ?? null
-  const hasDerivedRemainingDowntime = !usesManualDerivedValues || manualTotalDowntimeSeconds !== null
-  const totalDowntimeDisplay = usesManualDerivedValues
-    ? (manualTotalDowntimeSeconds === null ? t('characters.autoDisabledShort') : secondsToHourMinuteString(manualTotalDowntimeSeconds))
-    : secondsToHourMinuteString(totalDowntimeDuration)
-  const remainingDowntimeDisplay = usesManualDerivedValues
-    ? (hasDerivedRemainingDowntime ? secondsToHourMinuteString(remainingDowntimeDuration) : '?')
-    : secondsToHourMinuteString(remainingDowntimeDuration)
+  const totalDowntimeDisplay = secondsToHourMinuteString(totalDowntimeDuration)
+  const remainingDowntimeDisplay = secondsToHourMinuteString(remainingDowntimeDuration)
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
-  const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
   const statusIcon = guildStatus === 'approved'
@@ -427,11 +432,23 @@ export default function Show({
               </div>
               {statusSummary ? <p className="text-xs text-base-content/70">{statusSummary}</p> : null}
               <div className="space-y-1">
-                <Progress className="h-2 w-full" value={progressValue} max={progressMax} />
-                <p className="flex items-center justify-end gap-1 text-xs">
-                  <span className="font-semibold">{bubblesToNextLevel}</span>
-                  <Droplets size={13} />
-                  <span>{t('characters.toNextLevel')}</span>
+                <Progress className="h-2 w-full" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
+                <p className="flex items-center justify-end gap-1 text-xs text-base-content/70">
+                  {isMaxLevel ? (
+                    <span className="inline-flex flex-wrap items-center gap-x-1 text-base-content/45">
+                      <span className="whitespace-nowrap">{t('characters.maxLevelReached')}</span>
+                      {progressValue > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-base-content/35">
+                          (+{progressValue} <Droplets size={10} />)
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="font-semibold">{progressValue}/{progressMax}</span>
+                      <Droplets size={13} />
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -443,6 +460,15 @@ export default function Show({
             <InfoBox>
               <InfoBoxTitle>
                 <Swords size={15} /> {t('characters.adventures')}
+                {!bubbleAdjustmentsCount ? (
+                  <span
+                    className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                    data-tip={t('characters.bubbleShopNotCountedHint')}
+                    aria-label={t('characters.bubbleShopNotCountedHint')}
+                  >
+                    <AlertTriangle size={11} />
+                  </span>
+                ) : null}
               </InfoBoxTitle>
               <InfoBoxLine>
                 {t('characters.played')}:{' '}
@@ -514,41 +540,28 @@ export default function Show({
               </InfoBoxTitle>
               <InfoBoxLine>
                 {t('characters.total')}:{' '}
-                {usesManualDerivedValues ? (
-                  <span className="inline-flex items-center gap-1 leading-none align-middle">
-                    <span className={manualTotalDowntimeSeconds === null ? 'text-warning' : ''}>
-                      {totalDowntimeDisplay}
-                    </span>
-                    <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        modifier="square"
-                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
-                        aria-label={t('characters.manualTotalDowntimeLabel')}
-                        title={downtimeDisabledReason}
-                      >
-                        <Pencil size={10} />
-                      </Button>
-                    </CharacterManualOverrideModal>
-                  </span>
-                ) : (
-                  totalDowntimeDisplay
-                )}
+                {totalDowntimeDisplay}
               </InfoBoxLine>
               <InfoBoxLine>Faction: {secondsToHourMinuteString(factionDowntimeDuration)}</InfoBoxLine>
               <InfoBoxLine>{t('characters.other')}: {secondsToHourMinuteString(otherDowntimeDuration)}</InfoBoxLine>
               <InfoBoxLine className="font-semibold">
                 {t('characters.remaining')}:{' '}
-                <span className={usesManualDerivedValues && !hasDerivedRemainingDowntime ? 'text-warning' : ''}>
-                  {remainingDowntimeDisplay}
-                </span>
+                {remainingDowntimeDisplay}
               </InfoBoxLine>
             </InfoBox>
             {!character.is_filler && (
               <InfoBox>
                 <InfoBoxTitle>
                   <Crown size={15} /> {t('characters.gameMaster')}
+                  {!bubbleAdjustmentsCount ? (
+                    <span
+                      className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                      data-tip={t('characters.gmBubblesNotCountedHint')}
+                      aria-label={t('characters.gmBubblesNotCountedHint')}
+                    >
+                      <AlertTriangle size={11} />
+                    </span>
+                  ) : null}
                 </InfoBoxTitle>
                 <InfoBoxLine>
                   {t('characters.bubbles')}: {character.dm_bubbles}
@@ -650,14 +663,22 @@ export default function Show({
                           const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                           const gameMasterName = adv.game_master?.trim() || '-'
                           const adventureTitle = adv.title || 'Adventure'
-                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
-                            ? t('characters.levelTrackingAnchorWithLevel', {
-                                level: adv.target_level,
-                              })
-                            : t('characters.levelTrackingAnchor')
+                          const pseudoBubblesInLevel =
+                            adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
+                              ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
+                              : 0
+                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
+                            <>
+                              {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
+                              {pseudoBubblesInLevel > 0 && (
+                                <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">(+{pseudoBubblesInLevel} <Droplets size={11} />)</span>
+                              )}
+                            </>
+                          ) : t('characters.levelTrackingAnchor')
+                          const isSuperseded = supersededAdventureIds.has(adv.id)
                           return (
                             <ListRow key={adv.id} className="block">
-                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
+                            <div className={`space-y-3 rounded-box border bg-base-100 p-3.5 ${isSuperseded ? 'border-base-200 opacity-50' : 'border-base-200'}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex min-w-0 items-center gap-1">
@@ -679,6 +700,9 @@ export default function Show({
                                     <p className="text-xs text-base-content/50">{t('characters.playedWith')}: {participantSummary}</p>
                                   ) : null}
                                   <p className="text-xs text-base-content/50">DM: {gameMasterName}</p>
+                                  {isSuperseded && (
+                                    <p className="mt-0.5 text-xs text-base-content/40 italic">{t('characters.supersededByPseudo')}</p>
+                                  )}
                                 </div>
                                 <span className="badge badge-ghost badge-sm shrink-0 font-normal">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
@@ -757,15 +781,23 @@ export default function Show({
                               const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                               const gameMasterName = adv.game_master?.trim() || '-'
                               const adventureTitle = adv.title || 'Adventure'
-                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level
-                                ? t('characters.levelTrackingAnchorWithLevel', {
-                                    level: adv.target_level,
-                                  })
-                                : t('characters.levelTrackingAnchor')
+                              const pseudoBubblesInLevel =
+                                adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
+                                  ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
+                                  : 0
+                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
+                                <>
+                                  {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
+                                  {pseudoBubblesInLevel > 0 && (
+                                    <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">(+{pseudoBubblesInLevel} <Droplets size={11} />)</span>
+                                  )}
+                                </>
+                              ) : t('characters.levelTrackingAnchor')
+                              const isSuperseded = supersededAdventureIds.has(adv.id)
                               return (
                               <ListRow
                                 key={adv.id}
-                                className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
+                                className={`grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4 ${isSuperseded ? 'opacity-50' : ''}`}
                               >
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -790,6 +822,9 @@ export default function Show({
                                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                                     <span>DM: {gameMasterName}</span>
                                     {participantSummary ? <span>{t('characters.playedWith')}: {participantSummary}</span> : null}
+                                    {isSuperseded && (
+                                      <span className="italic text-base-content/40">{t('characters.supersededByPseudo')}</span>
+                                    )}
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">

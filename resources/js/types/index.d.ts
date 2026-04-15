@@ -14,6 +14,7 @@ export interface PageProps {
   features: { games_calendar: boolean; rooms: boolean; character_status_switch: boolean }
   botChannelOverride?: { active: boolean; channel_id?: string | null }
   discordConnected: boolean
+  impersonating?: { name: string } | null
   handbookChannels?: { id: string; name: string }[]
   levelProgressionTotals?: Record<number, number>
   activeChannelId?: string | null
@@ -421,7 +422,6 @@ export interface Character {
   faction_rank?: number
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
-  manual_total_downtime_seconds?: number | null
   simplified_tracking?: boolean
   avatar_masked?: boolean
   private_mode?: boolean
@@ -517,6 +517,7 @@ export interface Adventure {
   has_additional_bubble: boolean
   is_pseudo?: boolean
   target_level?: number | null
+  target_bubbles?: number | null
   progression_version_id?: number | null
   notes: string
   game_master: string

@@ -23,6 +23,7 @@ class SetQuickLevelRequest extends FormRequest
     {
         return [
             'level' => ['required', 'integer', 'min:1', 'max:20'],
+            'bubbles_in_level' => ['sometimes', 'integer', 'min:0', 'max:19'],
         ];
     }
 }

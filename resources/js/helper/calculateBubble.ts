@@ -35,11 +35,16 @@ const calculateBubbleByAdventures = (adventures?: Adventure[]): number => {
     return sorted.reduce((sum, a) => sum + realAdventureBubbles(a), 0)
   }
 
-  // Pseudo-adventures set the level directly via target_level — their
-  // duration is irrelevant.  Only real adventures after the last pseudo
-  // add bubbles on top of the pseudo's level-equivalent bubble count.
+  // Pseudo-adventures set the level directly.  target_bubbles stores the
+  // exact available-bubble count at pseudo-creation time (including dm,
+  // start_tier and shop-spend effects baked in), which preserves any
+  // fractional progress within a level.  Fall back to the level-floor
+  // for older rows that pre-date the target_bubbles column.
   const lastPseudo = sorted[lastPseudoIndex]
-  const pseudoBubbles = bubblesRequiredForLevel(Number(lastPseudo.target_level ?? 1))
+  const pseudoBubbles =
+    lastPseudo.target_bubbles != null
+      ? Number(lastPseudo.target_bubbles)
+      : bubblesRequiredForLevel(Number(lastPseudo.target_level ?? 1))
   const realBubblesAfter = sorted
     .slice(lastPseudoIndex + 1)
     .filter((a) => !a.is_pseudo)

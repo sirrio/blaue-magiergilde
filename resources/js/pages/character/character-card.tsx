@@ -494,16 +494,9 @@ export function CharacterCard({
       : trackingModeLabel
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
-  const manualTotalDowntimeSeconds = character.manual_total_downtime_seconds ?? null
-  const hasDerivedRemainingDowntime = !usesManualDerivedValues || manualTotalDowntimeSeconds !== null
-  const totalDowntimeDisplay = usesManualDerivedValues
-    ? (manualTotalDowntimeSeconds === null ? t('characters.autoDisabledShort') : secondsToHourMinuteString(manualTotalDowntimeSeconds))
-    : formattedDowntimes.total
-  const remainingDowntimeDisplay = usesManualDerivedValues
-    ? (hasDerivedRemainingDowntime ? formattedDowntimes.remaining : '?')
-    : formattedDowntimes.remaining
+  const totalDowntimeDisplay = formattedDowntimes.total
+  const remainingDowntimeDisplay = formattedDowntimes.remaining
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
-  const downtimeDisabledReason = t('characters.downtimeSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
 
@@ -674,34 +667,39 @@ export function CharacterCard({
                       ) : null}
                     </div>
                   </div>
-                  {!simplifiedTracking ? (
-                    <>
-                      <Progress className="block h-2" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
-                      <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
-                        {isMaxLevel ? (
-                          <span className="text-base-content/45">{t('characters.maxLevelReached')}</span>
-                        ) : isBubbleOverspent ? (
-                          <span className="text-error/80">{t('characters.overspentBubbles')}</span>
-                        ) : (
-                          <span>
-                            {progressValue}/{progressMax}
+                  <Progress className="block h-2" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
+                  <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
+                    {isMaxLevel ? (
+                      <span className="inline-flex flex-wrap items-center gap-x-1 text-base-content/45">
+                        <span className="whitespace-nowrap">{t('characters.maxLevelReached')}</span>
+                        {progressValue > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-base-content/35">
+                            (+{progressValue} <Droplets size={10} />)
                           </span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <Progress className="block h-2 opacity-45" value={0} max={1} />
-                      <div className="flex min-h-4 items-center justify-end text-xs text-base-content/45">
-                        {t('characters.directlyTrackedShort')}
-                      </div>
-                    </>
-                  )}
+                        ) : null}
+                      </span>
+                    ) : isBubbleOverspent ? (
+                      <span className="text-error/80">{t('characters.overspentBubbles')}</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        {progressValue}/{progressMax} <Droplets size={11} />
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Swords size={15} /> {t('characters.adventures')}
+                      {!bubbleAdjustmentsCount ? (
+                        <span
+                          className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                          data-tip={t('characters.bubbleShopNotCountedHint')}
+                          aria-label={t('characters.bubbleShopNotCountedHint')}
+                        >
+                          <AlertTriangle size={11} />
+                        </span>
+                      ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.played')}:{' '}
@@ -771,46 +769,28 @@ export function CharacterCard({
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.total')}:{' '}
-                      {usesManualDerivedValues ? (
-                        <span className="inline-flex items-center gap-1 leading-none align-middle">
-                          <span className={manualTotalDowntimeSeconds === null ? 'text-base-content/40' : ''}>
-                            {totalDowntimeDisplay}
-                          </span>
-                          <CharacterManualOverrideModal character={character} field="totalDowntime" value={manualTotalDowntimeSeconds}>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              modifier="square"
-                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
-                              aria-label={t('characters.manualTotalDowntimeLabel')}
-                              title={downtimeDisabledReason}
-                            >
-                              <Pencil size={10} />
-                            </Button>
-                          </CharacterManualOverrideModal>
-                        </span>
-                      ) : (
-                        totalDowntimeDisplay
-                      )}
+                      {totalDowntimeDisplay}
                     </InfoBoxLine>
                     <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
                     <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
-                    {hasDerivedRemainingDowntime ? (
-                      <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
-                        <InfoBoxLine className="font-semibold cursor-help">
-                          {t('characters.remaining')}: {remainingDowntimeDisplay}
-                        </InfoBoxLine>
-                      </div>
-                    ) : (
-                      <InfoBoxLine className="font-semibold">
-                        {t('characters.remaining')}:{' '}
-                        <span className="text-warning">{remainingDowntimeDisplay}</span>
+                    <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
+                      <InfoBoxLine className="font-semibold cursor-help">
+                        {t('characters.remaining')}: {remainingDowntimeDisplay}
                       </InfoBoxLine>
-                    )}
+                    </div>
                   </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Crown size={15} /> {t('characters.gameMaster')}
+                      {!bubbleAdjustmentsCount ? (
+                        <span
+                          className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
+                          data-tip={t('characters.gmBubblesNotCountedHint')}
+                          aria-label={t('characters.gmBubblesNotCountedHint')}
+                        >
+                          <AlertTriangle size={11} />
+                        </span>
+                      ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.bubbles')}: {character.dm_bubbles}
