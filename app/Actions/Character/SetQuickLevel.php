@@ -14,7 +14,7 @@ class SetQuickLevel
 
     public function handle(Character $character, int $level, int $bubblesInLevel = 0): array
     {
-        return DB::transaction(function () use ($character, $level): array {
+        return DB::transaction(function () use ($character, $level, $bubblesInLevel): array {
             $activeVersionId = LevelProgression::activeVersionId();
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
             $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
