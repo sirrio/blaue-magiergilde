@@ -17,8 +17,9 @@ const {
     getLinkedUserLocaleForDiscord,
     getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
+    getPrivacyPolicyStatusForDiscord,
 } = require('../../appDb');
-const { replyNotLinked } = require('../../linkingUi');
+const { replyNotLinked, buildPolicyUpdateContent, buildPolicyUpdateButtons } = require('../../linkingUi');
 const {
     additionalBubblesForStartTier,
     calculateBubblesInCurrentLevel,
@@ -634,6 +635,18 @@ module.exports = {
                 return;
             }
             throw error;
+        }
+
+        const policyStatus = await getPrivacyPolicyStatusForDiscord(interaction.user);
+        if (policyStatus.needsAcceptance) {
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({
+                    content: buildPolicyUpdateContent(),
+                    embeds: [],
+                    components: [buildPolicyUpdateButtons(interaction.user.id)],
+                });
+            }
+            return;
         }
 
         if (trackingDefault === null) {

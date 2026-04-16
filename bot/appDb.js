@@ -205,7 +205,7 @@ async function getLinkedUserForDiscord(discordUser) {
     const name = pickDiscordDisplayName(discordUser);
     const avatar = pickDiscordAvatarUrl(discordUser);
 
-    const [existing] = await db.execute('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
+    const [existing] = await db.execute('SELECT id, deleted_at, locale, simplified_tracking, privacy_policy_accepted_version FROM users WHERE discord_id = ? LIMIT 1', [discordId]);
     if (existing.length > 0) {
         const userId = existing[0].id;
         const deletedAt = existing[0].deleted_at;
@@ -281,9 +281,10 @@ async function createUserForDiscord(discordUser) {
 
     const createdAt = nowSql();
     try {
+        const policyVersion = parseInt(process.env.PRIVACY_POLICY_VERSION || '20260214', 10);
         const [result] = await db.execute(
-            'INSERT INTO users (discord_id, name, avatar, simplified_tracking, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [discordId, name, avatar, null, createdAt, createdAt],
+            'INSERT INTO users (discord_id, name, avatar, simplified_tracking, privacy_policy_accepted_at, privacy_policy_accepted_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [discordId, name, avatar, null, createdAt, policyVersion, createdAt, createdAt],
         );
 
         return { created: true, userId: result.insertId };
@@ -1933,6 +1934,28 @@ async function removeHiddenBidForDiscord(discordIdentity, auctionItemId) {
     }
 }
 
+async function getPrivacyPolicyStatusForDiscord(discordUser) {
+    const discordId = String(discordUser.id);
+    const required = parseInt(process.env.PRIVACY_POLICY_VERSION || '20260214', 10);
+    const [rows] = await db.execute(
+        'SELECT privacy_policy_accepted_version FROM users WHERE discord_id = ? LIMIT 1',
+        [discordId],
+    );
+    if (rows.length === 0) return { linked: false, needsAcceptance: false };
+    const accepted = parseInt(rows[0].privacy_policy_accepted_version || '0', 10);
+    return { linked: true, needsAcceptance: accepted < required };
+}
+
+async function acceptPrivacyPolicyForDiscord(discordUser) {
+    const discordId = String(discordUser.id);
+    const version = parseInt(process.env.PRIVACY_POLICY_VERSION || '20260214', 10);
+    const now = nowSql();
+    await db.execute(
+        'UPDATE users SET privacy_policy_accepted_at = ?, privacy_policy_accepted_version = ?, updated_at = ? WHERE discord_id = ?',
+        [now, version, now, discordId],
+    );
+}
+
 module.exports = {
     DiscordNotLinkedError,
     getLinkedUserForDiscord,
@@ -1972,4 +1995,6 @@ module.exports = {
     findOpenAuctionItemForHiddenBid,
     upsertHiddenBidForDiscord,
     removeHiddenBidForDiscord,
+    getPrivacyPolicyStatusForDiscord,
+    acceptPrivacyPolicyForDiscord,
 };

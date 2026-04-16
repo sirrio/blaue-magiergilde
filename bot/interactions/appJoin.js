@@ -1,4 +1,4 @@
-const { createUserForDiscord } = require('../appDb');
+const { createUserForDiscord, acceptPrivacyPolicyForDiscord } = require('../appDb');
 const { buildJoinConfirmButtons, legalLinksLine, notLinkedContent } = require('../linkingUi');
 const { buildErrorEmbed, buildInfoEmbed, buildSuccessEmbed, buildWarningEmbed } = require('../utils/noticeEmbeds');
 const { updateManageMessage } = require('../utils/updateManageMessage');
@@ -79,6 +79,25 @@ async function handle(interaction) {
             });
         } catch (error) {
              
+            console.error(error);
+            await interaction.update({
+                content: '',
+                embeds: [buildErrorEmbed(t('linking.createFailedTitle'), t('linking.createFailedBody', { message: error.message }))],
+                components: [],
+            });
+        }
+        return true;
+    }
+
+    if (action === 'appPolicyAccept') {
+        try {
+            await acceptPrivacyPolicyForDiscord(interaction.user);
+            await interaction.update({
+                content: '',
+                embeds: [buildSuccessEmbed(t('linking.policyAcceptedTitle'), t('linking.policyAcceptedBody'))],
+                components: [],
+            });
+        } catch (error) {
             console.error(error);
             await interaction.update({
                 content: '',
