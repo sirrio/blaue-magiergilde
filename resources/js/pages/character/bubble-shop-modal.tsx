@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Modal, ModalAction, ModalContent, ModalTitle } from '@/components/ui/modal'
 import {
   CharacterBubbleShopPurchaseType,
   characterBubbleShopPurchaseTypes,
@@ -18,8 +18,8 @@ import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Droplets, ShoppingBag } from 'lucide-react'
-import React, { useEffect, useMemo, useState } from 'react'
+import { Droplets, Minus, Plus, ShoppingBag } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 type BubbleShopFormData = Record<CharacterBubbleShopPurchaseType, number>
 
@@ -45,15 +45,18 @@ export default function BubbleShopModal({
   const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const [isOpen, setIsOpen] = useState(false)
+  const wasOpenRef = useRef(false)
 
   const baseData = useMemo(() => getCharacterBubbleShopQuantities(character), [character])
   const form = useForm<BubbleShopFormData>(baseData)
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       form.setData(getCharacterBubbleShopQuantities(character))
       form.clearErrors()
     }
+
+    wasOpenRef.current = isOpen
   }, [character, form, isOpen])
 
   const structuredSpend = getCharacterBubbleShopStructuredSpend(character, form.data)
@@ -71,20 +74,26 @@ export default function BubbleShopModal({
     })
   }
 
+  const openModal = (event?: React.MouseEvent<HTMLElement>) => {
+    event?.preventDefault()
+    event?.stopPropagation()
+    setIsOpen(true)
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={() => !form.processing && setIsOpen(false)}>
-      <ModalTrigger>
-        <Button
-          size="sm"
-          className={triggerClassName ?? 'w-full justify-center gap-1'}
-          aria-label={t('characters.manageBubbleShop')}
-          title={t('characters.manageBubbleShop')}
-          onClick={() => setIsOpen(true)}
-        >
-          <ShoppingBag size={14} />
-          {showLabel ? <span className={labelClassName}>{t('characters.manageBubbleShop')}</span> : <span className="md:hidden">{t('characters.bubbleShop')}</span>}
-        </Button>
-      </ModalTrigger>
+    <>
+      <Button
+        size="sm"
+        className={triggerClassName ?? 'w-full justify-center gap-1'}
+        aria-label={t('characters.manageBubbleShop')}
+        title={t('characters.manageBubbleShop')}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={openModal}
+      >
+        <ShoppingBag size={14} />
+        {showLabel ? <span className={labelClassName}>{t('characters.manageBubbleShop')}</span> : <span className="md:hidden">{t('characters.bubbleShop')}</span>}
+      </Button>
+      <Modal isOpen={isOpen} onClose={() => !form.processing && setIsOpen(false)}>
       <ModalTitle>{t('characters.manageBubbleShop')}</ModalTitle>
       <ModalContent>
         <div className="space-y-4">
@@ -137,23 +146,41 @@ export default function BubbleShopModal({
                         </div>
                       ) : null}
                     </div>
-                    <input
-                      type="number"
-                      min={0}
-                      max={max}
-                      step={1}
-                      disabled={form.processing || isLocked}
-                      className={cn(
-                        'input input-sm w-24 text-right',
-                        isLocked && 'input-disabled',
-                      )}
-                      value={String(form.data[type])}
-                      onChange={(event) => {
-                        const raw = Number(event.target.value)
-                        const normalized = Number.isFinite(raw) ? Math.max(0, Math.min(max, Math.floor(raw))) : 0
-                        form.setData(type, normalized)
-                      }}
-                    />
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        modifier="square"
+                        disabled={form.processing || isLocked || form.data[type] <= 0}
+                        aria-label={`${label} -1`}
+                        title={`${label} -1`}
+                        onClick={() => form.setData(type, Math.max(0, form.data[type] - 1))}
+                      >
+                        <Minus size={12} />
+                      </Button>
+                      <div
+                        className={cn(
+                          'flex h-8 min-w-12 items-center justify-center rounded-md border border-base-300 bg-base-200 px-2 text-sm font-semibold tabular-nums',
+                          isLocked && 'border-base-200 bg-base-200/60 text-base-content/40',
+                        )}
+                        aria-label={`${label}: ${form.data[type]}`}
+                      >
+                        {form.data[type]}
+                      </div>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        modifier="square"
+                        disabled={form.processing || isLocked || form.data[type] >= max}
+                        aria-label={`${label} +1`}
+                        title={`${label} +1`}
+                        onClick={() => form.setData(type, Math.min(max, form.data[type] + 1))}
+                      >
+                        <Plus size={12} />
+                      </Button>
+                    </div>
                   </div>
                   {errors[type] ? <p className="mt-2 text-xs text-error">{String(errors[type])}</p> : null}
                 </div>
@@ -165,6 +192,7 @@ export default function BubbleShopModal({
       <ModalAction onClick={submit} disabled={form.processing}>
         {t('common.save')}
       </ModalAction>
-    </Modal>
+      </Modal>
+    </>
   )
 }

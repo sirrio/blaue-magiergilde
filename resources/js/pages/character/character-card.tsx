@@ -865,7 +865,7 @@ export function CharacterCard({
             ) : null}
             <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5 sm:gap-1')}>
               {canSubmitForApproval ? (
-                <div className="col-span-2 sm:col-span-4">
+                <div className="col-span-2 sm:col-span-5">
                   {submissionBlockedReason ? (
                     <div
                       className="tooltip tooltip-bottom w-full"
@@ -893,7 +893,7 @@ export function CharacterCard({
                   )}
                 </div>
               ) : (
-                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
+                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-5')}>
                   <BookOpen size={14} />
                   {t('characters.details')}
                 </Button>
