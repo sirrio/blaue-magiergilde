@@ -18,7 +18,7 @@ export interface PageProps {
   handbookChannels?: { id: string; name: string }[]
   levelProgressionTotals?: Record<number, number>
   levelProgressionTotalsByVersion?: Record<number, Record<number, number>>
-  activeLevelProgressionVersionId?: number
+  activeLevelProgressionVersionId: number
   activeChannelId?: string | null
   ziggy: Config & { location: string }
 

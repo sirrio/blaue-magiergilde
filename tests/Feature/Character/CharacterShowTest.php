@@ -20,6 +20,7 @@ it('shows the character detail page for the owner', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('character/show')
+            ->where('activeLevelProgressionVersionId', LevelProgression::activeVersionId())
             ->where('character.id', $character->id)
             ->has('guildCharacters'));
 });

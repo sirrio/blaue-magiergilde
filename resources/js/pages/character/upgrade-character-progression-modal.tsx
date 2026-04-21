@@ -31,8 +31,11 @@ const UpgradeCharacterProgressionModal = ({
 }) => {
   const t = useTranslate()
   const { errors, activeLevelProgressionVersionId } = usePage<PageProps>().props
+  if (typeof activeLevelProgressionVersionId !== 'number' || activeLevelProgressionVersionId <= 0) {
+    throw new Error('Missing active level progression version in page props.')
+  }
   const initialLevel = clampLevel(calculateLevel(character))
-  const targetVersionId = activeLevelProgressionVersionId ?? character.progression_version_id ?? 1
+  const targetVersionId = activeLevelProgressionVersionId
   const currentVersionId = character.progression_version_id ?? targetVersionId
   const manualTracking = usesManualLevelTracking(character)
   const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
