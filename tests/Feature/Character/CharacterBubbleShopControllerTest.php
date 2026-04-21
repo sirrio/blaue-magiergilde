@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\CharacterBubbleShopPurchase;
 use App\Models\User;
+use App\Support\LevelProgression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -11,9 +13,22 @@ uses(RefreshDatabase::class);
 it('updates bubble shop purchases and keeps legacy spend as offset', function () {
     $user = User::factory()->create();
     $character = Character::factory()->for($user)->create([
-        'start_tier' => 'lt',
+        'start_tier' => 'bt',
         'bubble_shop_spend' => 8,
         'bubble_shop_legacy_spend' => 8,
+        'dm_bubbles' => 0,
+        'is_filler' => false,
+        'simplified_tracking' => false,
+    ]);
+
+    $requiredAdventureBubbles = LevelProgression::bubblesRequiredForLevel(6, $character->progression_version_id) + 2 + 8;
+
+    Adventure::factory()->create([
+        'character_id' => $character->id,
+        'duration' => $requiredAdventureBubbles * 10800,
+        'has_additional_bubble' => false,
+        'is_pseudo' => false,
+        'start_date' => '2026-01-01',
     ]);
 
     $response = $this->actingAs($user)->patch(route('characters.bubble-shop', $character), [
@@ -83,6 +98,37 @@ it('blocks downtime purchases above the unlocked tier', function () {
     ]);
 
     $response->assertSessionHasErrors(['downtime']);
+});
+
+it('does not allow bubble shop spending beyond the current level progress', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+        'is_filler' => false,
+        'simplified_tracking' => false,
+    ]);
+
+    $requiredBubbles = LevelProgression::bubblesRequiredForLevel(3, $character->progression_version_id) + 1;
+
+    Adventure::factory()->create([
+        'character_id' => $character->id,
+        'duration' => $requiredBubbles * 10800,
+        'has_additional_bubble' => false,
+        'is_pseudo' => false,
+        'start_date' => '2026-01-01',
+    ]);
+
+    $response = $this->actingAs($user)->patch(route('characters.bubble-shop', $character), [
+        'skill_proficiency' => 0,
+        'rare_language' => 0,
+        'tool_or_language' => 1,
+        'downtime' => 0,
+    ]);
+
+    $response->assertSessionHasErrors(['bubble_shop']);
 });
 
 it('allows unlimited downtime purchases after et is unlocked', function () {

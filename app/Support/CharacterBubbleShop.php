@@ -72,11 +72,19 @@ class CharacterBubbleShop
 
     public function structuredSpend(Character $character): int
     {
+        return $this->structuredSpendForQuantities($character, $this->quantitiesFor($character));
+    }
+
+    /**
+     * @param  array<string, int>  $quantities
+     */
+    public function structuredSpendForQuantities(Character $character, array $quantities): int
+    {
         $definitions = $this->definitionsFor($character);
 
-        return collect($this->quantitiesFor($character))
-            ->reduce(function (int $total, int $quantity, string $type) use ($definitions): int {
-                return $total + ($quantity * ($definitions[$type]['cost'] ?? 0));
+        return collect(self::purchaseTypes())
+            ->reduce(function (int $total, string $type) use ($definitions, $quantities): int {
+                return $total + (max(0, $this->safeInt($quantities[$type] ?? 0)) * ($definitions[$type]['cost'] ?? 0));
             }, 0);
     }
 
@@ -93,6 +101,14 @@ class CharacterBubbleShop
     public function effectiveSpend(Character $character): int
     {
         return max($this->legacySpend($character), $this->structuredSpend($character));
+    }
+
+    /**
+     * @param  array<string, int>  $quantities
+     */
+    public function effectiveSpendForQuantities(Character $character, array $quantities): int
+    {
+        return max($this->legacySpend($character), $this->structuredSpendForQuantities($character, $quantities));
     }
 
     public function coveredByLegacy(Character $character): int
@@ -162,6 +178,15 @@ class CharacterBubbleShop
         return $definitions[$type]['max'];
     }
 
+    public function maxEffectiveSpendWithoutDownlevel(Character $character): ?int
+    {
+        if (! $this->progressionState->countsBubbleAdjustments($character)) {
+            return null;
+        }
+
+        return $this->effectiveSpend($character) + $this->currentBubblesInCurrentLevel($character);
+    }
+
     /**
      * @return Collection<int, CharacterBubbleShopPurchase>
      */
@@ -228,6 +253,35 @@ class CharacterBubbleShop
         );
 
         return LevelProgression::levelFromAvailableBubbles($availableBubbles, $progressionVersionId);
+    }
+
+    private function currentAvailableBubbles(Character $character): int
+    {
+        if ($character->is_filler) {
+            return 0;
+        }
+
+        $progressionVersionId = $this->progressionState->progressionVersionId($character);
+        $additionalBubbles = $this->progressionState->hasPseudoAdventures($character)
+            ? 0
+            : $this->additionalBubblesForStartTier($character->start_tier);
+
+        return max(
+            0,
+            $this->adventureBubbles($character)
+            + $this->progressionState->dmBubblesForProgression($character)
+            + $additionalBubbles
+            - $this->progressionState->bubbleShopSpendForProgression($character),
+        );
+    }
+
+    private function currentBubblesInCurrentLevel(Character $character): int
+    {
+        $progressionVersionId = $this->progressionState->progressionVersionId($character);
+        $currentLevel = $this->currentLevel($character);
+        $currentLevelFloor = LevelProgression::bubblesRequiredForLevel($currentLevel, $progressionVersionId);
+
+        return max(0, $this->currentAvailableBubbles($character) - $currentLevelFloor);
     }
 
     private function adventureBubbles(Character $character): int

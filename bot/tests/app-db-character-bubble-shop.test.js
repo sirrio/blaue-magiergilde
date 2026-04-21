@@ -38,6 +38,46 @@ const fakeDb = {
         }
 
         if (sql.includes('WHERE c.id = ?') && sql.includes('LIMIT 1')) {
+            if (scenario === 'bubble-floor') {
+                return [[{
+                    id: 42,
+                    name: 'Bubble Tester',
+                    start_tier: 'bt',
+                    version: '2024',
+                    faction: 'none',
+                    external_link: '',
+                    avatar: null,
+                    notes: null,
+                    dm_bubbles: 0,
+                    dm_coins: 0,
+                    bubble_shop_spend: 0,
+                    bubble_shop_legacy_spend: 0,
+                    bubble_shop_skill_proficiency: 0,
+                    bubble_shop_rare_language: 0,
+                    bubble_shop_tool_or_language: 0,
+                    bubble_shop_downtime: 0,
+                    progression_version_id: 1,
+                    manual_adventures_count: null,
+                    manual_faction_rank: null,
+                    is_filler: 0,
+                    guild_status: 'approved',
+                    registration_note: null,
+                    review_note: null,
+                    simplified_tracking: 0,
+                    avatar_masked: 1,
+                    private_mode: 0,
+                    has_room: 0,
+                    adventures_count: 1,
+                    adventure_bubbles: 4,
+                    has_pseudo_adventure: 0,
+                    has_real_adventure: 1,
+                    total_downtime: 0,
+                    faction_downtime: 0,
+                    other_downtime: 0,
+                    class_names: 'Wizard',
+                }]];
+            }
+
             if (scenario === 'invalid') {
                 return [[{
                     id: 42,
@@ -184,6 +224,18 @@ Promise.resolve()
         assert.equal(invalid.reason, 'invalid_quantity');
         assert.equal(invalid.type, 'downtime');
         assert.equal(invalid.max, 0);
+        assert.equal(executed.length, 0);
+
+        scenario = 'bubble-floor';
+        executed.length = 0;
+        const floorBlocked = await updateCharacterBubbleShopForDiscord(discordUser, 42, {
+            skill_proficiency: 0,
+            rare_language: 0,
+            tool_or_language: 1,
+            downtime: 0,
+        });
+        assert.equal(floorBlocked.ok, false);
+        assert.equal(floorBlocked.reason, 'bubble_shop_floor');
         assert.equal(executed.length, 0);
 
         console.log('app-db-character-bubble-shop.test.js passed');

@@ -2466,6 +2466,8 @@ async function handle(interaction) {
         if (!result.ok) {
             const content = result.reason === 'invalid_quantity'
                 ? `Ungueltiger Bubble-Shop-Wert fuer ${result.type}. Maximal erlaubt: ${result.max}.`
+                : result.reason === 'bubble_shop_floor'
+                    ? 'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.'
                 : 'Character not found.';
             await updateManageMessage(interaction, { content, flags: MessageFlags.Ephemeral });
             return true;
@@ -2770,6 +2772,8 @@ async function handle(interaction) {
                 content = t('characters.levelCannotBeBelowReal', { level: result.minLevel }, locale);
             } else if (result.reason === 'above_max' && result.maxLevel) {
                 content = t('characters.upgradeLevelCurveMaxLevelReason', { level: result.maxLevel }, locale);
+            } else if (result.reason === 'bubble_shop_floor') {
+                content = 'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.';
             } else if (result.reason === 'character_not_found' || result.reason === 'not_found') {
                 content = await translateInteraction(interaction, 'characters.characterNotFound');
             }

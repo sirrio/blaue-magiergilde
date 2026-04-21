@@ -100,8 +100,9 @@ class UpgradeCharacterProgressionController extends Controller
             0,
             $availableBubbles - LevelProgression::bubblesRequiredForLevel($currentLevel, $currentVersionId),
         );
-        $minimumAllowedAvailableBubbles = LevelProgression::bubblesRequiredForLevel($currentLevel, $activeVersionId) + $currentBubblesInLevel;
+        $minimumAllowedAvailableBubbles = LevelProgression::bubblesRequiredForLevel($currentLevel, $currentVersionId);
         $minimumAllowedLevel = LevelProgression::levelFromAvailableBubbles($minimumAllowedAvailableBubbles, $activeVersionId);
+        $maximumAllowedSpend = $currentSpend + $currentBubblesInLevel;
 
         if ($targetLevel > $autoLevel) {
             return [
@@ -138,6 +139,13 @@ class UpgradeCharacterProgressionController extends Controller
         }
 
         $newSpend = max($currentSpend, max(0, $baseBubbles - $targetAvailableBubbles));
+
+        if ($newSpend > $maximumAllowedSpend) {
+            return [
+                'ok' => false,
+                'message' => 'Bubble shop spend cannot reduce the character below the current level floor.',
+            ];
+        }
 
         DB::transaction(function () use ($character, $activeVersionId, $newSpend): void {
             $character->forceFill([

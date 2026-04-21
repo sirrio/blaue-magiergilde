@@ -59,6 +59,23 @@ class UpdateCharacterBubbleShopRequest extends FormRequest
                         $validator->errors()->add($type, $this->maxMessageFor($type, $max));
                     }
                 }
+
+                $maxEffectiveSpend = $bubbleShop->maxEffectiveSpendWithoutDownlevel($character);
+                if ($maxEffectiveSpend === null) {
+                    return;
+                }
+
+                $quantities = [];
+                foreach (CharacterBubbleShop::purchaseTypes() as $type) {
+                    $quantities[$type] = max(0, $this->integer($type));
+                }
+
+                if ($bubbleShop->effectiveSpendForQuantities($character, $quantities) > $maxEffectiveSpend) {
+                    $validator->errors()->add(
+                        'bubble_shop',
+                        'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.',
+                    );
+                }
             },
         ];
     }

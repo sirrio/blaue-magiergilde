@@ -1,4 +1,6 @@
 import { calculateTier } from '@/helper/calculateTier'
+import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
+import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { Character } from '@/types'
 
 export type CharacterBubbleShopPurchaseType =
@@ -85,6 +87,16 @@ export const getCharacterBubbleShopEffectiveSpend = (
   quantities: Record<CharacterBubbleShopPurchaseType, number> = getCharacterBubbleShopQuantities(character),
 ): number => {
   return Math.max(getCharacterBubbleShopLegacySpend(character), getCharacterBubbleShopStructuredSpend(character, quantities))
+}
+
+export const getCharacterBubbleShopMaxEffectiveSpendWithoutDownlevel = (
+  character: Character,
+): number | null => {
+  if (!countsBubbleAdjustmentsForProgression(character)) {
+    return null
+  }
+
+  return getCharacterBubbleShopEffectiveSpend(character) + calculateBubblesInCurrentLevel(character)
 }
 
 export const getCharacterBubbleShopAdditionalSpend = (

@@ -9,6 +9,7 @@ const {
     definitionsForCharacter,
     quantitiesForCharacter,
     effectiveSpendForCharacter,
+    maxEffectiveSpendWithoutDownlevelForCharacter,
     structuredSpendForCharacter,
 } = require('./utils/characterBubbleShop');
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
@@ -271,7 +272,7 @@ async function getCharacterProgressionUpgradeStateForDiscord(discordUser, charac
     const additional = additionalBubblesForStartTier(character.start_tier);
     const minimumAvailableBubbles = usesManualTracking
         ? Math.max(0, immutableAdventureBubbles + additional)
-        : Math.max(0, bubblesRequiredForLevel(currentLevel, activeVersionId) + currentBubblesInLevel);
+        : Math.max(0, bubblesRequiredForLevel(currentLevel, currentVersionId));
     const minSelectableLevel = levelFromAvailableBubbles(minimumAvailableBubbles, activeVersionId);
     const maxSelectableLevel = latestPseudo ? recalculatedLevel : (usesManualTracking ? 20 : recalculatedLevel);
     const initialTargetLevel = usesManualTracking ? currentLevel : recalculatedLevel;
@@ -354,6 +355,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
             ? 0
             : Math.max(minBubblesInLevel, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel));
         const targetAvailableBubbles = levelFloor + clampedBubblesInLevel;
+        const maxAllowedSpend = safeInt(character.bubble_shop_spend) + currentBubblesInLevel;
 
         if (normalizedLevel > recalculatedLevel) {
             return { ok: false, reason: 'above_max', maxLevel: recalculatedLevel };
@@ -364,6 +366,9 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         }
 
         const newSpend = Math.max(currentSpend, Math.max(0, baseBubbles - targetAvailableBubbles));
+        if (newSpend > maxAllowedSpend) {
+            return { ok: false, reason: 'bubble_shop_floor', maxEffectiveSpend: maxAllowedSpend };
+        }
         const currentQuantities = quantitiesForCharacter(character);
         const currentDowntimeQuantity = safeInt(currentQuantities[TYPE_DOWNTIME]);
         const nonDowntimeSpend = structuredSpendForCharacter(character, {
@@ -1137,6 +1142,22 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
                 max: safeInt(max),
             };
         }
+    }
+
+    const maxEffectiveSpend = maxEffectiveSpendWithoutDownlevelForCharacter(existing);
+    const nextEffectiveSpend = effectiveSpendForCharacter({
+        ...existing,
+        bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
+        bubble_shop_rare_language: normalizedQuantities[TYPE_RARE_LANGUAGE],
+        bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
+        bubble_shop_downtime: normalizedQuantities[TYPE_DOWNTIME],
+    });
+    if (maxEffectiveSpend !== null && nextEffectiveSpend > maxEffectiveSpend) {
+        return {
+            ok: false,
+            reason: 'bubble_shop_floor',
+            maxEffectiveSpend,
+        };
     }
 
     const updatedAt = nowSql();

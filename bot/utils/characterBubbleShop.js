@@ -1,4 +1,4 @@
-const { calculateLevel, calculateTierFromLevel } = require('./characterTier');
+const { calculateBubblesInCurrentLevel, calculateLevel, calculateTierFromLevel, countsBubbleAdjustmentsForProgression } = require('./characterTier');
 
 const TYPE_SKILL_PROFICIENCY = 'skill_proficiency';
 const TYPE_RARE_LANGUAGE = 'rare_language';
@@ -105,6 +105,14 @@ function effectiveSpendForCharacter(character, quantities = quantitiesForCharact
     );
 }
 
+function maxEffectiveSpendWithoutDownlevelForCharacter(character) {
+    if (!countsBubbleAdjustmentsForProgression(character)) {
+        return null;
+    }
+
+    return effectiveSpendForCharacter(character) + calculateBubblesInCurrentLevel(character, calculateLevel(character));
+}
+
 function additionalSpendBeyondLegacyForCharacter(character, quantities = quantitiesForCharacter(character)) {
     return Math.max(
         0,
@@ -128,6 +136,7 @@ module.exports = {
     legacySpendForCharacter,
     coveredByLegacyForCharacter,
     effectiveSpendForCharacter,
+    maxEffectiveSpendWithoutDownlevelForCharacter,
     additionalSpendBeyondLegacyForCharacter,
     extraDowntimeSecondsForCharacter,
 };

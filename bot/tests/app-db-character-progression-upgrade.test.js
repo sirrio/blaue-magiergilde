@@ -106,7 +106,7 @@ const fakeDb = {
                     private_mode: 0,
                     has_room: 0,
                     adventures_count: 2,
-                    adventure_bubbles: 6,
+                    adventure_bubbles: 7,
                     has_pseudo_adventure: 0,
                     has_real_adventure: 1,
                     total_downtime: 0,
@@ -167,7 +167,7 @@ const fakeDb = {
 
         if (sql.includes('SELECT COALESCE(SUM(FLOOR(duration / 10800)')) {
             if (scenario === 'adventure') {
-                return [[{ bubbles: 6 }]];
+                return [[{ bubbles: 7 }]];
             }
 
             return [[{ bubbles: 0 }]];
@@ -225,15 +225,15 @@ Promise.resolve()
         updates = [];
         inserts = [];
         deletes = [];
-        const adventureResult = await upgradeCharacterProgressionForDiscord(discordUser, 42, 2, 1);
+        const adventureResult = await upgradeCharacterProgressionForDiscord(discordUser, 42, 3, 0);
         assert.equal(adventureResult.ok, true);
         assert.equal(updates.length, 1);
         assert.equal(inserts.length, 1);
         assert.equal(deletes.length, 0);
         assert.equal(inserts[0].bindings[1], 'downtime');
-        assert.equal(inserts[0].bindings[2], 2);
+        assert.equal(inserts[0].bindings[2], 1);
         assert.equal(updates[0].bindings[0], 2);
-        assert.equal(updates[0].bindings[1], 2);
+        assert.equal(updates[0].bindings[1], 1);
         assert.equal(updates[0].bindings[3], 42);
 
         scenario = 'pseudo';

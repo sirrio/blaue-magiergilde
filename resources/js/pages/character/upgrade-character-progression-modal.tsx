@@ -72,11 +72,7 @@ const UpgradeCharacterProgressionModal = ({
       + additionalBubblesForStartTier(character.start_tier)
       - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
   )
-  const currentBubblesInDisplayedLevel = Math.max(
-    0,
-    currentAvailableBubbles - bubblesRequiredForLevel(initialLevel, currentVersionId),
-  )
-  const exactMinimumAvailableBubbles = manualTracking
+  const minimumAllowedAvailableBubbles = manualTracking
     ? Math.max(
         0,
         immutableAdventureBubbles
@@ -84,7 +80,7 @@ const UpgradeCharacterProgressionModal = ({
           + additionalBubblesForStartTier(character.start_tier)
           - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
       )
-    : bubblesRequiredForLevel(initialLevel, targetVersionId) + currentBubblesInDisplayedLevel
+    : bubblesRequiredForLevel(initialLevel, currentVersionId)
 
   const recalculatedLevel = levelFromAvailableBubbles(currentAvailableBubbles, targetVersionId)
 
@@ -104,7 +100,7 @@ const UpgradeCharacterProgressionModal = ({
 
   const minSelectableLevel = character.is_filler
     ? 1
-    : levelFromAvailableBubbles(exactMinimumAvailableBubbles, targetVersionId)
+    : levelFromAvailableBubbles(minimumAllowedAvailableBubbles, targetVersionId)
 
   const maxSelectableLevel = hasPseudoAdventure ? recalculatedLevel : manualTracking ? MAX_LEVEL : recalculatedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
@@ -124,7 +120,7 @@ const UpgradeCharacterProgressionModal = ({
   const selectedLevelMaxByCurve = targetLevel >= 20
     ? 0
     : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId) - 1)
-  const selectedLevelMinByExactFloor = Math.max(0, exactMinimumAvailableBubbles - selectedLevelFloor)
+  const selectedLevelMinByExactFloor = Math.max(0, minimumAllowedAvailableBubbles - selectedLevelFloor)
   const selectedLevelMaxByCurrent = manualTracking
     ? selectedLevelMaxByCurve
     : Math.max(0, currentAvailableBubbles - selectedLevelFloor)
@@ -165,7 +161,7 @@ const UpgradeCharacterProgressionModal = ({
       ? 0
       : Math.min(
           Math.max(0, bubblesRequiredForNextLevel(defaultLevel, targetVersionId) - 1),
-          Math.max(0, exactMinimumAvailableBubbles - defaultLevelFloor),
+          Math.max(0, minimumAllowedAvailableBubbles - defaultLevelFloor),
         )
     const defaultMaxBubbles = defaultLevel >= 20
       ? 0
@@ -183,7 +179,7 @@ const UpgradeCharacterProgressionModal = ({
     })
   }, [
     currentAvailableBubbles,
-    exactMinimumAvailableBubbles,
+    minimumAllowedAvailableBubbles,
     initialBubblesInLevel,
     initialLevel,
     isOpen,
@@ -220,7 +216,7 @@ const UpgradeCharacterProgressionModal = ({
       ? 0
       : Math.min(
           Math.max(0, bubblesRequiredForNextLevel(clampedLevel, targetVersionId) - 1),
-          Math.max(0, exactMinimumAvailableBubbles - levelFloor),
+          Math.max(0, minimumAllowedAvailableBubbles - levelFloor),
         )
     const maxBubbles = clampedLevel >= 20
       ? 0
@@ -386,10 +382,15 @@ const UpgradeCharacterProgressionModal = ({
           ) : null}
 
           {!manualTracking ? (
-            <div className="rounded-box border border-base-300/70 bg-base-200/25 p-2.5 text-xs text-base-content/75 sm:text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>{t('characters.upgradeLevelCurveSpendPreview', { count: additionalBubbleShopSpend })}</span>
-                <span>{t('characters.upgradeLevelCurveTotalSpendPreview', { count: resultingBubbleShopSpend })}</span>
+            <div className="space-y-2">
+              <div className="rounded-box border border-base-300/70 bg-base-200/25 p-2.5 text-xs text-base-content/75 sm:text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{t('characters.upgradeLevelCurveSpendPreview', { count: additionalBubbleShopSpend })}</span>
+                  <span>{t('characters.upgradeLevelCurveTotalSpendPreview', { count: resultingBubbleShopSpend })}</span>
+                </div>
+              </div>
+              <div className="rounded-box border border-base-300/70 bg-base-200/25 p-2.5 text-[11px] leading-5 text-base-content/75 sm:text-xs">
+                {t('characters.upgradeLevelCurveAdventureFloorHint', { level: minSelectableLevel })}
               </div>
             </div>
           ) : null}
