@@ -60,12 +60,19 @@ class LevelProgressionController extends Controller
                 ]);
             }
 
-            $realignReport = $this->pseudoAdventureLevelAlignment->realignAllToVersion($newVersion->id);
+            $charactersPendingUpgrade = \App\Models\Character::query()
+                ->whereNull('deleted_at')
+                ->where(function ($query) use ($newVersion): void {
+                    $query
+                        ->whereNull('progression_version_id')
+                        ->orWhere('progression_version_id', '!=', $newVersion->id);
+                })
+                ->count();
 
             return [
                 'new_version_id' => $newVersion->id,
                 'backfill' => $backfillReport,
-                'realign' => $realignReport,
+                'characters_pending_upgrade' => $charactersPendingUpgrade,
             ];
         });
 

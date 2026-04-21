@@ -76,10 +76,7 @@ type LevelProgressionUpdateReport = {
     pseudo_adventures_backfilled: number
     characters_affected: number
   }
-  realign: {
-    pseudo_adventures_realigned: number
-    characters_affected: number
-  }
+  characters_pending_upgrade: number
 }
 
 const buildLevelProgressionStepValues = (entries: Array<{ level: number; required_bubbles: number }>) => {
@@ -1915,15 +1912,15 @@ export default function Settings({
           <div className="mt-4 rounded-lg border border-warning/30 bg-warning/8 p-3 text-xs text-base-content/75">
             <p className="font-medium text-base-content">Kurvenwechsel erzeugt immer eine neue Version.</p>
             <p className="mt-1">
-              Pseudoabenteuer werden auf die neue Kurve neu ausgerichtet. Echte Abenteuer bleiben unverändert.
+              Bestehende Charaktere bleiben auf ihrer bisherigen Kurve. Echte Abenteuer und gesetzte Level bleiben unverändert, bis ein Charakter bewusst auf die neue Kurve wechselt.
             </p>
           </div>
           {levelProgressionUpdateReport ? (
             <div className="mt-4 rounded-lg border border-success/30 bg-success/8 p-3 text-xs text-base-content/75">
               <p className="font-medium text-base-content">Version {levelProgressionUpdateReport.new_version_id} wurde aktiviert.</p>
               <p className="mt-1">
-                Neu ausgerichtet: {levelProgressionUpdateReport.realign.pseudo_adventures_realigned} Pseudoabenteuer bei{' '}
-                {levelProgressionUpdateReport.realign.characters_affected} Charakteren.
+                Bestehende Charaktere bleiben auf ihrer bisherigen Kurve. {levelProgressionUpdateReport.characters_pending_upgrade}{' '}
+                Charaktere können jetzt bewusst auf die neue Kurve wechseln.
               </p>
               {levelProgressionUpdateReport.backfill.pseudo_adventures_backfilled > 0 ? (
                 <p className="mt-1">

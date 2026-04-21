@@ -42,6 +42,11 @@ class CharacterProgressionState
             ->contains(fn (Adventure $adventure): bool => ! $adventure->trashed() && (bool) $adventure->is_pseudo);
     }
 
+    public function progressionVersionId(Character $character): int
+    {
+        return LevelProgression::versionIdForCharacter($character);
+    }
+
     /**
      * @return Collection<int, Adventure>
      */

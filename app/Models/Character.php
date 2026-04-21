@@ -44,6 +44,7 @@ class Character extends Model
         'simplified_tracking' => 'boolean',
         'avatar_masked' => 'boolean',
         'private_mode' => 'boolean',
+        'progression_version_id' => 'integer',
         'manual_adventures_count' => 'integer',
         'manual_faction_rank' => 'integer',
     ];
@@ -73,6 +74,11 @@ class Character extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function progressionVersion(): BelongsTo
+    {
+        return $this->belongsTo(LevelProgressionVersion::class, 'progression_version_id');
     }
 
     public function room(): HasOne

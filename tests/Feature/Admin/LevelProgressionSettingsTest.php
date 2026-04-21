@@ -44,10 +44,12 @@ it('shows the level progression table on admin settings', function () {
 
 it('updates the stored level progression and uses it for the shared calculation', function () {
     $admin = User::factory()->create(['is_admin' => true]);
+    $currentVersionId = LevelProgression::activeVersionId();
     $character = Character::factory()->create([
         'start_tier' => 'bt',
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
+        'progression_version_id' => $currentVersionId,
     ]);
     $pseudoAdventure = Adventure::factory()->create([
         'character_id' => $character->id,
@@ -86,17 +88,20 @@ it('updates the stored level progression and uses it for the shared calculation'
         ->and(LevelProgression::bubblesRequiredForLevel(12))->toBe(70)
         ->and(LevelProgression::levelFromAvailableBubbles(69))->toBe(11)
         ->and(LevelProgression::levelFromAvailableBubbles(70))->toBe(12)
+        ->and($character->fresh()->progression_version_id)->toBe($currentVersionId)
         ->and($updatedPseudoAdventure?->target_level)->toBe(12)
-        ->and($updatedPseudoAdventure?->progression_version_id)->toBe($activeVersionId)
+        ->and($updatedPseudoAdventure?->progression_version_id)->toBe($currentVersionId)
         ->and($updatedPseudoAdventure?->duration)->toBe(0);
 });
 
-it('realigns mixed real and pseudo adventures to keep the stored target level on curve changes', function () {
+it('keeps existing pseudo adventures on their stored version when the curve changes', function () {
     $admin = User::factory()->create(['is_admin' => true]);
+    $currentVersionId = LevelProgression::activeVersionId();
     $character = Character::factory()->create([
         'start_tier' => 'bt',
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
+        'progression_version_id' => $currentVersionId,
     ]);
 
     Adventure::factory()->create([
@@ -113,7 +118,7 @@ it('realigns mixed real and pseudo adventures to keep the stored target level on
         'has_additional_bubble' => false,
         'is_pseudo' => true,
         'target_level' => 3,
-        'progression_version_id' => LevelProgression::activeVersionId(),
+        'progression_version_id' => $currentVersionId,
         'start_date' => '2026-01-02',
     ]);
 
@@ -141,45 +146,15 @@ it('realigns mixed real and pseudo adventures to keep the stored target level on
 
     expect($realAdventure?->duration)->toBe(10800)
         ->and($updatedPseudoAdventure?->target_level)->toBe(3)
-        ->and($updatedPseudoAdventure?->progression_version_id)->toBe(LevelProgression::activeVersionId())
-        ->and($updatedPseudoAdventure?->duration)->toBe(0)
+        ->and($updatedPseudoAdventure?->progression_version_id)->toBe($currentVersionId)
+        ->and($updatedPseudoAdventure?->duration)->toBe(21600)
         ->and(LevelProgression::levelFromAvailableBubbles(4))->toBe(3);
 });
 
-it('keeps the stored pseudo target level even when real adventures exceed it after a curve change', function () {
+it('reports how many characters can upgrade after a curve change', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $character = Character::factory()->create([
-        'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
-
-    Adventure::factory()->create([
-        'character_id' => $character->id,
-        'duration' => 4 * 10800,
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-        'target_level' => 5,
+    Character::factory()->count(2)->create([
         'progression_version_id' => LevelProgression::activeVersionId(),
-        'start_date' => '2026-01-01',
-    ]);
-
-    Adventure::factory()->create([
-        'character_id' => $character->id,
-        'duration' => 15 * 10800,
-        'has_additional_bubble' => false,
-        'is_pseudo' => false,
-        'start_date' => '2026-01-02',
-    ]);
-
-    $latestPseudoAdventure = Adventure::factory()->create([
-        'character_id' => $character->id,
-        'duration' => 5 * 10800,
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-        'target_level' => 10,
-        'progression_version_id' => LevelProgression::activeVersionId(),
-        'start_date' => '2026-01-03',
     ]);
 
     $entries = collect(range(1, 20))
@@ -193,17 +168,8 @@ it('keeps the stored pseudo target level even when real adventures exceed it aft
         ->patch(route('admin.settings.level-progression.update'), [
             'entries' => $entries,
         ])
-        ->assertRedirect();
-
-    LevelProgression::clearCache();
-
-    $updatedLatestPseudoAdventure = $latestPseudoAdventure->fresh();
-    $minimumRealLevel = LevelProgression::levelFromAvailableBubbles(15);
-
-    expect($minimumRealLevel)->toBe(16)
-        ->and($updatedLatestPseudoAdventure?->target_level)->toBe(10)
-        ->and($updatedLatestPseudoAdventure?->progression_version_id)->toBe(LevelProgression::activeVersionId())
-        ->and($updatedLatestPseudoAdventure?->duration)->toBe(0);
+        ->assertRedirect()
+        ->assertSessionHas('level_progression_update', fn (array $report): bool => $report['characters_pending_upgrade'] === 2);
 });
 
 it('rejects invalid level progression updates', function () {

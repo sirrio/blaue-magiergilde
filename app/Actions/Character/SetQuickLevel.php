@@ -15,7 +15,7 @@ class SetQuickLevel
     public function handle(Character $character, int $level, int $bubblesInLevel = 0): array
     {
         return DB::transaction(function () use ($character, $level, $bubblesInLevel): array {
-            $activeVersionId = LevelProgression::activeVersionId();
+            $progressionVersionId = LevelProgression::versionIdForCharacter($character);
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
             $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
             $bubbleSpend = $this->progressionState->bubbleShopSpendForProgression($character);
@@ -74,7 +74,9 @@ class SetQuickLevel
 
             $minAllowedLevel = LevelProgression::levelFromAvailableBubbles(
                 $immutableBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend,
+                $progressionVersionId,
             );
+            $minAllowedAvailableBubbles = max(0, $immutableBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend);
 
             if (! $character->is_filler && $level < $minAllowedLevel) {
                 return ['ok' => false, 'reason' => 'below_real', 'minLevel' => $minAllowedLevel];
@@ -99,16 +101,21 @@ class SetQuickLevel
             // target_bubbles = level floor + any explicitly chosen bubbles-in-level.
             // dm, start_tier and shop-spend are NOT added: in the new system those
             // adjustments are ignored for pseudo-chars.
-            $maxBubblesInLevel = max(0, LevelProgression::bubblesRequiredForLevel(min(20, $level + 1)) - LevelProgression::bubblesRequiredForLevel($level));
-            $clampedBubblesInLevel = max(0, min($bubblesInLevel, $maxBubblesInLevel - 1));
-            $targetBubbles = LevelProgression::bubblesRequiredForLevel($level) + $clampedBubblesInLevel;
+            $maxBubblesInLevel = max(
+                0,
+                LevelProgression::bubblesRequiredForLevel(min(20, $level + 1), $progressionVersionId)
+                - LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId),
+            );
+            $minBubblesInLevel = max(0, $minAllowedAvailableBubbles - LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId));
+            $clampedBubblesInLevel = max($minBubblesInLevel, min($bubblesInLevel, $maxBubblesInLevel - 1));
+            $targetBubbles = LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId) + $clampedBubblesInLevel;
 
             if ($editablePseudo) {
                 $editablePseudo->duration = 0;
                 $editablePseudo->has_additional_bubble = false;
                 $editablePseudo->target_level = $level;
                 $editablePseudo->target_bubbles = $targetBubbles;
-                $editablePseudo->progression_version_id = $activeVersionId;
+                $editablePseudo->progression_version_id = $progressionVersionId;
                 $editablePseudo->save();
             } else {
                 $adventure = new Adventure;
@@ -118,7 +125,7 @@ class SetQuickLevel
                 $adventure->is_pseudo = true;
                 $adventure->target_level = $level;
                 $adventure->target_bubbles = $targetBubbles;
-                $adventure->progression_version_id = $activeVersionId;
+                $adventure->progression_version_id = $progressionVersionId;
                 $adventure->character_id = $character->id;
                 $adventure->title = 'Level tracking adjustment';
                 $adventure->game_master = 'Level tracking';

@@ -11,6 +11,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 
@@ -36,6 +37,7 @@ class CharacterManagementController extends Controller
         $character->start_tier = $request->string('start_tier')->toString();
         $character->external_link = $request->string('external_link')->toString();
         $character->guild_status = $request->input('guild_status', 'pending');
+        $character->progression_version_id = LevelProgression::activeVersionId();
         $character->admin_managed = true;
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');

@@ -39,13 +39,13 @@ function calculateBubblesInCurrentLevel(character, level) {
     const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
     const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
     const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
-    const currentTotal = bubblesRequiredForLevel(level) - additional;
+    const currentTotal = bubblesRequiredForLevel(level, character.progression_version_id) - additional;
     return Math.max(0, bubbles - currentTotal - spend);
 }
 
 function calculateLevel(character) {
     if (character.is_filler) return 3;
-    return levelFromAvailableBubbles(calculateAvailableBubbles(character));
+    return levelFromAvailableBubbles(calculateAvailableBubbles(character), character.progression_version_id);
 }
 
 function calculateTierFromLevel(level) {

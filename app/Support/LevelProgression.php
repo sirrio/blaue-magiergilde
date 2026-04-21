@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Character;
 use App\Models\LevelProgressionEntry;
 use App\Models\LevelProgressionVersion;
 use RuntimeException;
@@ -14,6 +15,26 @@ class LevelProgression
     private static array $totalsByVersion = [];
 
     private static ?int $cachedActiveVersionId = null;
+
+    /**
+     * @return array<int, array<int, int>>
+     */
+    public static function allTotalsByVersion(): array
+    {
+        $versionIds = LevelProgressionVersion::query()
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $totals = [];
+
+        foreach ($versionIds as $versionId) {
+            $totals[$versionId] = self::totals($versionId);
+        }
+
+        return $totals;
+    }
 
     /**
      * @return array<int, int>
@@ -66,6 +87,15 @@ class LevelProgression
     {
         self::$totalsByVersion = [];
         self::$cachedActiveVersionId = null;
+    }
+
+    public static function versionIdForCharacter(?Character $character): int
+    {
+        $resolvedVersionId = $character?->progression_version_id;
+
+        return is_numeric($resolvedVersionId) && (int) $resolvedVersionId > 0
+            ? (int) $resolvedVersionId
+            : self::activeVersionId();
     }
 
     public static function bubblesRequiredForLevel(int $level, ?int $versionId = null): int

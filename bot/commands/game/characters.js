@@ -105,8 +105,8 @@ function hoursOnly(seconds) {
 
 function calculateTotalBubblesToNextLevel(character, level) {
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const currentTotal = bubblesRequiredForLevel(level) - additional;
-    const nextTotal = bubblesRequiredForLevel(level + 1) - additional;
+    const currentTotal = bubblesRequiredForLevel(level, character.progression_version_id) - additional;
+    const nextTotal = bubblesRequiredForLevel(level + 1, character.progression_version_id) - additional;
     return Math.max(0, nextTotal - currentTotal);
 }
 

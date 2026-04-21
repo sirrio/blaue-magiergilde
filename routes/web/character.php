@@ -14,6 +14,7 @@ use App\Http\Controllers\Character\ShowDeletedCharacterController;
 use App\Http\Controllers\Character\SortCharacterController;
 use App\Http\Controllers\Character\SubmitCharacterForApprovalController;
 use App\Http\Controllers\Character\TrackingModeController;
+use App\Http\Controllers\Character\UpgradeCharacterProgressionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('characters/deleted', DeletedCharacterController::class)
@@ -41,6 +42,9 @@ Route::get('avatars/masked', AvatarMaskController::class)
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])
     ->middleware(['auth'])
     ->name('characters.quick-level');
+Route::post('characters/{character}/upgrade-progression', UpgradeCharacterProgressionController::class)
+    ->middleware(['auth'])
+    ->name('characters.upgrade-progression');
 Route::post('characters/{character}/submit-approval', SubmitCharacterForApprovalController::class)
     ->middleware(['auth'])
     ->name('characters.submit-approval');

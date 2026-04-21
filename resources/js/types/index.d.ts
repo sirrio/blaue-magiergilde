@@ -17,6 +17,8 @@ export interface PageProps {
   impersonating?: { name: string } | null
   handbookChannels?: { id: string; name: string }[]
   levelProgressionTotals?: Record<number, number>
+  levelProgressionTotalsByVersion?: Record<number, Record<number, number>>
+  activeLevelProgressionVersionId?: number
   activeChannelId?: string | null
   ziggy: Config & { location: string }
 
@@ -422,6 +424,7 @@ export interface Character {
   faction_rank?: number
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
+  progression_version_id?: number | null
   simplified_tracking?: boolean
   avatar_masked?: boolean
   private_mode?: boolean

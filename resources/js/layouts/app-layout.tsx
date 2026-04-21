@@ -1,4 +1,4 @@
-import { setLevelProgressionTotals } from '@/helper/levelProgression'
+import { setLevelProgressionVersions } from '@/helper/levelProgression'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
@@ -34,7 +34,18 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales, levelProgressionTotals, impersonating } =
+  const {
+    auth,
+    discordConnected,
+    handbookChannels,
+    activeChannelId,
+    features,
+    locale,
+    availableLocales,
+    levelProgressionTotalsByVersion,
+    activeLevelProgressionVersionId,
+    impersonating,
+  } =
     usePage<PageProps>().props
   const t = useTranslate()
   const [localeUpdating, setLocaleUpdating] = useState(false)
@@ -64,8 +75,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   )
 
   useEffect(() => {
-    setLevelProgressionTotals(levelProgressionTotals)
-  }, [levelProgressionTotals])
+    setLevelProgressionVersions(levelProgressionTotalsByVersion, activeLevelProgressionVersionId)
+  }, [activeLevelProgressionVersionId, levelProgressionTotalsByVersion])
 
   const menuLinks = [
     { name: t('nav.characters'), route: 'characters.index', method: 'get' as const, icon: Users },

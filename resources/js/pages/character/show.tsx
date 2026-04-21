@@ -665,7 +665,7 @@ export default function Show({
                           const adventureTitle = adv.title || 'Adventure'
                           const pseudoBubblesInLevel =
                             adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
-                              ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
+                              ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level, adv.progression_version_id ?? character.progression_version_id)
                               : 0
                           const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
                             <>
@@ -783,7 +783,7 @@ export default function Show({
                               const adventureTitle = adv.title || 'Adventure'
                               const pseudoBubblesInLevel =
                                 adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
-                                  ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
+                                  ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level, adv.progression_version_id ?? character.progression_version_id)
                                   : 0
                               const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
                                 <>

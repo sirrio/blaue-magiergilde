@@ -130,6 +130,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'handbookChannels' => $handbookChannels,
             'levelProgressionTotals' => LevelProgression::totals(),
+            'levelProgressionTotalsByVersion' => LevelProgression::allTotalsByVersion(),
+            'activeLevelProgressionVersionId' => LevelProgression::activeVersionId(),
         ];
     }
 }

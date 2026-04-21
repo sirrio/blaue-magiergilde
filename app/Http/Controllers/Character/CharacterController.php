@@ -10,6 +10,7 @@ use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
 use App\Support\CharacterAvatarPrivacy;
+use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -81,6 +82,7 @@ class CharacterController extends Controller
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;
         $character->guild_status = 'draft';
+        $character->progression_version_id = LevelProgression::activeVersionId();
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
         }

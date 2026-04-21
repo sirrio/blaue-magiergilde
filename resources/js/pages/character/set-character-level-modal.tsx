@@ -37,13 +37,17 @@ const SetCharacterLevelModal = ({
   const t = useTranslate()
   const { errors } = usePage<PageProps>().props
   const initialLevel = clampLevel(calculateLevel(character))
+  const progressionVersionId = character.progression_version_id ?? undefined
   const initialBubblesInLevel = (() => {
     const pseudo = [...character.adventures].sort((a, b) => {
       const d = String(b.start_date).localeCompare(String(a.start_date))
       return d !== 0 ? d : b.id - a.id
     }).find(a => a.is_pseudo) ?? null
     if (!pseudo || pseudo.target_bubbles == null || pseudo.target_level == null) return 0
-    return Math.max(0, pseudo.target_bubbles - bubblesRequiredForLevel(pseudo.target_level))
+    return Math.max(
+      0,
+      pseudo.target_bubbles - bubblesRequiredForLevel(pseudo.target_level, pseudo.progression_version_id ?? progressionVersionId),
+    )
   })()
   const { data, setData, post, processing } = useForm({ level: initialLevel, bubbles_in_level: initialBubblesInLevel })
   const [isOpen, setIsOpen] = useState(false)
@@ -81,12 +85,32 @@ const SetCharacterLevelModal = ({
       + (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0)
       + additionalBubblesForStartTier(character.start_tier)
       - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
+    progressionVersionId,
+  )
+  const minAllowedAvailableBubbles = Math.max(
+    0,
+    immutableAdventureBubbles
+      + (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0)
+      + additionalBubblesForStartTier(character.start_tier)
+      - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
   )
   const minSelectableLevel = character.is_filler ? 1 : minAllowedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
-  const bubblesForTargetLevel = bubblesRequiredForNextLevel(targetLevel)
-  const canSetBubbles = targetLevel > minSelectableLevel && targetLevel < 20
-  const hasChanges = levelDelta !== 0 || (canSetBubbles && data.bubbles_in_level !== (levelDelta === 0 ? initialBubblesInLevel : 0))
+  const bubblesForTargetLevel = bubblesRequiredForNextLevel(targetLevel, progressionVersionId)
+  const minBubblesInSelectedLevel = targetLevel >= 20
+    ? 0
+    : Math.min(
+        Math.max(0, bubblesForTargetLevel - 1),
+        Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(targetLevel, progressionVersionId)),
+      )
+  const maxBubblesInSelectedLevel = targetLevel >= 20 ? 0 : Math.max(0, bubblesForTargetLevel - 1)
+  const displayedBubblesInSelectedLevel = maxBubblesInSelectedLevel
+  const targetBubblesInLevel = Math.max(
+    minBubblesInSelectedLevel,
+    Math.min(Number.isFinite(Number(data.bubbles_in_level)) ? Number(data.bubbles_in_level) : 0, maxBubblesInSelectedLevel),
+  )
+  const canSetBubbles = targetLevel < 20 && displayedBubblesInSelectedLevel > 0
+  const hasChanges = levelDelta !== 0 || (canSetBubbles && targetBubblesInLevel !== (levelDelta === 0 ? initialBubblesInLevel : minBubblesInSelectedLevel))
 
   useEffect(() => {
     if (!isOpen) {
@@ -94,12 +118,22 @@ const SetCharacterLevelModal = ({
     }
 
     const newLevel = Math.max(initialLevel, minSelectableLevel)
+    const newMinBubbles = newLevel >= 20
+      ? 0
+      : Math.min(
+          Math.max(0, bubblesRequiredForNextLevel(newLevel, progressionVersionId) - 1),
+          Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(newLevel, progressionVersionId)),
+        )
+    const newMaxBubbles = newLevel >= 20 ? 0 : Math.max(0, bubblesRequiredForNextLevel(newLevel, progressionVersionId) - 1)
     setData(prev => ({
       ...prev,
       level: newLevel,
-      bubbles_in_level: newLevel === initialLevel ? initialBubblesInLevel : 0,
+      bubbles_in_level: Math.max(
+        newMinBubbles,
+        Math.min(newLevel === initialLevel ? initialBubblesInLevel : newMinBubbles, newMaxBubbles),
+      ),
     }))
-  }, [initialLevel, initialBubblesInLevel, isOpen, minSelectableLevel, setData])
+  }, [initialLevel, initialBubblesInLevel, isOpen, minAllowedAvailableBubbles, minSelectableLevel, progressionVersionId, setData])
 
   useEffect(() => {
     if (!isOpen) {
@@ -109,12 +143,28 @@ const SetCharacterLevelModal = ({
 
   const setLevel = (value: number) => {
     const clamped = clampLevel(value)
+    const minBubbles = clamped >= 20
+      ? 0
+      : Math.min(
+          Math.max(0, bubblesRequiredForNextLevel(clamped, progressionVersionId) - 1),
+          Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(clamped, progressionVersionId)),
+        )
+    const maxBubbles = clamped >= 20 ? 0 : Math.max(0, bubblesRequiredForNextLevel(clamped, progressionVersionId) - 1)
     setData(prev => ({
       ...prev,
       level: clamped,
-      bubbles_in_level: clamped === initialLevel ? initialBubblesInLevel : 0,
+      bubbles_in_level: Math.max(
+        minBubbles,
+        Math.min(clamped === initialLevel ? initialBubblesInLevel : minBubbles, maxBubbles),
+      ),
     }))
   }
+
+  useEffect(() => {
+    if (targetBubblesInLevel !== data.bubbles_in_level) {
+      setData('bubbles_in_level', targetBubblesInLevel)
+    }
+  }, [data.bubbles_in_level, setData, targetBubblesInLevel])
 
   const handleSubmit = () => {
     post(route('characters.quick-level', character.id), {
@@ -206,26 +256,34 @@ const SetCharacterLevelModal = ({
               <p className="text-xs uppercase tracking-wide text-base-content/50">
                 {t('characters.selectBubblesInLevel')}
               </p>
-              <div className="flex flex-wrap gap-1">
-                {Array.from({ length: bubblesForTargetLevel }, (_, i) => {
+              <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
+                {Array.from({ length: displayedBubblesInSelectedLevel }, (_, i) => {
                   const bubbleIndex = i + 1
-                  const isSelected = bubbleIndex <= data.bubbles_in_level
+                  const isDisabled = bubbleIndex < minBubblesInSelectedLevel || bubbleIndex > maxBubblesInSelectedLevel
+                  const isSelected = bubbleIndex <= targetBubblesInLevel && !isDisabled
+                  const isBelowSelection = bubbleIndex < targetBubblesInLevel && !isDisabled
+                  const isAboveSelection = bubbleIndex > targetBubblesInLevel && !isDisabled
                   return (
-                    <button
+                    <Button
                       key={i}
+                      size="xs"
+                      variant="ghost"
                       type="button"
-                      disabled={processing}
-                      onClick={() => setData('bubbles_in_level', data.bubbles_in_level === bubbleIndex ? bubbleIndex - 1 : bubbleIndex)}
+                      disabled={processing || isDisabled}
+                      onClick={() => setData('bubbles_in_level', targetBubblesInLevel === bubbleIndex ? Math.max(minBubblesInSelectedLevel, bubbleIndex - 1) : bubbleIndex)}
+                      aria-label={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                       className={cn(
-                        'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                        isSelected
-                          ? 'text-primary'
-                          : 'text-base-content/25 hover:text-base-content/50',
+                        'w-full justify-center gap-1 border transition-colors',
+                        isDisabled && 'cursor-not-allowed border-base-300/50 text-base-content/20',
+                        isBelowSelection && !isSelected && 'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
+                        isAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
+                        isSelected && 'border-primary bg-primary/15 font-semibold text-primary',
                       )}
                       title={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                     >
-                      <Droplets size={14} />
-                    </button>
+                      <Droplets size={12} />
+                      <span>{bubbleIndex}</span>
+                    </Button>
                   )
                 })}
               </div>

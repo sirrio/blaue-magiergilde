@@ -12,7 +12,7 @@ const calculateBubblesInCurrentLevel = (character: Character): number => {
   // Pseudo chars: calculateBubble already returns bubblesRequiredForLevel(target_level)
   // with no start_tier offset, so the threshold must also be computed without it.
   const additional_bubbles = hasPseudoAdventures(character) ? 0 : additionalBubblesForStartTier(character.start_tier)
-  const current_level_bubble_total = bubblesRequiredForLevel(level) - additional_bubbles
+  const current_level_bubble_total = bubblesRequiredForLevel(level, character.progression_version_id) - additional_bubbles
 
   const bubbleShopSpend = countsBubbleAdjustmentsForProgression(character)
     ? Number(character.bubble_shop_spend ?? 0)

@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Character;
 use App\Models\User;
+use App\Support\LevelProgression;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -32,6 +33,7 @@ class CharacterFactory extends Factory
             ]),
             'notes' => $this->faker->sentence(),
             'position' => $this->faker->numberBetween(0, 10),
+            'progression_version_id' => LevelProgression::activeVersionId(),
             'simplified_tracking' => false,
             'avatar_masked' => true,
             'private_mode' => false,

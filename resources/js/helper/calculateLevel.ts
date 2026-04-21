@@ -20,7 +20,7 @@ const calculateLevel = (character: LevelCharacter): number => {
 
   const availableBubbles = Math.max(0, normalizedBubbles + additional_bubbles - normalizedBubbleShopSpend)
 
-  return levelFromAvailableBubbles(availableBubbles)
+  return levelFromAvailableBubbles(availableBubbles, character.progression_version_id)
 }
 
 export { calculateLevel }

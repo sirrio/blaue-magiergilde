@@ -27,12 +27,13 @@ import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
+import UpgradeCharacterProgressionModal from '@/pages/character/upgrade-character-progression-modal'
 import { Character } from '@/types'
 import { PageProps } from '@/types'
 import { router, usePage } from '@inertiajs/react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, CircleHelp, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
+import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, CircleHelp, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, RefreshCcw, Settings, Swords, XCircle } from 'lucide-react'
 import React, { useState, useTransition } from 'react'
 import { useImage } from 'react-image'
 
@@ -330,7 +331,7 @@ export function CharacterCard({
   isPrivateModeUpdating?: boolean
 }) {
   const t = useTranslate()
-  const { features } = usePage<PageProps>().props
+  const { features, activeLevelProgressionVersionId } = usePage<PageProps>().props
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
 
@@ -492,6 +493,10 @@ export function CharacterCard({
     : hasLevelAnchors
       ? t('characters.levelAnchorHistoryHint')
       : trackingModeLabel
+  const hasProgressionUpgrade = !character.is_filler
+    && typeof activeLevelProgressionVersionId === 'number'
+    && activeLevelProgressionVersionId > 0
+    && (character.progression_version_id ?? activeLevelProgressionVersionId) !== activeLevelProgressionVersionId
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
   const totalDowntimeDisplay = formattedDowntimes.total
@@ -687,6 +692,23 @@ export function CharacterCard({
                     )}
                   </div>
                 </div>
+                {hasProgressionUpgrade ? (
+                  <div className="mt-2 rounded-md border border-info/20 bg-info/8 px-2 py-1.5 text-xs text-base-content/75">
+                    <div>{t('characters.upgradeLevelCurveNotice')}</div>
+                    <UpgradeCharacterProgressionModal
+                      character={character}
+                      trigger={(
+                        <button
+                          type="button"
+                          className="mt-1 inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-info hover:underline"
+                        >
+                          <RefreshCcw size={11} />
+                          <span>{t('characters.upgradeLevelCurveAction')}</span>
+                        </button>
+                      )}
+                    />
+                  </div>
+                ) : null}
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   <InfoBox>
                     <InfoBoxTitle>
