@@ -17,6 +17,7 @@ const {
 } = require('../commands/game/characters');
 const { t } = require('../i18n');
 const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
+const { bubblesRequiredForLevel } = require('../utils/levelProgression');
 const { formatIsoDate, formatLocalIsoDate } = require('../dateUtils');
 const { formatDurationSeconds } = require('../utils/time');
 const {
@@ -343,7 +344,7 @@ function buildCharacterCardPayload({ character, ownerDiscordId, registrationBloc
     }
 
     return {
-        embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail })],
+        embeds: [buildCharacterEmbed(character, { thumbnailUrlOrAttachment: thumbnail, locale: character.locale ?? null })],
         components: buildCharacterCardRows({
             ownerDiscordId,
             characterId: character.id,
@@ -354,6 +355,8 @@ function buildCharacterCardPayload({ character, ownerDiscordId, registrationBloc
             guildStatus: character.guild_status,
             registrationBlockedReason,
             registrationCounts,
+            hasProgressionUpgradeAvailable: Boolean(character.has_progression_upgrade_available),
+            locale: character.locale ?? null,
         }),
         files,
     };
@@ -1241,17 +1244,16 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, hasPseudoAdventure = false, hasRealAdventure = false, guildStatus, registrationBlockedReason = null, registrationCounts = null }) {
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, hasPseudoAdventure = false, hasRealAdventure = false, guildStatus, registrationBlockedReason = null, registrationCounts = null, hasProgressionUpgradeAvailable = false, locale = null }) {
     const primaryRow = new ActionRowBuilder();
     const normalizedStatus = String(guildStatus || '').trim().toLowerCase();
     const canRegister = normalizedStatus === 'draft' || normalizedStatus === 'needs_changes';
     const canLogActivity = !canRegister || !isCharacterStatusSwitchEnabled;
-    const isMixed = !simplifiedTracking && hasPseudoAdventure && hasRealAdventure;
     if (canRegister) {
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_register_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.registerWithMagiergilde'))
+                .setLabel(t('characters.registerWithMagiergilde', {}, locale))
                 .setStyle(ButtonStyle.Success)
                 .setDisabled(!isCharacterStatusSwitchEnabled || Boolean(registrationBlockedReason)),
         );
@@ -1260,11 +1262,11 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterCard_adv_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.adventureShort'))
+                .setLabel(t('characters.adventureShort', {}, locale))
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`characterCard_dt_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.downtimeShort'))
+                .setLabel(t('characters.downtimeShort', {}, locale))
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(Boolean(isFiller)),
         );
@@ -1273,31 +1275,177 @@ function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplif
         primaryRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`characterManage_manual_level_${characterId}_${ownerDiscordId}`)
-                .setLabel(t('characters.setLevelShort'))
+                .setLabel(t('characters.setLevelShort', {}, locale))
                 .setStyle(ButtonStyle.Primary),
         );
     }
     primaryRow.addComponents(
         new ButtonBuilder()
             .setCustomId(`characterCard_manage_${characterId}_${ownerDiscordId}`)
-            .setLabel(t('characters.manageShort'))
+            .setLabel(t('characters.manageShort', {}, locale))
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId(`characterCard_del_${characterId}_${ownerDiscordId}`)
-            .setLabel('Delete')
+            .setLabel(t('common.delete', {}, locale))
             .setStyle(ButtonStyle.Danger),
     );
 
     const rows = [primaryRow];
 
-    rows.push(new ActionRowBuilder().addComponents(
+    const secondaryRow = new ActionRowBuilder();
+    if (hasProgressionUpgradeAvailable) {
+        secondaryRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`characterCard_upgrade_${characterId}_${ownerDiscordId}`)
+                .setLabel(t('characters.upgradeLevelCurveShort', {}, locale))
+                .setStyle(ButtonStyle.Secondary),
+        );
+    }
+    secondaryRow.addComponents(
         new ButtonBuilder()
             .setCustomId(`characterCard_list_${characterId}_${ownerDiscordId}`)
-            .setLabel(t('characters.backToList'))
+            .setLabel(t('characters.backToList', {}, locale))
+            .setStyle(ButtonStyle.Secondary),
+    );
+    rows.push(secondaryRow);
+
+    return rows;
+}
+
+function formatProgressionTargetLabel(level, bubblesInLevel, versionId, locale = null) {
+    const normalizedLevel = Math.max(1, safeInt(level, 1));
+    if (normalizedLevel >= 20) {
+        return t('characters.upgradeLevelCurveLevelOnly', { level: normalizedLevel }, locale);
+    }
+
+    const floor = bubblesRequiredForLevel(normalizedLevel, versionId);
+    const nextFloor = bubblesRequiredForLevel(normalizedLevel + 1, versionId);
+    const maxBubbles = Math.max(0, nextFloor - floor - 1);
+
+    return t('characters.upgradeLevelCurveLevelWithBubbles', {
+        level: normalizedLevel,
+        bubbles: Math.max(0, safeInt(bubblesInLevel)),
+        max: maxBubbles,
+    }, locale);
+}
+
+function buildProgressionUpgradeLevelOptions({ minLevel, maxLevel, selectedLevel, locale = null }) {
+    const options = [];
+    for (let level = Math.max(1, safeInt(minLevel, 1)); level <= Math.max(1, safeInt(maxLevel, 1)); level += 1) {
+        options.push(
+            new StringSelectMenuOptionBuilder()
+                .setLabel(t('characters.upgradeLevelCurveLevelOption', { level }, locale))
+                .setValue(String(level))
+                .setDefault(level === selectedLevel),
+        );
+    }
+
+    return options.slice(0, 25);
+}
+
+function buildProgressionUpgradeBubbleOptions({ maxBubbles, minBubbles, selectedBubbles, locale = null }) {
+    const options = [];
+    for (let bubbles = Math.max(0, safeInt(minBubbles)); bubbles <= Math.max(0, safeInt(maxBubbles)); bubbles += 1) {
+        options.push(
+            new StringSelectMenuOptionBuilder()
+                .setLabel(t('characters.upgradeLevelCurveBubbleOption', { count: bubbles }, locale))
+                .setValue(String(bubbles))
+                .setDefault(bubbles === selectedBubbles),
+        );
+    }
+
+    return options.slice(0, 25);
+}
+
+function buildCharacterProgressionUpgradeView({ character, ownerDiscordId, state, selectedLevel, selectedBubbles, locale = null }) {
+    const currentText = formatProgressionTargetLabel(state.currentLevel, state.currentBubblesInLevel, state.currentVersionId, locale);
+    const recalculatedText = formatProgressionTargetLabel(state.recalculatedLevel, state.recalculatedBubblesInLevel, state.activeVersionId, locale);
+    const targetText = formatProgressionTargetLabel(selectedLevel, selectedBubbles, state.activeVersionId, locale);
+    const embed = new EmbedBuilder()
+        .setTitle(t('characters.upgradeLevelCurveTitle', {}, locale))
+        .setColor(0x4f46e5)
+        .setDescription(t('characters.upgradeLevelCurveBody', {}, locale))
+        .addFields(
+            { name: t('characters.currentField', {}, locale), value: currentText, inline: true },
+            { name: t('characters.upgradeLevelCurveRecalculatedField', {}, locale), value: recalculatedText, inline: true },
+            { name: t('characters.upgradeLevelCurveTargetField', {}, locale), value: targetText, inline: true },
+        );
+
+    const components = [];
+    const levelOptions = buildProgressionUpgradeLevelOptions({
+        minLevel: state.minSelectableLevel,
+        maxLevel: state.maxSelectableLevel,
+        selectedLevel,
+        locale,
+    });
+    if (levelOptions.length > 0) {
+        components.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`characterUpgradeLevel_${character.id}_${ownerDiscordId}_${selectedBubbles}`)
+                .setPlaceholder(t('characters.selectLevel', {}, locale))
+                .addOptions(levelOptions),
+        ));
+    }
+
+    const levelFloor = bubblesRequiredForLevel(selectedLevel, state.activeVersionId);
+    const minBubbles = selectedLevel >= 20
+        ? 0
+        : Math.max(0, state.minimumAvailableBubbles - levelFloor);
+    const maxBubbles = selectedLevel >= 20
+        ? 0
+        : Math.max(0, Math.min(
+            bubblesRequiredForLevel(Math.min(20, selectedLevel + 1), state.activeVersionId) - levelFloor - 1,
+            state.usesManualTracking ? Number.MAX_SAFE_INTEGER : state.currentAvailableBubbles - levelFloor,
+        ));
+    const bubbleOptions = buildProgressionUpgradeBubbleOptions({
+        minBubbles,
+        maxBubbles,
+        selectedBubbles,
+        locale,
+    });
+    if (bubbleOptions.length > 0) {
+        components.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`characterUpgradeBubbles_${character.id}_${ownerDiscordId}_${selectedLevel}`)
+                .setPlaceholder(t('characters.selectBubblesInLevel', {}, locale))
+                .addOptions(bubbleOptions),
+                ));
+    }
+
+    if (!state.usesManualTracking) {
+        const selectedAvailableBubbles = levelFloor + selectedBubbles;
+        const additionalSpend = Math.max(0, state.currentAvailableBubbles - selectedAvailableBubbles);
+        const totalSpend = safeInt(character.bubble_shop_spend) + additionalSpend;
+        embed.addFields({
+            name: t('characters.manageBubbleShop', {}, locale),
+            value: [
+                t('characters.upgradeLevelCurveSpendPreview', { count: additionalSpend }, locale),
+                t('characters.upgradeLevelCurveTotalSpendPreview', { count: totalSpend }, locale),
+            ].join('\n'),
+            inline: false,
+        });
+    }
+
+    embed.addFields({
+        name: t('characters.upgradeLevelCurveHintField', {}, locale),
+        value: state.usesManualTracking
+            ? t('characters.upgradeLevelCurveHint', {}, locale)
+            : t('characters.upgradeLevelCurveAdventureHint', {}, locale),
+        inline: false,
+    });
+
+    components.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`characterUpgradeConfirm_${character.id}_${ownerDiscordId}_${selectedLevel}_${selectedBubbles}`)
+            .setLabel(t('characters.upgradeLevelCurveApply', {}, locale))
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`characterUpgradeCancel_${character.id}_${ownerDiscordId}`)
+            .setLabel(t('common.cancel', {}, locale))
             .setStyle(ButtonStyle.Secondary),
     ));
 
-    return rows;
+    return { embeds: [embed], components };
 }
 
 function buildCharacterRegisterConfirmRow({ characterId, ownerDiscordId }) {
@@ -2252,6 +2400,7 @@ module.exports = {
     buildAdventureDeleteConfirmRow,
     buildDowntimeDeleteConfirmRow,
     buildCharacterCardRows,
+    buildCharacterProgressionUpgradeView,
     buildCharacterRegisterConfirmRow,
     buildCharacterRegisterConfirmView,
     buildCharacterRegistrationBlockedContent,

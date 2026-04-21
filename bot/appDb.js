@@ -5,7 +5,7 @@ const {
     calculateMinAllowedLevel,
     calculateRequiredAdventureBubbles,
 } = require('./utils/quickMode');
-const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('./utils/levelProgression');
+const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded, levelFromAvailableBubbles } = require('./utils/levelProgression');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -132,6 +132,231 @@ function bubblesForDuration(duration, hasAdditionalBubble) {
     const normalizedDuration = safeInt(duration);
     const bubbleCount = Math.floor(normalizedDuration / 10800);
     return bubbleCount + (hasAdditionalBubble ? 1 : 0);
+}
+
+function calculateCharacterAvailableBubbles(character) {
+    if (character?.is_filler) {
+        return 0;
+    }
+
+    const bubbleAdjustmentsCount = !character?.simplified_tracking && !safeInt(character?.has_pseudo_adventure);
+    const adventureBubbles = safeInt(character?.adventure_bubbles);
+    const dmBubbles = bubbleAdjustmentsCount ? safeInt(character?.dm_bubbles) : 0;
+    const additional = safeInt(character?.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character?.start_tier);
+    const bubbleSpend = bubbleAdjustmentsCount ? safeInt(character?.bubble_shop_spend) : 0;
+
+    return Math.max(0, adventureBubbles + dmBubbles + additional - bubbleSpend);
+}
+
+async function getLatestPseudoAdventureState(connection, characterId) {
+    const executor = connection ?? db;
+    const [rows] = await executor.execute(
+        `
+            SELECT id, start_date, target_level, target_bubbles, progression_version_id
+            FROM adventures
+            WHERE character_id = ?
+              AND deleted_at IS NULL
+              AND is_pseudo = 1
+            ORDER BY start_date DESC, id DESC
+            LIMIT 1
+        `,
+        [characterId],
+    );
+
+    return rows[0] ?? null;
+}
+
+async function countImmutableAdventureBubbles(connection, characterId, latestPseudo = null) {
+    const executor = connection ?? db;
+
+    if (latestPseudo) {
+        const [rows] = await executor.execute(
+            `
+                SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
+                FROM adventures
+                WHERE character_id = ?
+                  AND deleted_at IS NULL
+                  AND is_pseudo = 0
+                  AND (start_date > ? OR (start_date = ? AND id > ?))
+            `,
+            [characterId, latestPseudo.start_date, latestPseudo.start_date, latestPseudo.id],
+        );
+
+        return Math.max(0, safeInt(rows[0]?.bubbles));
+    }
+
+    const [rows] = await executor.execute(
+        `
+            SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
+            FROM adventures
+            WHERE character_id = ?
+              AND deleted_at IS NULL
+              AND is_pseudo = 0
+        `,
+        [characterId],
+    );
+
+    return Math.max(0, safeInt(rows[0]?.bubbles));
+}
+
+async function countAdventureTrackedBaseBubbles(connection, characterId, startTier, dmBubbles) {
+    const executor = connection ?? db;
+    const immutableAdventureBubbles = await countImmutableAdventureBubbles(executor, characterId, null);
+
+    return Math.max(
+        0,
+        immutableAdventureBubbles + safeInt(dmBubbles) + additionalBubblesForStartTier(startTier),
+    );
+}
+
+async function getCharacterProgressionUpgradeStateForDiscord(discordUser, characterId) {
+    await ensureLevelProgressionLoaded();
+
+    const character = await findCharacterForDiscord(discordUser, characterId);
+    if (!character) {
+        return { ok: false, reason: 'not_found' };
+    }
+
+    const activeVersionId = activeLevelProgressionVersionId();
+    const currentVersionId = safeInt(character.progression_version_id) > 0
+        ? safeInt(character.progression_version_id)
+        : activeVersionId;
+    const usesManualTracking = Boolean(character.simplified_tracking) || Boolean(safeInt(character.has_pseudo_adventure));
+    const currentAvailableBubbles = calculateCharacterAvailableBubbles(character);
+    const currentLevel = calculateLevel(character);
+    const currentBubblesInLevel = Math.max(
+        0,
+        currentAvailableBubbles - bubblesRequiredForLevel(currentLevel, currentVersionId),
+    );
+    const recalculatedLevel = levelFromAvailableBubbles(currentAvailableBubbles, activeVersionId);
+    const recalculatedBubblesInLevel = Math.max(
+        0,
+        currentAvailableBubbles - bubblesRequiredForLevel(recalculatedLevel, activeVersionId),
+    );
+    const latestPseudo = usesManualTracking
+        ? await getLatestPseudoAdventureState(null, characterId)
+        : null;
+    const immutableAdventureBubbles = await countImmutableAdventureBubbles(null, characterId, latestPseudo);
+    const additional = additionalBubblesForStartTier(character.start_tier);
+    const minimumAvailableBubbles = usesManualTracking
+        ? Math.max(0, immutableAdventureBubbles + additional)
+        : Math.max(0, bubblesRequiredForLevel(currentLevel, activeVersionId) + currentBubblesInLevel);
+    const minSelectableLevel = levelFromAvailableBubbles(minimumAvailableBubbles, activeVersionId);
+    const maxSelectableLevel = latestPseudo ? recalculatedLevel : (usesManualTracking ? 20 : recalculatedLevel);
+    const initialTargetLevel = usesManualTracking ? currentLevel : recalculatedLevel;
+    let initialTargetBubblesInLevel = usesManualTracking ? 0 : recalculatedBubblesInLevel;
+
+    if (latestPseudo && latestPseudo.target_level !== null) {
+        const pseudoVersionId = safeInt(latestPseudo.progression_version_id) > 0
+            ? safeInt(latestPseudo.progression_version_id)
+            : currentVersionId;
+        const targetLevel = Math.max(1, safeInt(latestPseudo.target_level, currentLevel));
+        const levelFloor = bubblesRequiredForLevel(targetLevel, pseudoVersionId);
+        initialTargetBubblesInLevel = Math.max(0, safeInt(latestPseudo.target_bubbles) - levelFloor);
+    }
+
+    return {
+        ok: true,
+        character,
+        activeVersionId,
+        currentVersionId,
+        usesManualTracking,
+        hasPseudoAdventure: Boolean(latestPseudo),
+        currentAvailableBubbles,
+        currentLevel,
+        currentBubblesInLevel,
+        recalculatedLevel,
+        recalculatedBubblesInLevel,
+        minSelectableLevel,
+        maxSelectableLevel,
+        minimumAvailableBubbles,
+        initialTargetLevel,
+        initialTargetBubblesInLevel,
+    };
+}
+
+async function upgradeCharacterProgressionForDiscord(discordUser, characterId, targetLevel, bubblesInLevel = 0) {
+    await ensureLevelProgressionLoaded();
+
+    const state = await getCharacterProgressionUpgradeStateForDiscord(discordUser, characterId);
+    if (!state.ok) {
+        return state;
+    }
+
+    const { character, activeVersionId, currentVersionId, usesManualTracking, hasPseudoAdventure, currentAvailableBubbles, currentLevel, currentBubblesInLevel, recalculatedLevel, minSelectableLevel, maxSelectableLevel, minimumAvailableBubbles } = state;
+
+    if (character.is_filler) {
+        return { ok: false, reason: 'filler' };
+    }
+
+    const normalizedLevel = normalizeLevel(targetLevel, null);
+    if (!normalizedLevel) {
+        return { ok: false, reason: 'invalid_level' };
+    }
+
+    if (normalizedLevel < minSelectableLevel) {
+        return { ok: false, reason: 'below_real', minLevel: minSelectableLevel };
+    }
+
+    if (normalizedLevel > maxSelectableLevel) {
+        return {
+            ok: false,
+            reason: 'above_max',
+            maxLevel: maxSelectableLevel,
+        };
+    }
+
+    if (!usesManualTracking) {
+        const baseBubbles = await countAdventureTrackedBaseBubbles(null, characterId, character.start_tier, character.dm_bubbles);
+        const currentSpend = safeInt(character.bubble_shop_spend);
+        const levelFloor = bubblesRequiredForLevel(normalizedLevel, activeVersionId);
+        const minBubblesInLevel = normalizedLevel >= 20
+            ? 0
+            : Math.max(0, minimumAvailableBubbles - levelFloor);
+        const maxBubblesInLevel = normalizedLevel >= 20
+            ? 0
+            : Math.max(0, Math.min(
+                bubblesRequiredForLevel(Math.min(20, normalizedLevel + 1), activeVersionId) - levelFloor - 1,
+                currentAvailableBubbles - levelFloor,
+            ));
+        const clampedBubblesInLevel = normalizedLevel >= 20
+            ? 0
+            : Math.max(minBubblesInLevel, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel));
+        const targetAvailableBubbles = levelFloor + clampedBubblesInLevel;
+
+        if (normalizedLevel > recalculatedLevel) {
+            return { ok: false, reason: 'above_max', maxLevel: recalculatedLevel };
+        }
+
+        if (targetAvailableBubbles > currentAvailableBubbles || targetAvailableBubbles < minimumAvailableBubbles) {
+            return { ok: false, reason: 'below_real', minLevel: minSelectableLevel };
+        }
+
+        const newSpend = Math.max(currentSpend, Math.max(0, baseBubbles - targetAvailableBubbles));
+        await db.execute(
+            'UPDATE characters SET progression_version_id = ?, bubble_shop_spend = ?, updated_at = ? WHERE id = ?',
+            [activeVersionId, newSpend, nowSql(), characterId],
+        );
+
+        return { ok: true };
+    }
+
+    await db.execute(
+        'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
+        [activeVersionId, nowSql(), characterId],
+    );
+
+    const result = await updateCharacterManualLevelForDiscord(discordUser, characterId, normalizedLevel, bubblesInLevel);
+    if (result.ok) {
+        return result;
+    }
+
+    await db.execute(
+        'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
+        [currentVersionId, nowSql(), characterId],
+    );
+
+    return result;
 }
 
 function normalizeAvatar(value) {
@@ -1963,6 +2188,8 @@ module.exports = {
     listCharactersForDiscord,
     getCharacterSubmissionStateForDiscord,
     findCharacterForDiscord,
+    getCharacterProgressionUpgradeStateForDiscord,
+    upgradeCharacterProgressionForDiscord,
     updateCharacterManualLevelForDiscord,
     updateCharacterManualOverridesForDiscord,
     createCharacterForDiscord,

@@ -2,22 +2,17 @@ const assert = require('node:assert/strict');
 
 const dbPath = require.resolve('../db');
 const appDbPath = require.resolve('../appDb');
+const levelProgressionPath = require.resolve('../utils/levelProgression');
 
 const originalDbModule = require.cache[dbPath];
 const originalAppDbModule = require.cache[appDbPath];
+const originalLevelProgressionModule = require.cache[levelProgressionPath];
 
 let step = 0;
 let insertParams = null;
 
 const fakeDb = {
     async execute(sql, params) {
-        if (sql.startsWith('SELECT level, required_bubbles FROM level_progressions')) {
-            return [[
-                { level: 1, required_bubbles: 0 },
-                { level: 2, required_bubbles: 1 },
-            ]];
-        }
-
         step += 1;
 
         if (step === 1) {
@@ -45,6 +40,18 @@ const fakeDb = {
         }
 
         throw new Error(`Unexpected DB step ${step}: ${sql}`);
+    },
+};
+
+require.cache[levelProgressionPath] = {
+    id: levelProgressionPath,
+    filename: levelProgressionPath,
+    loaded: true,
+    exports: {
+        activeLevelProgressionVersionId: () => 1,
+        bubblesRequiredForLevel: (level) => Math.max(0, Number(level) - 1),
+        ensureLevelProgressionLoaded: async () => true,
+        levelFromAvailableBubbles: (availableBubbles) => Math.max(1, Math.floor(Number(availableBubbles) || 0) + 1),
     },
 };
 
@@ -88,5 +95,11 @@ Promise.resolve()
             delete require.cache[appDbPath];
         } else {
             require.cache[appDbPath] = originalAppDbModule;
+        }
+
+        if (originalLevelProgressionModule === undefined) {
+            delete require.cache[levelProgressionPath];
+        } else {
+            require.cache[levelProgressionPath] = originalLevelProgressionModule;
         }
     });

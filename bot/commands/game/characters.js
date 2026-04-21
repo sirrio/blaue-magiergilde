@@ -27,6 +27,7 @@ const {
     countsBubbleAdjustmentsForProgression,
 } = require('../../utils/characterTier');
 const {
+    activeLevelProgressionVersionId,
     bubblesRequiredForLevel,
     ensureLevelProgressionLoaded,
 } = require('../../utils/levelProgression');
@@ -309,6 +310,13 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     // the start-tier bonus (which was never earned through play) and deducts bubble shop
     // spend (which was earned). Correct the downtime base accordingly.
     const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
+    let hasProgressionUpgradeAvailable = false;
+    try {
+        hasProgressionUpgradeAvailable = safeInt(character.progression_version_id) > 0
+            && safeInt(character.progression_version_id) !== activeLevelProgressionVersionId();
+    } catch {
+        hasProgressionUpgradeAvailable = false;
+    }
     const downtimeBubbles = isMixed
         ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
         : totalBubbles;
@@ -372,6 +380,17 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             warningLines.push('ℹ️ Bubble-Shop-Ausgaben werden ABER für die maximale Downtime berücksichtigt.');
         }
         embed.addFields({ name: 'Hinweise', value: warningLines.join('\n'), inline: false });
+    }
+
+    if (hasProgressionUpgradeAvailable) {
+        embed.addFields({
+            name: t('characters.upgradeLevelCurveNoticeTitle', {}, locale),
+            value: [
+                t('characters.upgradeLevelCurveNotice', {}, locale),
+                t('characters.upgradeLevelCurveAction', {}, locale),
+            ].join('\n'),
+            inline: false,
+        });
     }
 
     const externalLink = String(character.external_link || '').trim();

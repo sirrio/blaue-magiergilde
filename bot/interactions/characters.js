@@ -22,8 +22,10 @@ const {
     getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
     getCharacterSubmissionStateForDiscord,
+    getCharacterProgressionUpgradeStateForDiscord,
     updateCharacterManualLevelForDiscord,
     updateCharacterManualOverridesForDiscord,
+    upgradeCharacterProgressionForDiscord,
     updateLinkedUserLocaleForDiscord,
     updateLinkedUserTrackingDefaultForDiscord,
     findCharacterForDiscord,
@@ -81,6 +83,7 @@ const {
     buildParticipantOptions,
     buildCharacterCardPayload,
     buildCharacterCardRows,
+    buildCharacterProgressionUpgradeView,
     buildCharacterRegistrationBlockedContent,
     buildCharacterRegisterNoteModal,
     buildCharacterRegisterConfirmView,
@@ -181,14 +184,42 @@ async function getCharacterRegistrationBlock(interactionUser, characterId) {
 }
 
 async function buildCharacterCardPayloadForInteraction(interactionUser, character, ownerDiscordId) {
+    await ensureLevelProgressionLoaded();
     const registrationState = await getCharacterRegistrationBlock(interactionUser, character.id);
+    const activeVersionId = activeLevelProgressionVersionId();
 
     return buildCharacterCardPayload({
-        character,
+        character: {
+            ...character,
+            locale: await getLinkedUserLocaleForDiscord(interactionUser),
+            has_progression_upgrade_available: safeInt(character.progression_version_id) > 0
+                && safeInt(character.progression_version_id) !== activeVersionId,
+        },
         ownerDiscordId,
         registrationBlockedReason: registrationState.blockedReason,
         registrationCounts: registrationState.counts,
     });
+}
+
+function normalizeProgressionUpgradeSelection(state, selectedLevel, selectedBubbles) {
+    const minSelectableLevel = Math.max(1, safeInt(state.minSelectableLevel, 1));
+    const maxSelectableLevel = Math.max(minSelectableLevel, safeInt(state.maxSelectableLevel, minSelectableLevel));
+    const level = Math.max(minSelectableLevel, Math.min(maxSelectableLevel, safeInt(selectedLevel, state.initialTargetLevel)));
+    const levelFloor = bubblesRequiredForLevel(level, state.activeVersionId);
+    const minBubbles = level >= 20
+        ? 0
+        : Math.max(0, safeInt(state.minimumAvailableBubbles) - levelFloor);
+    const maxBubbles = level >= 20
+        ? 0
+        : Math.max(0, Math.min(
+            bubblesRequiredForLevel(Math.min(20, level + 1), state.activeVersionId) - levelFloor - 1,
+            state.usesManualTracking ? Number.MAX_SAFE_INTEGER : safeInt(state.currentAvailableBubbles) - levelFloor,
+        ));
+    const bubbles = level >= 20
+        ? 0
+        : Math.max(minBubbles, Math.min(maxBubbles, safeInt(selectedBubbles, state.initialTargetBubblesInLevel)));
+
+    return { level, bubbles };
 }
 
 async function resolveInteractionLocale(interaction) {
@@ -256,6 +287,11 @@ function parseDurationToSeconds(input) {
     const minutes = Number(normalized);
     if (Number.isFinite(minutes) && minutes >= 0) return Math.floor(minutes) * 60;
     return null;
+}
+
+function safeInt(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.floor(number) : fallback;
 }
 
 const allowedStartTiers = new Set(['bt', 'lt', 'ht']);
@@ -2607,6 +2643,153 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpgradeLevel_')) {
+        const [, characterIdRaw, ownerDiscordId, selectedBubblesRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+        if (!state.ok) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const { level, bubbles } = normalizeProgressionUpgradeSelection(
+            state,
+            Number(interaction.values?.[0] || state.initialTargetLevel),
+            Number(selectedBubblesRaw),
+        );
+
+        await interaction.update({
+            ...buildCharacterProgressionUpgradeView({
+                character: state.character,
+                ownerDiscordId,
+                state,
+                selectedLevel: level,
+                selectedBubbles: bubbles,
+                locale,
+            }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpgradeBubbles_')) {
+        const [, characterIdRaw, ownerDiscordId, selectedLevelRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+        if (!state.ok) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const { level, bubbles } = normalizeProgressionUpgradeSelection(
+            state,
+            Number(selectedLevelRaw),
+            Number(interaction.values?.[0] || state.initialTargetBubblesInLevel),
+        );
+
+        await interaction.update({
+            ...buildCharacterProgressionUpgradeView({
+                character: state.character,
+                ownerDiscordId,
+                state,
+                selectedLevel: level,
+                selectedBubbles: bubbles,
+                locale,
+            }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeConfirm_')) {
+        const [, characterIdRaw, ownerDiscordId, levelRaw, bubblesRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await upgradeCharacterProgressionForDiscord(
+            interaction.user,
+            characterId,
+            Number(levelRaw),
+            Number(bubblesRaw),
+        );
+
+        if (!result.ok) {
+            const locale = await resolveInteractionLocale(interaction);
+            let content = await translateInteraction(interaction, 'characters.characterUpdated');
+
+            if (result.reason === 'below_real' && result.minLevel) {
+                content = t('characters.levelCannotBeBelowReal', { level: result.minLevel }, locale);
+            } else if (result.reason === 'above_max' && result.maxLevel) {
+                content = t('characters.upgradeLevelCurveMaxLevelReason', { level: result.maxLevel }, locale);
+            } else if (result.reason === 'character_not_found' || result.reason === 'not_found') {
+                content = await translateInteraction(interaction, 'characters.characterNotFound');
+            }
+
+            await updateManageMessage(interaction, { content, flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterUpdated'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, refreshed, ownerDiscordId)),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeCancel_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
+            content: '',
+        });
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('characterCard_')) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -2686,6 +2869,34 @@ async function handle(interaction) {
 
             await interaction.update({
                 ...buildCharacterRegisterConfirmView({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'upgrade') {
+            const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+            if (!state.ok) {
+                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const locale = await resolveInteractionLocale(interaction);
+            const { level, bubbles } = normalizeProgressionUpgradeSelection(
+                state,
+                state.initialTargetLevel,
+                state.initialTargetBubblesInLevel,
+            );
+
+            await interaction.update({
+                ...buildCharacterProgressionUpgradeView({
+                    character: state.character,
+                    ownerDiscordId,
+                    state,
+                    selectedLevel: level,
+                    selectedBubbles: bubbles,
+                    locale,
+                }),
                 content: '',
             });
             return true;
