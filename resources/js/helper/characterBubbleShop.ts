@@ -5,15 +5,13 @@ export type CharacterBubbleShopPurchaseType =
   | 'skill_proficiency'
   | 'rare_language'
   | 'tool_or_language'
-  | 'lt_downtime'
-  | 'ht_downtime'
+  | 'downtime'
 
 export const characterBubbleShopPurchaseTypes: CharacterBubbleShopPurchaseType[] = [
   'skill_proficiency',
   'rare_language',
   'tool_or_language',
-  'lt_downtime',
-  'ht_downtime',
+  'downtime',
 ]
 
 const tierRank = (tier: Character['start_tier'] | 'et' | string | null | undefined): number => {
@@ -43,14 +41,18 @@ export const getCharacterBubbleShopQuantities = (character: Character): Record<C
   return quantities
 }
 
-export const getCharacterBubbleShopMaxQuantity = (character: Character, type: CharacterBubbleShopPurchaseType): number => {
+export const getCharacterBubbleShopMaxQuantity = (character: Character, type: CharacterBubbleShopPurchaseType): number | null => {
   const unlockedTierRank = Math.max(tierRank(character.start_tier), tierRank(calculateTier(character)))
 
   if (type === 'skill_proficiency') return 1
   if (type === 'rare_language') return 1
   if (type === 'tool_or_language') return 3
-  if (type === 'lt_downtime') return unlockedTierRank >= 2 ? 15 : 0
-  if (type === 'ht_downtime') return unlockedTierRank >= 3 ? 30 : 0
+  if (type === 'downtime') {
+    if (unlockedTierRank >= 4) return null
+    if (unlockedTierRank >= 3) return 45
+    if (unlockedTierRank >= 2) return 15
+    return 0
+  }
 
   return 0
 }
@@ -94,5 +96,5 @@ export const getCharacterBubbleShopExtraDowntimeSeconds = (
   character: Character,
   quantities: Record<CharacterBubbleShopPurchaseType, number> = getCharacterBubbleShopQuantities(character),
 ): number => {
-  return ((quantities.lt_downtime ?? 0) + (quantities.ht_downtime ?? 0)) * 8 * 60 * 60
+  return (quantities.downtime ?? 0) * 8 * 60 * 60
 }

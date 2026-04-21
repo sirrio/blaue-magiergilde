@@ -55,8 +55,7 @@ const fakeDb = {
                     bubble_shop_skill_proficiency: 0,
                     bubble_shop_rare_language: 0,
                     bubble_shop_tool_or_language: 0,
-                    bubble_shop_lt_downtime: 0,
-                    bubble_shop_ht_downtime: 0,
+                    bubble_shop_downtime: 0,
                     progression_version_id: 1,
                     manual_adventures_count: null,
                     manual_faction_rank: null,
@@ -95,8 +94,7 @@ const fakeDb = {
                 bubble_shop_skill_proficiency: 0,
                 bubble_shop_rare_language: 0,
                 bubble_shop_tool_or_language: 0,
-                bubble_shop_lt_downtime: 0,
-                bubble_shop_ht_downtime: 0,
+                bubble_shop_downtime: 0,
                 progression_version_id: 1,
                 manual_adventures_count: null,
                 manual_faction_rank: null,
@@ -168,8 +166,7 @@ Promise.resolve()
             skill_proficiency: 1,
             rare_language: 0,
             tool_or_language: 1,
-            lt_downtime: 2,
-            ht_downtime: 0,
+            downtime: 2,
         });
         assert.equal(success.ok, true);
         assert.equal(executed.filter((entry) => entry.sql.includes('INSERT INTO character_bubble_shop_purchases')).length, 3);
@@ -181,12 +178,11 @@ Promise.resolve()
             skill_proficiency: 0,
             rare_language: 0,
             tool_or_language: 0,
-            lt_downtime: 1,
-            ht_downtime: 0,
+            downtime: 1,
         });
         assert.equal(invalid.ok, false);
         assert.equal(invalid.reason, 'invalid_quantity');
-        assert.equal(invalid.type, 'lt_downtime');
+        assert.equal(invalid.type, 'downtime');
         assert.equal(invalid.max, 0);
         assert.equal(executed.length, 0);
 

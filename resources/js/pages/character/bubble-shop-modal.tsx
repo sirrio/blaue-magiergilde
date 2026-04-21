@@ -27,8 +27,7 @@ const purchaseLabelKey: Record<CharacterBubbleShopPurchaseType, string> = {
   skill_proficiency: 'characters.bubbleShopSkillProficiency',
   rare_language: 'characters.bubbleShopRareLanguage',
   tool_or_language: 'characters.bubbleShopToolOrLanguage',
-  lt_downtime: 'characters.bubbleShopLtDowntime',
-  ht_downtime: 'characters.bubbleShopHtDowntime',
+  downtime: 'characters.bubbleShopDowntime',
 }
 
 export default function BubbleShopModal({
@@ -131,6 +130,7 @@ export default function BubbleShopModal({
               const cost = getCharacterBubbleShopCost(type)
               const label = t(purchaseLabelKey[type])
               const isLocked = max === 0
+              const maxLabel = max === null ? t('common.unlimited') : max
 
               return (
                 <div key={type} className="rounded-md border border-base-200 bg-base-100 px-3 py-2">
@@ -138,11 +138,11 @@ export default function BubbleShopModal({
                     <div className="min-w-0">
                       <div className="font-medium">{label}</div>
                       <div className="text-xs text-base-content/55">
-                        {t('characters.bubbleShopPurchaseMeta', { cost, max })}
+                        {t('characters.bubbleShopPurchaseMeta', { cost, max: maxLabel })}
                       </div>
                       {isLocked ? (
                         <div className="mt-1 text-xs text-warning">
-                          {type === 'lt_downtime' ? t('characters.bubbleShopLtLocked') : t('characters.bubbleShopHtLocked')}
+                          {t('characters.bubbleShopDowntimeLocked')}
                         </div>
                       ) : null}
                     </div>
@@ -173,10 +173,10 @@ export default function BubbleShopModal({
                         size="xs"
                         variant="ghost"
                         modifier="square"
-                        disabled={form.processing || isLocked || form.data[type] >= max}
+                        disabled={form.processing || isLocked || (max !== null && form.data[type] >= max)}
                         aria-label={`${label} +1`}
                         title={`${label} +1`}
-                        onClick={() => form.setData(type, Math.min(max, form.data[type] + 1))}
+                        onClick={() => form.setData(type, max === null ? (form.data[type] + 1) : Math.min(max, form.data[type] + 1))}
                       >
                         <Plus size={12} />
                       </Button>

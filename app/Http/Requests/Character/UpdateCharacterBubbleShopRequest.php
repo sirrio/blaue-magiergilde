@@ -36,8 +36,7 @@ class UpdateCharacterBubbleShopRequest extends FormRequest
             CharacterBubbleShop::TYPE_SKILL_PROFICIENCY => 'required|integer|min:0|max:1',
             CharacterBubbleShop::TYPE_RARE_LANGUAGE => 'required|integer|min:0|max:1',
             CharacterBubbleShop::TYPE_TOOL_OR_LANGUAGE => 'required|integer|min:0|max:3',
-            CharacterBubbleShop::TYPE_LT_DOWNTIME => 'required|integer|min:0|max:15',
-            CharacterBubbleShop::TYPE_HT_DOWNTIME => 'required|integer|min:0|max:30',
+            CharacterBubbleShop::TYPE_DOWNTIME => 'required|integer|min:0',
         ];
     }
 
@@ -56,7 +55,7 @@ class UpdateCharacterBubbleShopRequest extends FormRequest
                     $value = $this->integer($type);
                     $max = $bubbleShop->maxQuantity($character, $type);
 
-                    if ($value > $max) {
+                    if ($max !== null && $value > $max) {
                         $validator->errors()->add($type, $this->maxMessageFor($type, $max));
                     }
                 }
@@ -67,12 +66,9 @@ class UpdateCharacterBubbleShopRequest extends FormRequest
     private function maxMessageFor(string $type, int $max): string
     {
         return match ($type) {
-            CharacterBubbleShop::TYPE_LT_DOWNTIME => $max === 0
-                ? 'LT-Downtime ist erst ab LT verfuegbar.'
-                : "Maximal {$max} LT-Downtime-Kaeufe erlaubt.",
-            CharacterBubbleShop::TYPE_HT_DOWNTIME => $max === 0
-                ? 'HT-Downtime ist erst ab HT verfuegbar.'
-                : "Maximal {$max} HT-Downtime-Kaeufe erlaubt.",
+            CharacterBubbleShop::TYPE_DOWNTIME => $max === 0
+                ? 'Downtime ist erst ab LT verfuegbar.'
+                : "Maximal {$max} Downtime-Kaeufe erlaubt.",
             CharacterBubbleShop::TYPE_TOOL_OR_LANGUAGE => 'Maximal 3 Tool-/Sprach-Kaeufe erlaubt.',
             CharacterBubbleShop::TYPE_SKILL_PROFICIENCY => 'Skill Prof kann nur einmal gekauft werden.',
             CharacterBubbleShop::TYPE_RARE_LANGUAGE => 'Rare Language kann nur einmal gekauft werden.',

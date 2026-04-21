@@ -19,7 +19,7 @@ it('calculates structured spend, legacy coverage and extra downtime bonus', func
         'quantity' => 1,
     ]);
     CharacterBubbleShopPurchase::factory()->for($character)->create([
-        'type' => CharacterBubbleShop::TYPE_HT_DOWNTIME,
+        'type' => CharacterBubbleShop::TYPE_DOWNTIME,
         'quantity' => 3,
     ]);
 
@@ -42,6 +42,33 @@ it('locks downtime purchases until the required tier is reached', function () {
 
     $bubbleShop = new CharacterBubbleShop;
 
-    expect($bubbleShop->maxQuantity($character, CharacterBubbleShop::TYPE_LT_DOWNTIME))->toBe(0)
-        ->and($bubbleShop->maxQuantity($character, CharacterBubbleShop::TYPE_HT_DOWNTIME))->toBe(0);
+    expect($bubbleShop->maxQuantity($character, CharacterBubbleShop::TYPE_DOWNTIME))->toBe(0);
+});
+
+it('expands downtime purchases by unlocked tier', function () {
+    $ltCharacter = Character::factory()->create([
+        'start_tier' => 'lt',
+        'is_filler' => false,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+    ]);
+    $htCharacter = Character::factory()->create([
+        'start_tier' => 'ht',
+        'is_filler' => false,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+    ]);
+    $etCharacter = Character::factory()->create([
+        'start_tier' => 'ht',
+        'is_filler' => false,
+        'dm_bubbles' => 5000,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+    ]);
+
+    $bubbleShop = new CharacterBubbleShop;
+
+    expect($bubbleShop->maxQuantity($ltCharacter, CharacterBubbleShop::TYPE_DOWNTIME))->toBe(15)
+        ->and($bubbleShop->maxQuantity($htCharacter, CharacterBubbleShop::TYPE_DOWNTIME))->toBe(45)
+        ->and($bubbleShop->maxQuantity($etCharacter, CharacterBubbleShop::TYPE_DOWNTIME))->toBeNull();
 });

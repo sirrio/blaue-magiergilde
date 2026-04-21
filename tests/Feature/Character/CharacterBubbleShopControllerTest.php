@@ -20,8 +20,7 @@ it('updates bubble shop purchases and keeps legacy spend as offset', function ()
         'skill_proficiency' => 1,
         'rare_language' => 0,
         'tool_or_language' => 1,
-        'lt_downtime' => 2,
-        'ht_downtime' => 0,
+        'downtime' => 2,
     ]);
 
     $response->assertRedirect();
@@ -33,7 +32,7 @@ it('updates bubble shop purchases and keeps legacy spend as offset', function ()
     expect($character->bubble_shop_legacy_spend)->toBe(8)
         ->and($character->bubble_shop_spend)->toBe(10)
         ->and($purchaseMap)->toBe([
-            'lt_downtime' => 2,
+            'downtime' => 2,
             'skill_proficiency' => 1,
             'tool_or_language' => 1,
         ]);
@@ -56,8 +55,7 @@ it('keeps the effective spend unchanged while structured purchases stay below th
         'skill_proficiency' => 0,
         'rare_language' => 0,
         'tool_or_language' => 2,
-        'lt_downtime' => 1,
-        'ht_downtime' => 0,
+        'downtime' => 1,
     ]);
 
     $response->assertRedirect();
@@ -81,11 +79,35 @@ it('blocks downtime purchases above the unlocked tier', function () {
         'skill_proficiency' => 0,
         'rare_language' => 0,
         'tool_or_language' => 0,
-        'lt_downtime' => 1,
-        'ht_downtime' => 1,
+        'downtime' => 1,
     ]);
 
-    $response->assertSessionHasErrors(['lt_downtime', 'ht_downtime']);
+    $response->assertSessionHasErrors(['downtime']);
+});
+
+it('allows unlimited downtime purchases after et is unlocked', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'start_tier' => 'ht',
+        'is_filler' => false,
+        'dm_bubbles' => 5000,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+    ]);
+
+    $response = $this->actingAs($user)->patch(route('characters.bubble-shop', $character), [
+        'skill_proficiency' => 0,
+        'rare_language' => 0,
+        'tool_or_language' => 0,
+        'downtime' => 60,
+    ]);
+
+    $response->assertRedirect();
+
+    $purchase = $character->fresh()->bubbleShopPurchases()->where('type', 'downtime')->first();
+
+    expect($purchase)->not->toBeNull()
+        ->and($purchase?->quantity)->toBe(60);
 });
 
 it('includes bubble shop purchases on the character detail payload', function () {

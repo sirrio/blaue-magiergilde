@@ -542,7 +542,7 @@ export interface Downtime {
 export interface CharacterBubbleShopPurchase {
   id: number
   character_id: number
-  type: 'skill_proficiency' | 'rare_language' | 'tool_or_language' | 'lt_downtime' | 'ht_downtime'
+  type: 'skill_proficiency' | 'rare_language' | 'tool_or_language' | 'downtime'
   quantity: number
   details?: Record<string, unknown> | null
 }

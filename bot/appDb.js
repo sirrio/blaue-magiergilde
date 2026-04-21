@@ -4,8 +4,7 @@ const {
     TYPE_SKILL_PROFICIENCY,
     TYPE_RARE_LANGUAGE,
     TYPE_TOOL_OR_LANGUAGE,
-    TYPE_LT_DOWNTIME,
-    TYPE_HT_DOWNTIME,
+    TYPE_DOWNTIME,
     purchaseTypes,
     definitionsForCharacter,
     quantitiesForCharacter,
@@ -70,8 +69,7 @@ const bubbleShopPurchaseSelect = `
                 COALESCE(shop.skill_proficiency_quantity, 0) AS bubble_shop_skill_proficiency,
                 COALESCE(shop.rare_language_quantity, 0) AS bubble_shop_rare_language,
                 COALESCE(shop.tool_or_language_quantity, 0) AS bubble_shop_tool_or_language,
-                COALESCE(shop.lt_downtime_quantity, 0) AS bubble_shop_lt_downtime,
-                COALESCE(shop.ht_downtime_quantity, 0) AS bubble_shop_ht_downtime,
+                COALESCE(shop.downtime_quantity, 0) AS bubble_shop_downtime,
 `;
 
 const bubbleShopPurchaseJoin = `
@@ -81,8 +79,7 @@ const bubbleShopPurchaseJoin = `
                     SUM(CASE WHEN type = 'skill_proficiency' THEN quantity ELSE 0 END) AS skill_proficiency_quantity,
                     SUM(CASE WHEN type = 'rare_language' THEN quantity ELSE 0 END) AS rare_language_quantity,
                     SUM(CASE WHEN type = 'tool_or_language' THEN quantity ELSE 0 END) AS tool_or_language_quantity,
-                    SUM(CASE WHEN type = 'lt_downtime' THEN quantity ELSE 0 END) AS lt_downtime_quantity,
-                    SUM(CASE WHEN type = 'ht_downtime' THEN quantity ELSE 0 END) AS ht_downtime_quantity
+                    SUM(CASE WHEN type = 'downtime' THEN quantity ELSE 0 END) AS downtime_quantity
                 FROM character_bubble_shop_purchases
                 GROUP BY character_id
             ) shop ON shop.character_id = c.id
@@ -1083,19 +1080,23 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
     const normalizedQuantities = quantitiesForCharacter(existing);
     for (const type of purchaseTypes()) {
         if (Object.prototype.hasOwnProperty.call(purchases || {}, type)) {
-            normalizedQuantities[type] = normalizeNumber(purchases[type], normalizedQuantities[type], 999);
+            normalizedQuantities[type] = normalizeNumber(
+                purchases[type],
+                normalizedQuantities[type],
+                100000,
+            );
         }
     }
 
     const definitions = definitionsForCharacter(existing);
     for (const type of purchaseTypes()) {
-        const max = safeInt(definitions[type]?.max);
-        if (normalizedQuantities[type] > max) {
+        const max = definitions[type]?.max;
+        if (max !== null && normalizedQuantities[type] > safeInt(max)) {
             return {
                 ok: false,
                 reason: 'invalid_quantity',
                 type,
-                max,
+                max: safeInt(max),
             };
         }
     }
@@ -1130,8 +1131,7 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
             bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
             bubble_shop_rare_language: normalizedQuantities[TYPE_RARE_LANGUAGE],
             bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
-            bubble_shop_lt_downtime: normalizedQuantities[TYPE_LT_DOWNTIME],
-            bubble_shop_ht_downtime: normalizedQuantities[TYPE_HT_DOWNTIME],
+            bubble_shop_downtime: normalizedQuantities[TYPE_DOWNTIME],
         });
 
         await connection.execute(

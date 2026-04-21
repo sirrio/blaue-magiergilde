@@ -3,8 +3,7 @@ const { calculateLevel, calculateTierFromLevel } = require('./characterTier');
 const TYPE_SKILL_PROFICIENCY = 'skill_proficiency';
 const TYPE_RARE_LANGUAGE = 'rare_language';
 const TYPE_TOOL_OR_LANGUAGE = 'tool_or_language';
-const TYPE_LT_DOWNTIME = 'lt_downtime';
-const TYPE_HT_DOWNTIME = 'ht_downtime';
+const TYPE_DOWNTIME = 'downtime';
 
 const DOWNTIME_SECONDS_PER_PURCHASE = 8 * 60 * 60;
 
@@ -18,8 +17,7 @@ function purchaseTypes() {
         TYPE_SKILL_PROFICIENCY,
         TYPE_RARE_LANGUAGE,
         TYPE_TOOL_OR_LANGUAGE,
-        TYPE_LT_DOWNTIME,
-        TYPE_HT_DOWNTIME,
+        TYPE_DOWNTIME,
     ];
 }
 
@@ -60,8 +58,10 @@ function definitionsForCharacter(character) {
         [TYPE_SKILL_PROFICIENCY]: { cost: 6, max: 1 },
         [TYPE_RARE_LANGUAGE]: { cost: 4, max: 1 },
         [TYPE_TOOL_OR_LANGUAGE]: { cost: 2, max: 3 },
-        [TYPE_LT_DOWNTIME]: { cost: 1, max: unlockedTierRank >= 2 ? 15 : 0 },
-        [TYPE_HT_DOWNTIME]: { cost: 1, max: unlockedTierRank >= 3 ? 30 : 0 },
+        [TYPE_DOWNTIME]: {
+            cost: 1,
+            max: unlockedTierRank >= 4 ? null : (unlockedTierRank >= 3 ? 45 : (unlockedTierRank >= 2 ? 15 : 0)),
+        },
     };
 }
 
@@ -70,8 +70,7 @@ function quantitiesForCharacter(character) {
         [TYPE_SKILL_PROFICIENCY]: safeInt(character?.bubble_shop_skill_proficiency),
         [TYPE_RARE_LANGUAGE]: safeInt(character?.bubble_shop_rare_language),
         [TYPE_TOOL_OR_LANGUAGE]: safeInt(character?.bubble_shop_tool_or_language),
-        [TYPE_LT_DOWNTIME]: safeInt(character?.bubble_shop_lt_downtime),
-        [TYPE_HT_DOWNTIME]: safeInt(character?.bubble_shop_ht_downtime),
+        [TYPE_DOWNTIME]: safeInt(character?.bubble_shop_downtime),
     };
 }
 
@@ -113,18 +112,14 @@ function additionalSpendBeyondLegacyForCharacter(character, quantities = quantit
 }
 
 function extraDowntimeSecondsForCharacter(character, quantities = quantitiesForCharacter(character)) {
-    return (
-        safeInt(quantities[TYPE_LT_DOWNTIME]) +
-        safeInt(quantities[TYPE_HT_DOWNTIME])
-    ) * DOWNTIME_SECONDS_PER_PURCHASE;
+    return safeInt(quantities[TYPE_DOWNTIME]) * DOWNTIME_SECONDS_PER_PURCHASE;
 }
 
 module.exports = {
     TYPE_SKILL_PROFICIENCY,
     TYPE_RARE_LANGUAGE,
     TYPE_TOOL_OR_LANGUAGE,
-    TYPE_LT_DOWNTIME,
-    TYPE_HT_DOWNTIME,
+    TYPE_DOWNTIME,
     purchaseTypes,
     definitionsForCharacter,
     quantitiesForCharacter,

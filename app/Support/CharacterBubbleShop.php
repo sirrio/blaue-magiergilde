@@ -14,13 +14,11 @@ class CharacterBubbleShop
 
     public const TYPE_TOOL_OR_LANGUAGE = 'tool_or_language';
 
-    public const TYPE_LT_DOWNTIME = 'lt_downtime';
-
-    public const TYPE_HT_DOWNTIME = 'ht_downtime';
+    public const TYPE_DOWNTIME = 'downtime';
 
     private const LT_DOWNTIME_MAX = 15;
 
-    private const HT_DOWNTIME_MAX = 30;
+    private const HT_DOWNTIME_MAX = 45;
 
     private const DOWNTIME_SECONDS_PER_PURCHASE = 28800;
 
@@ -35,13 +33,12 @@ class CharacterBubbleShop
             self::TYPE_SKILL_PROFICIENCY,
             self::TYPE_RARE_LANGUAGE,
             self::TYPE_TOOL_OR_LANGUAGE,
-            self::TYPE_LT_DOWNTIME,
-            self::TYPE_HT_DOWNTIME,
+            self::TYPE_DOWNTIME,
         ];
     }
 
     /**
-     * @return array<string, array{cost:int,max:int}>
+     * @return array<string, array{cost:int,max:int|null}>
      */
     public function definitionsFor(Character $character): array
     {
@@ -49,8 +46,7 @@ class CharacterBubbleShop
             self::TYPE_SKILL_PROFICIENCY => ['cost' => 6, 'max' => 1],
             self::TYPE_RARE_LANGUAGE => ['cost' => 4, 'max' => 1],
             self::TYPE_TOOL_OR_LANGUAGE => ['cost' => 2, 'max' => 3],
-            self::TYPE_LT_DOWNTIME => ['cost' => 1, 'max' => $this->ltDowntimeMaxFor($character)],
-            self::TYPE_HT_DOWNTIME => ['cost' => 1, 'max' => $this->htDowntimeMaxFor($character)],
+            self::TYPE_DOWNTIME => ['cost' => 1, 'max' => $this->downtimeMaxFor($character)],
         ];
     }
 
@@ -111,10 +107,7 @@ class CharacterBubbleShop
     {
         $quantities = $this->quantitiesFor($character);
 
-        return (
-            ($quantities[self::TYPE_LT_DOWNTIME] ?? 0)
-            + ($quantities[self::TYPE_HT_DOWNTIME] ?? 0)
-        ) * self::DOWNTIME_SECONDS_PER_PURCHASE;
+        return ($quantities[self::TYPE_DOWNTIME] ?? 0) * self::DOWNTIME_SECONDS_PER_PURCHASE;
     }
 
     public function syncEffectiveSpend(Character $character): Character
@@ -133,9 +126,15 @@ class CharacterBubbleShop
         return $character;
     }
 
-    public function maxQuantity(Character $character, string $type): int
+    public function maxQuantity(Character $character, string $type): ?int
     {
-        return $this->definitionsFor($character)[$type]['max'] ?? 0;
+        $definitions = $this->definitionsFor($character);
+
+        if (! array_key_exists($type, $definitions)) {
+            return 0;
+        }
+
+        return $definitions[$type]['max'];
     }
 
     /**
@@ -150,14 +149,14 @@ class CharacterBubbleShop
         return $character->bubbleShopPurchases()->get();
     }
 
-    private function ltDowntimeMaxFor(Character $character): int
+    private function downtimeMaxFor(Character $character): ?int
     {
-        return $this->highestUnlockedTierRank($character) >= 2 ? self::LT_DOWNTIME_MAX : 0;
-    }
-
-    private function htDowntimeMaxFor(Character $character): int
-    {
-        return $this->highestUnlockedTierRank($character) >= 3 ? self::HT_DOWNTIME_MAX : 0;
+        return match ($this->highestUnlockedTierRank($character)) {
+            4 => null,
+            3 => self::HT_DOWNTIME_MAX,
+            2 => self::LT_DOWNTIME_MAX,
+            default => 0,
+        };
     }
 
     private function highestUnlockedTierRank(Character $character): int

@@ -50,8 +50,7 @@ const {
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
 const {
-    TYPE_HT_DOWNTIME,
-    TYPE_LT_DOWNTIME,
+    TYPE_DOWNTIME,
     TYPE_RARE_LANGUAGE,
     TYPE_SKILL_PROFICIENCY,
     TYPE_TOOL_OR_LANGUAGE,
@@ -2461,8 +2460,7 @@ async function handle(interaction) {
             [TYPE_SKILL_PROFICIENCY]: interaction.fields.getTextInputValue(TYPE_SKILL_PROFICIENCY),
             [TYPE_RARE_LANGUAGE]: interaction.fields.getTextInputValue(TYPE_RARE_LANGUAGE),
             [TYPE_TOOL_OR_LANGUAGE]: interaction.fields.getTextInputValue(TYPE_TOOL_OR_LANGUAGE),
-            [TYPE_LT_DOWNTIME]: interaction.fields.getTextInputValue(TYPE_LT_DOWNTIME),
-            [TYPE_HT_DOWNTIME]: interaction.fields.getTextInputValue(TYPE_HT_DOWNTIME),
+            [TYPE_DOWNTIME]: interaction.fields.getTextInputValue(TYPE_DOWNTIME),
         };
         const result = await updateCharacterBubbleShopForDiscordAndSync(interaction.user, characterId, payload);
         if (!result.ok) {
@@ -3286,12 +3284,8 @@ async function handle(interaction) {
                     label: `${t('characters.bubbleShopToolOrLanguageShort', {}, locale)} (0-${safeInt(definitions[TYPE_TOOL_OR_LANGUAGE]?.max)})`,
                 },
                 {
-                    id: TYPE_LT_DOWNTIME,
-                    label: `${t('characters.bubbleShopLtDowntimeShort', {}, locale)} (0-${safeInt(definitions[TYPE_LT_DOWNTIME]?.max)})`,
-                },
-                {
-                    id: TYPE_HT_DOWNTIME,
-                    label: `${t('characters.bubbleShopHtDowntimeShort', {}, locale)} (0-${safeInt(definitions[TYPE_HT_DOWNTIME]?.max)})`,
+                    id: TYPE_DOWNTIME,
+                    label: `${t('characters.bubbleShopDowntimeShort', {}, locale)} (0-${definitions[TYPE_DOWNTIME]?.max ?? 'unlimited'})`,
                 },
             ];
 
