@@ -1,13 +1,9 @@
-import { calculateTier } from '@/helper/calculateTier'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
+import { calculateTier } from '@/helper/calculateTier'
 import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { Character } from '@/types'
 
-export type CharacterBubbleShopPurchaseType =
-  | 'skill_proficiency'
-  | 'rare_language'
-  | 'tool_or_language'
-  | 'downtime'
+export type CharacterBubbleShopPurchaseType = 'skill_proficiency' | 'rare_language' | 'tool_or_language' | 'downtime'
 
 export const characterBubbleShopPurchaseTypes: CharacterBubbleShopPurchaseType[] = [
   'skill_proficiency',
@@ -28,9 +24,7 @@ export const getCharacterBubbleShopLegacySpend = (character: Character): number 
 }
 
 export const getCharacterBubbleShopQuantities = (character: Character): Record<CharacterBubbleShopPurchaseType, number> => {
-  const quantities = Object.fromEntries(
-    characterBubbleShopPurchaseTypes.map((type) => [type, 0]),
-  ) as Record<CharacterBubbleShopPurchaseType, number>
+  const quantities = Object.fromEntries(characterBubbleShopPurchaseTypes.map((type) => [type, 0])) as Record<CharacterBubbleShopPurchaseType, number>
 
   for (const purchase of character.bubble_shop_purchases ?? []) {
     if (!characterBubbleShopPurchaseTypes.includes(purchase.type)) {
@@ -72,7 +66,7 @@ export const getCharacterBubbleShopStructuredSpend = (
   character: Character,
   quantities: Record<CharacterBubbleShopPurchaseType, number> = getCharacterBubbleShopQuantities(character),
 ): number => {
-  return characterBubbleShopPurchaseTypes.reduce((total, type) => total + (quantities[type] * getCharacterBubbleShopCost(type)), 0)
+  return characterBubbleShopPurchaseTypes.reduce((total, type) => total + quantities[type] * getCharacterBubbleShopCost(type), 0)
 }
 
 export const getCharacterBubbleShopCoveredByLegacy = (
@@ -89,9 +83,7 @@ export const getCharacterBubbleShopEffectiveSpend = (
   return Math.max(getCharacterBubbleShopLegacySpend(character), getCharacterBubbleShopStructuredSpend(character, quantities))
 }
 
-export const getCharacterBubbleShopMaxEffectiveSpendWithoutDownlevel = (
-  character: Character,
-): number | null => {
+export const getCharacterBubbleShopMaxEffectiveSpendWithoutDownlevel = (character: Character): number | null => {
   if (character.simplified_tracking && !(character.adventures ?? []).some((adventure) => Boolean(adventure.is_pseudo))) {
     return null
   }

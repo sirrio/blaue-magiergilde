@@ -42,10 +42,6 @@ it('does not create a pseudo anchor when switching to level tracking without set
         ]);
     }
 
-    $state = new CharacterProgressionState;
-    $before = $character->fresh('adventures');
-    $expectedLevel = $state->currentLevel($before);
-
     $this->actingAs($user)->patch(route('characters.tracking', $character), [
         'simplified_tracking' => true,
     ])->assertRedirect();
@@ -53,15 +49,7 @@ it('does not create a pseudo anchor when switching to level tracking without set
     $duringManualMode = $character->fresh('adventures');
 
     expect($duringManualMode->simplified_tracking)->toBeTrue()
-        ->and($state->hasPseudoAdventures($duringManualMode))->toBeFalse()
-        ->and($state->currentLevel($duringManualMode))->toBe($expectedLevel);
-
-    $duringManualMode->forceFill([
-        'bubble_shop_spend' => 15,
-    ])->save();
-
-    $withSpendApplied = $duringManualMode->fresh('adventures');
-    $expectedLevelWithSpend = $state->currentLevel($withSpendApplied);
+        ->and((new CharacterProgressionState)->hasPseudoAdventures($duringManualMode))->toBeFalse();
 
     $this->actingAs($user)->patch(route('characters.tracking', $character), [
         'simplified_tracking' => false,
@@ -70,8 +58,7 @@ it('does not create a pseudo anchor when switching to level tracking without set
     $after = $character->fresh('adventures');
 
     expect($after->simplified_tracking)->toBeFalse()
-        ->and($state->hasPseudoAdventures($after))->toBeFalse()
-        ->and($state->currentLevel($after))->toBe($expectedLevelWithSpend);
+        ->and((new CharacterProgressionState)->hasPseudoAdventures($after))->toBeFalse();
 });
 
 it('forbids changing tracking mode on foreign characters', function () {

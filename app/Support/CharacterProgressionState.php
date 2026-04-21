@@ -11,7 +11,7 @@ class CharacterProgressionState
 {
     public function usesManualLevelTracking(Character $character): bool
     {
-        return $this->hasPseudoAdventures($character);
+        return (bool) $character->simplified_tracking || $this->hasPseudoAdventures($character);
     }
 
     public function countsBubbleAdjustments(Character $character): bool

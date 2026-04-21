@@ -547,7 +547,6 @@ export interface CharacterBubbleShopPurchase {
   details?: Record<string, unknown> | null
 }
 
-
 export interface Game {
   id: number
   title: string

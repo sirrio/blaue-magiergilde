@@ -1,15 +1,14 @@
+import { Button } from '@/components/ui/button'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { calculateLevel } from '@/helper/calculateLevel'
 import { bubblesRequiredForLevel, bubblesRequiredForNextLevel, clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
 import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { Gauge } from 'lucide-react'
-import { Droplets } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import { Droplets, Gauge } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 const MAX_LEVEL = 20
 
@@ -39,15 +38,15 @@ const SetCharacterLevelModal = ({
   const initialLevel = clampLevel(calculateLevel(character))
   const progressionVersionId = character.progression_version_id ?? undefined
   const initialBubblesInLevel = (() => {
-    const pseudo = [...character.adventures].sort((a, b) => {
-      const d = String(b.start_date).localeCompare(String(a.start_date))
-      return d !== 0 ? d : b.id - a.id
-    }).find(a => a.is_pseudo) ?? null
+    const pseudo =
+      [...character.adventures]
+        .sort((a, b) => {
+          const d = String(b.start_date).localeCompare(String(a.start_date))
+          return d !== 0 ? d : b.id - a.id
+        })
+        .find((a) => a.is_pseudo) ?? null
     if (!pseudo || pseudo.target_bubbles == null || pseudo.target_level == null) return 0
-    return Math.max(
-      0,
-      pseudo.target_bubbles - bubblesRequiredForLevel(pseudo.target_level, pseudo.progression_version_id ?? progressionVersionId),
-    )
+    return Math.max(0, pseudo.target_bubbles - bubblesRequiredForLevel(pseudo.target_level, pseudo.progression_version_id ?? progressionVersionId))
   })()
   const { data, setData, post, processing } = useForm({ level: initialLevel, bubbles_in_level: initialBubblesInLevel })
   const [isOpen, setIsOpen] = useState(false)
@@ -70,10 +69,12 @@ const SetCharacterLevelModal = ({
     ? Math.max(
         0,
         character.adventures
-          .filter((a) => !a.is_pseudo && (
-            String(a.start_date) > String(latestPseudoAdventure.start_date)
-            || (String(a.start_date) === String(latestPseudoAdventure.start_date) && a.id > latestPseudoAdventure.id)
-          ))
+          .filter(
+            (a) =>
+              !a.is_pseudo &&
+              (String(a.start_date) > String(latestPseudoAdventure.start_date) ||
+                (String(a.start_date) === String(latestPseudoAdventure.start_date) && a.id > latestPseudoAdventure.id)),
+          )
           .reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
       )
     : Math.max(
@@ -81,28 +82,29 @@ const SetCharacterLevelModal = ({
         character.adventures.reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
       )
   const minAllowedLevel = levelFromAvailableBubbles(
-    immutableAdventureBubbles
-      + (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0)
-      + additionalBubblesForStartTier(character.start_tier)
-      - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
+    immutableAdventureBubbles +
+      (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0) +
+      additionalBubblesForStartTier(character.start_tier) -
+      (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
     progressionVersionId,
   )
   const minAllowedAvailableBubbles = Math.max(
     0,
-    immutableAdventureBubbles
-      + (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0)
-      + additionalBubblesForStartTier(character.start_tier)
-      - (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
+    immutableAdventureBubbles +
+      (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0) +
+      additionalBubblesForStartTier(character.start_tier) -
+      (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
   )
   const minSelectableLevel = character.is_filler ? 1 : minAllowedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
   const bubblesForTargetLevel = bubblesRequiredForNextLevel(targetLevel, progressionVersionId)
-  const minBubblesInSelectedLevel = targetLevel >= 20
-    ? 0
-    : Math.min(
-        Math.max(0, bubblesForTargetLevel - 1),
-        Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(targetLevel, progressionVersionId)),
-      )
+  const minBubblesInSelectedLevel =
+    targetLevel >= 20
+      ? 0
+      : Math.min(
+          Math.max(0, bubblesForTargetLevel - 1),
+          Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(targetLevel, progressionVersionId)),
+        )
   const maxBubblesInSelectedLevel = targetLevel >= 20 ? 0 : Math.max(0, bubblesForTargetLevel - 1)
   const displayedBubblesInSelectedLevel = maxBubblesInSelectedLevel
   const targetBubblesInLevel = Math.max(
@@ -110,7 +112,8 @@ const SetCharacterLevelModal = ({
     Math.min(Number.isFinite(Number(data.bubbles_in_level)) ? Number(data.bubbles_in_level) : 0, maxBubblesInSelectedLevel),
   )
   const canSetBubbles = targetLevel < 20 && displayedBubblesInSelectedLevel > 0
-  const hasChanges = levelDelta !== 0 || (canSetBubbles && targetBubblesInLevel !== (levelDelta === 0 ? initialBubblesInLevel : minBubblesInSelectedLevel))
+  const hasChanges =
+    levelDelta !== 0 || (canSetBubbles && targetBubblesInLevel !== (levelDelta === 0 ? initialBubblesInLevel : minBubblesInSelectedLevel))
 
   useEffect(() => {
     if (!isOpen) {
@@ -118,20 +121,18 @@ const SetCharacterLevelModal = ({
     }
 
     const newLevel = Math.max(initialLevel, minSelectableLevel)
-    const newMinBubbles = newLevel >= 20
-      ? 0
-      : Math.min(
-          Math.max(0, bubblesRequiredForNextLevel(newLevel, progressionVersionId) - 1),
-          Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(newLevel, progressionVersionId)),
-        )
+    const newMinBubbles =
+      newLevel >= 20
+        ? 0
+        : Math.min(
+            Math.max(0, bubblesRequiredForNextLevel(newLevel, progressionVersionId) - 1),
+            Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(newLevel, progressionVersionId)),
+          )
     const newMaxBubbles = newLevel >= 20 ? 0 : Math.max(0, bubblesRequiredForNextLevel(newLevel, progressionVersionId) - 1)
-    setData(prev => ({
+    setData((prev) => ({
       ...prev,
       level: newLevel,
-      bubbles_in_level: Math.max(
-        newMinBubbles,
-        Math.min(newLevel === initialLevel ? initialBubblesInLevel : newMinBubbles, newMaxBubbles),
-      ),
+      bubbles_in_level: Math.max(newMinBubbles, Math.min(newLevel === initialLevel ? initialBubblesInLevel : newMinBubbles, newMaxBubbles)),
     }))
   }, [initialLevel, initialBubblesInLevel, isOpen, minAllowedAvailableBubbles, minSelectableLevel, progressionVersionId, setData])
 
@@ -143,20 +144,18 @@ const SetCharacterLevelModal = ({
 
   const setLevel = (value: number) => {
     const clamped = clampLevel(value)
-    const minBubbles = clamped >= 20
-      ? 0
-      : Math.min(
-          Math.max(0, bubblesRequiredForNextLevel(clamped, progressionVersionId) - 1),
-          Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(clamped, progressionVersionId)),
-        )
+    const minBubbles =
+      clamped >= 20
+        ? 0
+        : Math.min(
+            Math.max(0, bubblesRequiredForNextLevel(clamped, progressionVersionId) - 1),
+            Math.max(0, minAllowedAvailableBubbles - bubblesRequiredForLevel(clamped, progressionVersionId)),
+          )
     const maxBubbles = clamped >= 20 ? 0 : Math.max(0, bubblesRequiredForNextLevel(clamped, progressionVersionId) - 1)
-    setData(prev => ({
+    setData((prev) => ({
       ...prev,
       level: clamped,
-      bubbles_in_level: Math.max(
-        minBubbles,
-        Math.min(clamped === initialLevel ? initialBubblesInLevel : minBubbles, maxBubbles),
-      ),
+      bubbles_in_level: Math.max(minBubbles, Math.min(clamped === initialLevel ? initialBubblesInLevel : minBubbles, maxBubbles)),
     }))
   }
 
@@ -185,7 +184,11 @@ const SetCharacterLevelModal = ({
           onClick={() => setIsOpen(true)}
         >
           <Gauge size={14} />
-          {showLabel ? <span className={labelClassName}>{t('characters.setLevel')}</span> : <span className="md:hidden">{t('characters.setLevel')}</span>}
+          {showLabel ? (
+            <span className={labelClassName}>{t('characters.setLevel')}</span>
+          ) : (
+            <span className="md:hidden">{t('characters.setLevel')}</span>
+          )}
         </Button>
       </ModalTrigger>
       <ModalTitle>
@@ -197,21 +200,27 @@ const SetCharacterLevelModal = ({
       <ModalContent>
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">{t('characters.currentLevel', { level: initialLevel })}</span>
-            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1 text-primary">{t('characters.targetLevel', { level: targetLevel })}</span>
+            <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
+              {t('characters.currentLevel', { level: initialLevel })}
+            </span>
+            <span className="border-primary/40 bg-primary/10 text-primary rounded-full border px-2 py-1">
+              {t('characters.targetLevel', { level: targetLevel })}
+            </span>
             {hasChanges ? (
-              <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">
+              <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
                 {levelDelta > 0 ? '+' : ''}
                 {levelDelta}
               </span>
             ) : null}
             {!character.is_filler ? (
-              <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">{t('characters.minAllowedLevel', { level: minSelectableLevel })}</span>
+              <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
+                {t('characters.minAllowedLevel', { level: minSelectableLevel })}
+              </span>
             ) : null}
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-base-content/50">{t('characters.selectLevel')}</p>
+            <p className="text-base-content/50 text-xs tracking-wide uppercase">{t('characters.selectLevel')}</p>
             <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
               {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((level) => {
                 const isDisabled = processing || level < minSelectableLevel
@@ -222,19 +231,17 @@ const SetCharacterLevelModal = ({
                 const isStrongAboveSelection = isAboveSelection && !isBelowHoverPreview
 
                 return (
-                  <div
-                    key={level}
-                    className="w-full"
-                    title={isDisabled ? levelRestrictionReason : undefined}
-                  >
+                  <div key={level} className="w-full" title={isDisabled ? levelRestrictionReason : undefined}>
                     <Button
                       size="xs"
                       variant="ghost"
                       className={cn(
                         'w-full justify-center border transition-colors',
-                        isBelowSelection && !isSelected && 'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
+                        isBelowSelection &&
+                          !isSelected &&
+                          'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
                         isStrongAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
-                        isSelected && 'border-primary bg-primary/15 font-semibold text-primary',
+                        isSelected && 'border-primary bg-primary/15 text-primary font-semibold',
                         isBelowHoverPreview && !isSelected && 'border-base-300/80 bg-primary/10 text-primary',
                       )}
                       onClick={() => setLevel(level)}
@@ -253,9 +260,7 @@ const SetCharacterLevelModal = ({
           </div>
           {canSetBubbles && (
             <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide text-base-content/50">
-                {t('characters.selectBubblesInLevel')}
-              </p>
+              <p className="text-base-content/50 text-xs tracking-wide uppercase">{t('characters.selectBubblesInLevel')}</p>
               <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
                 {Array.from({ length: displayedBubblesInSelectedLevel }, (_, i) => {
                   const bubbleIndex = i + 1
@@ -270,14 +275,21 @@ const SetCharacterLevelModal = ({
                       variant="ghost"
                       type="button"
                       disabled={processing || isDisabled}
-                      onClick={() => setData('bubbles_in_level', targetBubblesInLevel === bubbleIndex ? Math.max(minBubblesInSelectedLevel, bubbleIndex - 1) : bubbleIndex)}
+                      onClick={() =>
+                        setData(
+                          'bubbles_in_level',
+                          targetBubblesInLevel === bubbleIndex ? Math.max(minBubblesInSelectedLevel, bubbleIndex - 1) : bubbleIndex,
+                        )
+                      }
                       aria-label={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                       className={cn(
                         'w-full justify-center gap-1 border transition-colors',
-                        isDisabled && 'cursor-not-allowed border-base-300/50 text-base-content/20',
-                        isBelowSelection && !isSelected && 'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
+                        isDisabled && 'border-base-300/50 text-base-content/20 cursor-not-allowed',
+                        isBelowSelection &&
+                          !isSelected &&
+                          'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
                         isAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
-                        isSelected && 'border-primary bg-primary/15 font-semibold text-primary',
+                        isSelected && 'border-primary bg-primary/15 text-primary font-semibold',
                       )}
                       title={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                     >
@@ -290,11 +302,9 @@ const SetCharacterLevelModal = ({
             </div>
           )}
 
-          {errors.level ? <p className="text-xs text-error">{errors.level}</p> : null}
+          {errors.level ? <p className="text-error text-xs">{errors.level}</p> : null}
 
-          <div className="rounded-box border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
-            {t('characters.applyLevelHint')}
-          </div>
+          <div className="rounded-box border-warning/30 bg-warning/10 text-warning border p-3 text-xs">{t('characters.applyLevelHint')}</div>
         </div>
       </ModalContent>
       <ModalAction onClick={handleSubmit} disabled={processing || !hasChanges}>
