@@ -42,11 +42,13 @@ class CharacterBubbleShop
      */
     public function definitionsFor(Character $character): array
     {
+        $quantities = $this->quantitiesFor($character);
+
         return [
             self::TYPE_SKILL_PROFICIENCY => ['cost' => 6, 'max' => 1],
             self::TYPE_RARE_LANGUAGE => ['cost' => 4, 'max' => 1],
             self::TYPE_TOOL_OR_LANGUAGE => ['cost' => 2, 'max' => 3],
-            self::TYPE_DOWNTIME => ['cost' => 1, 'max' => $this->downtimeMaxFor($character)],
+            self::TYPE_DOWNTIME => ['cost' => 1, 'max' => $this->downtimeMaxFor($character, $quantities[self::TYPE_DOWNTIME] ?? 0)],
         ];
     }
 
@@ -126,6 +128,29 @@ class CharacterBubbleShop
         return $character;
     }
 
+    public function syncDowntimeSpendTarget(Character $character, int $targetSpend): Character
+    {
+        $normalizedTargetSpend = max(0, $targetSpend);
+        $quantities = $this->quantitiesFor($character);
+        $currentDowntimeQuantity = max(0, $this->safeInt($quantities[self::TYPE_DOWNTIME] ?? 0));
+        $nonDowntimeSpend = $this->structuredSpend($character) - $currentDowntimeQuantity;
+        $requiredDowntimeQuantity = max($currentDowntimeQuantity, max(0, $normalizedTargetSpend - $nonDowntimeSpend));
+
+        if ($requiredDowntimeQuantity === 0) {
+            $character->bubbleShopPurchases()->where('type', self::TYPE_DOWNTIME)->delete();
+        } else {
+            $character->bubbleShopPurchases()->updateOrCreate(
+                ['type' => self::TYPE_DOWNTIME],
+                ['quantity' => $requiredDowntimeQuantity, 'details' => null],
+            );
+        }
+
+        $character->unsetRelation('bubbleShopPurchases');
+        $character->load('bubbleShopPurchases');
+
+        return $this->syncEffectiveSpend($character);
+    }
+
     public function maxQuantity(Character $character, string $type): ?int
     {
         $definitions = $this->definitionsFor($character);
@@ -149,14 +174,20 @@ class CharacterBubbleShop
         return $character->bubbleShopPurchases()->get();
     }
 
-    private function downtimeMaxFor(Character $character): ?int
+    private function downtimeMaxFor(Character $character, int $currentQuantity = 0): ?int
     {
-        return match ($this->highestUnlockedTierRank($character)) {
+        $unlockedMax = match ($this->highestUnlockedTierRank($character)) {
             4 => null,
             3 => self::HT_DOWNTIME_MAX,
             2 => self::LT_DOWNTIME_MAX,
             default => 0,
         };
+
+        if ($unlockedMax === null) {
+            return null;
+        }
+
+        return max($unlockedMax, max(0, $currentQuantity));
     }
 
     private function highestUnlockedTierRank(Character $character): int

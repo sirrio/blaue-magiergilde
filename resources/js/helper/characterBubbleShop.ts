@@ -43,15 +43,17 @@ export const getCharacterBubbleShopQuantities = (character: Character): Record<C
 
 export const getCharacterBubbleShopMaxQuantity = (character: Character, type: CharacterBubbleShopPurchaseType): number | null => {
   const unlockedTierRank = Math.max(tierRank(character.start_tier), tierRank(calculateTier(character)))
+  const quantities = getCharacterBubbleShopQuantities(character)
+  const currentDowntimeQuantity = quantities.downtime ?? 0
 
   if (type === 'skill_proficiency') return 1
   if (type === 'rare_language') return 1
   if (type === 'tool_or_language') return 3
   if (type === 'downtime') {
     if (unlockedTierRank >= 4) return null
-    if (unlockedTierRank >= 3) return 45
-    if (unlockedTierRank >= 2) return 15
-    return 0
+    if (unlockedTierRank >= 3) return Math.max(45, currentDowntimeQuantity)
+    if (unlockedTierRank >= 2) return Math.max(15, currentDowntimeQuantity)
+    return currentDowntimeQuantity
   }
 
   return 0

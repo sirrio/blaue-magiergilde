@@ -53,6 +53,7 @@ function highestUnlockedTierRank(character) {
 
 function definitionsForCharacter(character) {
     const unlockedTierRank = highestUnlockedTierRank(character);
+    const currentDowntimeQuantity = safeInt(character?.bubble_shop_downtime);
 
     return {
         [TYPE_SKILL_PROFICIENCY]: { cost: 6, max: 1 },
@@ -60,7 +61,7 @@ function definitionsForCharacter(character) {
         [TYPE_TOOL_OR_LANGUAGE]: { cost: 2, max: 3 },
         [TYPE_DOWNTIME]: {
             cost: 1,
-            max: unlockedTierRank >= 4 ? null : (unlockedTierRank >= 3 ? 45 : (unlockedTierRank >= 2 ? 15 : 0)),
+            max: unlockedTierRank >= 4 ? null : (unlockedTierRank >= 3 ? Math.max(45, currentDowntimeQuantity) : (unlockedTierRank >= 2 ? Math.max(15, currentDowntimeQuantity) : currentDowntimeQuantity)),
         },
     };
 }

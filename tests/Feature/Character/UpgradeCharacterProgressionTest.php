@@ -5,6 +5,7 @@ use App\Models\Character;
 use App\Models\LevelProgressionEntry;
 use App\Models\LevelProgressionVersion;
 use App\Models\User;
+use App\Support\CharacterBubbleShop;
 use App\Support\LevelProgression;
 
 beforeEach(function () {
@@ -147,6 +148,7 @@ it('upgrades an adventure-tracked character without creating a pseudo adventure 
         'progression_version_id' => $originalVersion->id,
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -167,7 +169,9 @@ it('upgrades an adventure-tracked character without creating a pseudo adventure 
     $character->refresh();
 
     expect($character->progression_version_id)->toBe($newVersion->id)
+        ->and($character->bubble_shop_legacy_spend)->toBe(0)
         ->and($character->bubble_shop_spend)->toBe(2)
+        ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(2)
         ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0)
         ->and(LevelProgression::levelFromAvailableBubbles(5 - $character->bubble_shop_spend, $newVersion->id))->toBe(4);
 });
@@ -213,6 +217,7 @@ it('supports selecting bubbles within the target level during an adventure-track
         'progression_version_id' => $originalVersion->id,
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -233,7 +238,9 @@ it('supports selecting bubbles within the target level during an adventure-track
     $character->refresh();
 
     expect($character->progression_version_id)->toBe($newVersion->id)
+        ->and($character->bubble_shop_legacy_spend)->toBe(0)
         ->and($character->bubble_shop_spend)->toBe(2)
+        ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(2)
         ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0)
         ->and(LevelProgression::levelFromAvailableBubbles(10 - $character->bubble_shop_spend, $newVersion->id))->toBe(4)
         ->and((10 - $character->bubble_shop_spend) - LevelProgression::bubblesRequiredForLevel(4, $newVersion->id))->toBe(2);

@@ -10,6 +10,18 @@ const originalLevelProgressionModule = require.cache[levelProgressionPath];
 
 let scenario = 'adventure';
 let updates = [];
+let inserts = [];
+let deletes = [];
+
+const fakeConnection = {
+    async beginTransaction() {},
+    async commit() {},
+    async rollback() {},
+    release() {},
+    async execute(sql, bindings = []) {
+        return fakeDb.execute(sql, bindings);
+    },
+};
 
 const progressionTotals = {
     1: { 1: 0, 2: 5, 3: 10, 4: 15, 5: 20, 6: 25, 7: 30, 8: 35, 9: 40, 10: 45, 11: 50, 12: 55, 13: 60, 14: 65, 15: 70, 16: 75, 17: 80, 18: 85, 19: 90, 20: 95 },
@@ -81,6 +93,7 @@ const fakeDb = {
                     dm_bubbles: 0,
                     dm_coins: 0,
                     bubble_shop_spend: 0,
+                    bubble_shop_downtime: 0,
                     progression_version_id: 1,
                     manual_adventures_count: null,
                     manual_faction_rank: null,
@@ -115,6 +128,7 @@ const fakeDb = {
                 dm_bubbles: 0,
                 dm_coins: 0,
                 bubble_shop_spend: 0,
+                bubble_shop_downtime: 0,
                 progression_version_id: 1,
                 manual_adventures_count: null,
                 manual_faction_rank: null,
@@ -164,12 +178,25 @@ const fakeDb = {
             return [{ affectedRows: 1 }];
         }
 
+        if (sql.startsWith('DELETE FROM character_bubble_shop_purchases WHERE character_id = ? AND type = ?')) {
+            deletes.push({ sql, bindings });
+            return [{ affectedRows: 1 }];
+        }
+
+        if (sql.includes('INSERT INTO character_bubble_shop_purchases')) {
+            inserts.push({ sql, bindings });
+            return [{ affectedRows: 1 }];
+        }
+
         if (sql.startsWith('UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?')) {
             updates.push({ sql, bindings });
             return [{ affectedRows: 1 }];
         }
 
         throw new Error(`Unexpected SQL: ${sql}`);
+    },
+    async getConnection() {
+        return fakeConnection;
     },
 };
 
@@ -196,9 +223,15 @@ Promise.resolve()
 
         scenario = 'adventure';
         updates = [];
+        inserts = [];
+        deletes = [];
         const adventureResult = await upgradeCharacterProgressionForDiscord(discordUser, 42, 2, 1);
         assert.equal(adventureResult.ok, true);
         assert.equal(updates.length, 1);
+        assert.equal(inserts.length, 1);
+        assert.equal(deletes.length, 0);
+        assert.equal(inserts[0].bindings[1], 'downtime');
+        assert.equal(inserts[0].bindings[2], 2);
         assert.equal(updates[0].bindings[0], 2);
         assert.equal(updates[0].bindings[1], 2);
         assert.equal(updates[0].bindings[3], 42);

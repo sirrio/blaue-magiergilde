@@ -9,6 +9,7 @@ const {
     definitionsForCharacter,
     quantitiesForCharacter,
     effectiveSpendForCharacter,
+    structuredSpendForCharacter,
 } = require('./utils/characterBubbleShop');
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
 const {
@@ -363,10 +364,47 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         }
 
         const newSpend = Math.max(currentSpend, Math.max(0, baseBubbles - targetAvailableBubbles));
-        await db.execute(
-            'UPDATE characters SET progression_version_id = ?, bubble_shop_spend = ?, updated_at = ? WHERE id = ?',
-            [activeVersionId, newSpend, nowSql(), characterId],
-        );
+        const currentQuantities = quantitiesForCharacter(character);
+        const currentDowntimeQuantity = safeInt(currentQuantities[TYPE_DOWNTIME]);
+        const nonDowntimeSpend = structuredSpendForCharacter(character, {
+            ...currentQuantities,
+            [TYPE_DOWNTIME]: 0,
+        });
+        const requiredDowntimeQuantity = Math.max(currentDowntimeQuantity, Math.max(0, newSpend - nonDowntimeSpend));
+        const updatedAt = nowSql();
+        const connection = await db.getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            if (requiredDowntimeQuantity <= 0) {
+                await connection.execute(
+                    'DELETE FROM character_bubble_shop_purchases WHERE character_id = ? AND type = ?',
+                    [characterId, TYPE_DOWNTIME],
+                );
+            } else {
+                await connection.execute(
+                    `
+                        INSERT INTO character_bubble_shop_purchases (character_id, type, quantity, details, created_at, updated_at)
+                        VALUES (?, ?, ?, NULL, ?, ?)
+                        ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), details = VALUES(details), updated_at = VALUES(updated_at)
+                    `,
+                    [characterId, TYPE_DOWNTIME, requiredDowntimeQuantity, updatedAt, updatedAt],
+                );
+            }
+
+            await connection.execute(
+                'UPDATE characters SET progression_version_id = ?, bubble_shop_spend = ?, updated_at = ? WHERE id = ?',
+                [activeVersionId, newSpend, updatedAt, characterId],
+            );
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
 
         return { ok: true };
     }

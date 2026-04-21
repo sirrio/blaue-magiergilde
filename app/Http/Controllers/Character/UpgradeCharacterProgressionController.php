@@ -143,7 +143,7 @@ class UpgradeCharacterProgressionController extends Controller
             $character->forceFill([
                 'progression_version_id' => $activeVersionId,
             ]);
-            $this->bubbleShop->syncLegacySpend($character, $newSpend);
+            $this->bubbleShop->syncDowntimeSpendTarget($character, $newSpend);
             $character->save();
         });
 
