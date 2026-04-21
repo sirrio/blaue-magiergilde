@@ -18,7 +18,7 @@ function additionalBubblesForStartTier(startTier) {
 }
 
 function countsBubbleAdjustmentsForProgression(character) {
-    return !character.simplified_tracking && !safeInt(character.has_pseudo_adventure);
+    return !safeInt(character.has_pseudo_adventure);
 }
 
 function calculateAvailableBubbles(character) {

@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('ignores dm bubbles and bubble shop spend for simplified tracking characters', function () {
+it('keeps dm bubbles and bubble shop spend until a level anchor exists', function () {
     $character = Character::factory()->create([
         'simplified_tracking' => true,
         'dm_bubbles' => 7,
@@ -16,9 +16,9 @@ it('ignores dm bubbles and bubble shop spend for simplified tracking characters'
 
     $state = new CharacterProgressionState;
 
-    expect($state->usesManualLevelTracking($character))->toBeTrue()
-        ->and($state->dmBubblesForProgression($character))->toBe(0)
-        ->and($state->bubbleShopSpendForProgression($character))->toBe(0);
+    expect($state->usesManualLevelTracking($character))->toBeFalse()
+        ->and($state->dmBubblesForProgression($character))->toBe(7)
+        ->and($state->bubbleShopSpendForProgression($character))->toBe(3);
 });
 
 it('ignores dm bubbles and bubble shop spend once pseudo adventures exist', function () {

@@ -7,7 +7,7 @@ const hasPseudoAdventures = (character: Pick<Character, 'adventures'>): boolean 
 const usesManualLevelTracking = (
   character: Pick<Character, 'simplified_tracking' | 'adventures'>,
 ): boolean => {
-  return Boolean(character.simplified_tracking) || hasPseudoAdventures(character)
+  return hasPseudoAdventures(character)
 }
 
 const countsBubbleAdjustmentsForProgression = (

@@ -24,6 +24,7 @@ const {
     getCharacterSubmissionStateForDiscord,
     getCharacterProgressionUpgradeStateForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateCharacterTrackingModeForDiscord,
     updateCharacterManualOverridesForDiscord,
     updateCharacterBubbleShopForDiscord,
     upgradeCharacterProgressionForDiscord,
@@ -3101,7 +3102,7 @@ async function handle(interaction) {
 
         if (action === 'tracking_toggle') {
             const nextValue = !character.simplified_tracking;
-            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { simplifiedTracking: nextValue });
+            const result = await updateCharacterTrackingModeForDiscord(interaction.user, characterId, nextValue);
             if (!result.ok) {
                 await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
                 return true;

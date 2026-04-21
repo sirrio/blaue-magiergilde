@@ -12,9 +12,9 @@ class SetQuickLevel
 {
     public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
 
-    public function handle(Character $character, int $level, int $bubblesInLevel = 0): array
+    public function handle(Character $character, int $level, int $bubblesInLevel = 0, bool $forceAnchor = false): array
     {
-        return DB::transaction(function () use ($character, $level, $bubblesInLevel): array {
+        return DB::transaction(function () use ($character, $level, $bubblesInLevel, $forceAnchor): array {
             $progressionVersionId = LevelProgression::versionIdForCharacter($character);
             $additionalBubbles = $this->additionalBubblesForStartTier($character->start_tier);
             $dmBubbles = $this->progressionState->dmBubblesForProgression($character);
@@ -78,19 +78,19 @@ class SetQuickLevel
             );
             $minAllowedAvailableBubbles = max(0, $immutableBubbles + $dmBubbles + $additionalBubbles - $bubbleSpend);
 
-            if (! $character->is_filler && $level < $minAllowedLevel) {
+            if (! $forceAnchor && ! $character->is_filler && $level < $minAllowedLevel) {
                 return ['ok' => false, 'reason' => 'below_real', 'minLevel' => $minAllowedLevel];
             }
 
             // The pseudo-adventure uses target_level directly — no duration needed.
             $editablePseudo = $latestPseudoIsLast ? $latestPseudo : null;
-            $needsPseudo = $level > $minAllowedLevel || $latestPseudo;
+            $needsPseudo = $forceAnchor || $level > $minAllowedLevel || $latestPseudo;
 
             if (! $needsPseudo) {
                 return ['ok' => true];
             }
 
-            if ($level <= $minAllowedLevel) {
+            if (! $forceAnchor && $level <= $minAllowedLevel) {
                 if ($editablePseudo) {
                     $editablePseudo->delete();
                 }
@@ -106,8 +106,11 @@ class SetQuickLevel
                 LevelProgression::bubblesRequiredForLevel(min(20, $level + 1), $progressionVersionId)
                 - LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId),
             );
-            $minBubblesInLevel = max(0, $minAllowedAvailableBubbles - LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId));
-            $clampedBubblesInLevel = max($minBubblesInLevel, min($bubblesInLevel, $maxBubblesInLevel - 1));
+            $minBubblesInLevel = $forceAnchor
+                ? 0
+                : max(0, $minAllowedAvailableBubbles - LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId));
+            $maxSelectableBubblesInLevel = max(0, $maxBubblesInLevel - 1);
+            $clampedBubblesInLevel = max($minBubblesInLevel, min($bubblesInLevel, $maxSelectableBubblesInLevel));
             $targetBubbles = LevelProgression::bubblesRequiredForLevel($level, $progressionVersionId) + $clampedBubblesInLevel;
 
             if ($editablePseudo) {

@@ -9,6 +9,7 @@ const originalAppDbModule = require.cache[appDbPath];
 
 let scenario = 'success';
 const executed = [];
+let pseudoInsertions = 0;
 
 setLevelProgressionTotals({
     1: 0, 2: 1, 3: 3, 4: 6, 5: 10,
@@ -118,6 +119,46 @@ const fakeDb = {
                 }]];
             }
 
+            if (scenario === 'manual-anchor') {
+                return [[{
+                    id: 42,
+                    name: 'Bubble Tester',
+                    start_tier: 'bt',
+                    version: '2024',
+                    faction: 'none',
+                    external_link: '',
+                    avatar: null,
+                    notes: null,
+                    dm_bubbles: 0,
+                    dm_coins: 0,
+                    bubble_shop_spend: 0,
+                    bubble_shop_legacy_spend: 0,
+                    bubble_shop_skill_proficiency: 0,
+                    bubble_shop_rare_language: 0,
+                    bubble_shop_tool_or_language: 0,
+                    bubble_shop_downtime: 0,
+                    progression_version_id: 1,
+                    manual_adventures_count: null,
+                    manual_faction_rank: null,
+                    is_filler: 0,
+                    guild_status: 'approved',
+                    registration_note: null,
+                    review_note: null,
+                    simplified_tracking: 1,
+                    avatar_masked: 1,
+                    private_mode: 0,
+                    has_room: 0,
+                    adventures_count: 1,
+                    adventure_bubbles: 17,
+                    has_pseudo_adventure: pseudoInsertions > 0 ? 1 : 0,
+                    has_real_adventure: 1,
+                    total_downtime: 0,
+                    faction_downtime: 0,
+                    other_downtime: 0,
+                    class_names: 'Wizard',
+                }]];
+            }
+
             return [[{
                 id: 42,
                 name: 'Bubble Tester',
@@ -160,6 +201,36 @@ const fakeDb = {
         if (sql.startsWith('DELETE FROM character_bubble_shop_purchases')) {
             executed.push({ sql, bindings });
             return [{ affectedRows: 1 }];
+        }
+
+        if (sql.includes('SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler, simplified_tracking, progression_version_id')) {
+            return [[{
+                id: 42,
+                start_tier: 'bt',
+                dm_bubbles: 0,
+                bubble_shop_spend: 0,
+                is_filler: 0,
+                simplified_tracking: 1,
+                progression_version_id: 1,
+            }]];
+        }
+
+        if (sql.includes('SELECT id, start_date, target_level') && sql.includes('is_pseudo = 1')) {
+            return [pseudoInsertions > 0 ? [{ id: 900, start_date: '2026-04-22', target_level: 4 }] : []];
+        }
+
+        if (sql.includes('SELECT id, is_pseudo') && sql.includes('FROM adventures')) {
+            return [pseudoInsertions > 0 ? [{ id: 900, is_pseudo: 1 }] : []];
+        }
+
+        if (sql.includes('SELECT COALESCE(SUM(FLOOR(duration / 10800)')) {
+            return [[{ bubbles: 17 }]];
+        }
+
+        if (sql.includes('INSERT INTO adventures')) {
+            pseudoInsertions += 1;
+            executed.push({ sql, bindings });
+            return [{ affectedRows: 1, insertId: 900 }];
         }
 
         if (sql.includes('INSERT INTO character_bubble_shop_purchases')) {
@@ -237,6 +308,19 @@ Promise.resolve()
         assert.equal(floorBlocked.ok, false);
         assert.equal(floorBlocked.reason, 'bubble_shop_floor');
         assert.equal(executed.length, 0);
+
+        scenario = 'manual-anchor';
+        executed.length = 0;
+        pseudoInsertions = 0;
+        const anchored = await updateCharacterBubbleShopForDiscord(discordUser, 42, {
+            skill_proficiency: 1,
+            rare_language: 0,
+            tool_or_language: 0,
+            downtime: 0,
+        });
+        assert.equal(anchored.ok, true);
+        assert.equal(pseudoInsertions, 1);
+        assert.equal(executed.some((entry) => entry.sql.includes('INSERT INTO adventures')), true);
 
         console.log('app-db-character-bubble-shop.test.js passed');
     })

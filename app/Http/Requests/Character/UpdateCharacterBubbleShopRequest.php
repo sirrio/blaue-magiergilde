@@ -4,6 +4,7 @@ namespace App\Http\Requests\Character;
 
 use App\Models\Character;
 use App\Support\CharacterBubbleShop;
+use App\Support\CharacterProgressionState;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -62,6 +63,11 @@ class UpdateCharacterBubbleShopRequest extends FormRequest
 
                 $maxEffectiveSpend = $bubbleShop->maxEffectiveSpendWithoutDownlevel($character);
                 if ($maxEffectiveSpend === null) {
+                    return;
+                }
+
+                $progressionState = app(CharacterProgressionState::class);
+                if (($character->simplified_tracking ?? false) && ! $progressionState->hasPseudoAdventures($character)) {
                     return;
                 }
 

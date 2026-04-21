@@ -4,6 +4,7 @@ use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\CharacterBubbleShopPurchase;
 use App\Models\User;
+use App\Support\CharacterProgressionState;
 use App\Support\LevelProgression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -129,6 +130,54 @@ it('does not allow bubble shop spending beyond the current level progress', func
     ]);
 
     $response->assertSessionHasErrors(['bubble_shop']);
+});
+
+it('creates a level anchor before the first bubble shop change in level tracking', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+        'is_filler' => false,
+        'simplified_tracking' => true,
+    ]);
+
+    $requiredBubbles = LevelProgression::bubblesRequiredForLevel(4, $character->progression_version_id) + 2;
+
+    Adventure::factory()->create([
+        'character_id' => $character->id,
+        'duration' => $requiredBubbles * 10800,
+        'has_additional_bubble' => false,
+        'is_pseudo' => false,
+        'start_date' => '2026-01-01',
+    ]);
+
+    $state = new CharacterProgressionState;
+    $before = $character->fresh('adventures');
+    $expectedLevel = $state->currentLevel($before);
+    $expectedAvailableBubbles = $state->availableBubbles($before);
+
+    $response = $this->actingAs($user)->patch(route('characters.bubble-shop', $character), [
+        'skill_proficiency' => 1,
+        'rare_language' => 0,
+        'tool_or_language' => 0,
+        'downtime' => 0,
+    ]);
+
+    $response->assertRedirect();
+
+    $pseudo = Adventure::query()
+        ->where('character_id', $character->id)
+        ->where('is_pseudo', true)
+        ->whereNull('deleted_at')
+        ->latest('id')
+        ->first();
+
+    expect($pseudo)->not->toBeNull()
+        ->and($pseudo?->target_level)->toBe($expectedLevel)
+        ->and($pseudo?->target_bubbles)->toBe($expectedAvailableBubbles)
+        ->and($character->fresh()->bubble_shop_spend)->toBe(6);
 });
 
 it('allows unlimited downtime purchases after et is unlocked', function () {

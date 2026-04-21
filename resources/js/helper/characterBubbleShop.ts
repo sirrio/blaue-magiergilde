@@ -92,6 +92,10 @@ export const getCharacterBubbleShopEffectiveSpend = (
 export const getCharacterBubbleShopMaxEffectiveSpendWithoutDownlevel = (
   character: Character,
 ): number | null => {
+  if (character.simplified_tracking && !(character.adventures ?? []).some((adventure) => Boolean(adventure.is_pseudo))) {
+    return null
+  }
+
   if (!countsBubbleAdjustmentsForProgression(character)) {
     return null
   }

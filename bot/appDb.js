@@ -1,5 +1,5 @@
 const db = require('./db');
-const { additionalBubblesForStartTier, calculateLevel, calculateTierFromLevel } = require('./utils/characterTier');
+const { additionalBubblesForStartTier, calculateBubblesInCurrentLevel, calculateLevel, calculateTierFromLevel } = require('./utils/characterTier');
 const {
     TYPE_SKILL_PROFICIENCY,
     TYPE_RARE_LANGUAGE,
@@ -889,7 +889,7 @@ ${bubbleShopPurchaseJoin}
     return rows[0] ?? null;
 }
 
-async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel, bubblesInLevel = 0) {
+async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel, bubblesInLevel = 0, forceAnchor = false) {
     await ensureLevelProgressionLoaded();
 
     const userId = await getLinkedUserIdForDiscord(discordUser);
@@ -996,7 +996,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             progressionVersionId,
         });
 
-        if (!character.is_filler && level < minAllowedLevel) {
+        if (!forceAnchor && !character.is_filler && level < minAllowedLevel) {
             await connection.rollback();
             return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
         }
@@ -1006,12 +1006,15 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             0,
             bubblesRequiredForLevel(Math.min(20, level + 1), progressionVersionId) - bubblesRequiredForLevel(level, progressionVersionId),
         );
-        const clampedBubblesInLevel = Math.max(0, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel - 1));
+        const maxSelectableBubblesInLevel = Math.max(0, maxBubblesInLevel - 1);
+        const clampedBubblesInLevel = forceAnchor
+            ? Math.max(0, Math.min(safeInt(bubblesInLevel), maxSelectableBubblesInLevel))
+            : Math.max(0, Math.min(safeInt(bubblesInLevel), maxSelectableBubblesInLevel));
         const targetBubbles = bubblesRequiredForLevel(level, progressionVersionId) + clampedBubblesInLevel;
         const editablePseudo = latestPseudoIsLast ? latestPseudoRow : null;
-        const needsPseudo = level > minAllowedLevel || latestPseudoRow;
+        const needsPseudo = forceAnchor || level > minAllowedLevel || latestPseudoRow;
 
-        if (needsPseudo && level <= minAllowedLevel) {
+        if (!forceAnchor && needsPseudo && level <= minAllowedLevel) {
             if (editablePseudo) {
                 const now = nowSql();
                 await connection.execute(
@@ -1075,6 +1078,12 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
     } finally {
         connection.release();
     }
+}
+
+async function updateCharacterTrackingModeForDiscord(discordUser, characterId, simplifiedTracking) {
+    return updateCharacterForDiscord(discordUser, characterId, {
+        simplifiedTracking,
+    });
 }
 
 async function updateCharacterManualOverridesForDiscord(discordUser, characterId, { adventuresCount, factionRank }) {
@@ -1144,9 +1153,37 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
         }
     }
 
-    const maxEffectiveSpend = maxEffectiveSpendWithoutDownlevelForCharacter(existing);
+    const shouldCreateAnchor = Boolean(existing.simplified_tracking) && !safeInt(existing.has_pseudo_adventure)
+        && !existing.is_filler
+        && purchaseTypes().some((type) => normalizedQuantities[type] !== quantitiesForCharacter(existing)[type]);
+    let anchoredCharacter = existing;
+
+    if (shouldCreateAnchor) {
+        const currentLevel = calculateLevel(existing);
+        const currentBubblesInLevel = calculateBubblesInCurrentLevel(existing, currentLevel);
+        const anchorResult = await updateCharacterManualLevelForDiscord(
+            discordUser,
+            characterId,
+            currentLevel,
+            currentBubblesInLevel,
+            true,
+        );
+
+        if (!anchorResult.ok) {
+            return anchorResult;
+        }
+
+        anchoredCharacter = await findCharacterForDiscord(discordUser, characterId);
+        if (!anchoredCharacter) {
+            return { ok: false, reason: 'not_found' };
+        }
+    }
+
+    const maxEffectiveSpend = (Boolean(existing.simplified_tracking) && !safeInt(existing.has_pseudo_adventure))
+        ? null
+        : maxEffectiveSpendWithoutDownlevelForCharacter(anchoredCharacter);
     const nextEffectiveSpend = effectiveSpendForCharacter({
-        ...existing,
+        ...anchoredCharacter,
         bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
         bubble_shop_rare_language: normalizedQuantities[TYPE_RARE_LANGUAGE],
         bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
@@ -1186,7 +1223,7 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
         }
 
         const effectiveSpend = effectiveSpendForCharacter({
-            ...existing,
+            ...anchoredCharacter,
             bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
             bubble_shop_rare_language: normalizedQuantities[TYPE_RARE_LANGUAGE],
             bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
@@ -2403,6 +2440,7 @@ module.exports = {
     findCharacterForDiscord,
     getCharacterProgressionUpgradeStateForDiscord,
     upgradeCharacterProgressionForDiscord,
+    updateCharacterTrackingModeForDiscord,
     updateCharacterManualLevelForDiscord,
     updateCharacterManualOverridesForDiscord,
     updateCharacterBubbleShopForDiscord,
