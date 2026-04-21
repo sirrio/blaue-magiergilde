@@ -13,8 +13,6 @@ const {
 const { commandName } = require('../../commandConfig');
 const { t } = require('../../i18n');
 const {
-    additionalSpendBeyondLegacyForCharacter,
-    coveredByLegacyForCharacter,
     extraDowntimeSecondsForCharacter,
     legacySpendForCharacter,
     structuredSpendForCharacter,
@@ -346,9 +344,10 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const downtimeAllowed = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
     const downtimeRemaining = downtimeAllowed - downtimeTotal;
     const bubbleShopLegacy = legacySpendForCharacter(character);
-    const bubbleShopStructured = structuredSpendForCharacter(character);
-    const bubbleShopCovered = coveredByLegacyForCharacter(character);
-    const bubbleShopAdditional = additionalSpendBeyondLegacyForCharacter(character);
+    const bubbleShopUnassigned = Math.max(
+        bubbleShopLegacy - structuredSpendForCharacter(character),
+        0
+    );
     const bubbleShopExtraDowntime = extraDowntimeSecondsForCharacter(character);
 
     const factionLevel = calculateFactionLevel(character, level, tier);
@@ -385,18 +384,18 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             { name: 'Factions', value: factionsValue, inline: true },
             { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
-            {
-                name: t('characters.manageBubbleShop', {}, locale),
-                value: [
-                    `${t('characters.bubbleShopLegacyStand', {}, locale)}: **${bubbleShopLegacy}**`,
-                    `${t('characters.bubbleShopStructuredSpend', {}, locale)}: **${bubbleShopStructured}**`,
-                    `${t('characters.bubbleShopCoveredByLegacy', {}, locale)}: **${bubbleShopCovered}**`,
-                    `${t('characters.bubbleShopActiveSpend', {}, locale)}: **${safeInt(character.bubble_shop_spend)}**`,
-                    `${t('characters.bubbleShopAdditionalSpend', {}, locale)}: **${bubbleShopAdditional}**`,
-                    `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
-                ].join('\n'),
-                inline: true,
-            },
+              {
+                  name: t('characters.manageBubbleShop', {}, locale),
+                    value: bubbleShopLegacy > 0
+                        ? [
+                        `${t('characters.bubbleShopLegacyUnassigned', {}, locale)}: **${bubbleShopUnassigned}**`,
+                        t('characters.bubbleShopLegacyReasonBody', {}, locale),
+                        t('characters.bubbleShopLegacySubhint', { count: bubbleShopUnassigned }, locale),
+                        `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
+                        ].join('\n')
+                    : `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
+                  inline: true,
+              },
         );
 
     if (statusNextStep) {

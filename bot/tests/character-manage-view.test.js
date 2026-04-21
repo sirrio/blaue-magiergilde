@@ -45,7 +45,8 @@ assert.equal(payload.components[1].components[0].data.label, 'DM Bubbles');
 assert.equal(payload.components[2].components[0].data.label, 'Tracking: Adventure tracking');
 assert.equal(payload.components[2].components[2].data.label, 'Privatmodus: An');
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Privatmodus' && field.value === 'An'), true);
-assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Bubble Shop' && field.value.includes('Alter Stand: **2**')), true);
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Bubble Shop' && field.value.includes('Aus altem Stand noch offen: **0**')), true);
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Bubble Shop' && field.value.includes('Frueher wurde im Bubble Shop nur ein Gesamtwert gespeichert, nicht die einzelnen Kaeufe.')), true);
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Bubble Shop' && field.value.includes('Downtime extra: **16h 0m**')), true);
 assert.equal(payload.components[3].components[0].data.label, 'Zurück');
 

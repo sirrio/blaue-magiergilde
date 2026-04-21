@@ -18,7 +18,6 @@ const {
 const { t } = require('../i18n');
 const {
     definitionsForCharacter,
-    coveredByLegacyForCharacter,
     extraDowntimeSecondsForCharacter,
     legacySpendForCharacter,
     purchaseTypes,
@@ -177,15 +176,18 @@ function safeInt(value, fallback = 0) {
 
 function buildBubbleShopSummary(character, locale = null) {
     const legacySpend = legacySpendForCharacter(character);
-    const structuredSpend = structuredSpendForCharacter(character);
-    const coveredByLegacy = coveredByLegacyForCharacter(character);
     const extraDowntimeSeconds = extraDowntimeSecondsForCharacter(character);
+    const structuredSpend = structuredSpendForCharacter(character);
+    const unassignedLegacySpend = Math.max(legacySpend - structuredSpend, 0);
+
+    if (legacySpend <= 0) {
+        return `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`;
+    }
 
     return [
-        `${t('characters.bubbleShopLegacyStand', {}, locale)}: **${legacySpend}**`,
-        `${t('characters.bubbleShopStructuredSpend', {}, locale)}: **${structuredSpend}**`,
-        `${t('characters.bubbleShopCoveredByLegacy', {}, locale)}: **${coveredByLegacy}**`,
-        `${t('characters.bubbleShopActiveSpend', {}, locale)}: **${safeInt(character.bubble_shop_spend)}**`,
+        `${t('characters.bubbleShopLegacyUnassigned', {}, locale)}: **${unassignedLegacySpend}**`,
+        t('characters.bubbleShopLegacyReasonBody', {}, locale),
+        t('characters.bubbleShopLegacySubhint', { count: unassignedLegacySpend }, locale),
         `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`,
     ].join('\n');
 }

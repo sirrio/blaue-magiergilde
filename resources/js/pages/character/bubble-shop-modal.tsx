@@ -3,22 +3,17 @@ import { Modal, ModalAction, ModalContent, ModalTitle } from '@/components/ui/mo
 import {
   CharacterBubbleShopPurchaseType,
   characterBubbleShopPurchaseTypes,
-  getCharacterBubbleShopAdditionalSpend,
   getCharacterBubbleShopCost,
-  getCharacterBubbleShopCoveredByLegacy,
-  getCharacterBubbleShopEffectiveSpend,
-  getCharacterBubbleShopExtraDowntimeSeconds,
   getCharacterBubbleShopLegacySpend,
   getCharacterBubbleShopMaxQuantity,
   getCharacterBubbleShopQuantities,
   getCharacterBubbleShopStructuredSpend,
 } from '@/helper/characterBubbleShop'
-import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { Droplets, Minus, Plus, ShoppingBag } from 'lucide-react'
+import { AlertTriangle, Minus, Plus, ShoppingBag } from 'lucide-react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 type BubbleShopFormData = Record<CharacterBubbleShopPurchaseType, number>
@@ -60,10 +55,9 @@ export default function BubbleShopModal({
 
   const structuredSpend = getCharacterBubbleShopStructuredSpend(character, form.data)
   const legacySpend = getCharacterBubbleShopLegacySpend(character)
-  const coveredByLegacy = getCharacterBubbleShopCoveredByLegacy(character, form.data)
-  const effectiveSpend = getCharacterBubbleShopEffectiveSpend(character, form.data)
-  const additionalSpend = getCharacterBubbleShopAdditionalSpend(character, form.data)
-  const extraDowntime = secondsToHourMinuteString(getCharacterBubbleShopExtraDowntimeSeconds(character, form.data))
+  const legacySpendRemaining = Math.max(legacySpend - structuredSpend, 0)
+  const showsLegacyRedistribution = legacySpend > 0
+  const hasOutstandingLegacyRedistribution = legacySpendRemaining > 0
 
   const submit = () => {
     form.patch(route('characters.bubble-shop', character.id), {
@@ -83,7 +77,7 @@ export default function BubbleShopModal({
     <>
       <Button
         size="sm"
-        className={triggerClassName ?? 'w-full justify-center gap-1'}
+        className={cn(triggerClassName ?? 'w-full justify-center gap-1', hasOutstandingLegacyRedistribution && 'relative')}
         aria-label={t('characters.manageBubbleShop')}
         title={t('characters.manageBubbleShop')}
         onMouseDown={(event) => event.stopPropagation()}
@@ -91,38 +85,39 @@ export default function BubbleShopModal({
       >
         <ShoppingBag size={14} />
         {showLabel ? <span className={labelClassName}>{t('characters.manageBubbleShop')}</span> : <span className="md:hidden">{t('characters.bubbleShop')}</span>}
+        {hasOutstandingLegacyRedistribution ? (
+          <span className="badge badge-warning badge-xs absolute -right-1 -top-1 min-w-4 px-1 text-[10px] leading-none">
+            {legacySpendRemaining > 9 ? '9+' : legacySpendRemaining}
+          </span>
+        ) : null}
       </Button>
       <Modal isOpen={isOpen} onClose={() => !form.processing && setIsOpen(false)}>
       <ModalTitle>{t('characters.manageBubbleShop')}</ModalTitle>
       <ModalContent>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-            <div className="rounded-md border border-base-200 bg-base-100 px-3 py-2">
-              <div className="text-base-content/55">{t('characters.bubbleShopLegacyStand')}</div>
-              <div className="mt-1 font-semibold">{legacySpend}</div>
-            </div>
-            <div className="rounded-md border border-base-200 bg-base-100 px-3 py-2">
-              <div className="text-base-content/55">{t('characters.bubbleShopStructuredSpend')}</div>
-              <div className="mt-1 font-semibold">{structuredSpend}</div>
-            </div>
-            <div className="rounded-md border border-base-200 bg-base-100 px-3 py-2">
-              <div className="text-base-content/55">{t('characters.bubbleShopCoveredByLegacy')}</div>
-              <div className="mt-1 font-semibold">{coveredByLegacy}</div>
-            </div>
-            <div className="rounded-md border border-base-200 bg-base-100 px-3 py-2">
-              <div className="text-base-content/55">{t('characters.bubbleShopEffectiveSpend')}</div>
-              <div className="mt-1 font-semibold">{effectiveSpend}</div>
-            </div>
-          </div>
+          {showsLegacyRedistribution ? (
+            <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-3 text-xs text-base-content/75">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 text-warning">
+                  <AlertTriangle size={14} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium text-base-content">{t('characters.bubbleShopLegacyUnassigned')}</div>
+                      <div className="mt-1 text-base-content/55">{t('characters.bubbleShopLegacyReasonTitle')}</div>
+                    </div>
+                    <div className="rounded-md border border-warning/30 bg-base-100 px-2 py-1 text-sm font-semibold text-base-content">
+                      {legacySpendRemaining}
+                    </div>
+                  </div>
 
-          <div className="rounded-md border border-info/15 bg-info/6 px-3 py-2 text-xs text-base-content/70">
-            <div>{t('characters.bubbleShopLegacyHint')}</div>
-            <div className="mt-1 inline-flex items-center gap-1 font-medium text-info">
-              <Droplets size={12} />
-              <span>{t('characters.bubbleShopAdditionalSpendPreview', { count: additionalSpend })}</span>
+                  <div className="mt-2">{t('characters.bubbleShopLegacyReasonBody')}</div>
+                  <div className="mt-2 font-medium text-warning-content/90 dark:text-warning">{t('characters.bubbleShopLegacySubhint', { count: legacySpendRemaining })}</div>
+                </div>
+              </div>
             </div>
-            <div className="mt-1">{t('characters.bubbleShopExtraDowntimePreview', { duration: extraDowntime })}</div>
-          </div>
+          ) : null}
 
           <div className="space-y-2">
             {characterBubbleShopPurchaseTypes.map((type) => {
