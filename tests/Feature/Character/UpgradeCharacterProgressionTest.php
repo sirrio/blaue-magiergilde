@@ -284,3 +284,68 @@ it('does not allow an adventure-tracked character to switch below the current di
     expect($character->fresh()->progression_version_id)->toBe($originalVersionId)
         ->and($character->fresh()->bubble_shop_spend)->toBe(0);
 });
+
+it('does not allow a pseudo-tracked character to switch above the recalculated level on the new curve', function () {
+    $user = User::factory()->create();
+    $previousActiveVersionId = LevelProgression::activeVersionId();
+
+    LevelProgressionVersion::query()->whereKey($previousActiveVersionId)->update(['is_active' => false]);
+
+    $originalVersion = LevelProgressionVersion::query()->create([
+        'is_active' => true,
+    ]);
+
+    foreach (range(1, 20) as $level) {
+        LevelProgressionEntry::query()->create([
+            'version_id' => $originalVersion->id,
+            'level' => $level,
+            'required_bubbles' => $level - 1,
+        ]);
+    }
+
+    LevelProgression::clearCache();
+
+    $newVersion = LevelProgressionVersion::query()->create([
+        'is_active' => true,
+    ]);
+
+    LevelProgressionVersion::query()->whereKey($originalVersion->id)->update(['is_active' => false]);
+
+    foreach (range(1, 20) as $level) {
+        LevelProgressionEntry::query()->create([
+            'version_id' => $newVersion->id,
+            'level' => $level,
+            'required_bubbles' => ($level - 1) * 5,
+        ]);
+    }
+
+    LevelProgression::clearCache();
+
+    $character = Character::factory()->for($user)->create([
+        'simplified_tracking' => true,
+        'progression_version_id' => $originalVersion->id,
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+        'start_tier' => 'bt',
+        'is_filler' => false,
+    ]);
+
+    Adventure::forceCreate([
+        'character_id' => $character->id,
+        'title' => 'Pseudo level',
+        'duration' => 0,
+        'has_additional_bubble' => false,
+        'is_pseudo' => true,
+        'target_level' => 5,
+        'target_bubbles' => 4,
+        'progression_version_id' => $originalVersion->id,
+        'start_date' => '2026-01-01',
+    ]);
+
+    $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
+        'level' => 5,
+        'bubbles_in_level' => 0,
+    ])->assertSessionHasErrors('level');
+
+    expect($character->fresh()->progression_version_id)->toBe($originalVersion->id);
+});

@@ -34,6 +34,17 @@ class UpgradeCharacterProgressionController extends Controller
         $targetLevel = $request->integer('level');
         $targetBubblesInLevel = $request->integer('bubbles_in_level', 0);
 
+        if ($this->progressionState->hasPseudoAdventures($character)) {
+            $availableBubbles = $this->currentAvailableBubbles($character);
+            $maxLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $activeVersionId);
+
+            if ($targetLevel > $maxLevel) {
+                return redirect()->back()->withErrors([
+                    'level' => "Level cannot go above {$maxLevel} on the new curve while a set level exists.",
+                ]);
+            }
+        }
+
         if (! $this->progressionState->usesManualLevelTracking($character)) {
             $result = $this->upgradeAdventureTrackedCharacter($character, $activeVersionId, $targetLevel, $targetBubblesInLevel);
 
@@ -152,6 +163,50 @@ class UpgradeCharacterProgressionController extends Controller
             + $this->progressionState->dmBubblesForProgression($character)
             + $this->additionalBubblesForStartTier($character->start_tier),
         );
+    }
+
+    private function currentAvailableBubbles(Character $character): int
+    {
+        $durationBubbleSql = $this->durationBubbleSql();
+
+        $latestPseudo = $character->adventures()
+            ->whereNull('deleted_at')
+            ->where('is_pseudo', true)
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $latestPseudo) {
+            return max(
+                0,
+                $this->baseAdventureTrackedBubbles($character)
+                - $this->progressionState->bubbleShopSpendForProgression($character),
+            );
+        }
+
+        $pseudoBubbles = $latestPseudo->target_bubbles !== null
+            ? $this->safeInt($latestPseudo->target_bubbles)
+            : LevelProgression::bubblesRequiredForLevel(
+                $this->safeInt($latestPseudo->target_level, 1),
+                $latestPseudo->progression_version_id,
+            );
+
+        $realBubblesAfterPseudo = $this->safeInt(
+            $character->adventures()
+                ->whereNull('deleted_at')
+                ->where('is_pseudo', false)
+                ->where(function ($query) use ($latestPseudo): void {
+                    $query->where('start_date', '>', $latestPseudo->start_date)
+                        ->orWhere(function ($nestedQuery) use ($latestPseudo): void {
+                            $nestedQuery->where('start_date', $latestPseudo->start_date)
+                                ->where('id', '>', $latestPseudo->id);
+                        });
+                })
+                ->selectRaw('COALESCE(SUM('.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles')
+                ->value('bubbles')
+        );
+
+        return max(0, $pseudoBubbles + $realBubblesAfterPseudo);
     }
 
     private function additionalBubblesForStartTier(?string $startTier): int

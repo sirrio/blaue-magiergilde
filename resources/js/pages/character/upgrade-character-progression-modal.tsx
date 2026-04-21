@@ -49,6 +49,7 @@ const UpgradeCharacterProgressionModal = ({
   }, [character.adventures])
 
   const latestPseudoAdventure = adventuresSorted.find((a) => a.is_pseudo) ?? null
+  const hasPseudoAdventure = latestPseudoAdventure !== null
 
   const immutableAdventureBubbles = latestPseudoAdventure
     ? Math.max(
@@ -85,9 +86,7 @@ const UpgradeCharacterProgressionModal = ({
       )
     : bubblesRequiredForLevel(initialLevel, targetVersionId) + currentBubblesInDisplayedLevel
 
-  const recalculatedLevel = manualTracking
-    ? initialLevel
-    : levelFromAvailableBubbles(currentAvailableBubbles, targetVersionId)
+  const recalculatedLevel = levelFromAvailableBubbles(currentAvailableBubbles, targetVersionId)
 
   const initialBubblesInLevel = manualTracking
     ? (() => {
@@ -107,7 +106,7 @@ const UpgradeCharacterProgressionModal = ({
     ? 1
     : levelFromAvailableBubbles(exactMinimumAvailableBubbles, targetVersionId)
 
-  const maxSelectableLevel = manualTracking ? MAX_LEVEL : recalculatedLevel
+  const maxSelectableLevel = hasPseudoAdventure ? recalculatedLevel : manualTracking ? MAX_LEVEL : recalculatedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
   const maxLevelRestrictionReason = t('characters.upgradeLevelCurveMaxLevelReason', { level: recalculatedLevel })
 
@@ -286,7 +285,7 @@ const UpgradeCharacterProgressionModal = ({
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full border border-base-300 px-2 py-1 text-base-content/70">{t('characters.currentLevel', { level: initialLevel })}</span>
-            {!manualTracking ? (
+            {targetVersionId !== currentVersionId ? (
               <span className="rounded-full border border-info/30 bg-info/10 px-2 py-1 text-info">
                 {t('characters.recalculatedLevel', { level: recalculatedLevel })}
               </span>
