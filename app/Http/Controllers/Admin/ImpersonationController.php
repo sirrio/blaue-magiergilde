@@ -33,7 +33,7 @@ class ImpersonationController extends Controller
         $admin = $request->user();
         $admin->impersonate($user);
 
-        return redirect('/');
+        return redirect()->route('characters.index');
     }
 
     public function leave(): RedirectResponse
@@ -44,6 +44,6 @@ class ImpersonationController extends Controller
             $manager->leave();
         }
 
-        return redirect('/');
+        return redirect()->route('characters.index');
     }
 }
