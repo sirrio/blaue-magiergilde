@@ -52,7 +52,7 @@ const {
 const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateBubblesInCurrentLevel, calculateLevel } = require('../utils/characterTier');
-const { bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
+const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {

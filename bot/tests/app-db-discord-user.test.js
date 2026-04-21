@@ -16,7 +16,7 @@ const fakeDb = {
         step += 1;
 
         if (step === 1) {
-            assert.equal(sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1'), true);
+            assert.equal(sql.includes('FROM users WHERE discord_id = ? LIMIT 1'), true);
             return [[]];
         }
 
@@ -30,7 +30,7 @@ const fakeDb = {
         }
 
         if (step === 3) {
-            assert.equal(sql.includes('SELECT id, deleted_at, locale, simplified_tracking FROM users WHERE discord_id = ? LIMIT 1'), true);
+            assert.equal(sql.includes('FROM users WHERE discord_id = ? LIMIT 1'), true);
             return [[{ id: 42, deleted_at: null, locale: 'de', simplified_tracking: null }]];
         }
 

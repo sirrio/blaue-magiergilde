@@ -113,7 +113,7 @@ function calculateTotalBubblesToNextLevel(character, level) {
 }
 
 
-function buildCharacterSummaryLine(character) {
+function buildCharacterSummaryLine(character, locale = null) {
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level).toUpperCase();
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -136,14 +136,29 @@ function buildCharacterSummaryLine(character) {
             ? `Lv20 +${inCurrent}`
             : `Lv${level} ${inCurrent}/${toNextTotal}`).padEnd(11);
     const downtimePart = `${hoursOnly(downtimeUsed)}/${hoursOnly(downtimeMax)}`.padEnd(10);
-    const statusLabels = {
-        approved: 'ok',
-        pending: 'pend',
-        draft: 'draft',
-        declined: 'decl',
-        needs_changes: 'chgs',
-    };
-    const statusPart = statusLabels[character.guild_status] ?? character.guild_status ?? '?';
+    let statusPart;
+    try {
+        const hasProgressionUpgradeAvailable = safeInt(character.progression_version_id) > 0
+            && safeInt(character.progression_version_id) !== activeLevelProgressionVersionId();
+
+        if (hasProgressionUpgradeAvailable) {
+            statusPart = t('characters.dashboardStatusCurve', {}, locale);
+        }
+    } catch {
+        statusPart = null;
+    }
+
+    if (!statusPart) {
+        const statusLabels = {
+            approved: t('characters.dashboardStatusApproved', {}, locale),
+            pending: t('characters.dashboardStatusPending', {}, locale),
+            draft: t('characters.dashboardStatusDraft', {}, locale),
+            declined: t('characters.dashboardStatusDeclined', {}, locale),
+            needs_changes: t('characters.dashboardStatusNeedsChanges', {}, locale),
+            retired: t('characters.dashboardStatusRetired', {}, locale),
+        };
+        statusPart = statusLabels[character.guild_status] ?? String(character.guild_status ?? '?');
+    }
 
     return `${name} ${tierPart} ${bubblePart} ${downtimePart} ${statusPart}`;
 }
@@ -413,7 +428,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
 }
 
 function buildCharacterListView({ ownerDiscordId, characters, locale }) {
-    const characterLines = characters.slice(0, 25).map(buildCharacterSummaryLine).join('\n');
+    const characterLines = characters.slice(0, 25).map(character => buildCharacterSummaryLine(character, locale)).join('\n');
     const descriptionHeader = characters.length > 0
         ? t('characters.dashboardDescription', { count: characters.length }, locale)
         : t('characters.dashboardDescriptionEmpty', {}, locale);
