@@ -28,6 +28,7 @@ import UpdateCharacterModal from '@/pages/character/update-character-modal'
 import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import UpgradeCharacterProgressionModal from '@/pages/character/upgrade-character-progression-modal'
+import BubbleShopModal from '@/pages/character/bubble-shop-modal'
 import { Character } from '@/types'
 import { PageProps } from '@/types'
 import { router, usePage } from '@inertiajs/react'
@@ -862,7 +863,7 @@ export function CharacterCard({
                 ) : null}
               </div>
             ) : null}
-            <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
+            <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5 sm:gap-1')}>
               {canSubmitForApproval ? (
                 <div className="col-span-2 sm:col-span-4">
                   {submissionBlockedReason ? (
@@ -956,6 +957,9 @@ export function CharacterCard({
               ) : (
                 <AlliesModal character={character} guildCharacters={guildCharacters} />
               )}
+              {!character.is_filler ? (
+                <BubbleShopModal character={character} />
+              ) : null}
               <Button
                 as="a"
                 size="sm"

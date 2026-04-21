@@ -13,6 +13,13 @@ const {
 const { commandName } = require('../../commandConfig');
 const { t } = require('../../i18n');
 const {
+    additionalSpendBeyondLegacyForCharacter,
+    coveredByLegacyForCharacter,
+    extraDowntimeSecondsForCharacter,
+    legacySpendForCharacter,
+    structuredSpendForCharacter,
+} = require('../../utils/characterBubbleShop');
+const {
     DiscordNotLinkedError,
     getLinkedUserLocaleForDiscord,
     getLinkedUserTrackingDefaultForDiscord,
@@ -125,7 +132,7 @@ function buildCharacterSummaryLine(character, locale = null) {
     const downtimeBubbles = isMixed
         ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
         : totalBubbles;
-    const downtimeMax = downtimeBubbles * 8 * 60 * 60;
+    const downtimeMax = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
     const downtimeUsed = safeInt(character.total_downtime);
 
     const name = String(character.name || `Character ${character.id}`).slice(0, 16).padEnd(16);
@@ -336,8 +343,13 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const downtimeBubbles = isMixed
         ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
         : totalBubbles;
-    const downtimeAllowed = downtimeBubbles * 8 * 60 * 60;
+    const downtimeAllowed = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
     const downtimeRemaining = downtimeAllowed - downtimeTotal;
+    const bubbleShopLegacy = legacySpendForCharacter(character);
+    const bubbleShopStructured = structuredSpendForCharacter(character);
+    const bubbleShopCovered = coveredByLegacyForCharacter(character);
+    const bubbleShopAdditional = additionalSpendBeyondLegacyForCharacter(character);
+    const bubbleShopExtraDowntime = extraDowntimeSecondsForCharacter(character);
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
@@ -373,7 +385,18 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             { name: 'Factions', value: factionsValue, inline: true },
             { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
-            { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
+            {
+                name: t('characters.manageBubbleShop', {}, locale),
+                value: [
+                    `${t('characters.bubbleShopLegacyStand', {}, locale)}: **${bubbleShopLegacy}**`,
+                    `${t('characters.bubbleShopStructuredSpend', {}, locale)}: **${bubbleShopStructured}**`,
+                    `${t('characters.bubbleShopCoveredByLegacy', {}, locale)}: **${bubbleShopCovered}**`,
+                    `${t('characters.bubbleShopActiveSpend', {}, locale)}: **${safeInt(character.bubble_shop_spend)}**`,
+                    `${t('characters.bubbleShopAdditionalSpend', {}, locale)}: **${bubbleShopAdditional}**`,
+                    `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
+                ].join('\n'),
+                inline: true,
+            },
         );
 
     if (statusNextStep) {

@@ -30,7 +30,7 @@ const fakeConnection = {
         }
 
         if (sql.includes('INSERT INTO characters')) {
-            insertedAvatarParam = params[6];
+            insertedAvatarParam = params[7];
             return [{ insertId: 777 }];
         }
 

@@ -28,7 +28,6 @@ const UpdateCharacterModal = ({
     dm_bubbles: character.dm_bubbles,
     dm_coins: character.dm_coins,
     notes: character.notes,
-    bubble_shop_spend: character.bubble_shop_spend,
     external_link: character.external_link,
     is_filler: character.is_filler,
     avatar: undefined,
@@ -132,16 +131,6 @@ const UpdateCharacterModal = ({
                       {t('characters.dmCoins')}
                     </Input>
                   </div>
-                  <Input
-                    errors={errors.bubble_shop_spend}
-                    type="number"
-                    min={0}
-                    max={1024}
-                    value={data.bubble_shop_spend}
-                    onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-                  >
-                    {t('characters.bubbleShopSpend')}
-                  </Input>
                 </>
               )}
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>

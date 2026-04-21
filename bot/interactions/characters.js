@@ -25,6 +25,7 @@ const {
     getCharacterProgressionUpgradeStateForDiscord,
     updateCharacterManualLevelForDiscord,
     updateCharacterManualOverridesForDiscord,
+    updateCharacterBubbleShopForDiscord,
     upgradeCharacterProgressionForDiscord,
     updateLinkedUserLocaleForDiscord,
     updateLinkedUserTrackingDefaultForDiscord,
@@ -48,6 +49,15 @@ const {
     updateDowntimeForDiscord,
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
+const {
+    TYPE_HT_DOWNTIME,
+    TYPE_LT_DOWNTIME,
+    TYPE_RARE_LANGUAGE,
+    TYPE_SKILL_PROFICIENCY,
+    TYPE_TOOL_OR_LANGUAGE,
+    definitionsForCharacter,
+    quantitiesForCharacter,
+} = require('../utils/characterBubbleShop');
 
 const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
@@ -930,6 +940,14 @@ async function deleteLinkedAccountViaBot(discordUserId) {
 
 async function updateCharacterForDiscordAndSync(discordUser, characterId, payload) {
     const result = await updateCharacterForDiscord(discordUser, characterId, payload);
+    if (result.ok) {
+        await syncCharacterApprovalAnnouncement(characterId);
+    }
+    return result;
+}
+
+async function updateCharacterBubbleShopForDiscordAndSync(discordUser, characterId, payload) {
+    const result = await updateCharacterBubbleShopForDiscord(discordUser, characterId, payload);
     if (result.ok) {
         await syncCharacterApprovalAnnouncement(characterId);
     }
@@ -2429,7 +2447,7 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterBubbleSpendModal_')) {
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterBubbleShopModal_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) return false;
@@ -2439,10 +2457,19 @@ async function handle(interaction) {
             return true;
         }
 
-        const bubbleShopSpend = interaction.fields.getTextInputValue('bubbleSpend');
-        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { bubbleShopSpend });
+        const payload = {
+            [TYPE_SKILL_PROFICIENCY]: interaction.fields.getTextInputValue(TYPE_SKILL_PROFICIENCY),
+            [TYPE_RARE_LANGUAGE]: interaction.fields.getTextInputValue(TYPE_RARE_LANGUAGE),
+            [TYPE_TOOL_OR_LANGUAGE]: interaction.fields.getTextInputValue(TYPE_TOOL_OR_LANGUAGE),
+            [TYPE_LT_DOWNTIME]: interaction.fields.getTextInputValue(TYPE_LT_DOWNTIME),
+            [TYPE_HT_DOWNTIME]: interaction.fields.getTextInputValue(TYPE_HT_DOWNTIME),
+        };
+        const result = await updateCharacterBubbleShopForDiscordAndSync(interaction.user, characterId, payload);
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            const content = result.reason === 'invalid_quantity'
+                ? `Ungueltiger Bubble-Shop-Wert fuer ${result.type}. Maximal erlaubt: ${result.max}.`
+                : 'Character not found.';
+            await updateManageMessage(interaction, { content, flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -3239,18 +3266,45 @@ async function handle(interaction) {
         }
 
         if (action === 'bubble_spend') {
+            const definitions = definitionsForCharacter(character);
+            const quantities = quantitiesForCharacter(character);
             const modal = new ModalBuilder()
-                .setCustomId(`characterBubbleSpendModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Bubble Shop Spend');
+                .setCustomId(`characterBubbleShopModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Bubble Shop');
 
-            const spendInput = new TextInputBuilder()
-                .setCustomId('bubbleSpend')
-                .setLabel('Bubble Shop Spend')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.bubble_shop_spend ?? 0)));
+            const inputs = [
+                {
+                    id: TYPE_SKILL_PROFICIENCY,
+                    label: `${t('characters.bubbleShopSkillProficiencyShort', {}, locale)} (0-${safeInt(definitions[TYPE_SKILL_PROFICIENCY]?.max)})`,
+                },
+                {
+                    id: TYPE_RARE_LANGUAGE,
+                    label: `${t('characters.bubbleShopRareLanguageShort', {}, locale)} (0-${safeInt(definitions[TYPE_RARE_LANGUAGE]?.max)})`,
+                },
+                {
+                    id: TYPE_TOOL_OR_LANGUAGE,
+                    label: `${t('characters.bubbleShopToolOrLanguageShort', {}, locale)} (0-${safeInt(definitions[TYPE_TOOL_OR_LANGUAGE]?.max)})`,
+                },
+                {
+                    id: TYPE_LT_DOWNTIME,
+                    label: `${t('characters.bubbleShopLtDowntimeShort', {}, locale)} (0-${safeInt(definitions[TYPE_LT_DOWNTIME]?.max)})`,
+                },
+                {
+                    id: TYPE_HT_DOWNTIME,
+                    label: `${t('characters.bubbleShopHtDowntimeShort', {}, locale)} (0-${safeInt(definitions[TYPE_HT_DOWNTIME]?.max)})`,
+                },
+            ];
 
-            modal.addComponents(new ActionRowBuilder().addComponents(spendInput));
+            modal.addComponents(...inputs.map(({ id, label }) => (
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId(id)
+                        .setLabel(label)
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setValue(safeModalValue(String(quantities[id] ?? 0))),
+                )
+            )));
             await interaction.showModal(modal);
             return true;
         }

@@ -10,6 +10,7 @@ use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
 use App\Support\CharacterAvatarPrivacy;
+use App\Support\CharacterBubbleShop;
 use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -31,7 +32,7 @@ class CharacterController extends Controller
             ->where('user_id', $user?->getAuthIdentifier())
             ->withTrashed()
             ->withCount('room')
-            ->with(['adventures', 'adventures.allies:id'])
+            ->with(['adventures', 'adventures.allies:id', 'bubbleShopPurchases'])
             ->orderBy('position')
             ->get()
             ->withoutAppends();
@@ -67,6 +68,7 @@ class CharacterController extends Controller
      */
     public function store(
         StoreCharacterRequest $request,
+        CharacterBubbleShop $bubbleShop,
     ): RedirectResponse {
         $character = new Character;
         $character->name = $request->name;
@@ -76,7 +78,8 @@ class CharacterController extends Controller
         $character->version = $request->version;
         $character->dm_bubbles = $request->dm_bubbles;
         $character->dm_coins = $request->dm_coins;
-        $character->bubble_shop_spend = $request->bubble_shop_spend;
+        $character->bubble_shop_spend = $request->integer('bubble_shop_spend', 0);
+        $bubbleShop->syncLegacySpend($character, $character->bubble_shop_spend);
         $character->user_id = Auth::user()->getAuthIdentifier();
         $character->simplified_tracking = (bool) (Auth::user()?->simplified_tracking ?? false);
         $character->start_tier = $request->start_tier;
@@ -100,7 +103,7 @@ class CharacterController extends Controller
     public function show(Character $character): Response
     {
         $this->ensureCharacterOwner($character);
-        $character->load('adventures.allies.linkedCharacter');
+        $character->load('adventures.allies.linkedCharacter', 'bubbleShopPurchases');
         $this->attachReviewerNamesToCharacters(collect([$character]));
         $this->characterAvatarPrivacy->maskLinkedCharacterAvatars($character, Auth::id());
 
@@ -135,6 +138,7 @@ class CharacterController extends Controller
         UpdateCharacterRequest $request,
         Character $character,
         CharacterApprovalNotificationService $notificationService,
+        CharacterBubbleShop $bubbleShop,
     ): RedirectResponse {
         $this->ensureCharacterOwner($character);
 
@@ -145,7 +149,9 @@ class CharacterController extends Controller
         $character->version = $request->version;
         $character->dm_bubbles = $request->dm_bubbles;
         $character->dm_coins = $request->dm_coins;
-        $character->bubble_shop_spend = $request->bubble_shop_spend;
+        if ($request->exists('bubble_shop_spend')) {
+            $bubbleShop->syncLegacySpend($character, $request->integer('bubble_shop_spend'));
+        }
         $character->external_link = $request->external_link;
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');

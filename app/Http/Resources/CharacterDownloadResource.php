@@ -18,8 +18,15 @@ class CharacterDownloadResource extends JsonResource
             'dm_bubbles' => $this->dm_bubbles,
             'dm_coins' => $this->dm_coins,
             'bubble_shop_spend' => $this->bubble_shop_spend,
+            'bubble_shop_legacy_spend' => $this->bubble_shop_legacy_spend,
             'external_link' => $this->external_link,
             'classes' => $this->whenLoaded('characterClasses')->pluck('name'),
+            'bubble_shop_purchases' => $this->whenLoaded('bubbleShopPurchases')->mapWithKeys(fn ($purchase) => [
+                $purchase->type => [
+                    'quantity' => $purchase->quantity,
+                    'details' => $purchase->details,
+                ],
+            ]),
             'allies' => $this->whenLoaded('allies')->map(fn ($ally) => [
                 'name' => $ally->name,
                 'rating' => $ally->rating,

@@ -16,6 +16,15 @@ const {
     tryBuildLocalAvatarAttachment,
 } = require('../commands/game/characters');
 const { t } = require('../i18n');
+const {
+    definitionsForCharacter,
+    coveredByLegacyForCharacter,
+    extraDowntimeSecondsForCharacter,
+    legacySpendForCharacter,
+    purchaseTypes,
+    quantitiesForCharacter,
+    structuredSpendForCharacter,
+} = require('../utils/characterBubbleShop');
 const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
 const { bubblesRequiredForLevel } = require('../utils/levelProgression');
 const { formatIsoDate, formatLocalIsoDate } = require('../dateUtils');
@@ -166,6 +175,21 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+function buildBubbleShopSummary(character, locale = null) {
+    const legacySpend = legacySpendForCharacter(character);
+    const structuredSpend = structuredSpendForCharacter(character);
+    const coveredByLegacy = coveredByLegacyForCharacter(character);
+    const extraDowntimeSeconds = extraDowntimeSecondsForCharacter(character);
+
+    return [
+        `${t('characters.bubbleShopLegacyStand', {}, locale)}: **${legacySpend}**`,
+        `${t('characters.bubbleShopStructuredSpend', {}, locale)}: **${structuredSpend}**`,
+        `${t('characters.bubbleShopCoveredByLegacy', {}, locale)}: **${coveredByLegacy}**`,
+        `${t('characters.bubbleShopActiveSpend', {}, locale)}: **${safeInt(character.bubble_shop_spend)}**`,
+        `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`,
+    ].join('\n');
+}
+
 function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, hasPseudoAdventure = false, avatarMasked, privateMode, locale = null }) {
     const showManualOverrideButtons = simplifiedTracking || hasPseudoAdventure;
 
@@ -277,7 +301,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
         : '-';
     const dmBubbles = String(safeInt(character.dm_bubbles));
     const dmCoins = String(safeInt(character.dm_coins));
-    const bubbleSpend = String(safeInt(character.bubble_shop_spend));
+    const bubbleShopSummary = buildBubbleShopSummary(character, locale);
     const statusLabel = formatGuildStatusLabel(character.guild_status);
     const avatarMasked = character.avatar_masked === null || character.avatar_masked === undefined
         ? true
@@ -311,7 +335,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
             { name: t('characters.notesField', {}, locale), value: notes, inline: false },
             { name: t('characters.manageDmBubbles', {}, locale), value: dmBubbles, inline: true },
             { name: t('characters.manageDmCoins', {}, locale), value: dmCoins, inline: true },
-            { name: t('characters.manageBubbleShop', {}, locale), value: bubbleSpend, inline: true },
+            { name: t('characters.manageBubbleShop', {}, locale), value: bubbleShopSummary, inline: true },
         );
 
     return {

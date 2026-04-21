@@ -21,6 +21,12 @@ const payload = buildCharacterManageView({
     dm_bubbles: 3,
     dm_coins: 5,
     bubble_shop_spend: 2,
+    bubble_shop_legacy_spend: 2,
+    bubble_shop_skill_proficiency: 1,
+    bubble_shop_rare_language: 0,
+    bubble_shop_tool_or_language: 0,
+    bubble_shop_lt_downtime: 2,
+    bubble_shop_ht_downtime: 0,
     guild_status: 'pending',
     simplified_tracking: false,
     avatar_masked: true,
@@ -40,6 +46,8 @@ assert.equal(payload.components[1].components[0].data.label, 'DM Bubbles');
 assert.equal(payload.components[2].components[0].data.label, 'Tracking: Adventure tracking');
 assert.equal(payload.components[2].components[2].data.label, 'Privatmodus: An');
 assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Privatmodus' && field.value === 'An'), true);
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Bubble Shop' && field.value.includes('Alter Stand: **2**')), true);
+assert.equal(payload.embeds[0].data.fields.some(field => field.name === 'Bubble Shop' && field.value.includes('Downtime extra: **16h 0m**')), true);
 assert.equal(payload.components[3].components[0].data.label, 'Zurück');
 
 console.log('character-manage-view.test.js passed');

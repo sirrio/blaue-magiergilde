@@ -10,6 +10,7 @@ import { AlliesModal } from '@/pages/character/allies-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
+import BubbleShopModal from '@/pages/character/bubble-shop-modal'
 import AppLayout from '@/layouts/app-layout'
 import { useTranslate } from '@/lib/i18n'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
@@ -406,9 +407,19 @@ export default function Show({
         <div className="space-y-2 border-b border-base-200 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-bold sm:text-2xl">{t('characters.detailsHeading', { name: character.name })}</h1>
-            <Link href={route(isReadOnly ? 'characters.deleted' : 'characters.index')} className="btn btn-sm">
-              {t('characters.back')}
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {!isReadOnly && !character.is_filler ? (
+                <BubbleShopModal
+                  character={character}
+                  triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                  showLabel
+                  labelClassName="hidden sm:inline"
+                />
+              ) : null}
+              <Link href={route(isReadOnly ? 'characters.deleted' : 'characters.index')} className="btn btn-sm">
+                {t('characters.back')}
+              </Link>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="badge badge-ghost badge-sm">{character.adventures.length} {t('characters.adventures')}</span>

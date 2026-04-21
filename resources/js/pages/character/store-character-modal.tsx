@@ -24,7 +24,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
     dm_bubbles: 0,
     dm_coins: 0,
     notes: '',
-    bubble_shop_spend: 0,
     external_link: '',
     is_filler: false,
     start_tier: 'bt',
@@ -132,7 +131,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                     is_filler: isFiller,
                     dm_bubbles: isFiller ? 0 : prev.dm_bubbles,
                     dm_coins: isFiller ? 0 : prev.dm_coins,
-                    bubble_shop_spend: isFiller ? 0 : prev.bubble_shop_spend,
                   }))
                 }}
               >
@@ -151,16 +149,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
                       {t('characters.dmCoins')}
                     </Input>
                   </div>
-                  <Input
-                    errors={errors.bubble_shop_spend}
-                    type="number"
-                    min={0}
-                    max={1024}
-                    value={data.bubble_shop_spend}
-                    onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-                  >
-                    {t('characters.bubbleShopSpend')}
-                  </Input>
                 </>
               )}
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>

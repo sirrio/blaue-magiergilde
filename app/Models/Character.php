@@ -47,6 +47,7 @@ class Character extends Model
         'progression_version_id' => 'integer',
         'manual_adventures_count' => 'integer',
         'manual_faction_rank' => 'integer',
+        'bubble_shop_legacy_spend' => 'integer',
     ];
 
     protected $appends = ['faction_rank'];
@@ -69,6 +70,11 @@ class Character extends Model
     public function characterClasses(): BelongsToMany
     {
         return $this->belongsToMany(CharacterClass::class);
+    }
+
+    public function bubbleShopPurchases(): HasMany
+    {
+        return $this->hasMany(CharacterBubbleShopPurchase::class);
     }
 
     public function user(): BelongsTo

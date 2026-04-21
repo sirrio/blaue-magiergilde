@@ -18,7 +18,7 @@ class DownloadCharacterController extends Controller
             abort(403);
         }
 
-        $character->loadMissing(['adventures', 'downtimes', 'allies', 'characterClasses']);
+        $character->loadMissing(['adventures', 'downtimes', 'allies', 'characterClasses', 'bubbleShopPurchases']);
 
         $data = CharacterDownloadResource::make($character)->resolve();
         $format = strtolower((string) $request->query('format', 'json'));
@@ -60,10 +60,25 @@ class DownloadCharacterController extends Controller
             'DM Bubbles: '.((string) ($data['dm_bubbles'] ?? 0)),
             'DM Coins: '.((string) ($data['dm_coins'] ?? 0)),
             'Bubble Shop Spend: '.((string) ($data['bubble_shop_spend'] ?? 0)),
+            'Bubble Shop Legacy Spend: '.((string) ($data['bubble_shop_legacy_spend'] ?? 0)),
             '',
             '## Notes',
             (string) ($data['notes'] ?? '-'),
             '',
+            '## Bubble Shop Purchases',
+        ];
+
+        $bubbleShopPurchases = collect($data['bubble_shop_purchases'] ?? [])->filter(fn ($purchase) => (int) ($purchase['quantity'] ?? 0) > 0);
+        if ($bubbleShopPurchases->isEmpty()) {
+            $lines[] = '- None';
+        } else {
+            foreach ($bubbleShopPurchases as $type => $purchase) {
+                $lines[] = '- '.$type.': '.((string) ($purchase['quantity'] ?? 0));
+            }
+        }
+
+        $lines = [
+            ...$lines,
             '## Classes',
         ];
 

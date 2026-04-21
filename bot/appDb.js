@@ -1,5 +1,16 @@
 const db = require('./db');
 const { additionalBubblesForStartTier, calculateLevel, calculateTierFromLevel } = require('./utils/characterTier');
+const {
+    TYPE_SKILL_PROFICIENCY,
+    TYPE_RARE_LANGUAGE,
+    TYPE_TOOL_OR_LANGUAGE,
+    TYPE_LT_DOWNTIME,
+    TYPE_HT_DOWNTIME,
+    purchaseTypes,
+    definitionsForCharacter,
+    quantitiesForCharacter,
+    effectiveSpendForCharacter,
+} = require('./utils/characterBubbleShop');
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
 const {
     calculateMinAllowedLevel,
@@ -54,6 +65,28 @@ const allowedBotLocales = new Set(['de', 'en']);
 const isCharacterStatusSwitchEnabled = String(process.env.FEATURE_CHARACTER_STATUS_SWITCH ?? 'true').trim().toLowerCase() !== 'false';
 const maxActiveCharacters = 8;
 const exemptHighTierCharacters = 2;
+
+const bubbleShopPurchaseSelect = `
+                COALESCE(shop.skill_proficiency_quantity, 0) AS bubble_shop_skill_proficiency,
+                COALESCE(shop.rare_language_quantity, 0) AS bubble_shop_rare_language,
+                COALESCE(shop.tool_or_language_quantity, 0) AS bubble_shop_tool_or_language,
+                COALESCE(shop.lt_downtime_quantity, 0) AS bubble_shop_lt_downtime,
+                COALESCE(shop.ht_downtime_quantity, 0) AS bubble_shop_ht_downtime,
+`;
+
+const bubbleShopPurchaseJoin = `
+            LEFT JOIN (
+                SELECT
+                    character_id,
+                    SUM(CASE WHEN type = 'skill_proficiency' THEN quantity ELSE 0 END) AS skill_proficiency_quantity,
+                    SUM(CASE WHEN type = 'rare_language' THEN quantity ELSE 0 END) AS rare_language_quantity,
+                    SUM(CASE WHEN type = 'tool_or_language' THEN quantity ELSE 0 END) AS tool_or_language_quantity,
+                    SUM(CASE WHEN type = 'lt_downtime' THEN quantity ELSE 0 END) AS lt_downtime_quantity,
+                    SUM(CASE WHEN type = 'ht_downtime' THEN quantity ELSE 0 END) AS ht_downtime_quantity
+                FROM character_bubble_shop_purchases
+                GROUP BY character_id
+            ) shop ON shop.character_id = c.id
+`;
 
 function guildCharacterStatusesForAllies() {
     const statuses = ['pending', 'approved', 'needs_changes'];
@@ -548,6 +581,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                c.bubble_shop_legacy_spend,
                 c.progression_version_id,
                 c.manual_adventures_count,
                 c.manual_faction_rank,
@@ -566,6 +600,7 @@ async function listCharactersForDiscord(discordUser) {
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
+${bubbleShopPurchaseSelect}
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
             LEFT JOIN rooms r ON r.character_id = c.id
@@ -616,6 +651,7 @@ async function listCharactersForDiscord(discordUser) {
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
             ) dt ON dt.character_id = c.id
+${bubbleShopPurchaseJoin}
             LEFT JOIN (
                 SELECT
                     ccc.character_id,
@@ -725,6 +761,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.dm_bubbles,
                 c.dm_coins,
                 c.bubble_shop_spend,
+                c.bubble_shop_legacy_spend,
                 c.progression_version_id,
                 c.manual_adventures_count,
                 c.manual_faction_rank,
@@ -743,6 +780,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 COALESCE(dt.total_downtime, 0) AS total_downtime,
                 COALESCE(dt.faction_downtime, 0) AS faction_downtime,
                 COALESCE(dt.other_downtime, 0) AS other_downtime,
+${bubbleShopPurchaseSelect}
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
             LEFT JOIN rooms r ON r.character_id = c.id
@@ -793,6 +831,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 WHERE deleted_at IS NULL
                 GROUP BY character_id
             ) dt ON dt.character_id = c.id
+${bubbleShopPurchaseJoin}
             LEFT JOIN (
                 SELECT
                     ccc.character_id,
@@ -1030,6 +1069,87 @@ async function updateCharacterManualOverridesForDiscord(discordUser, characterId
     return { ok: true };
 }
 
+async function updateCharacterBubbleShopForDiscord(discordUser, characterId, purchases) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    if (!userId) {
+        throw new DiscordNotLinkedError();
+    }
+
+    const existing = await findCharacterForDiscord(discordUser, characterId);
+    if (!existing) {
+        return { ok: false, reason: 'not_found' };
+    }
+
+    const normalizedQuantities = quantitiesForCharacter(existing);
+    for (const type of purchaseTypes()) {
+        if (Object.prototype.hasOwnProperty.call(purchases || {}, type)) {
+            normalizedQuantities[type] = normalizeNumber(purchases[type], normalizedQuantities[type], 999);
+        }
+    }
+
+    const definitions = definitionsForCharacter(existing);
+    for (const type of purchaseTypes()) {
+        const max = safeInt(definitions[type]?.max);
+        if (normalizedQuantities[type] > max) {
+            return {
+                ok: false,
+                reason: 'invalid_quantity',
+                type,
+                max,
+            };
+        }
+    }
+
+    const updatedAt = nowSql();
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        for (const type of purchaseTypes()) {
+            const quantity = normalizedQuantities[type];
+            if (quantity <= 0) {
+                await connection.execute(
+                    'DELETE FROM character_bubble_shop_purchases WHERE character_id = ? AND type = ?',
+                    [characterId, type],
+                );
+                continue;
+            }
+
+            await connection.execute(
+                `
+                    INSERT INTO character_bubble_shop_purchases (character_id, type, quantity, details, created_at, updated_at)
+                    VALUES (?, ?, ?, NULL, ?, ?)
+                    ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), details = VALUES(details), updated_at = VALUES(updated_at)
+                `,
+                [characterId, type, quantity, updatedAt, updatedAt],
+            );
+        }
+
+        const effectiveSpend = effectiveSpendForCharacter({
+            ...existing,
+            bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
+            bubble_shop_rare_language: normalizedQuantities[TYPE_RARE_LANGUAGE],
+            bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
+            bubble_shop_lt_downtime: normalizedQuantities[TYPE_LT_DOWNTIME],
+            bubble_shop_ht_downtime: normalizedQuantities[TYPE_HT_DOWNTIME],
+        });
+
+        await connection.execute(
+            'UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+            [effectiveSpend, updatedAt, characterId, userId],
+        );
+
+        await connection.commit();
+
+        return { ok: true };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
 async function createCharacterForDiscord(
     discordUser,
     {
@@ -1082,15 +1202,16 @@ async function createCharacterForDiscord(
         const [insertCharacter] = await connection.execute(
             `
             INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, progression_version_id, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, bubble_shop_legacy_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, progression_version_id, created_at, updated_at)
             VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 safeName,
                 safeTier,
                 safeDmBubbles,
                 safeDmCoins,
+                safeBubbleShop,
                 safeBubbleShop,
                 safeExternal,
                 safeAvatar,
@@ -1202,8 +1323,17 @@ async function updateCharacterForDiscord(
     const newAvatar = typeof avatar === 'string' ? normalizeAvatar(avatar) : existing.avatar;
     const newDmBubbles = typeof dmBubbles !== 'undefined' ? normalizeNumber(dmBubbles, existing.dm_bubbles) : existing.dm_bubbles;
     const newDmCoins = typeof dmCoins !== 'undefined' ? normalizeNumber(dmCoins, existing.dm_coins) : existing.dm_coins;
-    const newBubbleShopSpend = typeof bubbleShopSpend !== 'undefined'
+    const requestedBubbleShopSpend = typeof bubbleShopSpend !== 'undefined'
         ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
+        : existing.bubble_shop_spend;
+    const newBubbleShopLegacySpend = typeof bubbleShopSpend !== 'undefined'
+        ? Math.max(safeInt(existing.bubble_shop_legacy_spend), requestedBubbleShopSpend)
+        : safeInt(existing.bubble_shop_legacy_spend);
+    const newBubbleShopSpend = typeof bubbleShopSpend !== 'undefined'
+        ? effectiveSpendForCharacter({
+            ...existing,
+            bubble_shop_legacy_spend: newBubbleShopLegacySpend,
+        })
         : existing.bubble_shop_spend;
     const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
     const newRegistrationNote = typeof registrationNote === 'string'
@@ -1228,7 +1358,7 @@ async function updateCharacterForDiscord(
     await db.execute(
         `
             UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, private_mode = ?, updated_at = ?
+            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, bubble_shop_legacy_spend = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, private_mode = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
         `,
         [
@@ -1242,6 +1372,7 @@ async function updateCharacterForDiscord(
             newDmBubbles,
             newDmCoins,
             newBubbleShopSpend,
+            newBubbleShopLegacySpend,
             newIsFiller ? 1 : 0,
             newGuildStatus,
             newRegistrationNote || null,
@@ -2215,6 +2346,7 @@ module.exports = {
     upgradeCharacterProgressionForDiscord,
     updateCharacterManualLevelForDiscord,
     updateCharacterManualOverridesForDiscord,
+    updateCharacterBubbleShopForDiscord,
     createCharacterForDiscord,
     updateCharacterForDiscord,
     softDeleteCharacterForDiscord,

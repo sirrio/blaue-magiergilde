@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Character\AvatarMaskController;
 use App\Http\Controllers\Character\AvatarModeController;
+use App\Http\Controllers\Character\CharacterBubbleShopController;
 use App\Http\Controllers\Character\CharacterController;
 use App\Http\Controllers\Character\CharacterManualOverridesController;
 use App\Http\Controllers\Character\DeletedCharacterController;
@@ -37,6 +38,9 @@ Route::patch('characters/{character}/private-mode', PrivateModeController::class
 Route::patch('characters/{character}/manual-overrides', CharacterManualOverridesController::class)
     ->middleware(['auth'])
     ->name('characters.manual-overrides');
+Route::patch('characters/{character}/bubble-shop', CharacterBubbleShopController::class)
+    ->middleware(['auth'])
+    ->name('characters.bubble-shop');
 Route::get('avatars/masked', AvatarMaskController::class)
     ->name('avatars.masked');
 Route::post('characters/{character}/quick-level', [QuickLevelController::class, 'store'])

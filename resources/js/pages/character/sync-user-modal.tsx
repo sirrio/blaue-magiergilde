@@ -20,7 +20,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
     dm_bubbles: 0,
     dm_coins: 0,
     notes: '',
-    bubble_shop_spend: 0,
     external_link: '',
     is_filler: false,
     start_tier: 'bt',
@@ -89,16 +88,6 @@ const StoreCharacterModal = ({ children }: React.PropsWithChildren) => {
               {t('characters.dmCoins')}
             </Input>
           </div>
-          <Input
-            errors={errors.bubble_shop_spend}
-            type="number"
-            min={0}
-            max={1024}
-            value={data.bubble_shop_spend}
-            onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-          >
-            {t('characters.bubbleShopSpend')}
-          </Input>
           <Input
             placeholder="https://www.dndbeyond.com/characters/..."
             errors={errors.external_link}

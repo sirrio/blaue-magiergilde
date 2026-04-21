@@ -6,6 +6,7 @@ use App\Actions\Character\SetQuickLevel;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Character\UpgradeCharacterProgressionRequest;
 use App\Models\Character;
+use App\Support\CharacterBubbleShop;
 use App\Support\CharacterProgressionState;
 use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +16,7 @@ class UpgradeCharacterProgressionController extends Controller
 {
     public function __construct(
         private SetQuickLevel $setQuickLevel,
+        private CharacterBubbleShop $bubbleShop = new CharacterBubbleShop,
         private CharacterProgressionState $progressionState = new CharacterProgressionState,
     ) {}
 
@@ -140,8 +142,9 @@ class UpgradeCharacterProgressionController extends Controller
         DB::transaction(function () use ($character, $activeVersionId, $newSpend): void {
             $character->forceFill([
                 'progression_version_id' => $activeVersionId,
-                'bubble_shop_spend' => $newSpend,
-            ])->save();
+            ]);
+            $this->bubbleShop->syncLegacySpend($character, $newSpend);
+            $character->save();
         });
 
         return ['ok' => true];

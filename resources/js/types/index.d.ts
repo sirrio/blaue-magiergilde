@@ -421,6 +421,8 @@ export interface Character {
   dm_coins: number
   is_filler: boolean
   bubble_shop_spend: number
+  bubble_shop_legacy_spend?: number
+  bubble_shop_purchases?: CharacterBubbleShopPurchase[]
   faction_rank?: number
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
@@ -535,6 +537,14 @@ export interface Downtime {
   type: 'faction' | 'other'
   notes: string
   character_id: number
+}
+
+export interface CharacterBubbleShopPurchase {
+  id: number
+  character_id: number
+  type: 'skill_proficiency' | 'rare_language' | 'tool_or_language' | 'lt_downtime' | 'ht_downtime'
+  quantity: number
+  details?: Record<string, unknown> | null
 }
 
 
