@@ -180,7 +180,7 @@ function buildBubbleShopSummary(character, locale = null) {
     const structuredSpend = structuredSpendForCharacter(character);
     const unassignedLegacySpend = Math.max(legacySpend - structuredSpend, 0);
 
-    if (legacySpend <= 0) {
+    if (unassignedLegacySpend <= 0) {
         return `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`;
     }
 

@@ -56,7 +56,6 @@ export default function BubbleShopModal({
   const structuredSpend = getCharacterBubbleShopStructuredSpend(character, form.data)
   const legacySpend = getCharacterBubbleShopLegacySpend(character)
   const legacySpendRemaining = Math.max(legacySpend - structuredSpend, 0)
-  const showsLegacyRedistribution = legacySpend > 0
   const hasOutstandingLegacyRedistribution = legacySpendRemaining > 0
 
   const submit = () => {
@@ -95,7 +94,7 @@ export default function BubbleShopModal({
       <ModalTitle>{t('characters.manageBubbleShop')}</ModalTitle>
       <ModalContent>
         <div className="space-y-4">
-          {showsLegacyRedistribution ? (
+          {hasOutstandingLegacyRedistribution ? (
             <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-3 text-xs text-base-content/75">
               <div className="flex items-start gap-2">
                 <span className="mt-0.5 text-warning">

@@ -384,9 +384,9 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             { name: 'Factions', value: factionsValue, inline: true },
             { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
-              {
-                  name: t('characters.manageBubbleShop', {}, locale),
-                    value: bubbleShopLegacy > 0
+                {
+                    name: t('characters.manageBubbleShop', {}, locale),
+                    value: bubbleShopUnassigned > 0
                         ? [
                         `${t('characters.bubbleShopLegacyUnassigned', {}, locale)}: **${bubbleShopUnassigned}**`,
                         t('characters.bubbleShopLegacyReasonBody', {}, locale),
