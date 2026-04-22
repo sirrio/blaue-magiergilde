@@ -79,7 +79,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
           additionalBubblesForStartTier(character.start_tier) -
           (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
       )
-    : bubblesRequiredForLevel(initialLevel, currentVersionId)
+    : bubblesRequiredForLevel(initialLevel, targetVersionId)
 
   const recalculatedLevel = levelFromAvailableBubbles(currentAvailableBubbles, targetVersionId)
 
@@ -97,7 +97,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
       })()
     : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(recalculatedLevel, targetVersionId))
 
-  const minSelectableLevel = character.is_filler ? 1 : levelFromAvailableBubbles(minimumAllowedAvailableBubbles, targetVersionId)
+  const minSelectableLevel = character.is_filler ? 1 : manualTracking ? levelFromAvailableBubbles(minimumAllowedAvailableBubbles, targetVersionId) : initialLevel
 
   const maxSelectableLevel = hasPseudoAdventure ? recalculatedLevel : manualTracking ? MAX_LEVEL : recalculatedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
@@ -129,14 +129,12 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
   const initialAvailableBubbles = manualTracking
     ? bubblesRequiredForLevel(initialLevel, targetVersionId) + initialBubblesInLevel
     : currentAvailableBubbles
-  const levelDelta = targetLevel - initialLevel
   const canSetBubbles = targetLevel < 20 && displayedBubblesInSelectedLevel > 0
 
   const oldCurveBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(initialLevel, currentVersionId))
   const oldCurveMaxBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(initialLevel, currentVersionId))
   const newCurveMaxBubblesInLevel = targetLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId))
   const additionalBubbleShopSpend = manualTracking ? 0 : Math.max(0, currentAvailableBubbles - targetAvailableBubbles)
-  const resultingBubbleShopSpend = Number(character.bubble_shop_spend ?? 0) + additionalBubbleShopSpend
   const hasChanges = targetVersionId !== (character.progression_version_id ?? null) || targetAvailableBubbles !== initialAvailableBubbles
 
   useEffect(() => {
@@ -290,7 +288,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
           {/* Floor-Hinweis als plain text, nur wenn relevant */}
           {!manualTracking && minSelectableLevel > 1 ? (
             <p className="text-[11px] leading-relaxed text-base-content/50">
-              {t('characters.upgradeLevelCurveAdventureFloorHint', { level: minSelectableLevel })}
+              {t('characters.upgradeLevelCurveAdventureFloorHint', { level: minSelectableLevel, maxLevel: recalculatedLevel })}
             </p>
           ) : null}
           {manualTracking && !character.is_filler && minSelectableLevel > 1 ? (

@@ -246,15 +246,125 @@ it('supports selecting bubbles within the target level during an adventure-track
         ->and((13 - $character->bubble_shop_spend) - LevelProgression::bubblesRequiredForLevel(5, $newVersion->id))->toBe(1);
 });
 
-it('does not allow an adventure-tracked character to switch below the current displayed level on the new curve', function () {
+it('allows an adventure-tracked character to choose between the old displayed level and the newly calculated level', function () {
     $user = User::factory()->create();
-    $originalVersionId = LevelProgression::activeVersionId();
+    $previousActiveVersionId = LevelProgression::activeVersionId();
 
-    LevelProgressionVersion::query()->whereKey($originalVersionId)->update(['is_active' => false]);
+    LevelProgressionVersion::query()->whereKey($previousActiveVersionId)->update(['is_active' => false]);
+
+    $originalVersion = LevelProgressionVersion::query()->create([
+        'is_active' => true,
+    ]);
+
+    foreach (range(1, 20) as $level) {
+        LevelProgressionEntry::query()->create([
+            'version_id' => $originalVersion->id,
+            'level' => $level,
+            'required_bubbles' => (int) (($level - 1) * $level / 2),
+        ]);
+    }
+
+    LevelProgression::clearCache();
 
     $newVersion = LevelProgressionVersion::query()->create([
         'is_active' => true,
     ]);
+
+    LevelProgressionVersion::query()->whereKey($originalVersion->id)->update(['is_active' => false]);
+
+    $newCurveTotals = [
+        1 => 0,
+        2 => 1,
+        3 => 3,
+        4 => 6,
+        5 => 10,
+        6 => 15,
+        7 => 21,
+        8 => 28,
+        9 => 36,
+        10 => 40,
+        11 => 44,
+        12 => 48,
+        13 => 52,
+        14 => 55,
+        15 => 60,
+        16 => 65,
+        17 => 70,
+        18 => 75,
+        19 => 80,
+        20 => 85,
+    ];
+
+    foreach ($newCurveTotals as $level => $requiredBubbles) {
+        LevelProgressionEntry::query()->create([
+            'version_id' => $newVersion->id,
+            'level' => $level,
+            'required_bubbles' => $requiredBubbles,
+        ]);
+    }
+
+    LevelProgression::clearCache();
+
+    $character = Character::factory()->for($user)->create([
+        'simplified_tracking' => false,
+        'progression_version_id' => $originalVersion->id,
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 0,
+        'bubble_shop_legacy_spend' => 0,
+        'start_tier' => 'bt',
+        'is_filler' => false,
+    ]);
+
+    Adventure::factory()->create([
+        'character_id' => $character->id,
+        'duration' => 95 * 10800,
+        'has_additional_bubble' => false,
+        'is_pseudo' => false,
+        'start_date' => '2026-01-01',
+    ]);
+
+    expect(LevelProgression::levelFromAvailableBubbles(95, $originalVersion->id))->toBe(14)
+        ->and(LevelProgression::levelFromAvailableBubbles(95, $newVersion->id))->toBe(20);
+
+    $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
+        'level' => 14,
+        'bubbles_in_level' => 0,
+    ])->assertRedirect();
+
+    $character->refresh();
+
+    expect($character->progression_version_id)->toBe($newVersion->id)
+        ->and($character->bubble_shop_spend)->toBe(40)
+        ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(40)
+        ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0)
+        ->and(LevelProgression::levelFromAvailableBubbles(95 - $character->bubble_shop_spend, $newVersion->id))->toBe(14);
+});
+
+it('does not allow an adventure-tracked character to switch below the current displayed level on the new curve', function () {
+    $user = User::factory()->create();
+    $previousActiveVersionId = LevelProgression::activeVersionId();
+
+    LevelProgressionVersion::query()->whereKey($previousActiveVersionId)->update(['is_active' => false]);
+
+    $originalVersion = LevelProgressionVersion::query()->create([
+        'is_active' => true,
+    ]);
+
+    foreach (range(1, 20) as $level) {
+        LevelProgressionEntry::query()->create([
+            'version_id' => $originalVersion->id,
+            'level' => $level,
+            'required_bubbles' => ($level - 1) * 5,
+        ]);
+    }
+
+    LevelProgression::clearCache();
+
+    $newVersion = LevelProgressionVersion::query()->create([
+        'is_active' => true,
+    ]);
+
+    LevelProgressionVersion::query()->whereKey($originalVersion->id)->update(['is_active' => false]);
 
     foreach (range(1, 20) as $level) {
         LevelProgressionEntry::query()->create([
@@ -268,7 +378,7 @@ it('does not allow an adventure-tracked character to switch below the current di
 
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => false,
-        'progression_version_id' => $originalVersionId,
+        'progression_version_id' => $originalVersion->id,
         'dm_bubbles' => 0,
         'bubble_shop_spend' => 0,
         'start_tier' => 'bt',
@@ -288,7 +398,7 @@ it('does not allow an adventure-tracked character to switch below the current di
         'bubbles_in_level' => 0,
     ])->assertSessionHasErrors('level');
 
-    expect($character->fresh()->progression_version_id)->toBe($originalVersionId)
+    expect($character->fresh()->progression_version_id)->toBe($originalVersion->id)
         ->and($character->fresh()->bubble_shop_spend)->toBe(0);
 });
 

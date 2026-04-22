@@ -272,8 +272,10 @@ async function getCharacterProgressionUpgradeStateForDiscord(discordUser, charac
     const additional = additionalBubblesForStartTier(character.start_tier);
     const minimumAvailableBubbles = usesManualTracking
         ? Math.max(0, immutableAdventureBubbles + additional)
-        : Math.max(0, bubblesRequiredForLevel(currentLevel, currentVersionId));
-    const minSelectableLevel = levelFromAvailableBubbles(minimumAvailableBubbles, activeVersionId);
+        : Math.max(0, bubblesRequiredForLevel(currentLevel, activeVersionId));
+    const minSelectableLevel = usesManualTracking
+        ? levelFromAvailableBubbles(minimumAvailableBubbles, activeVersionId)
+        : currentLevel;
     const maxSelectableLevel = latestPseudo ? recalculatedLevel : (usesManualTracking ? 20 : recalculatedLevel);
     const initialTargetLevel = usesManualTracking ? currentLevel : recalculatedLevel;
     let initialTargetBubblesInLevel = usesManualTracking ? 0 : recalculatedBubblesInLevel;
@@ -315,7 +317,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         return state;
     }
 
-    const { character, activeVersionId, currentVersionId, usesManualTracking, hasPseudoAdventure, currentAvailableBubbles, currentLevel, currentBubblesInLevel, recalculatedLevel, minSelectableLevel, maxSelectableLevel, minimumAvailableBubbles } = state;
+    const { character, activeVersionId, currentVersionId, usesManualTracking, currentAvailableBubbles, currentLevel, recalculatedLevel, minSelectableLevel, maxSelectableLevel, minimumAvailableBubbles } = state;
 
     if (character.is_filler) {
         return { ok: false, reason: 'filler' };
@@ -355,7 +357,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
             ? 0
             : Math.max(minBubblesInLevel, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel));
         const targetAvailableBubbles = levelFloor + clampedBubblesInLevel;
-        const maxAllowedSpend = safeInt(character.bubble_shop_spend) + currentBubblesInLevel;
+        const maxAllowedSpend = safeInt(character.bubble_shop_spend) + Math.max(0, currentAvailableBubbles - minimumAvailableBubbles);
 
         if (normalizedLevel > recalculatedLevel) {
             return { ok: false, reason: 'above_max', maxLevel: recalculatedLevel };

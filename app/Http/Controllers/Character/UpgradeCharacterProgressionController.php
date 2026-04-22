@@ -96,13 +96,9 @@ class UpgradeCharacterProgressionController extends Controller
         $autoLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $activeVersionId);
         $currentVersionId = $character->progression_version_id ?? $activeVersionId;
         $currentLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $currentVersionId);
-        $currentBubblesInLevel = max(
-            0,
-            $availableBubbles - LevelProgression::bubblesRequiredForLevel($currentLevel, $currentVersionId),
-        );
-        $minimumAllowedAvailableBubbles = LevelProgression::bubblesRequiredForLevel($currentLevel, $currentVersionId);
-        $minimumAllowedLevel = LevelProgression::levelFromAvailableBubbles($minimumAllowedAvailableBubbles, $activeVersionId);
-        $maximumAllowedSpend = $currentSpend + $currentBubblesInLevel;
+        $minimumAllowedLevel = $currentLevel;
+        $minimumAllowedAvailableBubbles = LevelProgression::bubblesRequiredForLevel($minimumAllowedLevel, $activeVersionId);
+        $maximumAllowedSpend = $currentSpend + max(0, $availableBubbles - $minimumAllowedAvailableBubbles);
 
         if ($targetLevel > $autoLevel) {
             return [

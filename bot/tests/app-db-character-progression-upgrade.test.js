@@ -24,8 +24,8 @@ const fakeConnection = {
 };
 
 const progressionTotals = {
-    1: { 1: 0, 2: 5, 3: 10, 4: 15, 5: 20, 6: 25, 7: 30, 8: 35, 9: 40, 10: 45, 11: 50, 12: 55, 13: 60, 14: 65, 15: 70, 16: 75, 17: 80, 18: 85, 19: 90, 20: 95 },
-    2: { 1: 0, 2: 3, 3: 6, 4: 10, 5: 15, 6: 21, 7: 28, 8: 36, 9: 45, 10: 55, 11: 66, 12: 78, 13: 91, 14: 105, 15: 120, 16: 136, 17: 153, 18: 171, 19: 190, 20: 210 },
+    1: { 1: 0, 2: 1, 3: 3, 4: 6, 5: 10, 6: 15, 7: 21, 8: 28, 9: 36, 10: 45, 11: 55, 12: 66, 13: 78, 14: 91, 15: 105, 16: 120, 17: 136, 18: 153, 19: 171, 20: 190 },
+    2: { 1: 0, 2: 1, 3: 3, 4: 6, 5: 10, 6: 15, 7: 21, 8: 28, 9: 36, 10: 40, 11: 44, 12: 48, 13: 52, 14: 55, 15: 60, 16: 65, 17: 70, 18: 75, 19: 80, 20: 85 },
 };
 
 function floorFor(level, versionId) {
@@ -105,8 +105,8 @@ const fakeDb = {
                     avatar_masked: 1,
                     private_mode: 0,
                     has_room: 0,
-                    adventures_count: 2,
-                    adventure_bubbles: 7,
+                    adventures_count: 12,
+                    adventure_bubbles: 95,
                     has_pseudo_adventure: 0,
                     has_real_adventure: 1,
                     total_downtime: 0,
@@ -141,7 +141,7 @@ const fakeDb = {
                 private_mode: 0,
                 has_room: 0,
                 adventures_count: 3,
-                adventure_bubbles: 10,
+                adventure_bubbles: 9,
                 has_pseudo_adventure: 1,
                 has_real_adventure: 1,
                 total_downtime: 0,
@@ -156,8 +156,8 @@ const fakeDb = {
                 return [[{
                     id: 901,
                     start_date: '2026-04-20',
-                    target_level: 6,
-                    target_bubbles: 25,
+                    target_level: 4,
+                    target_bubbles: 9,
                     progression_version_id: 1,
                 }]];
             }
@@ -167,7 +167,7 @@ const fakeDb = {
 
         if (sql.includes('SELECT COALESCE(SUM(FLOOR(duration / 10800)')) {
             if (scenario === 'adventure') {
-                return [[{ bubbles: 7 }]];
+                return [[{ bubbles: 95 }]];
             }
 
             return [[{ bubbles: 0 }]];
@@ -209,7 +209,7 @@ require.cache[dbPath] = {
 
 delete require.cache[appDbPath];
 
-const { upgradeCharacterProgressionForDiscord } = require('../appDb');
+const { getCharacterProgressionUpgradeStateForDiscord, upgradeCharacterProgressionForDiscord } = require('../appDb');
 
 Promise.resolve()
     .then(async () => {
@@ -225,15 +225,20 @@ Promise.resolve()
         updates = [];
         inserts = [];
         deletes = [];
-        const adventureResult = await upgradeCharacterProgressionForDiscord(discordUser, 42, 3, 0);
+        const adventureState = await getCharacterProgressionUpgradeStateForDiscord(discordUser, 42);
+        assert.equal(adventureState.ok, true);
+        assert.equal(adventureState.currentLevel, 14);
+        assert.equal(adventureState.recalculatedLevel, 20);
+        assert.equal(adventureState.minSelectableLevel, 14);
+        const adventureResult = await upgradeCharacterProgressionForDiscord(discordUser, 42, 14, 0);
         assert.equal(adventureResult.ok, true);
         assert.equal(updates.length, 1);
         assert.equal(inserts.length, 1);
         assert.equal(deletes.length, 0);
         assert.equal(inserts[0].bindings[1], 'downtime');
-        assert.equal(inserts[0].bindings[2], 1);
+        assert.equal(inserts[0].bindings[2], 40);
         assert.equal(updates[0].bindings[0], 2);
-        assert.equal(updates[0].bindings[1], 1);
+        assert.equal(updates[0].bindings[1], 40);
         assert.equal(updates[0].bindings[3], 42);
 
         scenario = 'pseudo';
