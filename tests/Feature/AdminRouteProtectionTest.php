@@ -15,6 +15,8 @@ it('blocks non-admin users from admin pages', function (string $routeName) {
     'admin.auctions.index',
     'admin.items.index',
     'admin.spells.index',
+    'admin.character-classes.index',
+    'admin.mundane-item-variants.index',
     'admin.character-approvals.index',
     'admin.rooms.index',
 ]);
@@ -43,4 +45,6 @@ it('redirects admin compendium shortcuts to the shared compendium pages', functi
 })->with([
     ['admin.items.index', 'compendium.items.index'],
     ['admin.spells.index', 'compendium.spells.index'],
+    ['admin.character-classes.index', 'compendium.character-classes.index'],
+    ['admin.mundane-item-variants.index', 'compendium.mundane-item-variants.index'],
 ]);

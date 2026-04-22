@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class MundaneItemVariant extends Model
 {
@@ -31,5 +32,10 @@ class MundaneItemVariant extends Model
     public function items(): BelongsToMany
     {
         return $this->belongsToMany(Item::class, 'item_mundane_variant');
+    }
+
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(CompendiumComment::class, 'commentable');
     }
 }

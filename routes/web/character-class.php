@@ -4,12 +4,19 @@ use App\Http\Controllers\CharacterClass\CharacterClassController;
 use App\Http\Controllers\CharacterClass\CharacterSubclassController;
 use Illuminate\Support\Facades\Route;
 
+Route::middleware(['auth'])
+    ->get('/compendium/classes', [CharacterClassController::class, 'index'])
+    ->name('compendium.character-classes.index');
+
+Route::middleware(['auth', 'admin'])
+    ->get('/admin/character-classes', fn () => redirect()->route('compendium.character-classes.index'))
+    ->name('admin.character-classes.index');
+
 Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::resource('character-classes', CharacterClassController::class)->only([
-            'index',
             'store',
             'update',
             'destroy',

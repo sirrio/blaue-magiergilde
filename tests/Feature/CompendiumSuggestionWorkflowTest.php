@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\CharacterClass;
 use App\Models\CompendiumComment;
 use App\Models\Item;
+use App\Models\MundaneItemVariant;
 use App\Models\Spell;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -15,6 +17,14 @@ test('authenticated users can access compendium item and spell pages', function 
 
     $this->actingAs($user)
         ->get(route('compendium.spells.index'))
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->get(route('compendium.character-classes.index'))
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->get(route('compendium.mundane-item-variants.index'))
         ->assertOk();
 });
 
@@ -32,6 +42,18 @@ test('admins can manage compendium pages from the shared routes', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->where('canManage', true)
             ->where('indexRoute', 'compendium.spells.index'));
+
+    $this->actingAs($admin)
+        ->get(route('compendium.character-classes.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('canManage', true)
+            ->where('indexRoute', 'compendium.character-classes.index'));
+
+    $this->actingAs($admin)
+        ->get(route('compendium.mundane-item-variants.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('canManage', true)
+            ->where('indexRoute', 'compendium.mundane-item-variants.index'));
 });
 
 test('authenticated users can add comments to item and spell compendium entries', function () {
@@ -63,6 +85,47 @@ test('authenticated users can add comments to item and spell compendium entries'
     expect($spellComment)->not->toBeNull()
         ->and($spellComment?->user_id)->toBe($user->id)
         ->and($spellComment?->body)->toBe('Die Legacy-URL passt noch nicht.');
+});
+
+test('authenticated users can add comments to class and variant compendium entries', function () {
+    $user = User::factory()->create(['is_admin' => false]);
+    $characterClass = CharacterClass::query()->create([
+        'name' => 'Swordmage',
+        'guild_enabled' => true,
+    ]);
+    $variant = MundaneItemVariant::query()->create([
+        'name' => 'Longsword',
+        'slug' => 'longsword-comment-check',
+        'category' => 'weapon',
+        'cost_gp' => 15,
+        'is_placeholder' => false,
+        'guild_enabled' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('compendium.character-classes.comments.store', $characterClass), [
+            'body' => 'Bitte die Klassenbeschreibung prüfen.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($user)
+        ->post(route('compendium.mundane-item-variants.comments.store', $variant), [
+            'body' => 'Die Kosten sollten noch geprüft werden.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $classComment = CompendiumComment::query()->whereMorphedTo('commentable', $characterClass)->latest('id')->first();
+    $variantComment = CompendiumComment::query()->whereMorphedTo('commentable', $variant)->latest('id')->first();
+
+    expect($classComment)->not->toBeNull()
+        ->and($classComment?->user_id)->toBe($user->id)
+        ->and($classComment?->body)->toBe('Bitte die Klassenbeschreibung prüfen.');
+
+    expect($variantComment)->not->toBeNull()
+        ->and($variantComment?->user_id)->toBe($user->id)
+        ->and($variantComment?->body)->toBe('Die Kosten sollten noch geprüft werden.');
 });
 
 test('comment authors can delete their own compendium comments', function () {

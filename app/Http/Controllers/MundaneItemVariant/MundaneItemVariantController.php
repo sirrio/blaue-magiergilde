@@ -5,6 +5,7 @@ namespace App\Http\Controllers\MundaneItemVariant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MundaneItemVariant\StoreMundaneItemVariantRequest;
 use App\Http\Requests\MundaneItemVariant\UpdateMundaneItemVariantRequest;
+use App\Models\CompendiumComment;
 use App\Models\MundaneItemVariant;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -16,8 +17,11 @@ class MundaneItemVariantController extends Controller
         $search = request('search', '');
         $category = request('category', null);
         $guild = request('guild', null);
+        $user = request()->user();
 
-        $query = MundaneItemVariant::query();
+        $currentUserId = $user?->id;
+        $isAdmin = (bool) $user?->is_admin;
+        $query = MundaneItemVariant::query()->with(['comments.user:id,name'])->withCount('comments');
         if (! empty($search)) {
             $query->where('name', 'LIKE', "%{$search}%");
         }
@@ -37,8 +41,28 @@ class MundaneItemVariantController extends Controller
             ->get(['id', 'name', 'slug', 'category', 'cost_gp', 'is_placeholder', 'guild_enabled']);
 
         return Inertia::render('mundane-item-variant/index', [
-            'variants' => Inertia::defer(fn () => $variants),
-            'canManage' => true,
+            'variants' => Inertia::defer(fn () => $variants->map(fn (MundaneItemVariant $variant) => [
+                'id' => $variant->id,
+                'name' => $variant->name,
+                'slug' => $variant->slug,
+                'category' => $variant->category,
+                'cost_gp' => $variant->cost_gp,
+                'is_placeholder' => (bool) $variant->is_placeholder,
+                'guild_enabled' => (bool) $variant->guild_enabled,
+                'comments_count' => $variant->comments_count ?? $variant->comments->count(),
+                'comments' => $variant->comments->map(fn (CompendiumComment $comment) => [
+                    'id' => $comment->id,
+                    'body' => $comment->body,
+                    'created_at' => $comment->created_at?->toISOString(),
+                    'can_delete' => $isAdmin || ($currentUserId !== null && $comment->user_id === $currentUserId),
+                    'user' => $comment->user ? [
+                        'id' => $comment->user->id,
+                        'name' => $comment->user->name,
+                    ] : null,
+                ])->values(),
+            ])->values()),
+            'canManage' => $isAdmin,
+            'indexRoute' => 'compendium.mundane-item-variants.index',
         ]);
     }
 

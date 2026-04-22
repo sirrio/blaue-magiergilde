@@ -286,6 +286,8 @@ export interface MundaneItemVariant {
   cost_gp?: number | null
   is_placeholder?: boolean
   guild_enabled?: boolean
+  comments_count?: number
+  comments?: CompendiumComment[]
 }
 
 export interface CompendiumImportRun {
@@ -398,6 +400,8 @@ export interface CharacterClass {
   source_id?: number | null
   source?: Source | null
   guild_enabled?: boolean
+  comments_count?: number
+  comments?: CompendiumComment[]
 }
 
 export interface CharacterSubclass {

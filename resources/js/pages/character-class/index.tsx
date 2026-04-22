@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
+import { CompendiumCommentsModal } from '@/pages/compendium/compendium-comments-modal'
 import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
 import { cn } from '@/lib/utils'
 import AppLayout from '@/layouts/app-layout'
@@ -538,6 +539,13 @@ const ClassRow = ({
                 <DestroyCharacterClassModal characterClass={characterClass} onSuccess={onSuccess} />
               </>
             ) : null}
+            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+            <CompendiumCommentsModal
+              title={`Kommentare zu ${characterClass.name}`}
+              comments={characterClass.comments}
+              count={characterClass.comments_count}
+              storeRoute={route('compendium.character-classes.comments.store', { characterClass: characterClass.id })}
+            />
           </div>
         </ListRow>
       ) : null}
@@ -599,10 +607,12 @@ export default function Index({
   characterClasses,
   sources,
   canManage = false,
+  indexRoute = 'compendium.character-classes.index',
 }: {
   characterClasses: CharacterClass[]
   sources: Source[]
   canManage?: boolean
+  indexRoute?: string
 }) {
   const t = useTranslate()
 
@@ -627,7 +637,7 @@ export default function Index({
 
   const renderFilterOptions = (filterKey: string, filters: FilterOption[]) => {
     const buildHref = (filterValue: string | null): string =>
-      route('admin.character-classes.index', {
+      route(indexRoute, {
         ...currentQueryParams,
         [filterKey]: filterValue,
       })
@@ -662,7 +672,7 @@ export default function Index({
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
     navigateTo(
-      route('admin.character-classes.index', { ...currentQueryParams, search: value }),
+      route(indexRoute, { ...currentQueryParams, search: value }),
     )
   }
 
@@ -712,7 +722,7 @@ export default function Index({
                 value={classFilter}
                 onChange={(e) =>
                   navigateTo(
-                    route('admin.character-classes.index', {
+                    route(indexRoute, {
                       ...currentQueryParams,
                       class: e.target.value || null,
                     }),
