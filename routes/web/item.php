@@ -8,11 +8,14 @@ Route::middleware(['auth'])
     ->name('compendium.items.index');
 
 Route::middleware(['auth', 'admin'])
+    ->get('/admin/items', [ItemController::class, 'index'])
+    ->name('admin.items.index');
+
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::resource('items', ItemController::class)->only([
-            'index',
             'store',
             'update',
             'destroy',

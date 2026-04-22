@@ -6,6 +6,7 @@ import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { TextArea } from '@/components/ui/text-area'
+import { Tooltip } from '@/components/ui/tooltip'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
@@ -16,48 +17,58 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
-import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
+import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { AlliesModal } from '@/pages/character/allies-modal'
+import BubbleShopModal from '@/pages/character/bubble-shop-modal'
+import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import DestroyCharacterModal from '@/pages/character/destroy-character-modal'
+import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
 import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
 import UpdateCharacterModal from '@/pages/character/update-character-modal'
-import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
-import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
-import { Character } from '@/types'
-import { PageProps } from '@/types'
-import { router, usePage } from '@inertiajs/react'
+import UpgradeCharacterProgressionModal from '@/pages/character/upgrade-character-progression-modal'
+import { Character, PageProps } from '@/types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, Anvil, Archive, BookHeart, BookOpen, CheckCircle2, CircleHelp, Clock, Coins, Crown, Download, Droplets, ExternalLink, FlameKindling, Gauge, Grip, MapPin, Pencil, Settings, Swords, XCircle } from 'lucide-react'
+import { router, usePage } from '@inertiajs/react'
+import {
+  AlertTriangle,
+  Anvil,
+  Archive,
+  BookHeart,
+  BookOpen,
+  CheckCircle2,
+  CircleHelp,
+  Clock,
+  Coins,
+  Crown,
+  Download,
+  Droplets,
+  ExternalLink,
+  FlameKindling,
+  Gauge,
+  Grip,
+  MapPin,
+  Pencil,
+  RefreshCcw,
+  Settings,
+  Swords,
+  XCircle,
+} from 'lucide-react'
 import React, { useState, useTransition } from 'react'
 import { useImage } from 'react-image'
 
-function CharacterImage({
-  character,
-  className,
-  masked = true,
-}: {
-  character: Character
-  className?: string
-  masked?: boolean
-}) {
+function CharacterImage({ character, className, masked = true }: { character: Character; className?: string; masked?: boolean }) {
   const avatar = String(character.avatar || '').trim()
-  const srcList = avatar
-    ? [avatar.startsWith('http') ? avatar : `/storage/${avatar}`, '/images/no-avatar.svg']
-    : ['/images/no-avatar.svg']
+  const srcList = avatar ? [avatar.startsWith('http') ? avatar : `/storage/${avatar}`, '/images/no-avatar.svg'] : ['/images/no-avatar.svg']
   const { src } = useImage({
     srcList,
   })
   return (
-    <img
-      className={cn('aspect-square w-full object-cover', masked ? 'rounded-full' : 'rounded-none', className)}
-      src={src}
-      alt={character.name}
-    />
+    <img className={cn('aspect-square w-full object-cover', masked ? 'rounded-full' : 'rounded-none', className)} src={src} alt={character.name} />
   )
 }
 
@@ -93,13 +104,11 @@ function CharacterSettingsModal({
   const t = useTranslate()
 
   const SettingHelp = ({ text, label }: { text: string; label: string }) => (
-    <span
-      className="inline-flex cursor-help items-center text-base-content/45"
-      title={text}
-      aria-label={`${label}: ${text}`}
-    >
-      <CircleHelp size={14} />
-    </span>
+    <Tooltip content={text} placement="top">
+      <span className="text-base-content/45 inline-flex cursor-help items-center" aria-label={`${label}: ${text}`}>
+        <CircleHelp size={14} />
+      </span>
+    </Tooltip>
   )
 
   return (
@@ -122,10 +131,7 @@ function CharacterSettingsModal({
           <div className={cn('flex items-start justify-between gap-3 text-sm', isTrackingModeUpdating && 'opacity-60')}>
             <span className="flex items-center gap-1.5 pt-1">
               <span>{t('characters.trackingMode')}</span>
-              <SettingHelp
-                label={t('characters.trackingMode')}
-                text={t('characters.trackingModeHelp')}
-              />
+              <SettingHelp label={t('characters.trackingMode')} text={t('characters.trackingModeHelp')} />
             </span>
             <div className="join">
               <Button
@@ -155,10 +161,7 @@ function CharacterSettingsModal({
           <label className={cn('flex items-center justify-between gap-3 text-sm', isAvatarMaskedUpdating && 'opacity-60')}>
             <span className="flex items-center gap-1.5">
               <span>{t('characters.tokenMask')}</span>
-              <SettingHelp
-                label={t('characters.tokenMask')}
-                text={t('characters.tokenMaskHelp')}
-              />
+              <SettingHelp label={t('characters.tokenMask')} text={t('characters.tokenMaskHelp')} />
             </span>
             <input
               type="checkbox"
@@ -171,10 +174,7 @@ function CharacterSettingsModal({
           <label className={cn('flex items-center justify-between gap-3 text-sm', isPrivateModeUpdating && 'opacity-60')}>
             <span className="flex items-center gap-1.5">
               <span>{t('characters.privateMode')}</span>
-              <SettingHelp
-                label={t('characters.privateMode')}
-                text={t('characters.privateModeHelp')}
-              />
+              <SettingHelp label={t('characters.privateMode')} text={t('characters.privateModeHelp')} />
             </span>
             <input
               type="checkbox"
@@ -184,7 +184,7 @@ function CharacterSettingsModal({
               onChange={(event) => onPrivateModeChange?.(event.target.checked)}
             />
           </label>
-          <div className="border-t border-base-200 pt-3">
+          <div className="border-base-200 border-t pt-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button as="a" href={route('characters.download', characterId)} size="sm" variant="outline" className="w-full">
                 <Download size={14} />
@@ -250,12 +250,8 @@ function SubmitForApprovalModal({
             {localNotice.message}
           </div>
         ) : null}
-        <p className="text-sm text-base-content/80">
-          {t('characters.registerBody', { name: character.name, from: fromLabel })}
-        </p>
-        <p className="text-xs text-base-content/60">
-          {t('characters.registerReviewHint')}
-        </p>
+        <p className="text-base-content/80 text-sm">{t('characters.registerBody', { name: character.name, from: fromLabel })}</p>
+        <p className="text-base-content/60 text-xs">{t('characters.registerReviewHint')}</p>
         <TextArea
           value={registrationNote}
           onChange={(event) => setRegistrationNote(event.target.value)}
@@ -263,23 +259,21 @@ function SubmitForApprovalModal({
         >
           {t('characters.registrationNotes')}
         </TextArea>
-        <p className="text-xs text-base-content/60">
-          {t('characters.registrationNotesHint')}
-        </p>
-        <p className="mt-2 text-xs text-base-content/60">
-          {t('characters.registerFinalHint')}
-        </p>
+        <p className="text-base-content/60 text-xs">{t('characters.registrationNotesHint')}</p>
+        <p className="text-base-content/60 mt-2 text-xs">{t('characters.registerFinalHint')}</p>
       </ModalContent>
       <ModalAction
-        onClick={() => onSubmit(registrationNote.trim(), {
-          onSuccess: () => {
-            setLocalNotice({ tone: 'success', message: t('characters.registeredSuccess') })
-            setIsOpen(false)
-          },
-          onError: (message) => {
-            setLocalNotice({ tone: 'error', message })
-          },
-        })}
+        onClick={() =>
+          onSubmit(registrationNote.trim(), {
+            onSuccess: () => {
+              setLocalNotice({ tone: 'success', message: t('characters.registeredSuccess') })
+              setIsOpen(false)
+            },
+            onError: (message) => {
+              setLocalNotice({ tone: 'error', message })
+            },
+          })
+        }
         disabled={processing}
       >
         {t('characters.registerWithMagiergilde')}
@@ -330,7 +324,7 @@ export function CharacterCard({
   isPrivateModeUpdating?: boolean
 }) {
   const t = useTranslate()
-  const { features } = usePage<PageProps>().props
+  const { features, activeLevelProgressionVersionId } = usePage<PageProps>().props
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: character.id })
   const dragStyle: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
 
@@ -355,39 +349,44 @@ export function CharacterCard({
   const canLogActivity = draftOnlyMode || !requiresRegistration
   const requiresSubmissionBeforeDowntime = !draftOnlyMode && requiresRegistration
   const hasRoom = (character.room_count ?? 0) > 0
-  const statusLabel = guildStatus === 'approved'
-    ? 'Approved'
-    : guildStatus === 'declined'
-      ? 'Declined'
-      : guildStatus === 'needs_changes'
-        ? 'Needs changes'
-      : guildStatus === 'retired'
-        ? 'Retired'
-        : guildStatus === 'draft'
-          ? 'Draft'
-          : 'Pending'
-  const statusIcon = guildStatus === 'approved'
-    ? <CheckCircle2 size={14} />
-    : guildStatus === 'declined'
-      ? <XCircle size={14} />
-      : guildStatus === 'needs_changes'
-        ? <AlertTriangle size={14} />
-      : guildStatus === 'retired'
-        ? <Archive size={14} />
-        : guildStatus === 'draft'
-          ? <Pencil size={14} />
-          : <Clock size={14} />
-  const statusClass = guildStatus === 'approved'
-    ? 'text-success'
-    : guildStatus === 'declined'
-      ? 'text-error'
-      : guildStatus === 'needs_changes'
-        ? 'text-warning'
-      : guildStatus === 'retired'
-        ? 'text-base-content/50'
-        : guildStatus === 'draft'
-          ? 'text-base-content/60'
-          : 'text-warning'
+  const statusLabel =
+    guildStatus === 'approved'
+      ? 'Approved'
+      : guildStatus === 'declined'
+        ? 'Declined'
+        : guildStatus === 'needs_changes'
+          ? 'Needs changes'
+          : guildStatus === 'retired'
+            ? 'Retired'
+            : guildStatus === 'draft'
+              ? 'Draft'
+              : 'Pending'
+  const statusIcon =
+    guildStatus === 'approved' ? (
+      <CheckCircle2 size={14} />
+    ) : guildStatus === 'declined' ? (
+      <XCircle size={14} />
+    ) : guildStatus === 'needs_changes' ? (
+      <AlertTriangle size={14} />
+    ) : guildStatus === 'retired' ? (
+      <Archive size={14} />
+    ) : guildStatus === 'draft' ? (
+      <Pencil size={14} />
+    ) : (
+      <Clock size={14} />
+    )
+  const statusClass =
+    guildStatus === 'approved'
+      ? 'text-success'
+      : guildStatus === 'declined'
+        ? 'text-error'
+        : guildStatus === 'needs_changes'
+          ? 'text-warning'
+          : guildStatus === 'retired'
+            ? 'text-base-content/50'
+            : guildStatus === 'draft'
+              ? 'text-base-content/60'
+              : 'text-warning'
   const statusTooltip = (() => {
     if (guildStatus === 'draft') {
       return t('characters.statusDraftHint')
@@ -412,15 +411,16 @@ export function CharacterCard({
     return statusLabel
   })()
   const statusHint = getCharacterStatusSummary(guildStatus, t)
-  const statusHintClass = guildStatus === 'draft'
-    ? 'border-base-300 bg-base-200/50 text-base-content/70'
-    : guildStatus === 'pending'
-    ? 'border-warning/25 bg-warning/10 text-warning'
-    : guildStatus === 'needs_changes'
-      ? 'border-warning/30 bg-warning/12 text-warning'
-      : guildStatus === 'declined'
-        ? 'border-error/25 bg-error/10 text-error'
-        : 'border-base-200 bg-base-200/35 text-base-content/75'
+  const statusHintClass =
+    guildStatus === 'draft'
+      ? 'border-base-300 bg-base-200/50 text-base-content/70'
+      : guildStatus === 'pending'
+        ? 'border-warning/25 bg-warning/10 text-warning'
+        : guildStatus === 'needs_changes'
+          ? 'border-warning/30 bg-warning/12 text-warning'
+          : guildStatus === 'declined'
+            ? 'border-error/25 bg-error/10 text-error'
+            : 'border-base-200 bg-base-200/35 text-base-content/75'
   const isStatusSwitchEnabled = features?.character_status_switch ?? true
   const canSubmitForApproval = isStatusSwitchEnabled && requiresRegistration
   const submittedLowAndBaseTierCount = allCharacters.filter((candidate) => {
@@ -447,16 +447,25 @@ export function CharacterCard({
   const candidateGeneralSlotCost = character.is_filler
     ? 0
     : tier === 'ht'
-      ? (submittedHighTierCount >= 2 ? 1 : 0)
-      : (['bt', 'lt'].includes(tier) ? 1 : 0)
+      ? submittedHighTierCount >= 2
+        ? 1
+        : 0
+      : ['bt', 'lt'].includes(tier)
+        ? 1
+        : 0
   const submissionBlockedReason = !canSubmitForApproval
     ? null
     : character.is_filler
-      ? (otherSubmittedFillerCount >= 1 ? t('characters.submitBlockedFillerLimit') : null)
-      : (submittedGeneralSlotCount + candidateGeneralSlotCost > 8 ? t('characters.submitBlockedActiveLimit', { count: 8 }) : null)
-  const registrationSupportHint = canSubmitForApproval && !submissionBlockedReason
-    ? t(guildStatus === 'needs_changes' ? 'characters.registrationActionHintNeedsChanges' : 'characters.registrationActionHintDraft')
-    : ''
+      ? otherSubmittedFillerCount >= 1
+        ? t('characters.submitBlockedFillerLimit')
+        : null
+      : submittedGeneralSlotCount + candidateGeneralSlotCost > 8
+        ? t('characters.submitBlockedActiveLimit', { count: 8 })
+        : null
+  const registrationSupportHint =
+    canSubmitForApproval && !submissionBlockedReason
+      ? t(guildStatus === 'needs_changes' ? 'characters.registrationActionHintNeedsChanges' : 'characters.registrationActionHintDraft')
+      : ''
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false)
   const [, startNavigationTransition] = useTransition()
 
@@ -481,17 +490,19 @@ export function CharacterCard({
   const hasLevelAnchors = pseudoAdventureCount > 0
   const usesManualDerivedValues = usesManualLevelTracking(character)
   const isMixedTrackingHistory = hasLevelAnchors && realAdventureCount > 0
-  const trackingModeLabel = simplifiedTracking
-    ? t('characters.levelTrackingBadge')
-    : t('characters.adventureTrackingBadge')
-  const trackingHistoryLabel = isMixedTrackingHistory
-    ? t('characters.mixedTrackingHistory')
-    : ''
+  const trackingModeLabel = simplifiedTracking ? t('characters.levelTrackingBadge') : t('characters.adventureTrackingBadge')
+  const trackingHistoryLabel = isMixedTrackingHistory ? t('characters.mixedTrackingHistory') : ''
   const trackingSummaryTooltip = isMixedTrackingHistory
     ? t('characters.mixedTrackingHistoryHint')
     : hasLevelAnchors
       ? t('characters.levelAnchorHistoryHint')
       : trackingModeLabel
+  const hasProgressionUpgrade =
+    Boolean(features?.level_curve_upgrade) &&
+    !character.is_filler &&
+    typeof activeLevelProgressionVersionId === 'number' &&
+    activeLevelProgressionVersionId > 0 &&
+    (character.progression_version_id ?? activeLevelProgressionVersionId) !== activeLevelProgressionVersionId
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
   const totalDowntimeDisplay = formattedDowntimes.total
@@ -500,10 +511,7 @@ export function CharacterCard({
   const submissionRequiredReason = t('characters.submissionRequired')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
 
-  const submitForApproval = (
-    registrationNote: string,
-    callbacks: { onSuccess: () => void; onError: (message: string) => void },
-  ) => {
+  const submitForApproval = (registrationNote: string, callbacks: { onSuccess: () => void; onError: (message: string) => void }) => {
     if (isSubmittingForApproval || !canSubmitForApproval) {
       return
     }
@@ -522,12 +530,7 @@ export function CharacterCard({
             callbacks.onSuccess()
           },
           onError: (errors) => {
-            const message = String(
-              errors.registration_note
-              ?? errors.guild_status
-              ?? errors.character
-              ?? t('characters.registerErrorFallback'),
-            )
+            const message = String(errors.registration_note ?? errors.guild_status ?? errors.character ?? t('characters.registerErrorFallback'))
             callbacks.onError(message)
           },
           onFinish: () => {
@@ -555,25 +558,18 @@ export function CharacterCard({
               onAvatarMaskedChange={onAvatarMaskedChange}
               onPrivateModeChange={onPrivateModeChange}
             />
-            <Button
-              className="flex"
-              size="xs"
-              modifier="square"
-              aria-label={t('characters.reorderCharacter')}
-              title={t('characters.reorderCharacter')}
-              {...attributes}
-              {...listeners}
-            >
-              <Grip size={14} />
-            </Button>
-            <UpdateCharacterModal character={character}>
               <Button
                 className="flex"
                 size="xs"
                 modifier="square"
-                aria-label={t('characters.editCharacter')}
-                title={t('characters.editCharacter')}
+                aria-label={t('characters.reorderCharacter')}
+                {...attributes}
+                {...listeners}
               >
+              <Grip size={14} />
+            </Button>
+            <UpdateCharacterModal character={character}>
+              <Button className="flex" size="xs" modifier="square" aria-label={t('characters.editCharacter')}>
                 <Pencil size={14} />
               </Button>
             </UpdateCharacterModal>
@@ -584,20 +580,17 @@ export function CharacterCard({
                 modifier="square"
                 color="error"
                 aria-label={t('characters.deleteCharacter')}
-                title={t('characters.deleteCharacter')}
               >
                 <XCircle size={14} />
               </Button>
             </DestroyCharacterModal>
           </CardAction>
-          <CardTitle className={cn('flex items-center gap-2 pb-0 pr-0')}>
-            <span
-              className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)}
-              data-tip={statusTooltip}
-              aria-label={statusTooltip}
-            >
-              {statusIcon}
-            </span>
+          <CardTitle className={cn('flex items-center gap-2 pr-0 pb-0')}>
+            <Tooltip content={statusTooltip} placement="bottom">
+              <span className={cn('inline-flex items-center', statusClass)} aria-label={statusTooltip}>
+                {statusIcon}
+              </span>
+            </Tooltip>
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
           </CardTitle>
           <CardContent>
@@ -607,13 +600,14 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
               {hasRoom ? (
-                <span
-                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/8 px-1.5 py-0.5 text-[10px] leading-none text-primary/75"
-                  title={t('characters.roomAssigned')}
-                  aria-label={t('characters.roomAssigned')}
-                >
-                  <MapPin size={11} />
-                </span>
+                <Tooltip content={t('characters.roomAssigned')} placement="top">
+                  <span
+                    className="border-primary/15 bg-primary/8 text-primary/75 ml-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
+                    aria-label={t('characters.roomAssigned')}
+                  >
+                    <MapPin size={11} />
+                  </span>
+                </Tooltip>
               ) : null}
             </div>
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
@@ -633,47 +627,50 @@ export function CharacterCard({
                 triggerClassName="w-full justify-center"
               />
               <UpdateCharacterModal character={character}>
-                <Button size="sm" variant="outline" className="w-full justify-center" aria-label={t('characters.editCharacter')} title={t('characters.editCharacter')}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full justify-center"
+                  aria-label={t('characters.editCharacter')}
+                >
                   <Pencil size={14} />
                 </Button>
               </UpdateCharacterModal>
               <DestroyCharacterModal character={character}>
-                <Button size="sm" variant="outline" color="error" className="w-full justify-center" aria-label={t('characters.deleteCharacter')} title={t('characters.deleteCharacter')}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="error"
+                  className="w-full justify-center"
+                  aria-label={t('characters.deleteCharacter')}
+                >
                   <XCircle size={14} />
                 </Button>
               </DestroyCharacterModal>
             </div>
-            <CharacterImage
-              className={cn('mb-2 mt-3 w-full', !avatarMasked && 'rounded-lg')}
-              character={character}
-              masked={avatarMasked}
-            />
+            <CharacterImage className={cn('mt-3 mb-2 w-full', !avatarMasked && 'rounded-lg')} character={character} masked={avatarMasked} />
             {!character.is_filler ? (
               <>
-                <div
-                  className="mt-2.5 space-y-0.5"
-                  title={trackingSummaryTooltip}
-                  aria-label={trackingSummaryTooltip}
-                >
+                <div className="mt-2.5 space-y-0.5" title={trackingSummaryTooltip} aria-label={trackingSummaryTooltip}>
                   <div className="flex items-center justify-between gap-2 leading-none">
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-                      <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-medium text-base-content/70">
+                      <span className="border-base-300 bg-base-100 text-base-content/70 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
                         {trackingModeLabel}
                       </span>
                       {trackingHistoryLabel ? (
-                        <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-medium text-base-content/55">
+                        <span className="border-base-300 bg-base-100 text-base-content/55 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
                           {trackingHistoryLabel}
                         </span>
                       ) : null}
                     </div>
                   </div>
                   <Progress className="block h-2" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
-                  <div className="flex min-h-4 items-center justify-end text-xs text-base-content/55">
+                  <div className="text-base-content/55 flex min-h-4 items-center justify-end text-xs">
                     {isMaxLevel ? (
-                      <span className="inline-flex flex-wrap items-center gap-x-1 text-base-content/45">
+                      <span className="text-base-content/45 inline-flex flex-wrap items-center gap-x-1">
                         <span className="whitespace-nowrap">{t('characters.maxLevelReached')}</span>
                         {progressValue > 0 ? (
-                          <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-base-content/35">
+                          <span className="text-base-content/35 inline-flex items-center gap-0.5 whitespace-nowrap">
                             (+{progressValue} <Droplets size={10} />)
                           </span>
                         ) : null}
@@ -687,24 +684,39 @@ export function CharacterCard({
                     )}
                   </div>
                 </div>
+                {hasProgressionUpgrade ? (
+                  <div className="border-info/20 bg-info/8 text-base-content/75 mt-2 rounded-md border px-2 py-1.5 text-xs">
+                    <div>{t('characters.upgradeLevelCurveNotice')}</div>
+                    <UpgradeCharacterProgressionModal
+                      character={character}
+                      trigger={
+                        <button
+                          type="button"
+                          className="text-info mt-1 inline-flex cursor-pointer items-center gap-1 text-xs font-medium hover:underline"
+                        >
+                          <RefreshCcw size={11} />
+                          <span>{t('characters.upgradeLevelCurveAction')}</span>
+                        </button>
+                      }
+                    />
+                  </div>
+                ) : null}
                 <div className={cn('mt-3 grid grid-cols-2 gap-1.5')}>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Swords size={15} /> {t('characters.adventures')}
                       {!bubbleAdjustmentsCount ? (
-                        <span
-                          className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
-                          data-tip={t('characters.bubbleShopNotCountedHint')}
-                          aria-label={t('characters.bubbleShopNotCountedHint')}
-                        >
-                          <AlertTriangle size={11} />
-                        </span>
+                        <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom">
+                          <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.bubbleShopNotCountedHint')}>
+                            <AlertTriangle size={11} />
+                          </span>
+                        </Tooltip>
                       ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
                       {t('characters.played')}:{' '}
                       {usesManualDerivedValues ? (
-                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                        <span className="inline-flex items-center gap-1 align-middle leading-none">
                           <span className={manualAdventuresCount === null ? 'text-base-content/40' : ''}>
                             {manualAdventuresCount ?? t('characters.autoDisabledShort')}
                           </span>
@@ -713,7 +725,7 @@ export function CharacterCard({
                               size="xs"
                               variant="ghost"
                               modifier="square"
-                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              className="text-base-content/45 h-3.5 min-h-0 w-3.5 p-0 align-middle leading-none"
                               aria-label={t('characters.manualAdventuresCountLabel')}
                               title={adventuresDisabledReason}
                             >
@@ -741,7 +753,7 @@ export function CharacterCard({
                     <InfoBoxLine>
                       {t('characters.levelLabel')}:{' '}
                       {usesManualDerivedValues ? (
-                        <span className="inline-flex items-center gap-1 leading-none align-middle">
+                        <span className="inline-flex items-center gap-1 align-middle leading-none">
                           <span className={manualFactionRank === null ? 'text-base-content/40' : ''}>
                             {manualFactionRank ?? t('characters.autoDisabledShort')}
                           </span>
@@ -750,7 +762,7 @@ export function CharacterCard({
                               size="xs"
                               variant="ghost"
                               modifier="square"
-                              className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                              className="text-base-content/45 h-3.5 min-h-0 w-3.5 p-0 align-middle leading-none"
                               aria-label={t('characters.manualFactionRankLabel')}
                               title={factionLevelWarningReason}
                             >
@@ -768,28 +780,29 @@ export function CharacterCard({
                       <FlameKindling size={15} /> {t('characters.downtime')}
                     </InfoBoxTitle>
                     <InfoBoxLine>
-                      {t('characters.total')}:{' '}
-                      {totalDowntimeDisplay}
+                      {t('characters.total')}: {totalDowntimeDisplay}
                     </InfoBoxLine>
                     <InfoBoxLine>Faction: {formattedDowntimes.faction}</InfoBoxLine>
-                    <InfoBoxLine>{t('characters.other')}: {formattedDowntimes.other}</InfoBoxLine>
-                    <div className="tooltip tooltip-info tooltip-bottom w-full" data-tip={remainingDowntimeTooltip} aria-label={remainingDowntimeTooltip}>
-                      <InfoBoxLine className="font-semibold cursor-help">
-                        {t('characters.remaining')}: {remainingDowntimeDisplay}
-                      </InfoBoxLine>
-                    </div>
+                    <InfoBoxLine>
+                      {t('characters.other')}: {formattedDowntimes.other}
+                    </InfoBoxLine>
+                    <Tooltip content={remainingDowntimeTooltip} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                      <div className="w-full" aria-label={remainingDowntimeTooltip}>
+                        <InfoBoxLine className="cursor-help font-semibold">
+                          {t('characters.remaining')}: {remainingDowntimeDisplay}
+                        </InfoBoxLine>
+                      </div>
+                    </Tooltip>
                   </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Crown size={15} /> {t('characters.gameMaster')}
                       {!bubbleAdjustmentsCount ? (
-                        <span
-                          className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
-                          data-tip={t('characters.gmBubblesNotCountedHint')}
-                          aria-label={t('characters.gmBubblesNotCountedHint')}
-                        >
-                          <AlertTriangle size={11} />
-                        </span>
+                        <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom">
+                          <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.gmBubblesNotCountedHint')}>
+                            <AlertTriangle size={11} />
+                          </span>
+                        </Tooltip>
                       ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
@@ -804,11 +817,11 @@ export function CharacterCard({
                 </div>
               </>
             ) : (
-              <div className="mt-3 flex items-center justify-between rounded-lg border border-base-300 px-3 py-2 text-sm text-base-content/60">
-                <div className="flex items-center gap-1.5 font-medium text-base-content/70">
+              <div className="border-base-300 text-base-content/60 mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                <div className="text-base-content/70 flex items-center gap-1.5 font-medium">
                   <LogoFiller /> {t('characters.fillerCharacter')}
                 </div>
-                <div className="flex items-center gap-1 text-xs text-base-content/55">
+                <div className="text-base-content/55 flex items-center gap-1 text-xs">
                   <Swords size={13} /> {character.adventures.length}
                 </div>
               </div>
@@ -818,9 +831,7 @@ export function CharacterCard({
                 {statusHint ? (
                   <div className={cn('rounded-md border px-2 py-1.5 text-xs font-medium', statusHintClass)}>
                     {statusHint}
-                    {reviewedByHint ? (
-                      <span className="ml-1 font-normal opacity-70"> · {reviewedByHint}</span>
-                    ) : null}
+                    {reviewedByHint ? <span className="ml-1 font-normal opacity-70"> · {reviewedByHint}</span> : null}
                   </div>
                 ) : null}
                 {reviewNote && (guildStatus === 'declined' || guildStatus === 'needs_changes') ? (
@@ -829,111 +840,86 @@ export function CharacterCard({
                   </div>
                 ) : null}
                 {registrationSupportHint ? (
-                  <div className="rounded-md border border-info/20 bg-info/6 px-2 py-1.5 text-xs text-base-content/70">
-                    {registrationSupportHint}
-                  </div>
+                  <div className="border-info/20 bg-info/6 text-base-content/70 rounded-md border px-2 py-1.5 text-xs">{registrationSupportHint}</div>
                 ) : null}
                 {submissionBlockedReason ? (
-                  <div className="rounded-md border border-warning/25 bg-warning/10 px-2 py-1.5 text-xs text-warning">
-                    {submissionBlockedReason}
-                  </div>
+                  <div className="border-warning/25 bg-warning/10 text-warning rounded-md border px-2 py-1.5 text-xs">{submissionBlockedReason}</div>
                 ) : null}
               </div>
             ) : null}
-            <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1')}>
+            <div className={cn('mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5 sm:gap-1')}>
               {canSubmitForApproval ? (
-                <div className="col-span-2 sm:col-span-4">
+                <div className="col-span-2 sm:col-span-5">
                   {submissionBlockedReason ? (
-                    <div
-                      className="tooltip tooltip-bottom w-full"
-                      data-tip={submissionBlockedReason}
-                      aria-label={submissionBlockedReason}
-                    >
-                      <Button
-                        size="sm"
-                        color="warning"
-                        className="w-full justify-center"
-                        disabled
-                        aria-label={t('characters.registerWithMagiergilde')}
-                        title={submissionBlockedReason}
-                      >
-                        <Clock size={14} />
-                        <span>{t('characters.registerWithMagiergilde')}</span>
-                      </Button>
-                    </div>
+                    <Tooltip content={submissionBlockedReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                      <div className="w-full" aria-label={submissionBlockedReason}>
+                        <Button
+                          size="sm"
+                          color="warning"
+                          className="w-full justify-center"
+                          disabled
+                          aria-label={t('characters.registerWithMagiergilde')}
+                          title={submissionBlockedReason}
+                        >
+                          <Clock size={14} />
+                          <span>{t('characters.registerWithMagiergilde')}</span>
+                        </Button>
+                      </div>
+                    </Tooltip>
                   ) : (
-                    <SubmitForApprovalModal
-                      character={character}
-                      processing={isSubmittingForApproval}
-                      onSubmit={submitForApproval}
-                    />
+                    <SubmitForApprovalModal character={character} processing={isSubmittingForApproval} onSubmit={submitForApproval} />
                   )}
                 </div>
               ) : (
-                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-4')}>
+                <Button as="a" href={route('characters.show', character.id)} size="sm" className={cn('col-span-2 sm:col-span-5')}>
                   <BookOpen size={14} />
                   {t('characters.details')}
                 </Button>
               )}
               {requiresSubmissionBeforeDowntime ? (
-                <div
-                  className="tooltip tooltip-bottom w-full"
-                  data-tip={submissionRequiredReason}
-                  aria-label={submissionRequiredReason}
-                >
-                  <Button
-                    size="sm"
-                    className="w-full justify-center gap-1"
-                    disabled
-                    aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
-                  >
-                    {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
-                    <span className="md:hidden">{simplifiedTracking ? t('characters.setLevel') : t('characters.adventure')}</span>
-                  </Button>
-                </div>
+                <Tooltip content={submissionRequiredReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                  <div className="w-full" aria-label={submissionRequiredReason}>
+                    <Button
+                      size="sm"
+                      className="w-full justify-center gap-1"
+                      disabled
+                      aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
+                    >
+                      {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
+                      <span className="md:hidden">{simplifiedTracking ? t('characters.setLevel') : t('characters.adventure')}</span>
+                    </Button>
+                  </div>
+                </Tooltip>
               ) : simplifiedTracking ? (
                 <SetCharacterLevelModal character={character} />
               ) : (
                 <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
               )}
               {requiresSubmissionBeforeDowntime ? (
-                <div
-                  className="tooltip tooltip-bottom w-full"
-                  data-tip={submissionRequiredReason}
-                  aria-label={submissionRequiredReason}
-                >
-                  <Button
-                    size="sm"
-                    className="w-full justify-center gap-1"
-                    disabled
-                    aria-label={t('characters.addDowntimeDisabled')}
-                  >
-                    <FlameKindling size={14} />
-                    <span className="md:hidden">{t('characters.downtime')}</span>
-                  </Button>
-                </div>
+                <Tooltip content={submissionRequiredReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                  <div className="w-full" aria-label={submissionRequiredReason}>
+                    <Button size="sm" className="w-full justify-center gap-1" disabled aria-label={t('characters.addDowntimeDisabled')}>
+                      <FlameKindling size={14} />
+                      <span className="md:hidden">{t('characters.downtime')}</span>
+                    </Button>
+                  </div>
+                </Tooltip>
               ) : canLogActivity ? (
                 <StoreDowntimeModal character={character}></StoreDowntimeModal>
               ) : null}
               {requiresSubmissionBeforeDowntime ? (
-                <div
-                  className="tooltip tooltip-bottom w-full"
-                  data-tip={submissionRequiredReason}
-                  aria-label={submissionRequiredReason}
-                >
-                  <Button
-                    size="sm"
-                    className="w-full justify-center gap-1"
-                    disabled
-                    aria-label={t('characters.manageAlliesDisabled')}
-                  >
-                    <BookHeart size={14} />
-                    <span className="md:hidden">{t('characters.allies')}</span>
-                  </Button>
-                </div>
+                <Tooltip content={submissionRequiredReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                  <div className="w-full" aria-label={submissionRequiredReason}>
+                    <Button size="sm" className="w-full justify-center gap-1" disabled aria-label={t('characters.manageAlliesDisabled')}>
+                      <BookHeart size={14} />
+                      <span className="md:hidden">{t('characters.allies')}</span>
+                    </Button>
+                  </div>
+                </Tooltip>
               ) : (
                 <AlliesModal character={character} guildCharacters={guildCharacters} />
               )}
+              {!character.is_filler ? <BubbleShopModal character={character} /> : null}
               <Button
                 as="a"
                 size="sm"

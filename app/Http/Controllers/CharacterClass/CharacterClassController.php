@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CharacterClass\StoreCharacterClassRequest;
 use App\Http\Requests\CharacterClass\UpdateCharacterClassRequest;
 use App\Models\CharacterClass;
+use App\Models\CharacterSubclass;
+use App\Models\CompendiumComment;
 use App\Models\Source;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -16,8 +18,15 @@ class CharacterClassController extends Controller
     {
         $search = request('search', '');
         $guild = request('guild');
+        $user = request()->user();
 
-        $query = CharacterClass::query()->with(['source:id,name,shortcode,kind', 'subclasses.source:id,name,shortcode,kind']);
+        $currentUserId = $user?->id;
+        $isAdmin = (bool) $user?->is_admin;
+        $query = CharacterClass::query()->with([
+            'source:id,name,shortcode,kind',
+            'subclasses.source:id,name,shortcode,kind',
+            'comments.user:id,name',
+        ])->withCount('comments');
 
         if (! empty($search)) {
             $query->where('name', 'LIKE', "%{$search}%");
@@ -33,9 +42,45 @@ class CharacterClassController extends Controller
         ]);
 
         return Inertia::render('character-class/index', [
-            'characterClasses' => Inertia::defer(fn () => $classes),
+            'characterClasses' => Inertia::defer(fn () => $classes->map(fn (CharacterClass $characterClass) => [
+                'id' => $characterClass->id,
+                'name' => $characterClass->name,
+                'source_id' => $characterClass->source_id,
+                'source' => $characterClass->source ? [
+                    'id' => $characterClass->source->id,
+                    'name' => $characterClass->source->name,
+                    'shortcode' => $characterClass->source->shortcode,
+                    'kind' => $characterClass->source->kind,
+                ] : null,
+                'guild_enabled' => (bool) $characterClass->guild_enabled,
+                'comments_count' => $characterClass->comments_count ?? $characterClass->comments->count(),
+                'comments' => $characterClass->comments->map(fn (CompendiumComment $comment) => [
+                    'id' => $comment->id,
+                    'body' => $comment->body,
+                    'created_at' => $comment->created_at?->toISOString(),
+                    'can_delete' => $isAdmin || ($currentUserId !== null && $comment->user_id === $currentUserId),
+                    'user' => $comment->user ? [
+                        'id' => $comment->user->id,
+                        'name' => $comment->user->name,
+                    ] : null,
+                ])->values(),
+                'subclasses' => $characterClass->subclasses->map(fn (CharacterSubclass $subclass) => [
+                    'id' => $subclass->id,
+                    'character_class_id' => $subclass->character_class_id,
+                    'name' => $subclass->name,
+                    'source_id' => $subclass->source_id,
+                    'guild_enabled' => (bool) $subclass->guild_enabled,
+                    'source' => $subclass->source ? [
+                        'id' => $subclass->source->id,
+                        'name' => $subclass->source->name,
+                        'shortcode' => $subclass->source->shortcode,
+                        'kind' => $subclass->source->kind,
+                    ] : null,
+                ])->values(),
+            ])->values()),
             'sources' => Source::query()->orderBy('shortcode')->orderBy('name')->get(['id', 'name', 'shortcode', 'kind']),
-            'canManage' => true,
+            'canManage' => $isAdmin,
+            'indexRoute' => 'compendium.character-classes.index',
         ]);
     }
 

@@ -8,8 +8,9 @@ import AppLayout from '@/layouts/app-layout'
 import { formatSourceOptionLabel } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import SpellRow from '@/pages/spell/spell-row'
-import { Source, Spell } from '@/types'
+import { PaginationMeta, Source, Spell } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
+import { cn } from '@/lib/utils'
 import { LoaderCircle, Plus, Scale, Shield } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
@@ -178,12 +179,16 @@ const StoreSpellModal = ({ sources }: { sources: Source[] }) => {
 }
 
 export default function Index({
-  spells,
+  spells = [],
+  pagination,
+  perPageOptions = [25, 50, 100],
   sources,
   canManage = false,
   indexRoute = 'compendium.spells.index',
 }: {
   spells: Spell[]
+  pagination?: PaginationMeta
+  perPageOptions?: number[]
   sources: Source[]
   canManage?: boolean
   indexRoute?: string
@@ -237,6 +242,7 @@ export default function Index({
       route(indexRoute, {
         ...queryParamsWithoutLegacyInfo,
         [filterKey]: filterValue,
+        page: undefined,
       })
 
     return (
@@ -268,7 +274,15 @@ export default function Index({
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value }))
+    navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value, page: undefined }))
+  }
+
+  const navigateToPage = (page: number, perPage: number) => {
+    navigateTo(route(indexRoute, {
+      ...queryParamsWithoutLegacyInfo,
+      page,
+      per_page: perPage,
+    }))
   }
 
   const activeFilters = [
@@ -286,7 +300,8 @@ export default function Index({
       ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
       : null,
   ].filter(Boolean) as string[]
-  const totalSpells = spells?.length ?? 0
+  const totalSpells = pagination?.total ?? spells.length
+  const pageSpells = spells.length
   return (
     <AppLayout>
       <Head title={t('compendium.spellsTitle')} />
@@ -298,6 +313,10 @@ export default function Index({
               {canManage
                 ? t('compendium.browseSpellsAdmin')
                 : t('compendium.browseSpellsPublic')}
+            </p>
+            <p className="text-xs text-base-content/60">
+              {totalSpells} spells
+              {pagination?.lastPage && pagination.lastPage > 1 ? ` · Page ${pagination.currentPage}/${pagination.lastPage}` : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -327,12 +346,27 @@ export default function Index({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/50">
-            <span>{totalSpells} spells</span>
+            <span>{pageSpells} of {totalSpells} on this page</span>
             {activeFilters.map((filter) => (
               <span key={filter} className="rounded-full border border-base-200 px-2 py-1 text-base-content/60">
                 {filter}
               </span>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-base-content/60">Page size:</span>
+            <div className="flex flex-wrap items-center gap-1">
+              {perPageOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={cn('btn btn-xs', pagination?.perPage === option ? 'btn-primary' : 'btn-ghost')}
+                  onClick={() => navigateToPage(1, option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <Deferred
@@ -343,9 +377,34 @@ export default function Index({
               </ListRow>
             </List>
           }
-          data={['spells']}
+          data={['spells', 'pagination']}
         >
-          <List>{spells?.map((spell) => <SpellRow key={spell.id} spell={spell} sources={sources} canManage={canManage} />)}</List>
+          <>
+            <List>{spells.map((spell) => <SpellRow key={spell.id} spell={spell} sources={sources} canManage={canManage} />)}</List>
+            {pagination && pagination.lastPage > 1 ? (
+              <div className="flex flex-wrap items-center justify-end gap-1 border-t border-base-200/80 pt-3">
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  disabled={pagination.currentPage <= 1}
+                  onClick={() => navigateToPage(pagination.currentPage - 1, pagination.perPage)}
+                >
+                  Previous
+                </button>
+                <span className="px-1 text-[11px] text-base-content/60">
+                  Page {pagination.currentPage} / {pagination.lastPage}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  disabled={!pagination.hasMorePages}
+                  onClick={() => navigateToPage(pagination.currentPage + 1, pagination.perPage)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </>
         </Deferred>
       </div>
     </AppLayout>

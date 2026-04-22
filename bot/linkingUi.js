@@ -63,6 +63,25 @@ function buildJoinConfirmButtons(discordUserId) {
     );
 }
 
+function buildPolicyUpdateContent() {
+    return [
+        `**${t('linking.policyUpdatedTitle')}**`,
+        '',
+        t('linking.policyUpdatedBody'),
+        '',
+        legalLinksLine(),
+    ].join('\n');
+}
+
+function buildPolicyUpdateButtons(discordUserId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`appPolicyAccept_${discordUserId}`)
+            .setLabel(t('linking.confirmAcceptPolicy'))
+            .setStyle(ButtonStyle.Primary),
+    );
+}
+
 async function replyNotLinked(interaction) {
     if (interaction?.isMessageComponent?.()) {
         await interaction.update({
@@ -90,6 +109,8 @@ module.exports = {
     replyNotLinked,
     buildNotLinkedButtons,
     buildJoinConfirmButtons,
+    buildPolicyUpdateContent,
+    buildPolicyUpdateButtons,
     legalLinksLine,
     notLinkedContent,
 };

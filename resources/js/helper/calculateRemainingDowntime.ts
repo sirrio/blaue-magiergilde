@@ -1,5 +1,6 @@
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
+import { getCharacterBubbleShopExtraDowntimeSeconds } from '@/helper/characterBubbleShop'
 import { hasPseudoAdventures } from '@/helper/usesManualLevelTracking'
 import { Character, Downtime } from '@/types'
 
@@ -21,6 +22,7 @@ const calculateRemainingDowntime = (character: Character): number => {
   }, 0)
 
   const totalDuration = Math.max(0, bubbles - tierBubbles + shopBubbles) * 8 * 60 * 60
+    + getCharacterBubbleShopExtraDowntimeSeconds(character)
   return totalDuration - usedDuration
 }
 

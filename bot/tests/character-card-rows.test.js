@@ -87,6 +87,19 @@ const blockedRegisterButton = rows[0]
 assert.ok(blockedRegisterButton);
 assert.equal(blockedRegisterButton.disabled, true);
 
+buildCharacterCardRows = loadBuildCharacterCardRows('true');
+rows = buildCharacterCardRows({
+    characterId: 15,
+    ownerDiscordId: '123',
+    isFiller: false,
+    simplifiedTracking: false,
+    guildStatus: 'approved',
+    hasProgressionUpgradeAvailable: true,
+});
+const secondaryLabels = rows[1].toJSON().components.map(component => component.label);
+assert.equal(secondaryLabels.includes('Neue Kurve'), true);
+assert.equal(secondaryLabels.includes('Zurück zur Liste'), true);
+
 if (originalFlag === undefined) {
     delete process.env.FEATURE_CHARACTER_STATUS_SWITCH;
 } else {

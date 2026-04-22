@@ -11,6 +11,8 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\CharacterBubbleShop;
+use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +24,7 @@ class CharacterManagementController extends Controller
         StoreCharacterForUserRequest $request,
         User $user,
         CharacterApprovalNotificationService $notificationService,
+        CharacterBubbleShop $bubbleShop,
     ): RedirectResponse {
         $character = new Character;
         $character->name = $request->string('name')->toString();
@@ -32,10 +35,12 @@ class CharacterManagementController extends Controller
         $character->dm_bubbles = $request->integer('dm_bubbles');
         $character->dm_coins = $request->integer('dm_coins');
         $character->bubble_shop_spend = $request->integer('bubble_shop_spend');
+        $bubbleShop->syncLegacySpend($character, $character->bubble_shop_spend);
         $character->user_id = $user->id;
         $character->start_tier = $request->string('start_tier')->toString();
         $character->external_link = $request->string('external_link')->toString();
         $character->guild_status = $request->input('guild_status', 'pending');
+        $character->progression_version_id = LevelProgression::activeVersionId();
         $character->admin_managed = true;
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
@@ -72,6 +77,7 @@ class CharacterManagementController extends Controller
         UpdateCharacterForUserRequest $request,
         Character $character,
         CharacterApprovalNotificationService $notificationService,
+        CharacterBubbleShop $bubbleShop,
     ): RedirectResponse {
         $previousStatus = $character->guild_status;
 
@@ -82,7 +88,7 @@ class CharacterManagementController extends Controller
         $character->version = $request->string('version')->toString();
         $character->dm_bubbles = $request->integer('dm_bubbles');
         $character->dm_coins = $request->integer('dm_coins');
-        $character->bubble_shop_spend = $request->integer('bubble_shop_spend');
+        $bubbleShop->syncLegacySpend($character, $request->integer('bubble_shop_spend'));
         $character->start_tier = $request->string('start_tier')->toString();
         $character->external_link = $request->string('external_link')->toString();
         if ($request->filled('guild_status') && in_array($previousStatus, ['pending', 'draft'], true)) {

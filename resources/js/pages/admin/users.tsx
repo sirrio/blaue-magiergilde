@@ -42,10 +42,10 @@ export default function AdminUsersPage({ users }: Props) {
 
   return (
     <AppLayout>
-      <Head title="Benutzer" />
+      <Head title="Als Benutzer ansehen" />
       <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
         <div className="border-b border-base-200 pb-3">
-          <h1 className="text-2xl font-bold">Benutzer</h1>
+          <h1 className="text-2xl font-bold">Als Benutzer ansehen</h1>
           <p className="text-xs text-base-content/70 sm:text-sm">Als Benutzer einloggen, um seine Sicht zu sehen.</p>
         </div>
 

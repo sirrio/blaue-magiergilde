@@ -44,8 +44,10 @@ class Character extends Model
         'simplified_tracking' => 'boolean',
         'avatar_masked' => 'boolean',
         'private_mode' => 'boolean',
+        'progression_version_id' => 'integer',
         'manual_adventures_count' => 'integer',
         'manual_faction_rank' => 'integer',
+        'bubble_shop_legacy_spend' => 'integer',
     ];
 
     protected $appends = ['faction_rank'];
@@ -70,9 +72,19 @@ class Character extends Model
         return $this->belongsToMany(CharacterClass::class);
     }
 
+    public function bubbleShopPurchases(): HasMany
+    {
+        return $this->hasMany(CharacterBubbleShopPurchase::class);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function progressionVersion(): BelongsTo
+    {
+        return $this->belongsTo(LevelProgressionVersion::class, 'progression_version_id');
     }
 
     public function room(): HasOne

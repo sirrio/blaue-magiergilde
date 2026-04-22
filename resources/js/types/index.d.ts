@@ -11,12 +11,14 @@ export interface PageProps {
   tiers: object
   versions: string[]
   factions: object
-  features: { games_calendar: boolean; rooms: boolean; character_status_switch: boolean }
+  features: { games_calendar: boolean; rooms: boolean; character_status_switch: boolean; level_curve_upgrade: boolean }
   botChannelOverride?: { active: boolean; channel_id?: string | null }
   discordConnected: boolean
   impersonating?: { name: string } | null
   handbookChannels?: { id: string; name: string }[]
   levelProgressionTotals?: Record<number, number>
+  levelProgressionTotalsByVersion?: Record<number, Record<number, number>>
+  activeLevelProgressionVersionId: number
   activeChannelId?: string | null
   ziggy: Config & { location: string }
 
@@ -256,6 +258,9 @@ export interface DiscordBotSettings {
   character_approval_channel_id?: string | null
   character_approval_channel_name?: string | null
   character_approval_channel_guild_id?: string | null
+  character_retirement_channel_id?: string | null
+  character_retirement_channel_name?: string | null
+  character_retirement_channel_guild_id?: string | null
   support_ticket_channel_id?: string | null
   support_ticket_channel_name?: string | null
   support_ticket_channel_guild_id?: string | null
@@ -281,6 +286,8 @@ export interface MundaneItemVariant {
   cost_gp?: number | null
   is_placeholder?: boolean
   guild_enabled?: boolean
+  comments_count?: number
+  comments?: CompendiumComment[]
 }
 
 export interface CompendiumImportRun {
@@ -327,6 +334,25 @@ export interface Auction {
   auction_items: AuctionItem[]
 }
 
+export interface CompendiumComment {
+  id: number
+  body: string
+  created_at?: string | null
+  can_delete?: boolean
+  user?: {
+    id: number
+    name: string
+  } | null
+}
+
+export interface PaginationMeta {
+  currentPage: number
+  lastPage: number
+  perPage: number
+  total: number
+  hasMorePages: boolean
+}
+
 export interface Item {
   id: number
   name: string
@@ -346,6 +372,8 @@ export interface Item {
   ruling_note?: string | null
   source_id?: number | null
   source?: Source | null
+  comments_count?: number
+  comments?: CompendiumComment[]
   mundane_variant_ids?: number[]
   mundane_variants?: MundaneItemVariant[]
 }
@@ -362,6 +390,8 @@ export interface Spell {
   ruling_note?: string | null
   source_id?: number | null
   source?: Source | null
+  comments_count?: number
+  comments?: CompendiumComment[]
 }
 
 export interface CharacterClass {
@@ -370,6 +400,8 @@ export interface CharacterClass {
   source_id?: number | null
   source?: Source | null
   guild_enabled?: boolean
+  comments_count?: number
+  comments?: CompendiumComment[]
 }
 
 export interface CharacterSubclass {
@@ -419,9 +451,12 @@ export interface Character {
   dm_coins: number
   is_filler: boolean
   bubble_shop_spend: number
+  bubble_shop_legacy_spend?: number
+  bubble_shop_purchases?: CharacterBubbleShopPurchase[]
   faction_rank?: number
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
+  progression_version_id?: number | null
   simplified_tracking?: boolean
   avatar_masked?: boolean
   private_mode?: boolean
@@ -534,6 +569,13 @@ export interface Downtime {
   character_id: number
 }
 
+export interface CharacterBubbleShopPurchase {
+  id: number
+  character_id: number
+  type: 'skill_proficiency' | 'rare_language' | 'tool_or_language' | 'downtime'
+  quantity: number
+  details?: Record<string, unknown> | null
+}
 
 export interface Game {
   id: number

@@ -38,7 +38,21 @@ export default [
         },
     },
     {
-        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js', 'bot', 'tmp-*.js', 'tmp-*.cjs', 'resources/js/ziggy.js'],
+        ignores: [
+            '.claude',
+            '.playwright-mcp',
+            'bootstrap/ssr',
+            'bot',
+            'node_modules',
+            'playwright-report',
+            'public',
+            'resources/js/ziggy.js',
+            'tailwind.config.js',
+            'test-results',
+            'tmp-*.cjs',
+            'tmp-*.js',
+            'vendor',
+        ],
     },
     prettier, // Turn off all rules that might conflict with Prettier
 ];

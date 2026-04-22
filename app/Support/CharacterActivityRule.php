@@ -163,6 +163,7 @@ class CharacterActivityRule
             return 3;
         }
 
+        $progressionVersionId = $this->progressionState->progressionVersionId($character);
         $bubbles = $this->calculateBubbles($character);
         // Pseudo-adventures encode the level directly via target_level — start_tier
         // is already accounted for in that stored value and must not be added again.
@@ -172,7 +173,7 @@ class CharacterActivityRule
         $bubbleShopSpend = $this->progressionState->bubbleShopSpendForProgression($character);
         $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
 
-        return LevelProgression::levelFromAvailableBubbles($availableBubbles);
+        return LevelProgression::levelFromAvailableBubbles($availableBubbles, $progressionVersionId);
     }
 
     private function calculateBubbles(Character $character): int
@@ -195,12 +196,15 @@ class CharacterActivityRule
         }
 
         $lastPseudo = $adventures->get($lastPseudoIndex);
+        $progressionVersionId = is_numeric($lastPseudo?->progression_version_id) && (int) $lastPseudo->progression_version_id > 0
+            ? (int) $lastPseudo->progression_version_id
+            : $this->progressionState->progressionVersionId($character);
         // Use the exact bubble count stored at pseudo-creation time when available
         // (target_bubbles preserves fractional progress within a level).  Fall back
         // to the level-floor for rows that pre-date the target_bubbles column.
         $pseudoBubbles = $lastPseudo->target_bubbles !== null
             ? $this->safeInt($lastPseudo->target_bubbles)
-            : LevelProgression::bubblesRequiredForLevel(max(1, min(20, $this->safeInt($lastPseudo->target_level, 1))));
+            : LevelProgression::bubblesRequiredForLevel(max(1, min(20, $this->safeInt($lastPseudo->target_level, 1))), $progressionVersionId);
         $realBubblesAfter = $adventures->slice($lastPseudoIndex + 1)
             ->filter(fn (Adventure $a): bool => ! $a->is_pseudo)
             ->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);

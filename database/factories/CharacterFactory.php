@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Character;
 use App\Models\User;
+use App\Support\LevelProgression;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -15,6 +16,8 @@ class CharacterFactory extends Factory
 
     public function definition(): array
     {
+        $bubbleShopSpend = $this->faker->numberBetween(0, 10);
+
         return [
             'user_id' => User::factory(),
             'name' => $this->faker->name(),
@@ -24,7 +27,8 @@ class CharacterFactory extends Factory
             'avatar' => $this->faker->imageUrl(200, 200, 'people'),
             'dm_bubbles' => $this->faker->numberBetween(0, 10),
             'dm_coins' => $this->faker->numberBetween(0, 10),
-            'bubble_shop_spend' => $this->faker->numberBetween(0, 10),
+            'bubble_shop_spend' => $bubbleShopSpend,
+            'bubble_shop_legacy_spend' => $bubbleShopSpend,
             'is_filler' => $this->faker->boolean(),
             'faction' => $this->faker->randomElement([
                 'none', 'heiler', 'handwerker', 'feldforscher', 'bibliothekare', 'diplomaten', 'gardisten', 'unterhalter', 'logistiker', 'flora & fauna', 'waffenmeister', 'ermittler', 'arkanisten',
@@ -32,6 +36,7 @@ class CharacterFactory extends Factory
             ]),
             'notes' => $this->faker->sentence(),
             'position' => $this->faker->numberBetween(0, 10),
+            'progression_version_id' => LevelProgression::activeVersionId(),
             'simplified_tracking' => false,
             'avatar_masked' => true,
             'private_mode' => false,

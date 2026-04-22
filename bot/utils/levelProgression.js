@@ -1,6 +1,6 @@
 const db = require('../db');
 
-let cachedTotals = null;
+let cachedTotalsByVersion = null;
 let cachedVersionId = null;
 let cachedFromTestInjection = false;
 
@@ -8,7 +8,7 @@ function clampLevel(value) {
     return Math.min(20, Math.max(1, Math.round(Number(value) || 0)));
 }
 
-function setLevelProgressionTotals(totals) {
+function normalizeTotals(totals) {
     if (!totals || typeof totals !== 'object') {
         throw new Error('Missing level progression totals.');
     }
@@ -33,45 +33,75 @@ function setLevelProgressionTotals(totals) {
         throw new Error('Level progression totals must contain exactly 20 levels.');
     }
 
-    cachedTotals = normalizedTotals;
-    cachedVersionId = null;
+    return normalizedTotals;
+}
+
+function setLevelProgressionTotals(totals) {
+    cachedTotalsByVersion = { 1: normalizeTotals(totals) };
+    cachedVersionId = 1;
     cachedFromTestInjection = true;
 }
 
-function currentTotals() {
-    if (!cachedTotals) {
+function currentTotals(versionId = null) {
+    if (!cachedTotalsByVersion) {
         throw new Error('Level progression totals have not been loaded.');
     }
 
-    return cachedTotals;
+    const resolvedVersionId = Number.isInteger(Number(versionId)) && Number(versionId) > 0
+        ? Number(versionId)
+        : cachedVersionId;
+
+    const totals = cachedTotalsByVersion[resolvedVersionId];
+
+    if (!totals) {
+        throw new Error(`Level progression totals for version ${resolvedVersionId} have not been loaded.`);
+    }
+
+    return totals;
 }
 
 async function ensureLevelProgressionLoaded(force = false) {
-    if (!force && cachedTotals && cachedFromTestInjection) {
-        return cachedTotals;
+    if (!force && cachedTotalsByVersion && cachedFromTestInjection) {
+        return cachedTotalsByVersion;
     }
 
     const [rows] = await db.execute(
         `
-            SELECT lp.level, lp.required_bubbles, lp.version_id
+            SELECT lp.level, lp.required_bubbles, lp.version_id, lpv.is_active
             FROM level_progressions lp
             INNER JOIN level_progression_versions lpv ON lpv.id = lp.version_id
-            WHERE lpv.is_active = 1
-            ORDER BY lp.level ASC
+            ORDER BY lp.version_id ASC, lp.level ASC
         `,
     );
 
-    const totals = {};
-    const versionId = rows[0] ? Number(rows[0].version_id) : null;
+    const totalsByVersion = {};
+    let activeVersionId = null;
+
     for (const row of rows || []) {
-        totals[Number(row.level)] = Number(row.required_bubbles);
+        const versionId = Number(row.version_id);
+        const level = Number(row.level);
+        const requiredBubbles = Number(row.required_bubbles);
+
+        if (!totalsByVersion[versionId]) {
+            totalsByVersion[versionId] = {};
+        }
+
+        totalsByVersion[versionId][level] = requiredBubbles;
+
+        if (Number(row.is_active) === 1) {
+            activeVersionId = versionId;
+        }
     }
 
-    cachedTotals = totals;
-    cachedVersionId = Number.isFinite(versionId) ? versionId : null;
+    for (const [versionId, totals] of Object.entries(totalsByVersion)) {
+        totalsByVersion[Number(versionId)] = normalizeTotals(totals);
+    }
+
+    cachedTotalsByVersion = totalsByVersion;
+    cachedVersionId = Number.isInteger(activeVersionId) && activeVersionId > 0 ? activeVersionId : null;
     cachedFromTestInjection = false;
 
-    return cachedTotals;
+    return cachedTotalsByVersion;
 }
 
 function activeLevelProgressionVersionId() {
@@ -82,26 +112,26 @@ function activeLevelProgressionVersionId() {
     return cachedVersionId;
 }
 
-function bubblesRequiredForLevel(level) {
+function bubblesRequiredForLevel(level, versionId = null) {
     const normalizedLevel = clampLevel(level);
-    return currentTotals()[normalizedLevel];
+    return currentTotals(versionId)[normalizedLevel];
 }
 
-function bubblesRequiredForNextLevel(level) {
+function bubblesRequiredForNextLevel(level, versionId = null) {
     const normalizedLevel = clampLevel(level);
     if (normalizedLevel >= 20) {
         return 0;
     }
 
-    return bubblesRequiredForLevel(normalizedLevel + 1) - bubblesRequiredForLevel(normalizedLevel);
+    return bubblesRequiredForLevel(normalizedLevel + 1, versionId) - bubblesRequiredForLevel(normalizedLevel, versionId);
 }
 
-function levelFromAvailableBubbles(availableBubbles) {
+function levelFromAvailableBubbles(availableBubbles, versionId = null) {
     let remainingBubbles = Math.max(0, Number(availableBubbles) || 0);
     let level = 1;
 
     while (level < 20) {
-        const requiredForNextLevel = bubblesRequiredForNextLevel(level);
+        const requiredForNextLevel = bubblesRequiredForNextLevel(level, versionId);
 
         if (remainingBubbles < requiredForNextLevel) {
             break;

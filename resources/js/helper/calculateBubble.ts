@@ -2,7 +2,7 @@ import type { Adventure, Character, Game } from '@/types'
 import { bubblesRequiredForLevel } from '@/helper/levelProgression'
 import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 
-type BubbleCharacter = Pick<Character, 'adventures' | 'dm_bubbles' | 'is_filler' | 'simplified_tracking'>
+type BubbleCharacter = Pick<Character, 'adventures' | 'dm_bubbles' | 'is_filler' | 'simplified_tracking' | 'progression_version_id'>
 
 enum Bubble {
   MIN_DURATION = 10800,
@@ -13,7 +13,7 @@ const calculateBubble = (character: BubbleCharacter): number => {
     ? Number(character.dm_bubbles ?? 0)
     : 0
 
-  return calculateBubbleByAdventures(character.adventures) + (Number.isFinite(dmBubbles) ? dmBubbles : 0)
+  return calculateBubbleByAdventures(character.adventures, character.progression_version_id) + (Number.isFinite(dmBubbles) ? dmBubbles : 0)
 }
 
 const realAdventureBubbles = (adventure: Adventure): number => {
@@ -22,7 +22,10 @@ const realAdventureBubbles = (adventure: Adventure): number => {
   return Math.floor(normalizedDuration / Bubble.MIN_DURATION) + (adventure.has_additional_bubble ? 1 : 0)
 }
 
-const calculateBubbleByAdventures = (adventures?: Adventure[]): number => {
+const calculateBubbleByAdventures = (
+  adventures?: Adventure[],
+  characterProgressionVersionId?: number | null,
+): number => {
   const list = adventures ?? []
 
   const sorted = [...list].sort((a, b) => {
@@ -44,7 +47,10 @@ const calculateBubbleByAdventures = (adventures?: Adventure[]): number => {
   const pseudoBubbles =
     lastPseudo.target_bubbles != null
       ? Number(lastPseudo.target_bubbles)
-      : bubblesRequiredForLevel(Number(lastPseudo.target_level ?? 1))
+      : bubblesRequiredForLevel(
+          Number(lastPseudo.target_level ?? 1),
+          lastPseudo.progression_version_id ?? characterProgressionVersionId,
+        )
   const realBubblesAfter = sorted
     .slice(lastPseudoIndex + 1)
     .filter((a) => !a.is_pseudo)

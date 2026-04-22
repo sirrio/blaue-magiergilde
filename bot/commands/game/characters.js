@@ -13,12 +13,18 @@ const {
 const { commandName } = require('../../commandConfig');
 const { t } = require('../../i18n');
 const {
+    extraDowntimeSecondsForCharacter,
+    legacySpendForCharacter,
+    structuredSpendForCharacter,
+} = require('../../utils/characterBubbleShop');
+const {
     DiscordNotLinkedError,
     getLinkedUserLocaleForDiscord,
     getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
+    getPrivacyPolicyStatusForDiscord,
 } = require('../../appDb');
-const { replyNotLinked } = require('../../linkingUi');
+const { replyNotLinked, buildPolicyUpdateContent, buildPolicyUpdateButtons } = require('../../linkingUi');
 const {
     additionalBubblesForStartTier,
     calculateBubblesInCurrentLevel,
@@ -105,13 +111,13 @@ function hoursOnly(seconds) {
 
 function calculateTotalBubblesToNextLevel(character, level) {
     const additional = additionalBubblesForStartTier(character.start_tier);
-    const currentTotal = bubblesRequiredForLevel(level) - additional;
-    const nextTotal = bubblesRequiredForLevel(level + 1) - additional;
+    const currentTotal = bubblesRequiredForLevel(level, character.progression_version_id) - additional;
+    const nextTotal = bubblesRequiredForLevel(level + 1, character.progression_version_id) - additional;
     return Math.max(0, nextTotal - currentTotal);
 }
 
 
-function buildCharacterSummaryLine(character) {
+function buildCharacterSummaryLine(character, locale = null) {
     const level = calculateLevel(character);
     const tier = calculateTierFromLevel(level).toUpperCase();
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
@@ -123,7 +129,7 @@ function buildCharacterSummaryLine(character) {
     const downtimeBubbles = isMixed
         ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
         : totalBubbles;
-    const downtimeMax = downtimeBubbles * 8 * 60 * 60;
+    const downtimeMax = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
     const downtimeUsed = safeInt(character.total_downtime);
 
     const name = String(character.name || `Character ${character.id}`).slice(0, 16).padEnd(16);
@@ -134,14 +140,28 @@ function buildCharacterSummaryLine(character) {
             ? `Lv20 +${inCurrent}`
             : `Lv${level} ${inCurrent}/${toNextTotal}`).padEnd(11);
     const downtimePart = `${hoursOnly(downtimeUsed)}/${hoursOnly(downtimeMax)}`.padEnd(10);
-    const statusLabels = {
-        approved: 'ok',
-        pending: 'pend',
-        draft: 'draft',
-        declined: 'decl',
-        needs_changes: 'chgs',
-    };
-    const statusPart = statusLabels[character.guild_status] ?? character.guild_status ?? '?';
+    let statusPart;
+    try {
+        const hasProgressionUpgradeAvailable = Boolean(character.has_progression_upgrade_available);
+
+        if (hasProgressionUpgradeAvailable) {
+            statusPart = t('characters.dashboardStatusCurve', {}, locale);
+        }
+    } catch {
+        statusPart = null;
+    }
+
+    if (!statusPart) {
+        const statusLabels = {
+            approved: t('characters.dashboardStatusApproved', {}, locale),
+            pending: t('characters.dashboardStatusPending', {}, locale),
+            draft: t('characters.dashboardStatusDraft', {}, locale),
+            declined: t('characters.dashboardStatusDeclined', {}, locale),
+            needs_changes: t('characters.dashboardStatusNeedsChanges', {}, locale),
+            retired: t('characters.dashboardStatusRetired', {}, locale),
+        };
+        statusPart = statusLabels[character.guild_status] ?? String(character.guild_status ?? '?');
+    }
 
     return `${name} ${tierPart} ${bubblePart} ${downtimePart} ${statusPart}`;
 }
@@ -309,11 +329,23 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     // the start-tier bonus (which was never earned through play) and deducts bubble shop
     // spend (which was earned). Correct the downtime base accordingly.
     const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
+    let hasProgressionUpgradeAvailable = false;
+    try {
+        hasProgressionUpgradeAvailable = Boolean(character.has_progression_upgrade_available);
+    } catch {
+        hasProgressionUpgradeAvailable = false;
+    }
     const downtimeBubbles = isMixed
         ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
         : totalBubbles;
-    const downtimeAllowed = downtimeBubbles * 8 * 60 * 60;
+    const downtimeAllowed = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
     const downtimeRemaining = downtimeAllowed - downtimeTotal;
+    const bubbleShopLegacy = legacySpendForCharacter(character);
+    const bubbleShopUnassigned = Math.max(
+        bubbleShopLegacy - structuredSpendForCharacter(character),
+        0
+    );
+    const bubbleShopExtraDowntime = extraDowntimeSecondsForCharacter(character);
 
     const factionLevel = calculateFactionLevel(character, level, tier);
     const factionName = humanFactionName(character.faction);
@@ -349,7 +381,18 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             { name: 'Factions', value: factionsValue, inline: true },
             { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
-            { name: 'Bubble Shop', value: `Spend: **${safeInt(character.bubble_shop_spend)}**`, inline: true },
+                {
+                    name: t('characters.manageBubbleShop', {}, locale),
+                    value: bubbleShopUnassigned > 0
+                        ? [
+                        `${t('characters.bubbleShopLegacyUnassigned', {}, locale)}: **${bubbleShopUnassigned}**`,
+                        t('characters.bubbleShopLegacyReasonBody', {}, locale),
+                        t('characters.bubbleShopLegacySubhint', { count: bubbleShopUnassigned }, locale),
+                        `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
+                        ].join('\n')
+                    : `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
+                  inline: true,
+              },
         );
 
     if (statusNextStep) {
@@ -374,6 +417,17 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
         embed.addFields({ name: 'Hinweise', value: warningLines.join('\n'), inline: false });
     }
 
+    if (hasProgressionUpgradeAvailable) {
+        embed.addFields({
+            name: t('characters.upgradeLevelCurveNoticeTitle', {}, locale),
+            value: [
+                t('characters.upgradeLevelCurveNotice', {}, locale),
+                t('characters.upgradeLevelCurveAction', {}, locale),
+            ].join('\n'),
+            inline: false,
+        });
+    }
+
     const externalLink = String(character.external_link || '').trim();
     const managerUrl = resolveCharacterManagerUrl(character.id);
     if (managerUrl) {
@@ -393,7 +447,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
 }
 
 function buildCharacterListView({ ownerDiscordId, characters, locale }) {
-    const characterLines = characters.slice(0, 25).map(buildCharacterSummaryLine).join('\n');
+    const characterLines = characters.slice(0, 25).map(character => buildCharacterSummaryLine(character, locale)).join('\n');
     const descriptionHeader = characters.length > 0
         ? t('characters.dashboardDescription', { count: characters.length }, locale)
         : t('characters.dashboardDescriptionEmpty', {}, locale);
@@ -634,6 +688,18 @@ module.exports = {
                 return;
             }
             throw error;
+        }
+
+        const policyStatus = await getPrivacyPolicyStatusForDiscord(interaction.user);
+        if (policyStatus.needsAcceptance) {
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({
+                    content: buildPolicyUpdateContent(),
+                    embeds: [],
+                    components: [buildPolicyUpdateButtons(interaction.user.id)],
+                });
+            }
+            return;
         }
 
         if (trackingDefault === null) {

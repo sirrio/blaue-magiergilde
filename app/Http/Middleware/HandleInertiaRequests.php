@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\CharacterClass;
 use App\Models\DiscordBackupSetting;
 use App\Models\DiscordChannel;
+use App\Support\FeatureAccess;
 use App\Support\LevelProgression;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -91,7 +92,13 @@ class HandleInertiaRequests extends Middleware
 
                 return ['name' => $manager->getImpersonator()?->name];
             })(),
-            'features' => config('features'),
+            'features' => [
+                'games_calendar' => config('features.games_calendar'),
+                'rooms' => config('features.rooms'),
+                'character_status_switch' => config('features.character_status_switch'),
+                /** TODO: remove this temporary beta flag once level curve upgrades are released for everyone. */
+                'level_curve_upgrade' => FeatureAccess::canUseLevelCurveUpgrade($user),
+            ],
             'botChannelOverride' => [
                 'active' => filled(config('services.bot.channel_override_id')),
                 'channel_id' => config('services.bot.channel_override_id'),
@@ -102,7 +109,7 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
-            'classes' => CharacterClass::query()->select(['id', 'name'])->get(),
+            'classes' => CharacterClass::query()->select(['id', 'name', 'guild_enabled'])->get(),
             'factions' => [
                 'none' => 'Keine',
                 'heiler' => 'Heiler',
@@ -130,6 +137,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'handbookChannels' => $handbookChannels,
             'levelProgressionTotals' => LevelProgression::totals(),
+            'levelProgressionTotalsByVersion' => LevelProgression::allTotalsByVersion(),
+            'activeLevelProgressionVersionId' => LevelProgression::activeVersionId(),
         ];
     }
 }

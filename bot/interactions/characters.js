@@ -22,8 +22,12 @@ const {
     getLinkedUserTrackingDefaultForDiscord,
     listCharactersForDiscord,
     getCharacterSubmissionStateForDiscord,
+    getCharacterProgressionUpgradeStateForDiscord,
     updateCharacterManualLevelForDiscord,
+    updateCharacterTrackingModeForDiscord,
     updateCharacterManualOverridesForDiscord,
+    updateCharacterBubbleShopForDiscord,
+    upgradeCharacterProgressionForDiscord,
     updateLinkedUserLocaleForDiscord,
     updateLinkedUserTrackingDefaultForDiscord,
     findCharacterForDiscord,
@@ -46,11 +50,20 @@ const {
     updateDowntimeForDiscord,
     softDeleteDowntimeForDiscord,
 } = require('../appDb');
+const {
+    TYPE_DOWNTIME,
+    TYPE_RARE_LANGUAGE,
+    TYPE_SKILL_PROFICIENCY,
+    TYPE_TOOL_OR_LANGUAGE,
+    definitionsForCharacter,
+    quantitiesForCharacter,
+} = require('../utils/characterBubbleShop');
 
 const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLanguageView, buildTrackingDefaultSelectionView, buildDeleteAccountConfirmView } = require('../commands/game/characters');
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateBubblesInCurrentLevel, calculateLevel } = require('../utils/characterTier');
-const { bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
+const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
+const { canUseLevelCurveUpgradeForUserId } = require('../utils/featureAccess');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -80,7 +93,7 @@ const {
     buildAvatarUploadRow,
     buildParticipantOptions,
     buildCharacterCardPayload,
-    buildCharacterCardRows,
+    buildCharacterProgressionUpgradeView,
     buildCharacterRegistrationBlockedContent,
     buildCharacterRegisterNoteModal,
     buildCharacterRegisterConfirmView,
@@ -181,14 +194,58 @@ async function getCharacterRegistrationBlock(interactionUser, characterId) {
 }
 
 async function buildCharacterCardPayloadForInteraction(interactionUser, character, ownerDiscordId) {
+    await ensureLevelProgressionLoaded();
     const registrationState = await getCharacterRegistrationBlock(interactionUser, character.id);
+    const activeVersionId = activeLevelProgressionVersionId();
+    /** TODO: remove this temporary beta allowlist once level curve upgrades are released for everyone. */
+    const canUseLevelCurveUpgrade = canUseLevelCurveUpgradeForUserId(character.user_id);
 
     return buildCharacterCardPayload({
-        character,
+        character: {
+            ...character,
+            locale: await getLinkedUserLocaleForDiscord(interactionUser),
+            has_progression_upgrade_available: canUseLevelCurveUpgrade
+                && safeInt(character.progression_version_id) > 0
+                && safeInt(character.progression_version_id) !== activeVersionId,
+        },
         ownerDiscordId,
         registrationBlockedReason: registrationState.blockedReason,
         registrationCounts: registrationState.counts,
     });
+}
+
+function normalizeProgressionUpgradeSelection(state, selectedLevel, selectedBubbles, allowOutsideRangeWithoutDowntime = false) {
+    const currentLevelFloor = bubblesRequiredForLevel(state.currentLevel, state.activeVersionId);
+    const defaultRangeMinAvailableBubbles = Math.min(currentLevelFloor, safeInt(state.currentAvailableBubbles));
+    const defaultRangeMaxAvailableBubbles = Math.max(currentLevelFloor, safeInt(state.currentAvailableBubbles));
+    const absoluteMinSelectableLevel = Math.max(1, safeInt(state.minSelectableLevel, 1));
+    const minSelectableLevel = state.usesManualTracking && !allowOutsideRangeWithoutDowntime
+        ? Math.min(state.currentLevel, state.recalculatedLevel)
+        : absoluteMinSelectableLevel;
+    const maxSelectableLevel = state.usesManualTracking && allowOutsideRangeWithoutDowntime
+        ? 20
+        : Math.max(minSelectableLevel, state.usesManualTracking ? Math.max(state.currentLevel, state.recalculatedLevel) : safeInt(state.maxSelectableLevel, minSelectableLevel));
+    const level = Math.max(minSelectableLevel, Math.min(maxSelectableLevel, safeInt(selectedLevel, state.initialTargetLevel)));
+    const levelFloor = bubblesRequiredForLevel(level, state.activeVersionId);
+    const minBubbles = level >= 20
+        ? 0
+        : Math.max(
+            0,
+            (state.usesManualTracking && !allowOutsideRangeWithoutDowntime ? defaultRangeMinAvailableBubbles : safeInt(state.minimumAvailableBubbles)) - levelFloor,
+        );
+    const maxBubbles = level >= 20
+        ? 0
+        : Math.max(0, Math.min(
+            bubblesRequiredForLevel(Math.min(20, level + 1), state.activeVersionId) - levelFloor - 1,
+            state.usesManualTracking
+                ? (allowOutsideRangeWithoutDowntime ? Number.MAX_SAFE_INTEGER : defaultRangeMaxAvailableBubbles) - levelFloor
+                : safeInt(state.currentAvailableBubbles) - levelFloor,
+        ));
+    const bubbles = level >= 20
+        ? 0
+        : Math.max(minBubbles, Math.min(maxBubbles, safeInt(selectedBubbles, state.initialTargetBubblesInLevel)));
+
+    return { level, bubbles };
 }
 
 async function resolveInteractionLocale(interaction) {
@@ -256,6 +313,11 @@ function parseDurationToSeconds(input) {
     const minutes = Number(normalized);
     if (Number.isFinite(minutes) && minutes >= 0) return Math.floor(minutes) * 60;
     return null;
+}
+
+function safeInt(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.floor(number) : fallback;
 }
 
 const allowedStartTiers = new Set(['bt', 'lt', 'ht']);
@@ -894,6 +956,14 @@ async function deleteLinkedAccountViaBot(discordUserId) {
 
 async function updateCharacterForDiscordAndSync(discordUser, characterId, payload) {
     const result = await updateCharacterForDiscord(discordUser, characterId, payload);
+    if (result.ok) {
+        await syncCharacterApprovalAnnouncement(characterId);
+    }
+    return result;
+}
+
+async function updateCharacterBubbleShopForDiscordAndSync(discordUser, characterId, payload) {
+    const result = await updateCharacterBubbleShopForDiscord(discordUser, characterId, payload);
     if (result.ok) {
         await syncCharacterApprovalAnnouncement(characterId);
     }
@@ -2393,7 +2463,7 @@ async function handle(interaction) {
         return true;
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterBubbleSpendModal_')) {
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('characterBubbleShopModal_')) {
         const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) return false;
@@ -2403,10 +2473,20 @@ async function handle(interaction) {
             return true;
         }
 
-        const bubbleShopSpend = interaction.fields.getTextInputValue('bubbleSpend');
-        const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { bubbleShopSpend });
+        const payload = {
+            [TYPE_SKILL_PROFICIENCY]: interaction.fields.getTextInputValue(TYPE_SKILL_PROFICIENCY),
+            [TYPE_RARE_LANGUAGE]: interaction.fields.getTextInputValue(TYPE_RARE_LANGUAGE),
+            [TYPE_TOOL_OR_LANGUAGE]: interaction.fields.getTextInputValue(TYPE_TOOL_OR_LANGUAGE),
+            [TYPE_DOWNTIME]: interaction.fields.getTextInputValue(TYPE_DOWNTIME),
+        };
+        const result = await updateCharacterBubbleShopForDiscordAndSync(interaction.user, characterId, payload);
         if (!result.ok) {
-            await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
+            const content = result.reason === 'invalid_quantity'
+                ? `Ungueltiger Bubble-Shop-Wert fuer ${result.type}. Maximal erlaubt: ${result.max}.`
+                : result.reason === 'bubble_shop_floor'
+                    ? 'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.'
+                : 'Character not found.';
+            await updateManageMessage(interaction, { content, flags: MessageFlags.Ephemeral });
             return true;
         }
 
@@ -2607,6 +2687,222 @@ async function handle(interaction) {
         return true;
     }
 
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpgradeLevel_')) {
+        const [, characterIdRaw, ownerDiscordId, selectedBubblesRaw, allowOutsideRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+        if (!state.ok) {
+            await updateManageMessage(interaction, {
+                content: state.reason === 'feature_disabled'
+                    ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                    : await translateInteraction(interaction, 'characters.characterNotFound'),
+                flags: MessageFlags.Ephemeral,
+            });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const allowOutsideRangeWithoutDowntime = allowOutsideRaw === '1';
+        const { level, bubbles } = normalizeProgressionUpgradeSelection(
+            state,
+            Number(interaction.values?.[0] || state.initialTargetLevel),
+            Number(selectedBubblesRaw),
+            allowOutsideRangeWithoutDowntime,
+        );
+
+        await interaction.update({
+            ...buildCharacterProgressionUpgradeView({
+                character: state.character,
+                ownerDiscordId,
+                state,
+                selectedLevel: level,
+                selectedBubbles: bubbles,
+                allowOutsideRangeWithoutDowntime,
+                locale,
+            }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpgradeBubbles_')) {
+        const [, characterIdRaw, ownerDiscordId, selectedLevelRaw, allowOutsideRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+        if (!state.ok) {
+            await updateManageMessage(interaction, {
+                content: state.reason === 'feature_disabled'
+                    ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                    : await translateInteraction(interaction, 'characters.characterNotFound'),
+                flags: MessageFlags.Ephemeral,
+            });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const allowOutsideRangeWithoutDowntime = allowOutsideRaw === '1';
+        const { level, bubbles } = normalizeProgressionUpgradeSelection(
+            state,
+            Number(selectedLevelRaw),
+            Number(interaction.values?.[0] || state.initialTargetBubblesInLevel),
+            allowOutsideRangeWithoutDowntime,
+        );
+
+        await interaction.update({
+            ...buildCharacterProgressionUpgradeView({
+                character: state.character,
+                ownerDiscordId,
+                state,
+                selectedLevel: level,
+                selectedBubbles: bubbles,
+                allowOutsideRangeWithoutDowntime,
+                locale,
+            }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeToggleOutside_')) {
+        const [, characterIdRaw, ownerDiscordId, levelRaw, bubblesRaw, allowOutsideRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+        if (!state.ok) {
+            await updateManageMessage(interaction, {
+                content: state.reason === 'feature_disabled'
+                    ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                    : await translateInteraction(interaction, 'characters.characterNotFound'),
+                flags: MessageFlags.Ephemeral,
+            });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const allowOutsideRangeWithoutDowntime = allowOutsideRaw !== '1';
+        const { level, bubbles } = normalizeProgressionUpgradeSelection(
+            state,
+            Number(levelRaw),
+            Number(bubblesRaw),
+            allowOutsideRangeWithoutDowntime,
+        );
+
+        await interaction.update({
+            ...buildCharacterProgressionUpgradeView({
+                character: state.character,
+                ownerDiscordId,
+                state,
+                selectedLevel: level,
+                selectedBubbles: bubbles,
+                allowOutsideRangeWithoutDowntime,
+                locale,
+            }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeConfirm_')) {
+        const [, characterIdRaw, ownerDiscordId, levelRaw, bubblesRaw, allowOutsideRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const result = await upgradeCharacterProgressionForDiscord(
+            interaction.user,
+            characterId,
+            Number(levelRaw),
+            Number(bubblesRaw),
+            allowOutsideRaw === '1',
+        );
+
+        if (!result.ok) {
+            const locale = await resolveInteractionLocale(interaction);
+            let content = await translateInteraction(interaction, 'characters.characterUpdated');
+
+            if (result.reason === 'below_real' && result.minLevel) {
+                content = t('characters.levelCannotBeBelowReal', { level: result.minLevel }, locale);
+            } else if (result.reason === 'above_max' && result.maxLevel) {
+                content = t('characters.upgradeLevelCurveMaxLevelReason', { level: result.maxLevel }, locale);
+            } else if (result.reason === 'outside_manual_range' && result.minLevel && result.maxLevel) {
+                content = t('characters.upgradeLevelCurveManualRangeHint', { level: result.minLevel, maxLevel: result.maxLevel }, locale);
+            } else if (result.reason === 'bubble_shop_floor') {
+                content = 'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.';
+            } else if (result.reason === 'feature_disabled') {
+                content = await translateInteraction(interaction, 'common.actionDeniedBody');
+            } else if (result.reason === 'character_not_found' || result.reason === 'not_found') {
+                content = await translateInteraction(interaction, 'characters.characterNotFound');
+            }
+
+            await updateManageMessage(interaction, { content, flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const refreshed = await findCharacterForDiscord(interaction.user, characterId);
+        if (!refreshed) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterUpdated'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, refreshed, ownerDiscordId)),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeCancel_')) {
+        const [, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const character = await findCharacterForDiscord(interaction.user, characterId);
+        if (!character) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        await interaction.update({
+            ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
+            content: '',
+        });
+        return true;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('characterCard_')) {
         const [, action, characterIdRaw, ownerDiscordId] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
@@ -2686,6 +2982,41 @@ async function handle(interaction) {
 
             await interaction.update({
                 ...buildCharacterRegisterConfirmView({ character, ownerDiscordId }),
+                content: '',
+            });
+            return true;
+        }
+
+        if (action === 'upgrade') {
+            const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+            if (!state.ok) {
+                await updateManageMessage(interaction, {
+                    content: state.reason === 'feature_disabled'
+                        ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                        : await translateInteraction(interaction, 'characters.characterNotFound'),
+                    flags: MessageFlags.Ephemeral,
+                });
+                return true;
+            }
+
+            const locale = await resolveInteractionLocale(interaction);
+            const { level, bubbles } = normalizeProgressionUpgradeSelection(
+                state,
+                state.initialTargetLevel,
+                state.initialTargetBubblesInLevel,
+                false,
+            );
+
+            await interaction.update({
+                ...buildCharacterProgressionUpgradeView({
+                    character: state.character,
+                    ownerDiscordId,
+                    state,
+                    selectedLevel: level,
+                    selectedBubbles: bubbles,
+                    allowOutsideRangeWithoutDowntime: false,
+                    locale,
+                }),
                 content: '',
             });
             return true;
@@ -2861,7 +3192,7 @@ async function handle(interaction) {
 
         if (action === 'tracking_toggle') {
             const nextValue = !character.simplified_tracking;
-            const result = await updateCharacterForDiscordAndSync(interaction.user, characterId, { simplifiedTracking: nextValue });
+            const result = await updateCharacterTrackingModeForDiscord(interaction.user, characterId, nextValue);
             if (!result.ok) {
                 await updateManageMessage(interaction, { content: 'Character not found.', flags: MessageFlags.Ephemeral });
                 return true;
@@ -3028,18 +3359,42 @@ async function handle(interaction) {
         }
 
         if (action === 'bubble_spend') {
+            const locale = await resolveInteractionLocale(interaction);
+            const definitions = definitionsForCharacter(character);
+            const quantities = quantitiesForCharacter(character);
             const modal = new ModalBuilder()
-                .setCustomId(`characterBubbleSpendModal_${character.id}_${ownerDiscordId}`)
-                .setTitle('Bubble Shop Spend');
+                .setCustomId(`characterBubbleShopModal_${character.id}_${ownerDiscordId}`)
+                .setTitle('Bubble Shop');
 
-            const spendInput = new TextInputBuilder()
-                .setCustomId('bubbleSpend')
-                .setLabel('Bubble Shop Spend')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(safeModalValue(String(character.bubble_shop_spend ?? 0)));
+            const inputs = [
+                {
+                    id: TYPE_SKILL_PROFICIENCY,
+                    label: `${t('characters.bubbleShopSkillProficiencyShort', {}, locale)} (0-${safeInt(definitions[TYPE_SKILL_PROFICIENCY]?.max)})`,
+                },
+                {
+                    id: TYPE_RARE_LANGUAGE,
+                    label: `${t('characters.bubbleShopRareLanguageShort', {}, locale)} (0-${safeInt(definitions[TYPE_RARE_LANGUAGE]?.max)})`,
+                },
+                {
+                    id: TYPE_TOOL_OR_LANGUAGE,
+                    label: `${t('characters.bubbleShopToolOrLanguageShort', {}, locale)} (0-${safeInt(definitions[TYPE_TOOL_OR_LANGUAGE]?.max)})`,
+                },
+                {
+                    id: TYPE_DOWNTIME,
+                    label: `${t('characters.bubbleShopDowntimeShort', {}, locale)} (0-${definitions[TYPE_DOWNTIME]?.max ?? 'unlimited'})`,
+                },
+            ];
 
-            modal.addComponents(new ActionRowBuilder().addComponents(spendInput));
+            modal.addComponents(...inputs.map(({ id, label }) => (
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId(id)
+                        .setLabel(label)
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setValue(safeModalValue(String(quantities[id] ?? 0))),
+                )
+            )));
             await interaction.showModal(modal);
             return true;
         }

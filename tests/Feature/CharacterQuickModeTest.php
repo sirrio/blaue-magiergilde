@@ -3,6 +3,7 @@
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\User;
+use App\Support\CharacterProgressionState;
 use App\Support\LevelProgression;
 
 it('updates tracking mode for an owned character', function () {
@@ -18,6 +19,46 @@ it('updates tracking mode for an owned character', function () {
 
     $response->assertRedirect();
     expect($character->fresh()->simplified_tracking)->toBeTrue();
+});
+
+it('does not create a pseudo anchor when switching to level tracking without setting a level', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->create([
+        'user_id' => $user->id,
+        'start_tier' => 'bt',
+        'dm_bubbles' => 0,
+        'bubble_shop_spend' => 15,
+        'is_filler' => false,
+        'simplified_tracking' => false,
+    ]);
+
+    foreach (range(1, 30) as $index) {
+        Adventure::factory()->create([
+            'character_id' => $character->id,
+            'duration' => 10800,
+            'has_additional_bubble' => false,
+            'is_pseudo' => false,
+            'start_date' => sprintf('2026-01-%02d', min($index, 28)),
+        ]);
+    }
+
+    $this->actingAs($user)->patch(route('characters.tracking', $character), [
+        'simplified_tracking' => true,
+    ])->assertRedirect();
+
+    $duringManualMode = $character->fresh('adventures');
+
+    expect($duringManualMode->simplified_tracking)->toBeTrue()
+        ->and((new CharacterProgressionState)->hasPseudoAdventures($duringManualMode))->toBeFalse();
+
+    $this->actingAs($user)->patch(route('characters.tracking', $character), [
+        'simplified_tracking' => false,
+    ])->assertRedirect();
+
+    $after = $character->fresh('adventures');
+
+    expect($after->simplified_tracking)->toBeFalse()
+        ->and((new CharacterProgressionState)->hasPseudoAdventures($after))->toBeFalse();
 });
 
 it('forbids changing tracking mode on foreign characters', function () {

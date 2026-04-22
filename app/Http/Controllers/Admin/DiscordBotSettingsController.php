@@ -29,6 +29,21 @@ class DiscordBotSettingsController extends Controller
             $updates['character_approval_channel_guild_id'] = $guildId !== '' ? $guildId : null;
         }
 
+        if (array_key_exists('character_retirement_channel_id', $validated)) {
+            $channelId = trim((string) ($validated['character_retirement_channel_id'] ?? ''));
+            $updates['character_retirement_channel_id'] = $channelId !== '' ? $channelId : null;
+        }
+
+        if (array_key_exists('character_retirement_channel_name', $validated)) {
+            $channelName = trim((string) ($validated['character_retirement_channel_name'] ?? ''));
+            $updates['character_retirement_channel_name'] = $channelName !== '' ? $channelName : null;
+        }
+
+        if (array_key_exists('character_retirement_channel_guild_id', $validated)) {
+            $guildId = trim((string) ($validated['character_retirement_channel_guild_id'] ?? ''));
+            $updates['character_retirement_channel_guild_id'] = $guildId !== '' ? $guildId : null;
+        }
+
         if (array_key_exists('games_channel_id', $validated)) {
             $channelId = trim((string) ($validated['games_channel_id'] ?? ''));
             $updates['games_channel_id'] = $channelId !== '' ? $channelId : null;

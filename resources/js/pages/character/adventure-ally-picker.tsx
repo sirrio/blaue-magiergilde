@@ -1,4 +1,5 @@
 import { Input } from '@/components/ui/input'
+import { Tooltip } from '@/components/ui/tooltip'
 import { getAllyDisplayName, getAllyOwnerName, getCharacterOwnerName, getGuildCharacterOptionLabel, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { cn } from '@/lib/utils'
 import { Ally, Character } from '@/types'
@@ -61,21 +62,23 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
         ownerName,
       }
     })
-    const guildOptions = availableGuildCharacters.map((character) => {
-      return {
-        key: `guild-${character.id}`,
-        type: 'guild' as const,
-        id: character.id,
-        label: getGuildCharacterOptionLabel(character),
-        sublabel: 'Guild member',
-      }
-    })
-    const combined = [...allyOptions, ...guildOptions]
-    const filtered = query
-      ? combined.filter((option) =>
-          [option.label, option.sublabel].filter(Boolean).join(' ').toLowerCase().includes(query),
-        )
-      : combined
+      const guildOptions = availableGuildCharacters.map((character) => {
+        const ownerName = getCharacterOwnerName(character)
+        return {
+          key: `guild-${character.id}`,
+          type: 'guild' as const,
+          id: character.id,
+          label: getGuildCharacterOptionLabel(character),
+          sublabel: 'Guild member',
+          ownerName,
+        }
+      })
+      const combined = [...allyOptions, ...guildOptions]
+      const filtered = query
+        ? combined.filter((option) =>
+            [option.label, option.sublabel, option.ownerName].filter(Boolean).join(' ').toLowerCase().includes(query),
+          )
+        : combined
     return filtered.sort((a, b) => a.label.localeCompare(b.label))
   }, [allies, availableGuildCharacters, search])
 
@@ -119,26 +122,30 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
       {selectedAllies.length > 0 || selectedGuildCharacters.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {selectedAllies.map((ally) => (
-            <button
-              key={`selected-ally-${ally.id}`}
-              type="button"
-              onClick={() => toggleOption('ally', ally.id)}
-              title={getAllyOwnerName(ally) ? `Owner: ${getAllyOwnerName(ally)}` : undefined}
-              className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary transition hover:border-primary/60"
-            >
-              {getAllyDisplayName(ally)}
-            </button>
+            <Tooltip key={`selected-ally-${ally.id}`} content={getAllyOwnerName(ally) ? `Owner: ${getAllyOwnerName(ally)}` : undefined} placement="top">
+              <button
+                type="button"
+                onClick={() => toggleOption('ally', ally.id)}
+                className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary transition hover:border-primary/60"
+              >
+                {getAllyDisplayName(ally)}
+              </button>
+            </Tooltip>
           ))}
           {selectedGuildCharacters.map((character) => (
-            <button
+            <Tooltip
               key={`selected-guild-${character.id}`}
-              type="button"
-              onClick={() => toggleOption('guild', character.id)}
-              title={getCharacterOwnerName(character) ? `Owner: ${getCharacterOwnerName(character)}` : undefined}
-              className="rounded-full border border-secondary/30 bg-secondary/10 px-2 py-1 text-xs text-secondary transition hover:border-secondary/60"
+              content={getCharacterOwnerName(character) ? `Owner: ${getCharacterOwnerName(character)}` : undefined}
+              placement="top"
             >
-              {getGuildCharacterOptionLabel(character)}
-            </button>
+              <button
+                type="button"
+                onClick={() => toggleOption('guild', character.id)}
+                className="rounded-full border border-secondary/30 bg-secondary/10 px-2 py-1 text-xs text-secondary transition hover:border-secondary/60"
+              >
+                {getGuildCharacterOptionLabel(character)}
+              </button>
+            </Tooltip>
           ))}
         </div>
       ) : null}
@@ -149,7 +156,7 @@ const AdventureParticipantPicker: React.FC<AdventureParticipantPickerProps> = ({
               const isSelected = option.type === 'ally'
                 ? selectedAllyIds.includes(option.id)
                 : selectedGuildCharacterIds.includes(option.id)
-            return (
+              return (
                 <button
                   key={option.key}
                   type="button"

@@ -5,26 +5,37 @@ namespace App\Http\Controllers\Spell;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Spell\StoreSpellRequest;
 use App\Http\Requests\Spell\UpdateSpellRequest;
+use App\Models\CompendiumComment;
 use App\Models\Source;
 use App\Models\Spell;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class SpellController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(): \Inertia\Response
+    public function index(): Response
     {
-        $spellSchool = request('spell_school', null);
-        $spellLevel = request('spell_level', null);
+        $user = Auth::user();
+        $spellSchool = request('spell_school');
+        $spellLevel = request('spell_level');
         $guild = request('guild');
         $ruling = request('ruling');
         $searchTerm = request('search', '');
+        $perPageOptions = [25, 50, 100];
+        $perPage = (int) request('per_page', 50);
+        if (! in_array($perPage, $perPageOptions, true)) {
+            $perPage = 50;
+        }
 
         $spellQuery = Spell::query();
-        $spellQuery->with('source:id,name,shortcode,kind');
+        $spellQuery->with([
+            'source:id,name,shortcode,kind',
+            'comments.user:id,name',
+        ]);
+        $spellQuery->withCount('comments');
 
         if (! empty($searchTerm)) {
             $spellQuery->where('name', 'LIKE', "%{$searchTerm}%");
@@ -38,14 +49,14 @@ class SpellController extends Controller
         if ($guild === 'allowed') {
             $spellQuery->where('guild_enabled', true);
         } elseif ($guild === 'blocked') {
-            $spellQuery->where(function ($query) {
+            $spellQuery->where(function ($query): void {
                 $query->whereNull('guild_enabled')->orWhere('guild_enabled', false);
             });
         }
         if ($ruling === 'changed') {
             $spellQuery->where('ruling_changed', true);
         } elseif ($ruling === 'none') {
-            $spellQuery->where(function ($query) {
+            $spellQuery->where(function ($query): void {
                 $query->whereNull('ruling_changed')->orWhere('ruling_changed', false);
             });
         }
@@ -53,34 +64,38 @@ class SpellController extends Controller
         $spells = $spellQuery
             ->orderBy('spell_level')
             ->orderBy('name')
-            ->select(['id', 'name', 'url', 'legacy_url', 'spell_school', 'spell_level', 'guild_enabled', 'ruling_changed', 'ruling_note', 'source_id'])
-            ->get();
+            ->select([
+                'id',
+                'name',
+                'url',
+                'legacy_url',
+                'spell_school',
+                'spell_level',
+                'guild_enabled',
+                'ruling_changed',
+                'ruling_note',
+                'source_id',
+            ])
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('spell/index', [
-            'spells' => Inertia::defer(fn () => $spells),
+            'spells' => Inertia::defer(fn () => $spells->getCollection()->map(
+                fn (Spell $spell): array => $this->serializeSpell($spell, $user?->id, (bool) ($user?->is_admin))
+            )->values()->all()),
+            'pagination' => Inertia::defer(fn (): array => $this->paginationData($spells)),
+            'perPageOptions' => $perPageOptions,
             'sources' => Source::query()
                 ->orderBy('shortcode')
                 ->orderBy('name')
                 ->get(['id', 'name', 'shortcode', 'kind']),
-            'canManage' => request()->routeIs('admin.spells.index'),
-            'indexRoute' => request()->routeIs('admin.spells.index')
-                ? 'admin.spells.index'
-                : 'compendium.spells.index',
+            'canManage' => (bool) ($user?->is_admin),
+            'indexRoute' => 'compendium.spells.index',
         ]);
-
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
+    public function create() {}
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreSpellRequest $request): RedirectResponse
     {
         $spell = new Spell;
@@ -103,26 +118,11 @@ class SpellController extends Controller
         return redirect()->back();
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Spell $spell)
-    {
-        //
-    }
+    public function show(Spell $spell) {}
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Spell $spell)
-    {
-        //
-    }
+    public function edit(Spell $spell) {}
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateSpellRequest $request, Spell $spell)
+    public function update(UpdateSpellRequest $request, Spell $spell): RedirectResponse
     {
         $spell->name = $request->name;
         $spell->url = $request->input('url');
@@ -142,13 +142,55 @@ class SpellController extends Controller
         return redirect()->back();
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Spell $spell): RedirectResponse
     {
         $spell->delete();
 
         return redirect()->back();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeSpell(Spell $spell, ?int $currentUserId, bool $isAdmin): array
+    {
+        return [
+            'id' => $spell->id,
+            'name' => $spell->name,
+            'url' => $spell->url,
+            'legacy_url' => $spell->legacy_url,
+            'spell_school' => $spell->spell_school,
+            'spell_level' => $spell->spell_level,
+            'guild_enabled' => $spell->guild_enabled,
+            'ruling_changed' => $spell->ruling_changed,
+            'ruling_note' => $spell->ruling_note,
+            'source_id' => $spell->source_id,
+            'source' => $spell->source,
+            'comments_count' => $spell->comments_count ?? $spell->comments->count(),
+            'comments' => $spell->comments->map(fn (CompendiumComment $comment): array => [
+                'id' => $comment->id,
+                'body' => $comment->body,
+                'created_at' => optional($comment->created_at)?->toIso8601String(),
+                'user' => $comment->user ? [
+                    'id' => $comment->user->id,
+                    'name' => $comment->user->name,
+                ] : null,
+                'can_delete' => $isAdmin || ($currentUserId !== null && $comment->user_id === $currentUserId),
+            ])->values(),
+        ];
+    }
+
+    /**
+     * @return array{currentPage:int,lastPage:int,perPage:int,total:int,hasMorePages:bool}
+     */
+    private function paginationData(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'currentPage' => $paginator->currentPage(),
+            'lastPage' => $paginator->lastPage(),
+            'perPage' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'hasMorePages' => $paginator->hasMorePages(),
+        ];
     }
 }

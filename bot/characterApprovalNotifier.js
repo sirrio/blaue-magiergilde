@@ -495,6 +495,91 @@ async function postNewAccountAnnouncement({ client, channelId, payload }) {
     }
 }
 
+function buildCharacterRetirementMessage(payload) {
+    const name = trimField(payload?.character_name || 'Unknown character', 256);
+    const tier = payload?.character_tier ? String(payload.character_tier).toUpperCase() : '—';
+    const levelRaw = Number(payload?.character_level);
+    const level = Number.isFinite(levelRaw) && levelRaw > 0 ? String(Math.floor(levelRaw)) : '—';
+    const playedAdventuresRaw = Number(payload?.character_played_adventures);
+    const playedAdventures = Number.isFinite(playedAdventuresRaw) && playedAdventuresRaw >= 0 ? String(Math.floor(playedAdventuresRaw)) : '—';
+    const version = payload?.character_version ? String(payload.character_version).trim() : '—';
+    const classes = formatClasses(payload?.character_classes, 4);
+    const userName = trimField(payload?.user_name || 'Unknown user', 256);
+    const userMention = buildUserMention(payload?.user_discord_id);
+    const previousStatus = trimField(payload?.previous_status || payload?.character_status || '—', 256);
+    const externalLink = trimField(payload?.external_link || '—', 1024);
+
+    const embed = new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle(`Charakter abgemeldet · ${name}`)
+        .addFields(
+            { name: 'Spieler', value: userMention ? `${userName}\n${userMention}` : userName, inline: true },
+            { name: 'Vorheriger Status', value: previousStatus, inline: true },
+            { name: 'Level', value: level, inline: true },
+            { name: 'Tier', value: tier, inline: true },
+            { name: 'Gespielte Adventures', value: playedAdventures, inline: true },
+            { name: 'Klassen', value: classes, inline: true },
+            { name: 'Version', value: version || '—', inline: true },
+        )
+        .setTimestamp(new Date());
+
+    if (isMeaningful(externalLink)) {
+        embed.addFields({ name: 'Link', value: externalLink, inline: false });
+    }
+
+    return {
+        embeds: [embed],
+    };
+}
+
+async function postCharacterRetirementAnnouncement({ client, channelId, payload }) {
+    channelId = resolveChannelId(channelId);
+
+    if (!channelId || !/^[0-9]{5,}$/.test(String(channelId))) {
+        return { ok: false, status: 422, error: 'Invalid channel_id.' };
+    }
+
+    let channel;
+    try {
+        channel = await client.channels.fetch(String(channelId));
+    } catch {
+        return { ok: false, status: 404, error: 'Channel not found.' };
+    }
+
+    if (!channel?.isTextBased?.()) {
+        return { ok: false, status: 422, error: 'Channel must be text-based.' };
+    }
+
+    let avatarAttachment = null;
+    let avatarOverride = null;
+    const avatarUrl = payload?.character_avatar_url || '';
+    if (avatarUrl && shouldAllowInsecure(avatarUrl)) {
+        try {
+            avatarAttachment = await fetchAvatarAttachment(avatarUrl);
+            avatarOverride = `attachment://${avatarAttachment.name}`;
+        } catch (error) {
+            console.warn('[bot] Character retirement avatar fetch failed.', error);
+        }
+    } else if (avatarUrl) {
+        avatarOverride = avatarUrl;
+    }
+
+    const messagePayload = buildCharacterRetirementMessage(payload);
+    if (avatarOverride) {
+        messagePayload.embeds[0].setThumbnail(avatarOverride);
+    }
+    if (avatarAttachment) {
+        messagePayload.files = [avatarAttachment];
+    }
+
+    try {
+        const message = await channel.send(messagePayload);
+        return { ok: true, status: 200, message_id: message.id, channel_id: channel.id };
+    } catch {
+        return { ok: false, status: 500, error: 'Failed to post retirement announcement.' };
+    }
+}
+
 async function updateCharacterApprovalAnnouncement({ client, channelId, messageId, payload }) {
     channelId = resolveChannelId(channelId);
 
@@ -583,9 +668,11 @@ async function deleteCharacterApprovalAnnouncement({ client, channelId, messageI
 
 module.exports = {
     buildCharacterApprovalMessage,
+    buildCharacterRetirementMessage,
     buildNewAccountMessage,
     sendCharacterApprovalDm,
     postCharacterApprovalAnnouncement,
+    postCharacterRetirementAnnouncement,
     postNewAccountAnnouncement,
     updateCharacterApprovalAnnouncement,
     deleteCharacterApprovalAnnouncement,

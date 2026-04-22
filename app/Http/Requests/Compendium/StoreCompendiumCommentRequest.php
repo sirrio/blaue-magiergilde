@@ -1,20 +1,17 @@
 <?php
 
-namespace App\Http\Requests\Admin;
+namespace App\Http\Requests\Compendium;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Auth;
 
-class ReviewCompendiumSuggestionRequest extends FormRequest
+class StoreCompendiumCommentRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        $user = Auth::user();
-
-        return (bool) ($user?->is_admin);
+        return $this->user() !== null;
     }
 
     /**
@@ -25,7 +22,7 @@ class ReviewCompendiumSuggestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'review_notes' => 'nullable|string|max:2000',
+            'body' => ['required', 'string', 'min:2', 'max:5000'],
         ];
     }
 }

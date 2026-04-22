@@ -8,11 +8,14 @@ Route::middleware(['auth'])
     ->name('compendium.spells.index');
 
 Route::middleware(['auth', 'admin'])
+    ->get('/admin/spells', [SpellController::class, 'index'])
+    ->name('admin.spells.index');
+
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::resource('spells', SpellController::class)->only([
-            'index',
             'store',
             'update',
             'destroy',

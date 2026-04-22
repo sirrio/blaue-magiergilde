@@ -3,9 +3,11 @@
 namespace App\Http\Requests\Character;
 
 use App\Models\Character;
+use App\Models\CharacterClass;
 use App\Rules\ExternalCharacterLink;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Collection;
 
 /**
  * @property array $class
@@ -44,15 +46,54 @@ class UpdateCharacterRequest extends FormRequest
     {
         return [
             'name' => 'required|string',
-            'class' => 'required|array|min:1',
+            'class' => ['required', 'array', 'min:1', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_array($value)) {
+                    return;
+                }
+
+                $selectedClassIds = collect($value)
+                    ->map(fn (mixed $classId) => (int) $classId)
+                    ->filter(fn (int $classId) => $classId > 0);
+
+                $invalidClassIds = $selectedClassIds->diff($this->allowedCharacterClassIds());
+
+                if ($invalidClassIds->isNotEmpty()) {
+                    $fail('One or more selected classes are not allowed in the guild.');
+                }
+            }],
             'class.*' => 'integer|exists:character_classes,id',
             'external_link' => ['required', 'url', new ExternalCharacterLink],
             'version' => 'required|string',
             'dm_bubbles' => 'required|integer|min:0|max:1024',
             'dm_coins' => 'required|integer|min:0|max:1024',
             'is_filler' => 'required|boolean',
-            'bubble_shop_spend' => 'required|integer|min:0|max:1024',
+            'bubble_shop_spend' => 'sometimes|integer|min:0|max:1024',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ];
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function allowedCharacterClassIds(): Collection
+    {
+        $enabledClassIds = CharacterClass::query()
+            ->where('guild_enabled', true)
+            ->pluck('id')
+            ->map(fn (mixed $id) => (int) $id);
+
+        $character = $this->route('character');
+        if (! $character instanceof Character) {
+            return $enabledClassIds;
+        }
+
+        $currentClassIds = $character->characterClasses()
+            ->pluck('character_classes.id')
+            ->map(fn (mixed $id) => (int) $id);
+
+        return $enabledClassIds
+            ->merge($currentClassIds)
+            ->unique()
+            ->values();
     }
 }

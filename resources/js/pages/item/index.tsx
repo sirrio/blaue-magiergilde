@@ -10,9 +10,9 @@ import { formatSourceOptionLabel } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import ItemRow from '@/pages/item/item-row'
-import { Item, MundaneItemVariant, Source } from '@/types'
+import { Item, MundaneItemVariant, PaginationMeta, Source } from '@/types'
 import { Deferred, Head, router, useForm } from '@inertiajs/react'
-import { LoaderCircle, MessageSquarePlus, Plus, Scale, ScrollText, Shield, Store } from 'lucide-react'
+import { LoaderCircle, Plus, Scale, ScrollText, Shield, Store } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
 interface FilterOption {
@@ -151,7 +151,7 @@ const buildSuggestionItemValidationState = (
   const invalidVariantSelection = requiredCategory === null && selectedVariants.length > 0
 
   const variantHint = requiredCategory === null
-    ? 'Variants are not used for item, consumable, or spell scroll suggestions.'
+    ? 'Variants are not used for item, consumable, or spell scroll entries.'
     : hasPlaceholder
       ? `"Any ${requiredCategory}" is selected and excludes specific variants.`
       : specificCount > 0
@@ -165,9 +165,9 @@ const buildSuggestionItemValidationState = (
   const trimmedExtraCostNote = extraCostNote.trim()
   const extraCostHint = requiredCategory === null
     ? 'Use extra cost note only when the item adds an extra cost, like material components or embedded valuables.'
-    : 'Weapon and armor suggestions use mundane variants instead of an extra cost note.'
+    : 'Weapon and armor entries use mundane variants instead of an extra cost note.'
   const extraCostError = requiredCategory !== null && trimmedExtraCostNote !== ''
-    ? 'Extra cost note is not used for weapon or armor suggestions.'
+    ? 'Extra cost note is not used for weapon or armor entries.'
     : null
 
   return {
@@ -176,231 +176,6 @@ const buildSuggestionItemValidationState = (
     extraCostHint,
     extraCostError,
   }
-}
-
-const SuggestNewItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
-  const t = useTranslate()
-  const [isOpen, setIsOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({})
-  const { data, setData, reset } = useForm({
-    name: '',
-    url: '',
-    rarity: 'common' as Item['rarity'],
-    type: 'item' as Item['type'],
-    mundane_variant_ids: [] as number[],
-    extra_cost_note: '',
-    source_id: '' as number | '',
-    source_url: '',
-    notes: '',
-  })
-
-  useEffect(() => {
-    if (!isOpen) return
-    reset()
-    setSubmitErrors({})
-    setData('rarity', 'common')
-    setData('type', 'item')
-    setData('mundane_variant_ids', [])
-    setData('extra_cost_note', '')
-  }, [isOpen, reset, setData])
-
-  const validationState = buildSuggestionItemValidationState(
-    data.type as Item['type'],
-    data.mundane_variant_ids,
-    mundaneVariants,
-    data.extra_cost_note,
-  )
-
-  const normalizeText = (value: string) => {
-    const trimmed = value.trim()
-    return trimmed === '' ? null : trimmed
-  }
-
-  const toggleMundaneVariant = (variantId: number) => {
-    const isSelected = data.mundane_variant_ids.includes(variantId)
-    if (isSelected) {
-      setData('mundane_variant_ids', data.mundane_variant_ids.filter((id) => id !== variantId))
-      return
-    }
-
-    const targetVariant = mundaneVariants.find((variant) => variant.id === variantId)
-    if (!targetVariant) {
-      setData('mundane_variant_ids', [...data.mundane_variant_ids, variantId])
-      return
-    }
-
-    if (targetVariant.is_placeholder) {
-      setData('mundane_variant_ids', [variantId])
-      return
-    }
-
-    const selectedPlaceholder = mundaneVariants.find(
-      (variant) => data.mundane_variant_ids.includes(variant.id) && variant.is_placeholder,
-    )
-    const nextIds = selectedPlaceholder
-      ? data.mundane_variant_ids.filter((id) => id !== selectedPlaceholder.id)
-      : data.mundane_variant_ids
-
-    setData('mundane_variant_ids', [...nextIds, variantId])
-  }
-
-  const handleSubmit = () => {
-    const normalizedName = (data.name ?? '').trim()
-    if (normalizedName === '') {
-      toast.show('Name is required.', 'error')
-      return
-    }
-
-    const normalizedVariantIds = filterVariantIdsByType(data.type, data.mundane_variant_ids, mundaneVariants)
-
-    const changes: Record<string, string | number | null> = {
-      name: normalizedName,
-      type: data.type,
-      rarity: data.rarity,
-      url: normalizeText(data.url ?? ''),
-      extra_cost_note: data.type === 'weapon' || data.type === 'armor'
-        ? null
-        : normalizeText(data.extra_cost_note ?? ''),
-      source_id: data.source_id === '' ? null : Number(data.source_id),
-    }
-
-    if (data.type === 'weapon' || data.type === 'armor' || normalizedVariantIds.length > 0) {
-      Object.assign(changes, { mundane_variant_ids: normalizedVariantIds })
-    }
-
-    setIsSubmitting(true)
-    router.post(route('compendium-suggestions.store'), {
-      kind: 'item',
-      changes,
-      source_url: normalizeText(data.source_url ?? ''),
-      notes: normalizeText(data.notes ?? ''),
-    }, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setIsOpen(false)
-        setSubmitErrors({})
-        toast.show('Suggestion submitted. Thank you!', 'info')
-      },
-      onError: (formErrors) => {
-        setSubmitErrors(Object.fromEntries(Object.entries(formErrors).map(([key, value]) => [key, String(value)])))
-        const message = formErrors.changes
-          || formErrors.target_id
-          || formErrors.kind
-          || formErrors.notes
-          || formErrors.source_url
-          || formErrors.name
-          || formErrors.url
-          || formErrors.rarity
-          || formErrors.type
-          || formErrors.source_id
-          || formErrors.mundane_variant_ids
-          || formErrors['mundane_variant_ids.0']
-
-        if (message) {
-          toast.show(String(message), 'error')
-        }
-      },
-      onFinish: () => {
-        setIsSubmitting(false)
-      },
-    })
-  }
-
-  return (
-    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-      <ModalTrigger>
-        <Button size="sm" variant="outline" onClick={() => setIsOpen(true)} className="gap-2">
-          <MessageSquarePlus size={14} />
-          {t('compendium.suggestNewItem')}
-        </Button>
-      </ModalTrigger>
-      <ModalTitle>{t('compendium.suggestNewItemTitle')}</ModalTitle>
-      <ModalContent>
-        <div className="space-y-3">
-          <p className="text-xs text-base-content/70">
-            {t('compendium.suggestNewItemBody')}
-          </p>
-          <Input value={data.name} onChange={(e) => setData('name', e.target.value)}>
-            Name
-          </Input>
-          <Input value={data.url} onChange={(e) => setData('url', e.target.value)}>
-            URL
-          </Input>
-          <Select value={data.rarity} onChange={(e) => setData('rarity', e.target.value as Item['rarity'])}>
-            <SelectLabel>Rarity</SelectLabel>
-            <SelectOptions>
-              <option value="common">Common</option>
-              <option value="uncommon">Uncommon</option>
-              <option value="rare">Rare</option>
-              <option value="very_rare">Very Rare</option>
-              <option value="legendary">Legendary</option>
-              <option value="artifact">Artifact</option>
-              <option value="unknown_rarity">Unknown rarity</option>
-            </SelectOptions>
-          </Select>
-          <Select
-            value={data.type}
-            onChange={(e) => {
-              const nextType = e.target.value as Item['type']
-              setData('type', nextType)
-              const nextVariantIds = filterVariantIdsByType(nextType, data.mundane_variant_ids, mundaneVariants)
-              setData('mundane_variant_ids', nextVariantIds)
-              if (nextType === 'weapon' || nextType === 'armor') {
-                setData('extra_cost_note', '')
-              }
-            }}
-          >
-            <SelectLabel>Type</SelectLabel>
-            <SelectOptions>
-              <option value="weapon">Weapon</option>
-              <option value="armor">Armor</option>
-              <option value="item">Item</option>
-              <option value="consumable">Consumable</option>
-              <option value="spellscroll">Spell Scroll</option>
-              </SelectOptions>
-            </Select>
-          <VariantSelector
-            variants={mundaneVariants}
-            selectedIds={data.mundane_variant_ids}
-            onToggle={toggleMundaneVariant}
-            itemType={data.type as Item['type']}
-            helperText={validationState.variantHint}
-            error={submitErrors.mundane_variant_ids ?? submitErrors['mundane_variant_ids.0'] ?? validationState.variantError}
-          />
-          {data.type === 'item' || data.type === 'consumable' || data.type === 'spellscroll' ? (
-            <div className="space-y-1">
-              <Input value={data.extra_cost_note} onChange={(e) => setData('extra_cost_note', e.target.value)}>
-                Extra cost note (optional)
-              </Input>
-              <p className="text-xs text-base-content/60">{validationState.extraCostHint}</p>
-              {submitErrors.extra_cost_note ? <p className="text-xs font-medium text-error">{submitErrors.extra_cost_note}</p> : null}
-            </div>
-          ) : null}
-          <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
-            <SelectLabel>Source</SelectLabel>
-            <SelectOptions>
-              <option value="">No source</option>
-              {sources.map((source) => (
-                <option key={source.id} value={source.id}>
-                  {formatSourceOptionLabel(source, t)}
-                </option>
-              ))}
-            </SelectOptions>
-          </Select>
-          <Input value={data.source_url} onChange={(e) => setData('source_url', e.target.value)}>
-            {t('compendium.referenceUrl')}
-          </Input>
-          <TextArea value={data.notes} onChange={(e) => setData('notes', e.target.value)}>
-            {t('compendium.noteForReviewers')}
-          </TextArea>
-        </div>
-      </ModalContent>
-      <ModalAction onClick={handleSubmit} disabled={isSubmitting}>
-        {t('compendium.submitSuggestion')}
-      </ModalAction>
-    </Modal>
-  )
 }
 
 const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; mundaneVariants: MundaneItemVariant[] }) => {
@@ -739,13 +514,17 @@ const StoreItemModal = ({ sources, mundaneVariants }: { sources: Source[]; munda
 }
 
 export default function Index({
-  items,
+  items = [],
+  pagination,
+  perPageOptions = [25, 50, 100],
   sources,
   mundaneVariants,
   canManage = false,
   indexRoute = 'compendium.items.index',
 }: {
   items: Item[]
+  pagination?: PaginationMeta
+  perPageOptions?: number[]
   sources: Source[]
   mundaneVariants: MundaneItemVariant[]
   canManage?: boolean
@@ -815,6 +594,7 @@ export default function Index({
       route(indexRoute, {
         ...queryParamsWithoutLegacyInfo,
         [filterKey]: filterValue,
+        page: undefined,
       })
 
     return (
@@ -846,13 +626,22 @@ export default function Index({
 
   const handleSearch = ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(value)
-    navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value }))
+    navigateTo(route(indexRoute, { ...queryParamsWithoutLegacyInfo, search: value, page: undefined }))
   }
 
   const handleSourceFilterChange = (value: string) => {
     navigateTo(route(indexRoute, {
       ...queryParamsWithoutLegacyInfo,
       source: value || null,
+      page: undefined,
+    }))
+  }
+
+  const navigateToPage = (page: number, perPage: number) => {
+    navigateTo(route(indexRoute, {
+      ...queryParamsWithoutLegacyInfo,
+      page,
+      per_page: perPage,
     }))
   }
 
@@ -882,7 +671,8 @@ export default function Index({
       ? `Ruling: ${rulingLabelMap[String(currentQueryParams.ruling)] ?? currentQueryParams.ruling}`
       : null,
   ].filter(Boolean) as string[]
-  const totalItems = items?.length ?? 0
+  const totalItems = pagination?.total ?? items.length
+  const pageItems = items.length
   return (
     <AppLayout>
       <Head title={t('compendium.itemsTitle')} />
@@ -895,10 +685,13 @@ export default function Index({
                 ? t('compendium.browseInventory')
                 : t('compendium.browseCompendiumItems')}
             </p>
+            <p className="text-xs text-base-content/60">
+              {totalItems} items
+              {pagination?.lastPage && pagination.lastPage > 1 ? ` · Page ${pagination.currentPage}/${pagination.lastPage}` : ''}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {canManage ? <StoreItemModal sources={sources} mundaneVariants={mundaneVariants} /> : null}
-            {!canManage ? <SuggestNewItemModal sources={sources} mundaneVariants={mundaneVariants} /> : null}
           </div>
         </section>
         <div className="rounded-box border border-base-200 bg-base-100 p-4 space-y-3">
@@ -948,12 +741,27 @@ export default function Index({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/50">
-            <span>{totalItems} items</span>
+            <span>{pageItems} of {totalItems} on this page</span>
             {activeFilters.map((filter) => (
               <span key={filter} className="rounded-full border border-base-200 px-2 py-1 text-base-content/60">
                 {filter}
               </span>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-base-content/60">Page size:</span>
+            <div className="flex flex-wrap items-center gap-1">
+              {perPageOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={cn('btn btn-xs', pagination?.perPage === option ? 'btn-primary' : 'btn-ghost')}
+                  onClick={() => navigateToPage(1, option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <Deferred
@@ -964,21 +772,47 @@ export default function Index({
               </ListRow>
             </List>
           }
-          data={['items']}
+          data={['items', 'pagination']}
         >
-          <List>
-            {items?.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                sources={sources}
-                canManage={canManage}
-                mundaneVariants={mundaneVariants}
-              />
-            ))}
-          </List>
+          <>
+            <List>
+              {items.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  sources={sources}
+                  canManage={canManage}
+                  mundaneVariants={mundaneVariants}
+                />
+              ))}
+            </List>
+            {pagination && pagination.lastPage > 1 ? (
+              <div className="flex flex-wrap items-center justify-end gap-1 border-t border-base-200/80 pt-3">
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  disabled={pagination.currentPage <= 1}
+                  onClick={() => navigateToPage(pagination.currentPage - 1, pagination.perPage)}
+                >
+                  Previous
+                </button>
+                <span className="px-1 text-[11px] text-base-content/60">
+                  Page {pagination.currentPage} / {pagination.lastPage}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  disabled={!pagination.hasMorePages}
+                  onClick={() => navigateToPage(pagination.currentPage + 1, pagination.perPage)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </>
         </Deferred>
       </div>
     </AppLayout>
   )
 }
+

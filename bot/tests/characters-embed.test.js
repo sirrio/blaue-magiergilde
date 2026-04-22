@@ -23,6 +23,11 @@ const character = {
     adventure_bubbles: 0,
     dm_bubbles: 0,
     bubble_shop_spend: 0,
+    bubble_shop_legacy_spend: 0,
+    bubble_shop_skill_proficiency: 0,
+    bubble_shop_rare_language: 0,
+    bubble_shop_tool_or_language: 0,
+    bubble_shop_downtime: 0,
     total_downtime: 0,
     faction_downtime: 0,
     other_downtime: 0,
@@ -53,6 +58,7 @@ const simpleModeEmbed = buildCharacterEmbed({
     adventures_count: 12,
     manual_adventures_count: 9,
     adventure_bubbles: 20,
+    bubble_shop_downtime: 2,
     faction_downtime: 360000,
     total_downtime: 400000,
     manual_faction_rank: 4,
@@ -62,12 +68,14 @@ const simpleModeAdventures = simpleModeEmbed.fields.find((field) => field.name =
 const simpleModeFactions = simpleModeEmbed.fields.find((field) => field.name === 'Factions');
 const simpleModeDowntime = simpleModeEmbed.fields.find((field) => field.name === 'Downtime');
 const simpleModeProgress = simpleModeEmbed.fields.find((field) => field.name === 'Progress');
+const simpleModeBubbleShop = simpleModeEmbed.fields.find((field) => field.name === 'Bubble Shop');
 
 assert.equal(simpleModeAdventures?.value.includes('Played: **9**'), true);
 assert.equal(simpleModeFactions?.value.includes('Level: **4**'), true);
-assert.equal(simpleModeDowntime?.value.includes('Total: **160h 0m**'), true);
-assert.equal(simpleModeDowntime?.value.includes('Remaining: **48h 53m**'), true);
+assert.equal(simpleModeDowntime?.value.includes('Total: **176h 0m**'), true);
+assert.equal(simpleModeDowntime?.value.includes('Remaining: **64h 53m**'), true);
 assert.equal(simpleModeProgress?.value.includes('Remaining: **1** Bubble(s)'), true);
+assert.equal(simpleModeBubbleShop?.value.includes('16h 0m'), true);
 
 if (originalBaseUrl === undefined) {
     delete process.env.BOT_PUBLIC_APP_URL;

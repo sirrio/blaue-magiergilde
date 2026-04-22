@@ -3,6 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { CompendiumCommentsModal } from '@/pages/compendium/compendium-comments-modal'
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import AppLayout from '@/layouts/app-layout'
 import { useTranslate } from '@/lib/i18n'
@@ -207,9 +208,11 @@ const DestroyVariantModal = ({ variant, onSuccess }: { variant: MundaneItemVaria
 export default function Index({
   variants,
   canManage = false,
+  indexRoute = 'compendium.mundane-item-variants.index',
 }: {
   variants: MundaneItemVariant[]
   canManage?: boolean
+  indexRoute?: string
 }) {
   const t = useTranslate()
   const [search, setSearch] = useState('')
@@ -223,7 +226,7 @@ export default function Index({
   }
 
   const navigate = (params: Record<string, string | undefined>) => {
-    router.get(route('admin.mundane-item-variants.index'), { ...currentParams, ...params }, { preserveState: true, preserveScroll: true })
+    router.get(route(indexRoute), { ...currentParams, ...params }, { preserveState: true, preserveScroll: true })
   }
 
   const weapons = variants?.filter((v) => v.category === 'weapon') ?? []
@@ -329,6 +332,13 @@ export default function Index({
                     <DestroyVariantModal variant={variant} onSuccess={reload} />
                   </div>
                 ) : null}
+                <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
+                <CompendiumCommentsModal
+                  title={`Kommentare zu ${variant.name}`}
+                  comments={variant.comments}
+                  count={variant.comments_count}
+                  storeRoute={route('compendium.mundane-item-variants.comments.store', { mundaneItemVariant: variant.id })}
+                />
               </ListRow>
             ))}
           </List>

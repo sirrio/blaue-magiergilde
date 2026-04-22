@@ -1,4 +1,4 @@
-import { setLevelProgressionTotals } from '@/helper/levelProgression'
+import { setLevelProgressionVersions } from '@/helper/levelProgression'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PageProps } from '@/types'
@@ -12,7 +12,6 @@ import {
   Gavel,
   GraduationCap,
   Map,
-  MessageSquarePlus,
   Menu,
   Package,
   ScrollText,
@@ -34,7 +33,18 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { auth, discordConnected, handbookChannels, activeChannelId, features, locale, availableLocales, levelProgressionTotals, impersonating } =
+  const {
+    auth,
+    discordConnected,
+    handbookChannels,
+    activeChannelId,
+    features,
+    locale,
+    availableLocales,
+    levelProgressionTotalsByVersion,
+    activeLevelProgressionVersionId,
+    impersonating,
+  } =
     usePage<PageProps>().props
   const t = useTranslate()
   const [localeUpdating, setLocaleUpdating] = useState(false)
@@ -64,8 +74,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   )
 
   useEffect(() => {
-    setLevelProgressionTotals(levelProgressionTotals)
-  }, [levelProgressionTotals])
+    setLevelProgressionVersions(levelProgressionTotalsByVersion, activeLevelProgressionVersionId)
+  }, [activeLevelProgressionVersionId, levelProgressionTotalsByVersion])
 
   const menuLinks = [
     { name: t('nav.characters'), route: 'characters.index', method: 'get' as const, icon: Users },
@@ -78,6 +88,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const compendiumLinks = [
     { name: t('nav.items'), route: 'compendium.items.index', method: 'get' as const, icon: Package },
     { name: t('nav.spells'), route: 'compendium.spells.index', method: 'get' as const, icon: Sparkles },
+    { name: t('nav.classes'), route: 'compendium.character-classes.index', method: 'get' as const, icon: GraduationCap },
+    { name: t('nav.variants'), route: 'compendium.mundane-item-variants.index', method: 'get' as const, icon: Sword },
   ]
   const accountLinks = [
     { name: t('common.profile'), route: 'profile.edit', method: 'get' as const },
@@ -100,16 +112,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
       ],
     },
     {
-      label: t('nav.compendium'),
-      links: [
-        { name: t('nav.items'), route: 'admin.items.index', method: 'get' as const, icon: Package },
-        { name: t('nav.spells'), route: 'admin.spells.index', method: 'get' as const, icon: Sparkles },
-        { name: t('nav.classes'), route: 'admin.character-classes.index', method: 'get' as const, icon: GraduationCap },
-        { name: t('nav.variants'), route: 'admin.mundane-item-variants.index', method: 'get' as const, icon: Sword },
-        { name: t('nav.suggestions'), route: 'admin.compendium-suggestions.index', method: 'get' as const, icon: MessageSquarePlus },
-      ],
-    },
-    {
       label: t('nav.administration'),
       links: [
         { name: t('nav.characterApprovals'), route: 'admin.character-approvals.index', method: 'get' as const, icon: UserCheck },
@@ -128,7 +130,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const handbookChannelList = handbookChannels ?? []
   const showHandbookDropdown = handbookChannelList.length > 0
   const showCompendiumDropdown = compendiumLinks.length > 0
-  const isCompendiumActive = route().current('compendium.items.index') || route().current('compendium.spells.index')
+  const isCompendiumActive = route().current('compendium.items.index')
+    || route().current('compendium.spells.index')
+    || route().current('compendium.character-classes.index')
+    || route().current('compendium.mundane-item-variants.index')
   const isHandbookActive = route().current('handbook.index')
   const compendiumLabel = t('nav.compendium')
   const handbookLabel = t('nav.guildHandbook')

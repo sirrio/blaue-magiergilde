@@ -1,36 +1,39 @@
-import { List, ListRow } from '@/components/ui/list'
-import { Button } from '@/components/ui/button'
 import LogoTier from '@/components/logo-tier'
+import { Button } from '@/components/ui/button'
 import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
+import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
-import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
-import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
-import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
-import { AlliesModal } from '@/pages/character/allies-modal'
-import StoreAdventureModal from '@/pages/character/store-adventure-modal'
-import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
-import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
-import AppLayout from '@/layouts/app-layout'
-import { useTranslate } from '@/lib/i18n'
+import { Progress } from '@/components/ui/progress'
+import { Tooltip } from '@/components/ui/tooltip'
+import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
 import { calculateFactionLevel } from '@/helper/calculateFactionLevel'
 import { calculateLevel } from '@/helper/calculateLevel'
+import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
+import { calculateTier } from '@/helper/calculateTier'
+import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
 import { bubblesRequiredForLevel } from '@/helper/levelProgression'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
-import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
-import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
-import { calculateTier } from '@/helper/calculateTier'
 import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
-import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
-import { Progress } from '@/components/ui/progress'
-import { Character, Ally, PageProps } from '@/types'
+import AppLayout from '@/layouts/app-layout'
+import { useTranslate } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
+import { AlliesModal } from '@/pages/character/allies-modal'
+import BubbleShopModal from '@/pages/character/bubble-shop-modal'
+import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
+import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
+import StoreAdventureModal from '@/pages/character/store-adventure-modal'
+import StoreDowntimeModal from '@/pages/character/store-downtime-modal'
+import UpdateAdventureModal from '@/pages/character/update-adventure-modal'
+import UpdateDowntimeModal from '@/pages/character/update-downtime-modal'
+import { Ally, Character, PageProps } from '@/types'
 import { Head, Link, router, usePage } from '@inertiajs/react'
 import { format } from 'date-fns'
 import {
-  Anvil,
   AlertTriangle,
+  Anvil,
   Archive,
   CheckCircle2,
   ChevronDown,
@@ -51,19 +54,10 @@ import {
   Trash,
   XCircle,
 } from 'lucide-react'
-import { useImage } from 'react-image'
-import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
+import { useImage } from 'react-image'
 
-function CharacterPortrait({
-  character,
-  className,
-  masked = true,
-}: {
-  character: Character
-  className?: string
-  masked?: boolean
-}) {
+function CharacterPortrait({ character, className, masked = true }: { character: Character; className?: string; masked?: boolean }) {
   const avatarValue = String(character.avatar || '').trim()
   const srcList = avatarValue
     ? [avatarValue.startsWith('http') ? avatarValue : `/storage/${avatarValue}`, '/images/no-avatar.svg']
@@ -71,13 +65,7 @@ function CharacterPortrait({
   const { src } = useImage({
     srcList,
   })
-  return (
-    <img
-      className={cn('aspect-square object-cover', masked ? 'rounded-full' : 'rounded-none', className)}
-      src={src}
-      alt={character.name}
-    />
-  )
+  return <img className={cn('aspect-square object-cover', masked ? 'rounded-full' : 'rounded-none', className)} src={src} alt={character.name} />
 }
 
 function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
@@ -96,7 +84,7 @@ function AllyPortrait({ ally, className }: { ally: Ally; className?: string }) {
 function RatingHearts({ rating }: { rating: number }) {
   const normalized = Math.max(1, Math.min(5, rating || 3))
   return (
-    <div className="flex items-center gap-0.5 text-primary">
+    <div className="text-primary flex items-center gap-0.5">
       {Array.from({ length: 5 }, (_, index) => (
         <Heart key={index} size={14} className={index < normalized ? 'fill-current' : 'text-base-content/30'} />
       ))}
@@ -163,9 +151,8 @@ export default function Show({
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
   const statusHint = getCharacterStatusHint(guildStatus, t)
-  const statusSummary = reviewNote && (guildStatus === 'needs_changes' || guildStatus === 'declined')
-    ? `${statusHint} ${t('common.note')}: ${reviewNote}`
-    : statusHint
+  const statusSummary =
+    reviewNote && (guildStatus === 'needs_changes' || guildStatus === 'declined') ? `${statusHint} ${t('common.note')}: ${reviewNote}` : statusHint
   const avatarMasked = character.avatar_masked ?? true
   const simplifiedTracking = character.simplified_tracking ?? false
   const draftOnlyMode = !(features?.character_status_switch ?? true)
@@ -183,9 +170,7 @@ export default function Show({
   const [isAdventuresPending, startAdventuresTransition] = useTransition()
   const [isDowntimesPending, startDowntimesTransition] = useTransition()
   const [isAlliesPending, startAlliesTransition] = useTransition()
-  const [adventuresOpen, setAdventuresOpen] = useState(
-    character.adventures.length > 0 && character.adventures.length <= 6,
-  )
+  const [adventuresOpen, setAdventuresOpen] = useState(character.adventures.length > 0 && character.adventures.length <= 6)
   const [downtimesOpen, setDowntimesOpen] = useState(false)
   const [alliesOpen, setAlliesOpen] = useState(character.allies.length > 0 && character.allies.length <= 12)
 
@@ -224,9 +209,14 @@ export default function Show({
       const bDate = new Date(b.start_date).getTime()
       return aDate !== bDate ? aDate - bDate : a.id - b.id
     })
-    const lastPseudoIdx = chronological.reduceRight((found, adv, i) => found === -1 && adv.is_pseudo ? i : found, -1)
+    const lastPseudoIdx = chronological.reduceRight((found, adv, i) => (found === -1 && adv.is_pseudo ? i : found), -1)
     if (lastPseudoIdx === -1) return new Set<number>()
-    return new Set(chronological.slice(0, lastPseudoIdx).filter(a => !a.is_pseudo).map(a => a.id))
+    return new Set(
+      chronological
+        .slice(0, lastPseudoIdx)
+        .filter((a) => !a.is_pseudo)
+        .map((a) => a.id),
+    )
   }, [character.adventures])
 
   const sortedDowntimes = useMemo(() => {
@@ -241,9 +231,7 @@ export default function Show({
   const adventureParticipantMap = useMemo(() => {
     const map = new Map<number, string>()
     sortedAdventures.forEach((adv) => {
-      const summary = formatParticipantSummary(
-        (adv.allies ?? []).map((ally) => getAllyDisplayName(ally)),
-      )
+      const summary = formatParticipantSummary((adv.allies ?? []).map((ally) => getAllyDisplayName(ally)))
       if (summary) {
         map.set(adv.id, summary)
       }
@@ -330,20 +318,14 @@ export default function Show({
     () => character.adventures.filter((adv) => !adv.is_pseudo).reduce((total, adv) => total + adv.duration, 0),
     [character.adventures],
   )
-  const downtimeTotalDuration = useMemo(
-    () => character.downtimes.reduce((total, dt) => total + dt.duration, 0),
-    [character.downtimes],
-  )
+  const downtimeTotalDuration = useMemo(() => character.downtimes.reduce((total, dt) => total + dt.duration, 0), [character.downtimes])
   const factionDowntimeDuration = useMemo(() => calculateFactionDowntime(character), [character])
   const otherDowntimeDuration = useMemo(() => calculateOtherDowntime(character), [character])
   const factionLevel = useMemo(() => character.faction_rank ?? calculateFactionLevel(character), [character])
   const remainingDowntimeDuration = useMemo(() => Math.max(0, calculateRemainingDowntime(character)), [character])
   const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
   const usesManualDerivedValues = usesManualLevelTracking(character)
-  const pseudoAdventureCount = useMemo(
-    () => character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length,
-    [character.adventures],
-  )
+  const pseudoAdventureCount = useMemo(() => character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length, [character.adventures])
   const realAdventureCount = character.adventures.length - pseudoAdventureCount
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
@@ -352,24 +334,28 @@ export default function Show({
   const adventuresDisabledReason = t('characters.adventuresSimpleModeBlocked')
   const factionLevelWarningReason = t('characters.factionSimpleModeBlocked')
   const submissionRequiredReason = t('characters.submissionRequired')
-  const statusIcon = guildStatus === 'approved'
-    ? <CheckCircle2 size={12} />
-    : guildStatus === 'declined'
-      ? <XCircle size={12} />
-      : guildStatus === 'needs_changes'
-        ? <AlertTriangle size={12} />
-        : guildStatus === 'retired'
-          ? <Archive size={12} />
-          : guildStatus === 'draft'
-            ? <Pencil size={12} />
-            : <Clock size={12} />
-  const statusClass = guildStatus === 'approved'
-    ? 'text-success'
-    : guildStatus === 'declined'
-      ? 'text-error'
-      : guildStatus === 'needs_changes' || guildStatus === 'pending'
-        ? 'text-warning'
-        : 'text-base-content/60'
+  const statusIcon =
+    guildStatus === 'approved' ? (
+      <CheckCircle2 size={12} />
+    ) : guildStatus === 'declined' ? (
+      <XCircle size={12} />
+    ) : guildStatus === 'needs_changes' ? (
+      <AlertTriangle size={12} />
+    ) : guildStatus === 'retired' ? (
+      <Archive size={12} />
+    ) : guildStatus === 'draft' ? (
+      <Pencil size={12} />
+    ) : (
+      <Clock size={12} />
+    )
+  const statusClass =
+    guildStatus === 'approved'
+      ? 'text-success'
+      : guildStatus === 'declined'
+        ? 'text-error'
+        : guildStatus === 'needs_changes' || guildStatus === 'pending'
+          ? 'text-warning'
+          : 'text-base-content/60'
 
   const handleAdventureDelete = (adventureId: number) => {
     if (!window.confirm(t('characters.deleteAdventureConfirm'))) return
@@ -398,54 +384,67 @@ export default function Show({
         <Modal isOpen={Boolean(activeNotes)} onClose={() => setActiveNotes(null)}>
           <ModalTitle>{activeNotes?.title || t('characters.noteTitle')}</ModalTitle>
           <ModalContent>
-            <p className="whitespace-pre-wrap text-sm text-base-content/80">
-              {activeNotes?.notes || ''}
-            </p>
+            <p className="text-base-content/80 text-sm whitespace-pre-wrap">{activeNotes?.notes || ''}</p>
           </ModalContent>
         </Modal>
-        <div className="space-y-2 border-b border-base-200 pb-3">
+        <div className="border-base-200 space-y-2 border-b pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-bold sm:text-2xl">{t('characters.detailsHeading', { name: character.name })}</h1>
-            <Link href={route(isReadOnly ? 'characters.deleted' : 'characters.index')} className="btn btn-sm">
-              {t('characters.back')}
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {!isReadOnly && !character.is_filler ? (
+                <BubbleShopModal character={character} triggerClassName="shrink-0 gap-1 px-2 sm:px-3" showLabel labelClassName="hidden sm:inline" />
+              ) : null}
+              <Link href={route(isReadOnly ? 'characters.deleted' : 'characters.index')} className="btn btn-sm">
+                {t('characters.back')}
+              </Link>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="badge badge-ghost badge-sm">{character.adventures.length} {t('characters.adventures')}</span>
+            <span className="badge badge-ghost badge-sm">
+              {character.adventures.length} {t('characters.adventures')}
+            </span>
             <span className="badge badge-ghost badge-sm">{character.downtimes.length} Downtimes</span>
-            <span className="badge badge-ghost badge-sm">{character.allies.length} {t('characters.allies')}</span>
+            <span className="badge badge-ghost badge-sm">
+              {character.allies.length} {t('characters.allies')}
+            </span>
           </div>
         </div>
-        <div className="rounded-box border border-base-200 bg-base-100 p-4 shadow-sm">
+        <div className="rounded-box border-base-200 bg-base-100 border p-4 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center gap-2">
-                <span className={cn('inline-flex items-center gap-1 rounded-full border border-base-200 bg-base-100 px-2 py-0.5 text-xs', statusClass)}>
+                <span
+                  className={cn('border-base-200 bg-base-100 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs', statusClass)}
+                >
                   {statusIcon}
                   <span>{getStatusLabel(guildStatus)}</span>
                 </span>
               </div>
-              <p className="truncate text-lg font-semibold leading-tight">{character.name}</p>
-              <div className="flex items-center gap-1 text-sm text-base-content/70">
+              <p className="truncate text-lg leading-tight font-semibold">{character.name}</p>
+              <div className="text-base-content/70 flex items-center gap-1 text-sm">
                 <LogoTier tier={tier} width={12} />
-                <span>{t('characters.levelLabel')} {level} {classString}</span>
+                <span>
+                  {t('characters.levelLabel')} {level} {classString}
+                </span>
               </div>
-              {statusSummary ? <p className="text-xs text-base-content/70">{statusSummary}</p> : null}
+              {statusSummary ? <p className="text-base-content/70 text-xs">{statusSummary}</p> : null}
               <div className="space-y-1">
                 <Progress className="h-2 w-full" value={isMaxLevel ? 1 : progressValue} max={isMaxLevel ? 1 : progressMax} />
-                <p className="flex items-center justify-end gap-1 text-xs text-base-content/70">
+                <p className="text-base-content/70 flex items-center justify-end gap-1 text-xs">
                   {isMaxLevel ? (
-                    <span className="inline-flex flex-wrap items-center gap-x-1 text-base-content/45">
+                    <span className="text-base-content/45 inline-flex flex-wrap items-center gap-x-1">
                       <span className="whitespace-nowrap">{t('characters.maxLevelReached')}</span>
                       {progressValue > 0 ? (
-                        <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-base-content/35">
+                        <span className="text-base-content/35 inline-flex items-center gap-0.5 whitespace-nowrap">
                           (+{progressValue} <Droplets size={10} />)
                         </span>
                       ) : null}
                     </span>
                   ) : (
                     <>
-                      <span className="font-semibold">{progressValue}/{progressMax}</span>
+                      <span className="font-semibold">
+                        {progressValue}/{progressMax}
+                      </span>
                       <Droplets size={13} />
                     </>
                   )}
@@ -461,19 +460,17 @@ export default function Show({
               <InfoBoxTitle>
                 <Swords size={15} /> {t('characters.adventures')}
                 {!bubbleAdjustmentsCount ? (
-                  <span
-                    className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
-                    data-tip={t('characters.bubbleShopNotCountedHint')}
-                    aria-label={t('characters.bubbleShopNotCountedHint')}
-                  >
-                    <AlertTriangle size={11} />
-                  </span>
+                  <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom">
+                    <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.bubbleShopNotCountedHint')}>
+                      <AlertTriangle size={11} />
+                    </span>
+                  </Tooltip>
                 ) : null}
               </InfoBoxTitle>
               <InfoBoxLine>
                 {t('characters.played')}:{' '}
                 {usesManualDerivedValues ? (
-                  <span className="inline-flex items-center gap-1 leading-none align-middle">
+                  <span className="inline-flex items-center gap-1 align-middle leading-none">
                     <span className={manualAdventuresCount === null ? 'text-warning' : ''}>
                       {manualAdventuresCount ?? t('characters.autoDisabledShort')}
                     </span>
@@ -482,7 +479,7 @@ export default function Show({
                         size="xs"
                         variant="ghost"
                         modifier="square"
-                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                        className="text-base-content/45 h-3.5 min-h-0 w-3.5 p-0 align-middle leading-none"
                         aria-label={t('characters.manualAdventuresCountLabel')}
                         title={adventuresDisabledReason}
                       >
@@ -512,16 +509,14 @@ export default function Show({
               <InfoBoxLine>
                 {t('characters.levelLabel')}:{' '}
                 {usesManualDerivedValues ? (
-                  <span className="inline-flex items-center gap-1 leading-none align-middle">
-                    <span className={manualFactionRank === null ? 'text-warning' : ''}>
-                      {manualFactionRank ?? t('characters.autoDisabledShort')}
-                    </span>
+                  <span className="inline-flex items-center gap-1 align-middle leading-none">
+                    <span className={manualFactionRank === null ? 'text-warning' : ''}>{manualFactionRank ?? t('characters.autoDisabledShort')}</span>
                     <CharacterManualOverrideModal character={character} field="factionRank" value={manualFactionRank}>
                       <Button
                         size="xs"
                         variant="ghost"
                         modifier="square"
-                        className="h-3.5 min-h-0 w-3.5 p-0 leading-none text-base-content/45 align-middle"
+                        className="text-base-content/45 h-3.5 min-h-0 w-3.5 p-0 align-middle leading-none"
                         aria-label={t('characters.manualFactionRankLabel')}
                         title={factionLevelWarningReason}
                       >
@@ -539,14 +534,14 @@ export default function Show({
                 <FlameKindling size={15} /> {t('characters.downtime')}
               </InfoBoxTitle>
               <InfoBoxLine>
-                {t('characters.total')}:{' '}
-                {totalDowntimeDisplay}
+                {t('characters.total')}: {totalDowntimeDisplay}
               </InfoBoxLine>
               <InfoBoxLine>Faction: {secondsToHourMinuteString(factionDowntimeDuration)}</InfoBoxLine>
-              <InfoBoxLine>{t('characters.other')}: {secondsToHourMinuteString(otherDowntimeDuration)}</InfoBoxLine>
+              <InfoBoxLine>
+                {t('characters.other')}: {secondsToHourMinuteString(otherDowntimeDuration)}
+              </InfoBoxLine>
               <InfoBoxLine className="font-semibold">
-                {t('characters.remaining')}:{' '}
-                {remainingDowntimeDisplay}
+                {t('characters.remaining')}: {remainingDowntimeDisplay}
               </InfoBoxLine>
             </InfoBox>
             {!character.is_filler && (
@@ -554,13 +549,11 @@ export default function Show({
                 <InfoBoxTitle>
                   <Crown size={15} /> {t('characters.gameMaster')}
                   {!bubbleAdjustmentsCount ? (
-                    <span
-                      className="tooltip tooltip-warning tooltip-bottom ml-auto cursor-help text-warning/70"
-                      data-tip={t('characters.gmBubblesNotCountedHint')}
-                      aria-label={t('characters.gmBubblesNotCountedHint')}
-                    >
-                      <AlertTriangle size={11} />
-                    </span>
+                    <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom">
+                      <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.gmBubblesNotCountedHint')}>
+                        <AlertTriangle size={11} />
+                      </span>
+                    </Tooltip>
                   ) : null}
                 </InfoBoxTitle>
                 <InfoBoxLine>
@@ -577,14 +570,12 @@ export default function Show({
         </div>
 
         <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+          <div className="rounded-box border-base-200 bg-base-100 border">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <button
                 type="button"
                 className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
-                onClick={() =>
-                  startAdventuresTransition(() => setAdventuresOpen((current) => !current))
-                }
+                onClick={() => startAdventuresTransition(() => setAdventuresOpen((current) => !current))}
                 aria-expanded={adventuresOpen}
                 disabled={character.adventures.length === 0}
               >
@@ -593,7 +584,7 @@ export default function Show({
                   {isAdventuresPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold">Adventures</h2>
-                    <p className="text-xs text-base-content/60">
+                    <p className="text-base-content/60 text-xs">
                       {character.adventures.length === 0
                         ? t('characters.noAdventuresRecorded')
                         : t('characters.entriesTotal', {
@@ -606,21 +597,19 @@ export default function Show({
               </button>
               {!isReadOnly ? (
                 requiresSubmissionBeforeDowntime ? (
-                  <div
-                    className="tooltip tooltip-left shrink-0"
-                    data-tip={submissionRequiredReason}
-                    aria-label={submissionRequiredReason}
-                  >
-                    <Button
-                      size="sm"
-                      className="shrink-0 gap-1"
-                      disabled
-                      aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
-                    >
-                      {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
-                      <span className="hidden sm:inline">{simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventure')}</span>
-                    </Button>
-                  </div>
+                  <Tooltip content={submissionRequiredReason} placement="left" wrapperElement="div">
+                    <div className="shrink-0" aria-label={submissionRequiredReason}>
+                      <Button
+                        size="sm"
+                        className="shrink-0 gap-1"
+                        disabled
+                        aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
+                      >
+                        {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
+                        <span className="hidden sm:inline">{simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventure')}</span>
+                      </Button>
+                    </div>
+                  </Tooltip>
                 ) : simplifiedTracking ? (
                   <SetCharacterLevelModal
                     character={character}
@@ -640,7 +629,7 @@ export default function Show({
               ) : null}
             </div>
             {adventuresOpen ? (
-              <div className="border-t border-base-200 px-4 pb-4 pt-2">
+              <div className="border-base-200 border-t px-4 pt-2 pb-4">
                 {character.adventures.length > 0 ? (
                   <>
                     <div className="flex justify-end pb-2 md:hidden">
@@ -648,37 +637,43 @@ export default function Show({
                         type="button"
                         size="xs"
                         variant="ghost"
-                        className="cursor-pointer transition-colors hover:text-base-content"
-                        onClick={() =>
-                          setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                        }
+                        className="hover:text-base-content cursor-pointer transition-colors"
+                        onClick={() => setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))}
                       >
                         {t('characters.date')}
                         {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
-                      <List className="md:hidden shadow-none">
-                        {sortedAdventures.map((adv) => {
-                          const notes = adventureNotesMap.get(adv.id) ?? ''
-                          const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
-                          const gameMasterName = adv.game_master?.trim() || '-'
-                          const adventureTitle = adv.title || 'Adventure'
-                          const pseudoBubblesInLevel =
-                            adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
-                              ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
-                              : 0
-                          const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
+                    <List className="shadow-none md:hidden">
+                      {sortedAdventures.map((adv) => {
+                        const notes = adventureNotesMap.get(adv.id) ?? ''
+                        const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                        const gameMasterName = adv.game_master?.trim() || '-'
+                        const adventureTitle = adv.title || 'Adventure'
+                        const pseudoBubblesInLevel =
+                          adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
+                            ? adv.target_bubbles -
+                              bubblesRequiredForLevel(adv.target_level, adv.progression_version_id ?? character.progression_version_id)
+                            : 0
+                        const pseudoAnchorLabel =
+                          adv.is_pseudo && adv.target_level ? (
                             <>
                               {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
                               {pseudoBubblesInLevel > 0 && (
-                                <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">(+{pseudoBubblesInLevel} <Droplets size={11} />)</span>
+                                <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">
+                                  (+{pseudoBubblesInLevel} <Droplets size={11} />)
+                                </span>
                               )}
                             </>
-                          ) : t('characters.levelTrackingAnchor')
-                          const isSuperseded = supersededAdventureIds.has(adv.id)
-                          return (
-                            <ListRow key={adv.id} className="block">
-                            <div className={`space-y-3 rounded-box border bg-base-100 p-3.5 ${isSuperseded ? 'border-base-200 opacity-50' : 'border-base-200'}`}>
+                          ) : (
+                            t('characters.levelTrackingAnchor')
+                          )
+                        const isSuperseded = supersededAdventureIds.has(adv.id)
+                        return (
+                          <ListRow key={adv.id} className="block">
+                            <div
+                              className={`rounded-box bg-base-100 space-y-3 border p-3.5 ${isSuperseded ? 'border-base-200 opacity-50' : 'border-base-200'}`}
+                            >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex min-w-0 items-center gap-1">
@@ -697,24 +692,24 @@ export default function Show({
                                     </Button>
                                   </div>
                                   {participantSummary ? (
-                                    <p className="text-xs text-base-content/50">{t('characters.playedWith')}: {participantSummary}</p>
+                                    <p className="text-base-content/50 text-xs">
+                                      {t('characters.playedWith')}: {participantSummary}
+                                    </p>
                                   ) : null}
-                                  <p className="text-xs text-base-content/50">DM: {gameMasterName}</p>
-                                  {isSuperseded && (
-                                    <p className="mt-0.5 text-xs text-base-content/40 italic">{t('characters.supersededByPseudo')}</p>
-                                  )}
+                                  <p className="text-base-content/50 text-xs">DM: {gameMasterName}</p>
+                                  {isSuperseded && <p className="text-base-content/40 mt-0.5 text-xs italic">{t('characters.supersededByPseudo')}</p>}
                                 </div>
                                 <span className="badge badge-ghost badge-sm shrink-0 font-normal">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
-                                <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
+                              <div className="border-base-200 flex items-center justify-between gap-2 border-t pt-2">
                                 <span className="badge badge-ghost badge-sm font-medium">
                                   {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   {adv.is_pseudo ? (
-                                    <span className="text-xs text-base-content/50">{t('characters.auto')}</span>
+                                    <span className="text-base-content/50 text-xs">{t('characters.auto')}</span>
                                   ) : !isReadOnly ? (
                                     <>
                                       <UpdateAdventureModal
@@ -747,8 +742,7 @@ export default function Show({
                                         <Trash size={14} />
                                       </Button>
                                     </>
-                                  ) : null
-                                  }
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
@@ -756,45 +750,47 @@ export default function Show({
                         )
                       })}
                     </List>
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden overflow-x-auto md:block">
                       <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold text-base-content/50">
+                        <div className="text-base-content/50 grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold">
                           <span>{t('characters.adventure')}</span>
                           <span className="text-right">{t('characters.time')}</span>
                           <button
                             type="button"
-                            className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
-                            onClick={() =>
-                              setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                            }
+                            className="hover:text-base-content inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors"
+                            onClick={() => setAdventureSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))}
                           >
                             {t('characters.date')}
-                            {adventureSortDir === 'desc'
-                              ? <ChevronDown size={12} />
-                              : <ChevronUp size={12} />}
+                            {adventureSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                           </button>
                           <span className="text-right">{t('characters.actions')}</span>
                         </div>
-                          <List className="shadow-none">
-                            {sortedAdventures.map((adv) => {
-                              const notes = adventureNotesMap.get(adv.id) ?? ''
-                              const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
-                              const gameMasterName = adv.game_master?.trim() || '-'
-                              const adventureTitle = adv.title || 'Adventure'
-                              const pseudoBubblesInLevel =
-                                adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
-                                  ? adv.target_bubbles - bubblesRequiredForLevel(adv.target_level)
-                                  : 0
-                              const pseudoAnchorLabel = adv.is_pseudo && adv.target_level ? (
+                        <List className="shadow-none">
+                          {sortedAdventures.map((adv) => {
+                            const notes = adventureNotesMap.get(adv.id) ?? ''
+                            const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
+                            const gameMasterName = adv.game_master?.trim() || '-'
+                            const adventureTitle = adv.title || 'Adventure'
+                            const pseudoBubblesInLevel =
+                              adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
+                                ? adv.target_bubbles -
+                                  bubblesRequiredForLevel(adv.target_level, adv.progression_version_id ?? character.progression_version_id)
+                                : 0
+                            const pseudoAnchorLabel =
+                              adv.is_pseudo && adv.target_level ? (
                                 <>
                                   {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
                                   {pseudoBubblesInLevel > 0 && (
-                                    <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">(+{pseudoBubblesInLevel} <Droplets size={11} />)</span>
+                                    <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">
+                                      (+{pseudoBubblesInLevel} <Droplets size={11} />)
+                                    </span>
                                   )}
                                 </>
-                              ) : t('characters.levelTrackingAnchor')
-                              const isSuperseded = supersededAdventureIds.has(adv.id)
-                              return (
+                              ) : (
+                                t('characters.levelTrackingAnchor')
+                              )
+                            const isSuperseded = supersededAdventureIds.has(adv.id)
+                            return (
                               <ListRow
                                 key={adv.id}
                                 className={`grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4 ${isSuperseded ? 'opacity-50' : ''}`}
@@ -802,40 +798,40 @@ export default function Show({
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <div className="flex min-w-0 items-center gap-1">
-                                      <h3 className="min-w-0 truncate text-sm font-medium">
-                                        {adventureTitle}
-                                      </h3>
+                                      <h3 className="min-w-0 truncate text-sm font-medium">{adventureTitle}</h3>
                                       <Button
-                                      type="button"
-                                      size="xs"
-                                      variant="ghost"
-                                      modifier="square"
-                                      aria-label={t('characters.showAdventureNotes')}
-                                      title={notes ? t('characters.showAdventureNotes') : t('characters.noNotes')}
-                                      disabled={!notes}
-                                      onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
-                                    >
+                                        type="button"
+                                        size="xs"
+                                        variant="ghost"
+                                        modifier="square"
+                                        aria-label={t('characters.showAdventureNotes')}
+                                        title={notes ? t('characters.showAdventureNotes') : t('characters.noNotes')}
+                                        disabled={!notes}
+                                        onClick={() => openNotes(`${adventureTitle} Notes`, notes)}
+                                      >
                                         <ScrollText size={14} />
                                       </Button>
                                     </div>
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+                                  </div>
+                                  <div className="text-base-content/50 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                                     <span>DM: {gameMasterName}</span>
-                                    {participantSummary ? <span>{t('characters.playedWith')}: {participantSummary}</span> : null}
-                                    {isSuperseded && (
-                                      <span className="italic text-base-content/40">{t('characters.supersededByPseudo')}</span>
-                                    )}
+                                    {participantSummary ? (
+                                      <span>
+                                        {t('characters.playedWith')}: {participantSummary}
+                                      </span>
+                                    ) : null}
+                                    {isSuperseded && <span className="text-base-content/40 italic">{t('characters.supersededByPseudo')}</span>}
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">
                                   {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
                                 </p>
-                                <div className="self-center text-right text-xs text-base-content/70">
+                                <div className="text-base-content/70 self-center text-right text-xs">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </div>
-                                <div className="flex self-center justify-end gap-2">
+                                <div className="flex justify-end gap-2 self-center">
                                   {adv.is_pseudo ? (
-                                    <span className="text-xs text-base-content/50">{t('characters.auto')}</span>
+                                    <span className="text-base-content/50 text-xs">{t('characters.auto')}</span>
                                   ) : !isReadOnly ? (
                                     <>
                                       <UpdateAdventureModal
@@ -868,8 +864,7 @@ export default function Show({
                                         <Trash size={14} />
                                       </Button>
                                     </>
-                                  ) : null
-                                  }
+                                  ) : null}
                                 </div>
                               </ListRow>
                             )
@@ -879,7 +874,7 @@ export default function Show({
                     </div>
                   </>
                 ) : (
-                  <p className="text-center text-sm text-base-content/70">{t('characters.noAdventuresShort')}</p>
+                  <p className="text-base-content/70 text-center text-sm">{t('characters.noAdventuresShort')}</p>
                 )}
               </div>
             ) : null}
@@ -887,14 +882,12 @@ export default function Show({
         </div>
 
         <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+          <div className="rounded-box border-base-200 bg-base-100 border">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <button
                 type="button"
                 className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
-                onClick={() =>
-                  startDowntimesTransition(() => setDowntimesOpen((current) => !current))
-                }
+                onClick={() => startDowntimesTransition(() => setDowntimesOpen((current) => !current))}
                 aria-expanded={downtimesOpen}
                 disabled={character.downtimes.length === 0}
               >
@@ -903,7 +896,7 @@ export default function Show({
                   {isDowntimesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold">Downtimes</h2>
-                    <p className="text-xs text-base-content/60">
+                    <p className="text-base-content/60 text-xs">
                       {character.downtimes.length === 0
                         ? t('characters.noDowntimesRecorded')
                         : t('characters.downtimeEntriesTotal', {
@@ -918,21 +911,14 @@ export default function Show({
               </button>
               {!isReadOnly ? (
                 requiresSubmissionBeforeDowntime ? (
-                  <div
-                    className="tooltip tooltip-left shrink-0"
-                    data-tip={submissionRequiredReason}
-                    aria-label={submissionRequiredReason}
-                  >
-                    <Button
-                      size="sm"
-                      className="shrink-0 gap-1"
-                      disabled
-                      aria-label={t('characters.addDowntimeDisabled')}
-                    >
-                      <FlameKindling size={14} />
-                      <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
-                    </Button>
-                  </div>
+                  <Tooltip content={submissionRequiredReason} placement="left" wrapperElement="div">
+                    <div className="shrink-0" aria-label={submissionRequiredReason}>
+                      <Button size="sm" className="shrink-0 gap-1" disabled aria-label={t('characters.addDowntimeDisabled')}>
+                        <FlameKindling size={14} />
+                        <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
+                      </Button>
+                    </div>
+                  </Tooltip>
                 ) : canLogActivity ? (
                   <StoreDowntimeModal
                     character={character}
@@ -944,7 +930,7 @@ export default function Show({
               ) : null}
             </div>
             {downtimesOpen ? (
-              <div className="border-t border-base-200 px-4 pb-4 pt-2">
+              <div className="border-base-200 border-t px-4 pt-2 pb-4">
                 {character.downtimes.length > 0 ? (
                   <>
                     <div className="flex justify-end pb-2 md:hidden">
@@ -952,21 +938,19 @@ export default function Show({
                         type="button"
                         size="xs"
                         variant="ghost"
-                        className="cursor-pointer transition-colors hover:text-base-content"
-                        onClick={() =>
-                          setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                        }
+                        className="hover:text-base-content cursor-pointer transition-colors"
+                        onClick={() => setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))}
                       >
                         {t('characters.date')}
                         {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                       </Button>
                     </div>
-                    <List className="md:hidden shadow-none">
+                    <List className="shadow-none md:hidden">
                       {sortedDowntimes.map((dt) => {
                         const notes = downtimeNotesMap.get(dt.id) ?? ''
                         return (
                           <ListRow key={dt.id} className="block">
-                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
+                            <div className="rounded-box border-base-200 bg-base-100 space-y-3 border p-3.5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex min-w-0 items-center gap-1">
                                   <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
@@ -987,10 +971,8 @@ export default function Show({
                                   {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between gap-2 border-t border-base-200 pt-2">
-                                <span className="badge badge-ghost badge-sm font-medium">
-                                  {secondsToHourMinuteString(dt.duration)}
-                                </span>
+                              <div className="border-base-200 flex items-center justify-between gap-2 border-t pt-2">
+                                <span className="badge badge-ghost badge-sm font-medium">{secondsToHourMinuteString(dt.duration)}</span>
                                 <div className="flex items-center gap-2">
                                   {!isReadOnly ? (
                                     <>
@@ -1030,22 +1012,18 @@ export default function Show({
                         )
                       })}
                     </List>
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden overflow-x-auto md:block">
                       <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold text-base-content/50">
+                        <div className="text-base-content/50 grid grid-cols-[minmax(0,1fr)_96px_110px_92px] gap-4 px-2 pb-2 text-xs font-semibold">
                           <span>{t('characters.type')}</span>
                           <span className="text-right">{t('characters.time')}</span>
                           <button
                             type="button"
-                            className="inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors hover:text-base-content"
-                            onClick={() =>
-                              setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))
-                            }
+                            className="hover:text-base-content inline-flex cursor-pointer items-center justify-end gap-1 text-right transition-colors"
+                            onClick={() => setDowntimeSortDir((current) => (current === 'desc' ? 'asc' : 'desc'))}
                           >
                             {t('characters.date')}
-                            {downtimeSortDir === 'desc'
-                              ? <ChevronDown size={12} />
-                              : <ChevronUp size={12} />}
+                            {downtimeSortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
                           </button>
                           <span className="text-right">{t('characters.actions')}</span>
                         </div>
@@ -1053,10 +1031,7 @@ export default function Show({
                           {sortedDowntimes.map((dt) => {
                             const notes = downtimeNotesMap.get(dt.id) ?? ''
                             return (
-                              <ListRow
-                                key={dt.id}
-                                className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
-                              >
+                              <ListRow key={dt.id} className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4">
                                 <div className="min-w-0">
                                   <div className="flex min-w-0 items-center gap-1">
                                     <h3 className="truncate text-sm font-medium capitalize">{dt.type}</h3>
@@ -1074,13 +1049,11 @@ export default function Show({
                                     </Button>
                                   </div>
                                 </div>
-                                <p className="self-center text-right text-xs font-medium">
-                                  {secondsToHourMinuteString(dt.duration)}
-                                </p>
-                                <div className="self-center text-right text-xs text-base-content/70">
+                                <p className="self-center text-right text-xs font-medium">{secondsToHourMinuteString(dt.duration)}</p>
+                                <div className="text-base-content/70 self-center text-right text-xs">
                                   {format(new Date(dt.start_date), 'dd.MM.yyyy')}
                                 </div>
-                                <div className="flex self-center justify-end gap-2">
+                                <div className="flex justify-end gap-2 self-center">
                                   {!isReadOnly ? (
                                     <>
                                       <UpdateDowntimeModal
@@ -1121,7 +1094,7 @@ export default function Show({
                     </div>
                   </>
                 ) : (
-                  <p className="text-center text-sm text-base-content/70">{t('characters.noDowntimesShort')}</p>
+                  <p className="text-base-content/70 text-center text-sm">{t('characters.noDowntimesShort')}</p>
                 )}
               </div>
             ) : null}
@@ -1129,14 +1102,12 @@ export default function Show({
         </div>
 
         <div>
-          <div className="rounded-box border border-base-200 bg-base-100">
+          <div className="rounded-box border-base-200 bg-base-100 border">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <button
                 type="button"
                 className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
-                onClick={() =>
-                  startAlliesTransition(() => setAlliesOpen((current) => !current))
-                }
+                onClick={() => startAlliesTransition(() => setAlliesOpen((current) => !current))}
                 aria-expanded={alliesOpen}
                 disabled={character.allies.length === 0}
               >
@@ -1145,7 +1116,7 @@ export default function Show({
                   {isAlliesPending ? <LoaderCircle size={14} className="animate-spin" /> : null}
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold">{t('characters.allies')}</h2>
-                    <p className="text-xs text-base-content/60">
+                    <p className="text-base-content/60 text-xs">
                       {character.allies.length === 0
                         ? t('characters.noAlliesRecorded')
                         : t('characters.alliesCount', { count: character.allies.length })}
@@ -1164,35 +1135,17 @@ export default function Show({
               ) : null}
             </div>
             {alliesOpen ? (
-              <div className="border-t border-base-200 px-4 pb-4 pt-2">
+              <div className="border-base-200 border-t px-4 pt-2 pb-4">
                 {character.allies.length > 0 ? (
                   <>
                     <div className="flex flex-wrap justify-end gap-1 pb-2 md:hidden">
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant={allySortBy === 'name' ? 'outline' : 'ghost'}
-                        onClick={() => setAllySort('name')}
-                      >
+                      <Button type="button" size="xs" variant={allySortBy === 'name' ? 'outline' : 'ghost'} onClick={() => setAllySort('name')}>
                         {t('characters.name')}
-                        {allySortBy === 'name'
-                          ? allySortDir === 'desc'
-                            ? <ChevronDown size={12} />
-                            : <ChevronUp size={12} />
-                          : null}
+                        {allySortBy === 'name' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                       </Button>
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant={allySortBy === 'owner' ? 'outline' : 'ghost'}
-                        onClick={() => setAllySort('owner')}
-                      >
+                      <Button type="button" size="xs" variant={allySortBy === 'owner' ? 'outline' : 'ghost'} onClick={() => setAllySort('owner')}>
                         {t('characters.owner')}
-                        {allySortBy === 'owner'
-                          ? allySortDir === 'desc'
-                            ? <ChevronDown size={12} />
-                            : <ChevronUp size={12} />
-                          : null}
+                        {allySortBy === 'owner' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                       </Button>
                       <Button
                         type="button"
@@ -1201,11 +1154,7 @@ export default function Show({
                         onClick={() => setAllySort('standing')}
                       >
                         {t('characters.standing')}
-                        {allySortBy === 'standing'
-                          ? allySortDir === 'desc'
-                            ? <ChevronDown size={12} />
-                            : <ChevronUp size={12} />
-                          : null}
+                        {allySortBy === 'standing' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                       </Button>
                       <Button
                         type="button"
@@ -1214,14 +1163,10 @@ export default function Show({
                         onClick={() => setAllySort('shared_adventures')}
                       >
                         {t('characters.sharedAdventuresShort')}
-                        {allySortBy === 'shared_adventures'
-                          ? allySortDir === 'desc'
-                            ? <ChevronDown size={12} />
-                            : <ChevronUp size={12} />
-                          : null}
+                        {allySortBy === 'shared_adventures' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                       </Button>
                     </div>
-                    <List className="md:hidden shadow-none">
+                    <List className="shadow-none md:hidden">
                       {sortedAllies.map((ally) => {
                         const sharedAdventureCount = allyAdventureCountMap.get(ally.id) ?? 0
                         const sharedAdventureEntries = allyAdventureEntriesMap.get(ally.id) ?? []
@@ -1229,28 +1174,34 @@ export default function Show({
 
                         return (
                           <ListRow key={ally.id} className="block">
-                            <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-3.5">
+                            <div className="rounded-box border-base-200 bg-base-100 space-y-3 border p-3.5">
                               <div className="flex min-w-0 items-center gap-3">
                                 <AllyPortrait ally={ally} className="h-10 w-10" />
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                   <div className="flex min-w-0 items-center gap-2">
                                     <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
-                                    <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                      {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                    <span className="text-base-content/50 border-base-200 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase">
+                                      {deletedLinked
+                                        ? t('characters.linkedDeleted')
+                                        : ally.linked_character_id
+                                          ? t('characters.linked')
+                                          : t('characters.custom')}
                                     </span>
                                   </div>
                                   {getAllyOwnerName(ally) ? (
-                                    <span className="truncate text-xs text-base-content/50">
+                                    <span className="text-base-content/50 truncate text-xs">
                                       {t('characters.owner')}: {getAllyOwnerName(ally)}
                                     </span>
                                   ) : deletedLinked ? (
-                                    <span className="truncate text-xs text-base-content/50">
-                                      {t('characters.allyDeletedLinkedCharacter')}
-                                    </span>
+                                    <span className="text-base-content/50 truncate text-xs">{t('characters.allyDeletedLinkedCharacter')}</span>
                                   ) : null}
                                   <button
                                     type="button"
-                                    className="inline-flex w-fit cursor-pointer items-center gap-1 text-xs text-base-content/60 transition-colors hover:text-base-content"
+                                    className="text-base-content/60 hover:text-base-content inline-flex w-fit cursor-pointer items-center gap-1 text-xs transition-colors"
+                                    aria-label={t('characters.openAllyMeetingsWithCount', {
+                                      name: getAllyDisplayName(ally),
+                                      count: sharedAdventureCount,
+                                    })}
                                     onClick={() =>
                                       setActiveAllyMeetings({
                                         allyName: getAllyDisplayName(ally),
@@ -1258,14 +1209,16 @@ export default function Show({
                                       })
                                     }
                                   >
-                                    <Handshake size={12} className="text-base-content/45" />
-                                    {t('characters.allySharedAdventures', { count: sharedAdventureCount })}
+                                    <span className="inline-flex items-center gap-1">
+                                      <Handshake size={12} className="text-base-content/45" />
+                                      {t('characters.allySharedAdventures', { count: sharedAdventureCount })}
+                                    </span>
                                   </button>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between gap-3 border-t border-base-200 pt-2">
+                              <div className="border-base-200 flex items-center justify-between gap-3 border-t pt-2">
                                 <RatingHearts rating={ally.rating} />
-                                <span className="truncate text-xs text-base-content/70">
+                                <span className="text-base-content/70 truncate text-xs">
                                   {t('characters.classesLabel')}: {ally.classes || '-'}
                                 </span>
                               </div>
@@ -1274,56 +1227,40 @@ export default function Show({
                         )
                       })}
                     </List>
-                    <div className="hidden md:block overflow-x-auto">
-                      <div className="min-w-[680px]">
-                        <div className="grid grid-cols-[minmax(0,1.45fr)_minmax(0,1.1fr)_104px_60px] gap-3 px-2 pb-2 text-xs font-semibold text-base-content/50">
+                    <div className="hidden overflow-x-auto md:block">
+                      <div className="min-w-[760px]">
+                        <div className="text-base-content/50 grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_104px_152px] gap-3 px-2 pb-2 text-xs font-semibold">
                           <button
                             type="button"
-                            className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                            className="hover:text-base-content inline-flex cursor-pointer items-center gap-1 text-left transition-colors"
                             onClick={() => setAllySort('name')}
                           >
                             {t('characters.name')}
-                            {allySortBy === 'name'
-                              ? allySortDir === 'desc'
-                                ? <ChevronDown size={12} />
-                                : <ChevronUp size={12} />
-                              : null}
+                            {allySortBy === 'name' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                           </button>
                           <button
                             type="button"
-                            className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                            className="hover:text-base-content inline-flex cursor-pointer items-center gap-1 text-left transition-colors"
                             onClick={() => setAllySort('owner')}
                           >
                             {t('characters.owner')}
-                            {allySortBy === 'owner'
-                              ? allySortDir === 'desc'
-                                ? <ChevronDown size={12} />
-                                : <ChevronUp size={12} />
-                              : null}
+                            {allySortBy === 'owner' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                           </button>
                           <button
                             type="button"
-                            className="inline-flex cursor-pointer items-center gap-1 text-left transition-colors hover:text-base-content"
+                            className="hover:text-base-content inline-flex cursor-pointer items-center gap-1 text-left transition-colors"
                             onClick={() => setAllySort('standing')}
                           >
                             {t('characters.standing')}
-                            {allySortBy === 'standing'
-                              ? allySortDir === 'desc'
-                                ? <ChevronDown size={12} />
-                                : <ChevronUp size={12} />
-                              : null}
+                            {allySortBy === 'standing' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                           </button>
                           <button
                             type="button"
-                            className="inline-flex cursor-pointer items-center justify-center gap-1 text-center transition-colors hover:text-base-content"
+                            className="hover:text-base-content inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap text-center transition-colors"
                             onClick={() => setAllySort('shared_adventures')}
                           >
                             {t('characters.sharedAdventuresShort')}
-                            {allySortBy === 'shared_adventures'
-                              ? allySortDir === 'desc'
-                                ? <ChevronDown size={12} />
-                                : <ChevronUp size={12} />
-                              : null}
+                            {allySortBy === 'shared_adventures' ? allySortDir === 'desc' ? <ChevronDown size={12} /> : <ChevronUp size={12} /> : null}
                           </button>
                         </div>
                         <List className="shadow-none">
@@ -1335,34 +1272,39 @@ export default function Show({
                             return (
                               <ListRow
                                 key={ally.id}
-                                className="grid w-full grid-cols-[minmax(0,1.45fr)_minmax(0,1.1fr)_104px_60px] items-center gap-3"
+                                className="grid w-full grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_104px_152px] items-center gap-3"
                               >
                                 <div className="flex min-w-0 items-center gap-3">
                                   <AllyPortrait ally={ally} className="h-9 w-9" />
                                   <div className="flex min-w-0 flex-col gap-0.5">
                                     <div className="flex min-w-0 items-center gap-2">
-                                      <span className="truncate text-sm font-medium">
-                                        {getAllyDisplayName(ally)}
-                                      </span>
-                                      <span className="text-base-content/50 inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase">
-                                        {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                                      <span className="truncate text-sm font-medium">{getAllyDisplayName(ally)}</span>
+                                      <span className="text-base-content/50 border-base-200 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase">
+                                        {deletedLinked
+                                          ? t('characters.linkedDeleted')
+                                          : ally.linked_character_id
+                                            ? t('characters.linked')
+                                            : t('characters.custom')}
                                       </span>
                                     </div>
-                                    <span className="truncate text-xs text-base-content/50">
+                                    <span className="text-base-content/50 truncate text-xs">
                                       {t('characters.classesLabel')}: {ally.classes || '-'}
                                     </span>
                                   </div>
                                 </div>
                                 <div className="min-w-0 space-y-0.5">
-                                  <span className="block truncate text-sm text-base-content/70">
+                                  <span className="text-base-content/70 block truncate text-sm">
                                     {getAllyOwnerName(ally) || (deletedLinked ? t('characters.allyDeletedLinkedCharacter') : '-')}
                                   </span>
                                 </div>
                                 <RatingHearts rating={ally.rating} />
                                 <button
                                   type="button"
-                                  className="inline-flex cursor-pointer items-center justify-center gap-1 text-sm text-base-content/70 transition-colors hover:text-base-content"
-                                  aria-label={t('characters.openAllyMeetings', { name: getAllyDisplayName(ally) })}
+                                  className="text-base-content/70 hover:text-base-content inline-flex cursor-pointer items-center justify-center gap-1 text-sm transition-colors"
+                                  aria-label={t('characters.openAllyMeetingsWithCount', {
+                                    name: getAllyDisplayName(ally),
+                                    count: sharedAdventureCount,
+                                  })}
                                   onClick={() =>
                                     setActiveAllyMeetings({
                                       allyName: getAllyDisplayName(ally),
@@ -1370,8 +1312,10 @@ export default function Show({
                                     })
                                   }
                                 >
-                                  <span>{sharedAdventureCount}</span>
-                                  <Handshake size={12} className="text-base-content/45" />
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>{sharedAdventureCount}</span>
+                                    <Handshake size={12} className="text-base-content/45" />
+                                  </span>
                                 </button>
                               </ListRow>
                             )
@@ -1381,7 +1325,7 @@ export default function Show({
                     </div>
                   </>
                 ) : (
-                  <p className="text-center text-sm text-base-content/70">{t('characters.noAlliesShort')}</p>
+                  <p className="text-base-content/70 text-center text-sm">{t('characters.noAlliesShort')}</p>
                 )}
               </div>
             ) : null}
@@ -1391,25 +1335,20 @@ export default function Show({
 
       <Modal isOpen={activeAllyMeetings !== null} onClose={() => setActiveAllyMeetings(null)}>
         <ModalTitle>
-          {activeAllyMeetings
-            ? t('characters.allyMeetingsTitle', { name: activeAllyMeetings.allyName })
-            : t('characters.sharedAdventuresShort')}
+          {activeAllyMeetings ? t('characters.allyMeetingsTitle', { name: activeAllyMeetings.allyName }) : t('characters.sharedAdventuresShort')}
         </ModalTitle>
         <ModalContent>
           {activeAllyMeetings && activeAllyMeetings.entries.length > 0 ? (
             <List className="shadow-none">
               {activeAllyMeetings.entries.map((entry, index) => (
-                <ListRow
-                  key={`${entry.date}-${entry.title}-${index}`}
-                  className="grid w-full grid-cols-[96px_minmax(0,1fr)] items-start gap-3"
-                >
-                  <span className="text-xs text-base-content/60">{entry.date}</span>
+                <ListRow key={`${entry.date}-${entry.title}-${index}`} className="grid w-full grid-cols-[96px_minmax(0,1fr)] items-start gap-3">
+                  <span className="text-base-content/60 text-xs">{entry.date}</span>
                   <span className="min-w-0 text-sm">{entry.title}</span>
                 </ListRow>
               ))}
             </List>
           ) : (
-            <p className="text-sm text-base-content/70">{t('characters.noSharedAdventuresRecorded')}</p>
+            <p className="text-base-content/70 text-sm">{t('characters.noSharedAdventuresRecorded')}</p>
           )}
         </ModalContent>
       </Modal>
