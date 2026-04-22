@@ -50,7 +50,6 @@ const SetCharacterLevelModal = ({
   })()
   const { data, setData, post, processing } = useForm({ level: initialLevel, bubbles_in_level: initialBubblesInLevel })
   const [isOpen, setIsOpen] = useState(false)
-  const [hoveredLevel, setHoveredLevel] = useState<number | null>(null)
   const targetLevel = clampLevel(Number.isFinite(Number(data.level)) ? Number(data.level) : initialLevel)
   const levelDelta = targetLevel - initialLevel
   const adventuresSorted = [...character.adventures].sort((a, b) => {
@@ -136,12 +135,6 @@ const SetCharacterLevelModal = ({
     }))
   }, [initialLevel, initialBubblesInLevel, isOpen, minAllowedAvailableBubbles, minSelectableLevel, progressionVersionId, setData])
 
-  useEffect(() => {
-    if (!isOpen) {
-      setHoveredLevel(null)
-    }
-  }, [isOpen])
-
   const setLevel = (value: number) => {
     const clamped = clampLevel(value)
     const minBubbles =
@@ -206,7 +199,7 @@ const SetCharacterLevelModal = ({
             <span className="border-primary/40 bg-primary/10 text-primary rounded-full border px-2 py-1">
               {t('characters.targetLevel', { level: targetLevel })}
             </span>
-            {hasChanges ? (
+            {hasChanges && levelDelta !== 0 ? (
               <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
                 {levelDelta > 0 ? '+' : ''}
                 {levelDelta}
@@ -225,10 +218,7 @@ const SetCharacterLevelModal = ({
               {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((level) => {
                 const isDisabled = processing || level < minSelectableLevel
                 const isSelected = targetLevel === level
-                const isBelowSelection = level < targetLevel && !isDisabled
-                const isAboveSelection = level > targetLevel && !isDisabled
-                const isBelowHoverPreview = hoveredLevel !== null && level < hoveredLevel && !isDisabled
-                const isStrongAboveSelection = isAboveSelection && !isBelowHoverPreview
+                const isPast = level < targetLevel
 
                 return (
                   <div key={level} className="w-full" title={isDisabled ? levelRestrictionReason : undefined}>
@@ -237,16 +227,13 @@ const SetCharacterLevelModal = ({
                       variant="ghost"
                       className={cn(
                         'w-full justify-center border transition-colors',
-                        isBelowSelection &&
-                          !isSelected &&
-                          'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
-                        isStrongAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
-                        isSelected && 'border-primary bg-primary/15 text-primary font-semibold',
-                        isBelowHoverPreview && !isSelected && 'border-base-300/80 bg-primary/10 text-primary',
+                        isDisabled && !isPast && 'cursor-not-allowed opacity-20',
+                        isPast && isDisabled && 'cursor-not-allowed border-primary/25 bg-primary/8 text-primary/35',
+                        isPast && !isDisabled && 'border-primary/50 bg-primary/20 text-primary/70 hover:border-primary/70 hover:bg-primary/30',
+                        isSelected && 'border-primary bg-primary text-primary-content font-bold',
+                        !isDisabled && !isSelected && !isPast && 'border-base-300 bg-base-100 text-base-content hover:border-primary hover:bg-primary/15 hover:text-primary',
                       )}
                       onClick={() => setLevel(level)}
-                      onMouseEnter={() => setHoveredLevel(level)}
-                      onMouseLeave={() => setHoveredLevel(null)}
                       disabled={isDisabled}
                       aria-label={t('characters.setLevelAria', { level })}
                       title={isDisabled ? levelRestrictionReason : t('characters.setLevelAria', { level })}
@@ -262,15 +249,15 @@ const SetCharacterLevelModal = ({
             <div className="space-y-2">
               <p className="text-base-content/50 text-xs tracking-wide uppercase">{t('characters.selectBubblesInLevel')}</p>
               <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
-                {Array.from({ length: displayedBubblesInSelectedLevel }, (_, i) => {
-                  const bubbleIndex = i + 1
+                {Array.from({ length: displayedBubblesInSelectedLevel + 1 }, (_, i) => {
+                  const bubbleIndex = i
                   const isDisabled = bubbleIndex < minBubblesInSelectedLevel || bubbleIndex > maxBubblesInSelectedLevel
-                  const isSelected = bubbleIndex <= targetBubblesInLevel && !isDisabled
-                  const isBelowSelection = bubbleIndex < targetBubblesInLevel && !isDisabled
-                  const isAboveSelection = bubbleIndex > targetBubblesInLevel && !isDisabled
+                  const isSelected = bubbleIndex === targetBubblesInLevel && !isDisabled
+                  const isPastFilled = bubbleIndex < targetBubblesInLevel && !isDisabled
+                  const isAvailable = bubbleIndex > targetBubblesInLevel && !isDisabled
                   return (
                     <Button
-                      key={i}
+                      key={bubbleIndex}
                       size="xs"
                       variant="ghost"
                       type="button"
@@ -284,12 +271,10 @@ const SetCharacterLevelModal = ({
                       aria-label={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                       className={cn(
                         'w-full justify-center gap-1 border transition-colors',
-                        isDisabled && 'border-base-300/50 text-base-content/20 cursor-not-allowed',
-                        isBelowSelection &&
-                          !isSelected &&
-                          'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
-                        isAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
-                        isSelected && 'border-primary bg-primary/15 text-primary font-semibold',
+                        isDisabled && 'cursor-not-allowed border-primary/25 bg-primary/8 text-primary/35',
+                        isSelected && 'border-primary bg-primary text-primary-content font-semibold',
+                        isPastFilled && 'border-primary/50 bg-primary/20 text-primary/70',
+                        isAvailable && 'border-base-300 bg-base-100 text-base-content/70 hover:border-primary hover:bg-primary/15 hover:text-primary',
                       )}
                       title={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                     >

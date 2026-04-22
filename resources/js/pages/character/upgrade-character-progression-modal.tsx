@@ -108,14 +108,13 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
     bubbles_in_level: initialBubblesInLevel,
   })
   const [isOpen, setIsOpen] = useState(false)
-  const [hoveredLevel, setHoveredLevel] = useState<number | null>(null)
 
   const rawTargetLevel = clampLevel(Number.isFinite(Number(data.level)) ? Number(data.level) : initialLevel)
   const targetLevel = Math.min(maxSelectableLevel, Math.max(minSelectableLevel, rawTargetLevel))
 
   const selectedLevelFloor = bubblesRequiredForLevel(targetLevel, targetVersionId)
   const selectedLevelMaxByCurve = targetLevel >= 20 ? 0 : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId) - 1)
-  const selectedLevelMinByExactFloor = Math.max(0, minimumAllowedAvailableBubbles - selectedLevelFloor)
+  const selectedLevelMinByExactFloor = manualTracking ? Math.max(0, minimumAllowedAvailableBubbles - selectedLevelFloor) : 0
   const selectedLevelMaxByCurrent = manualTracking ? selectedLevelMaxByCurve : Math.max(0, currentAvailableBubbles - selectedLevelFloor)
   const minBubblesInSelectedLevel = targetLevel >= 20 ? 0 : Math.min(selectedLevelMaxByCurve, selectedLevelMinByExactFloor)
   const maxBubblesInSelectedLevel = targetLevel >= 20 ? 0 : Math.min(selectedLevelMaxByCurve, selectedLevelMaxByCurrent)
@@ -132,6 +131,10 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
     : currentAvailableBubbles
   const levelDelta = targetLevel - initialLevel
   const canSetBubbles = targetLevel < 20 && displayedBubblesInSelectedLevel > 0
+
+  const oldCurveBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(initialLevel, currentVersionId))
+  const oldCurveMaxBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(initialLevel, currentVersionId))
+  const newCurveMaxBubblesInLevel = targetLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId))
   const additionalBubbleShopSpend = manualTracking ? 0 : Math.max(0, currentAvailableBubbles - targetAvailableBubbles)
   const resultingBubbleShopSpend = Number(character.bubble_shop_spend ?? 0) + additionalBubbleShopSpend
   const hasChanges = targetVersionId !== (character.progression_version_id ?? null) || targetAvailableBubbles !== initialAvailableBubbles
@@ -148,7 +151,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
         ? 0
         : Math.min(
             Math.max(0, bubblesRequiredForNextLevel(defaultLevel, targetVersionId) - 1),
-            Math.max(0, minimumAllowedAvailableBubbles - defaultLevelFloor),
+            manualTracking ? Math.max(0, minimumAllowedAvailableBubbles - defaultLevelFloor) : 0,
           )
     const defaultMaxBubbles =
       defaultLevel >= 20
@@ -178,12 +181,6 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
   ])
 
   useEffect(() => {
-    if (!isOpen) {
-      setHoveredLevel(null)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
     const normalizedLevel = targetLevel
     const normalizedBubbles = targetBubblesInLevel
 
@@ -204,7 +201,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
         ? 0
         : Math.min(
             Math.max(0, bubblesRequiredForNextLevel(clampedLevel, targetVersionId) - 1),
-            Math.max(0, minimumAllowedAvailableBubbles - levelFloor),
+            manualTracking ? Math.max(0, minimumAllowedAvailableBubbles - levelFloor) : 0,
           )
     const maxBubbles =
       clampedLevel >= 20
@@ -259,44 +256,57 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
         </span>
       </ModalTitle>
       <ModalContent>
-        <div className="space-y-3">
-          <p className="text-base-content/75 text-xs leading-5 sm:text-sm">{t('characters.upgradeLevelCurveBody')}</p>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
-              {t('characters.currentLevel', { level: initialLevel })}
-            </span>
-            {targetVersionId !== currentVersionId ? (
-              <span className="border-info/30 bg-info/10 text-info rounded-full border px-2 py-1">
-                {t('characters.recalculatedLevel', { level: recalculatedLevel })}
-              </span>
-            ) : null}
-            <span className="border-primary/40 bg-primary/10 text-primary rounded-full border px-2 py-1">
-              {t('characters.targetLevel', { level: targetLevel })}
-            </span>
-            {manualTracking && hasChanges ? (
-              <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
-                {levelDelta > 0 ? '+' : ''}
-                {levelDelta}
-              </span>
-            ) : null}
-            {manualTracking && !character.is_filler ? (
-              <span className="border-base-300 text-base-content/70 rounded-full border px-2 py-1">
-                {t('characters.minAllowedLevel', { level: minSelectableLevel })}
-              </span>
-            ) : null}
+        <div className="space-y-4">
+          {/* Vorher / Nachher */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-base-200 bg-base-200/30 p-3 text-center">
+              <div className="mb-1 text-[10px] uppercase tracking-widest text-base-content/40">Aktuell</div>
+              <div className="text-3xl font-bold tabular-nums text-base-content/50">{initialLevel}</div>
+              {oldCurveBubblesInLevel !== null && oldCurveMaxBubblesInLevel !== null && oldCurveMaxBubblesInLevel > 0 ? (
+                <div className="mt-1 flex items-center justify-center gap-0.5 text-[11px] tabular-nums text-base-content/35">
+                  <Droplets size={10} />
+                  <span>{oldCurveBubblesInLevel} / {oldCurveMaxBubblesInLevel}</span>
+                </div>
+              ) : (
+                <div className="mt-1 text-[10px] text-base-content/30">alte Kurve</div>
+              )}
+            </div>
+            <div className="rounded-lg border border-primary/25 bg-primary/7 p-3 text-center">
+              <div className="mb-1 text-[10px] uppercase tracking-widest text-primary/60">
+                {manualTracking || targetLevel !== recalculatedLevel ? 'Ziel' : 'Neu berechnet'}
+              </div>
+              <div className="text-3xl font-bold tabular-nums text-primary">{targetLevel}</div>
+              {newCurveMaxBubblesInLevel !== null && newCurveMaxBubblesInLevel > 0 ? (
+                <div className="mt-1 flex items-center justify-center gap-0.5 text-[11px] tabular-nums text-primary/45">
+                  <Droplets size={10} />
+                  <span>{targetBubblesInLevel} / {newCurveMaxBubblesInLevel}</span>
+                </div>
+              ) : (
+                <div className="mt-1 text-[10px] text-primary/50">neue Kurve</div>
+              )}
+            </div>
           </div>
 
+          {/* Floor-Hinweis als plain text, nur wenn relevant */}
+          {!manualTracking && minSelectableLevel > 1 ? (
+            <p className="text-[11px] leading-relaxed text-base-content/50">
+              {t('characters.upgradeLevelCurveAdventureFloorHint', { level: minSelectableLevel })}
+            </p>
+          ) : null}
+          {manualTracking && !character.is_filler && minSelectableLevel > 1 ? (
+            <p className="text-[11px] text-base-content/50">
+              {t('characters.minAllowedLevel', { level: minSelectableLevel })}
+            </p>
+          ) : null}
+
+          {/* Level-Grid */}
           <div className="space-y-1.5">
-            <p className="text-base-content/50 text-xs tracking-wide uppercase">{t('characters.selectLevel')}</p>
+            <p className="text-xs uppercase tracking-wide text-base-content/50">{t('characters.selectLevel')}</p>
             <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
               {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((level) => {
                 const isDisabled = processing || level < minSelectableLevel || level > maxSelectableLevel
                 const isSelected = targetLevel === level
-                const isBelowSelection = level < targetLevel && !isDisabled
-                const isAboveSelection = level > targetLevel && !isDisabled
-                const isBelowHoverPreview = hoveredLevel !== null && level < hoveredLevel && !isDisabled
-                const isStrongAboveSelection = isAboveSelection && !isBelowHoverPreview
+                const isPast = level < targetLevel
                 const buttonReason = level > maxSelectableLevel ? maxLevelRestrictionReason : levelRestrictionReason
 
                 return (
@@ -306,16 +316,13 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
                       variant="ghost"
                       className={cn(
                         'w-full justify-center border transition-colors',
-                        isBelowSelection &&
-                          !isSelected &&
-                          'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
-                        isStrongAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
-                        isSelected && 'border-primary bg-primary/15 text-primary font-semibold',
-                        isBelowHoverPreview && !isSelected && 'border-base-300/80 bg-primary/10 text-primary',
+                        isDisabled && !isPast && 'cursor-not-allowed opacity-20',
+                        isPast && isDisabled && 'cursor-not-allowed border-primary/25 bg-primary/8 text-primary/35',
+                        isPast && !isDisabled && 'border-primary/50 bg-primary/20 text-primary/70 hover:border-primary/70 hover:bg-primary/30',
+                        isSelected && 'border-primary bg-primary text-primary-content font-bold',
+                        !isDisabled && !isSelected && !isPast && 'border-base-300 bg-base-100 text-base-content hover:border-primary hover:bg-primary/15 hover:text-primary',
                       )}
                       onClick={() => setLevel(level)}
-                      onMouseEnter={() => setHoveredLevel(level)}
-                      onMouseLeave={() => setHoveredLevel(null)}
                       disabled={isDisabled}
                       aria-label={t('characters.setLevelAria', { level })}
                       title={isDisabled ? buttonReason : t('characters.setLevelAria', { level })}
@@ -328,20 +335,21 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
             </div>
           </div>
 
+          {/* Bubble-Grid */}
           {canSetBubbles ? (
             <div className="space-y-1.5">
-              <p className="text-base-content/50 text-xs tracking-wide uppercase">{t('characters.selectBubblesInLevel')}</p>
+              <p className="text-xs uppercase tracking-wide text-base-content/50">{t('characters.selectBubblesInLevel')}</p>
               <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
-                {Array.from({ length: displayedBubblesInSelectedLevel }, (_, i) => {
-                  const bubbleIndex = i + 1
+                {Array.from({ length: displayedBubblesInSelectedLevel + 1 }, (_, i) => {
+                  const bubbleIndex = i
                   const isDisabled = bubbleIndex < minBubblesInSelectedLevel || bubbleIndex > maxBubblesInSelectedLevel
-                  const isSelected = bubbleIndex <= targetBubblesInLevel && !isDisabled
-                  const isBelowSelection = bubbleIndex < targetBubblesInLevel && !isDisabled
-                  const isAboveSelection = bubbleIndex > targetBubblesInLevel && !isDisabled
+                  const isSelected = bubbleIndex === targetBubblesInLevel && !isDisabled
+                  const isPastFilled = bubbleIndex < targetBubblesInLevel && !isDisabled
+                  const isAvailable = bubbleIndex > targetBubblesInLevel && !isDisabled
 
                   return (
                     <Button
-                      key={i}
+                      key={bubbleIndex}
                       size="xs"
                       variant="ghost"
                       type="button"
@@ -355,12 +363,10 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
                       aria-label={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                       className={cn(
                         'w-full justify-center gap-1 border transition-colors',
-                        isDisabled && 'border-base-300/50 text-base-content/20 cursor-not-allowed',
-                        isBelowSelection &&
-                          !isSelected &&
-                          'border-base-300/80 bg-base-200/40 text-base-content/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
-                        isAboveSelection && !isSelected && 'border-primary/60 text-primary hover:bg-primary/10',
-                        isSelected && 'border-primary bg-primary/15 text-primary font-semibold',
+                        isDisabled && 'cursor-not-allowed border-primary/25 bg-primary/8 text-primary/35',
+                        isSelected && 'border-primary bg-primary text-primary-content font-semibold',
+                        isPastFilled && 'border-primary/50 bg-primary/20 text-primary/70',
+                        isAvailable && 'border-base-300 bg-base-100 text-base-content/70 hover:border-primary hover:bg-primary/15 hover:text-primary',
                       )}
                       title={`${bubbleIndex} Bubble${bubbleIndex !== 1 ? 's' : ''}`}
                     >
@@ -373,23 +379,17 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
             </div>
           ) : null}
 
-          {!manualTracking ? (
-            <div className="space-y-2">
-              <div className="rounded-box border-base-300/70 bg-base-200/25 text-base-content/75 border p-2.5 text-xs sm:text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{t('characters.upgradeLevelCurveSpendPreview', { count: additionalBubbleShopSpend })}</span>
-                  <span>{t('characters.upgradeLevelCurveTotalSpendPreview', { count: resultingBubbleShopSpend })}</span>
-                </div>
-              </div>
-              <div className="rounded-box border-base-300/70 bg-base-200/25 text-base-content/75 border p-2.5 text-[11px] leading-5 sm:text-xs">
-                {t('characters.upgradeLevelCurveAdventureFloorHint', { level: minSelectableLevel })}
-              </div>
+          {/* Bubble-Shop-Impact — nur wenn tatsächlich Auswirkung */}
+          {!manualTracking && additionalBubbleShopSpend > 0 ? (
+            <div className="rounded-md border border-warning/20 bg-warning/8 px-3 py-2.5 text-xs leading-relaxed text-base-content/70">
+              {t('characters.upgradeLevelCurveSpendPreview', { count: additionalBubbleShopSpend })}
             </div>
           ) : null}
 
-          {errors.level ? <p className="text-error text-xs">{errors.level}</p> : null}
+          {errors.level ? <p className="text-xs text-error">{errors.level}</p> : null}
 
-          <div className="rounded-box border-info/20 bg-info/8 text-base-content/75 border p-2.5 text-[11px] leading-5 sm:text-xs">
+          {/* Einzelner kontextueller Hinweis */}
+          <div className="rounded-md border border-base-200 bg-base-200/30 px-3 py-2.5 text-[11px] leading-relaxed text-base-content/55">
             {manualTracking ? t('characters.upgradeLevelCurveHint') : t('characters.upgradeLevelCurveAdventureHint')}
           </div>
         </div>
