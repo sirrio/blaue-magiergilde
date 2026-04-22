@@ -63,6 +63,7 @@ const { buildCharacterListView, buildCharactersSettingsView, buildCharacterLangu
 const { formatLocalIsoDate } = require('../dateUtils');
 const { calculateBubblesInCurrentLevel, calculateLevel } = require('../utils/characterTier');
 const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded } = require('../utils/levelProgression');
+const { canUseLevelCurveUpgradeForUserId } = require('../utils/featureAccess');
 
 const { replyNotLinked, notLinkedContent, buildNotLinkedButtons } = require('../linkingUi');
 const {
@@ -196,12 +197,15 @@ async function buildCharacterCardPayloadForInteraction(interactionUser, characte
     await ensureLevelProgressionLoaded();
     const registrationState = await getCharacterRegistrationBlock(interactionUser, character.id);
     const activeVersionId = activeLevelProgressionVersionId();
+    /** TODO: remove this temporary beta allowlist once level curve upgrades are released for everyone. */
+    const canUseLevelCurveUpgrade = canUseLevelCurveUpgradeForUserId(character.user_id);
 
     return buildCharacterCardPayload({
         character: {
             ...character,
             locale: await getLinkedUserLocaleForDiscord(interactionUser),
-            has_progression_upgrade_available: safeInt(character.progression_version_id) > 0
+            has_progression_upgrade_available: canUseLevelCurveUpgrade
+                && safeInt(character.progression_version_id) > 0
                 && safeInt(character.progression_version_id) !== activeVersionId,
         },
         ownerDiscordId,
@@ -2696,7 +2700,12 @@ async function handle(interaction) {
 
         const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
         if (!state.ok) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, {
+                content: state.reason === 'feature_disabled'
+                    ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                    : await translateInteraction(interaction, 'characters.characterNotFound'),
+                flags: MessageFlags.Ephemeral,
+            });
             return true;
         }
 
@@ -2737,7 +2746,12 @@ async function handle(interaction) {
 
         const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
         if (!state.ok) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, {
+                content: state.reason === 'feature_disabled'
+                    ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                    : await translateInteraction(interaction, 'characters.characterNotFound'),
+                flags: MessageFlags.Ephemeral,
+            });
             return true;
         }
 
@@ -2778,7 +2792,12 @@ async function handle(interaction) {
 
         const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
         if (!state.ok) {
-            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            await updateManageMessage(interaction, {
+                content: state.reason === 'feature_disabled'
+                    ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                    : await translateInteraction(interaction, 'characters.characterNotFound'),
+                flags: MessageFlags.Ephemeral,
+            });
             return true;
         }
 
@@ -2837,6 +2856,8 @@ async function handle(interaction) {
                 content = t('characters.upgradeLevelCurveManualRangeHint', { level: result.minLevel, maxLevel: result.maxLevel }, locale);
             } else if (result.reason === 'bubble_shop_floor') {
                 content = 'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.';
+            } else if (result.reason === 'feature_disabled') {
+                content = await translateInteraction(interaction, 'common.actionDeniedBody');
             } else if (result.reason === 'character_not_found' || result.reason === 'not_found') {
                 content = await translateInteraction(interaction, 'characters.characterNotFound');
             }
@@ -2969,7 +2990,12 @@ async function handle(interaction) {
         if (action === 'upgrade') {
             const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
             if (!state.ok) {
-                await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+                await updateManageMessage(interaction, {
+                    content: state.reason === 'feature_disabled'
+                        ? await translateInteraction(interaction, 'common.actionDeniedBody')
+                        : await translateInteraction(interaction, 'characters.characterNotFound'),
+                    flags: MessageFlags.Ephemeral,
+                });
                 return true;
             }
 

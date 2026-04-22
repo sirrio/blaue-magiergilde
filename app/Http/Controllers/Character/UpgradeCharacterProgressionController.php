@@ -8,6 +8,7 @@ use App\Http\Requests\Character\UpgradeCharacterProgressionRequest;
 use App\Models\Character;
 use App\Support\CharacterBubbleShop;
 use App\Support\CharacterProgressionState;
+use App\Support\FeatureAccess;
 use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,8 @@ class UpgradeCharacterProgressionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $character->user_id === $user->id, 403);
+        /** TODO: remove this temporary beta guard once level curve upgrades are released for everyone. */
+        abort_unless(FeatureAccess::canUseLevelCurveUpgrade($user), 403);
 
         if ($character->is_filler) {
             return redirect()->back()->withErrors([

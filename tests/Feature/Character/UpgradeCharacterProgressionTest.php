@@ -7,13 +7,32 @@ use App\Models\LevelProgressionVersion;
 use App\Models\User;
 use App\Support\CharacterBubbleShop;
 use App\Support\LevelProgression;
+use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {
+    Config::set('features.level_curve_upgrade_user_ids', range(1, 10000));
     LevelProgression::clearCache();
 });
 
 afterEach(function () {
     LevelProgression::clearCache();
+});
+
+it('forbids the progression upgrade route for users outside the beta allowlist', function () {
+    Config::set('features.level_curve_upgrade_user_ids', []);
+
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create([
+        'simplified_tracking' => true,
+        'progression_version_id' => LevelProgression::activeVersionId(),
+        'is_filler' => false,
+    ]);
+
+    $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
+        'level' => 2,
+        'bubbles_in_level' => 0,
+        'allow_outside_range_without_downtime' => true,
+    ])->assertForbidden();
 });
 
 it('upgrades a character to the active progression version and stores the chosen target level', function () {

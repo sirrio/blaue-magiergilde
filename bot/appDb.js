@@ -15,6 +15,7 @@ const {
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
 const { calculateMinAllowedLevel } = require('./utils/quickMode');
 const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded, levelFromAvailableBubbles } = require('./utils/levelProgression');
+const { canUseLevelCurveUpgradeForUserId } = require('./utils/featureAccess');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -38,6 +39,11 @@ function uniqueNumberList(values) {
         .filter(value => Number.isFinite(value) && value > 0)
         .map(value => Math.floor(value));
     return Array.from(new Set(numbers));
+}
+
+async function canUseLevelCurveUpgradeForDiscordUser(discordUser) {
+    const userId = await getLinkedUserIdForDiscord(discordUser);
+    return canUseLevelCurveUpgradeForUserId(userId);
 }
 
 const allowedTiers = new Set(['bt', 'lt', 'ht', 'et']);
@@ -234,6 +240,11 @@ async function countAdventureTrackedBaseBubbles(connection, characterId, startTi
 
 async function getCharacterProgressionUpgradeStateForDiscord(discordUser, characterId) {
     await ensureLevelProgressionLoaded();
+
+    /** TODO: remove this temporary beta guard once level curve upgrades are released for everyone. */
+    if (!await canUseLevelCurveUpgradeForDiscordUser(discordUser)) {
+        return { ok: false, reason: 'feature_disabled' };
+    }
 
     const character = await findCharacterForDiscord(discordUser, characterId);
     if (!character) {
@@ -670,6 +681,8 @@ async function getDefaultCharacterClassId(connection) {
 async function listCharactersForDiscord(discordUser) {
     const userId = await getLinkedUserIdForDiscord(discordUser);
     if (!userId) throw new DiscordNotLinkedError();
+    /** TODO: remove this temporary beta allowlist once level curve upgrades are released for everyone. */
+    const canUseLevelCurveUpgrade = canUseLevelCurveUpgradeForUserId(userId);
     const [rows] = await db.execute(
         `
             SELECT
@@ -686,6 +699,7 @@ async function listCharactersForDiscord(discordUser) {
                 c.bubble_shop_spend,
                 c.bubble_shop_legacy_spend,
                 c.progression_version_id,
+                c.user_id,
                 c.manual_adventures_count,
                 c.manual_faction_rank,
                 c.is_filler,
@@ -769,7 +783,12 @@ ${bubbleShopPurchaseJoin}
         `,
         [userId],
     );
-    return rows;
+    return rows.map((row) => ({
+        ...row,
+        has_progression_upgrade_available: canUseLevelCurveUpgrade
+            && safeInt(row.progression_version_id) > 0
+            && safeInt(row.progression_version_id) !== activeLevelProgressionVersionId(),
+    }));
 }
 
 function submittedCharacterCounts(characters, excludeCharacterId = null) {
@@ -866,6 +885,7 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.bubble_shop_spend,
                 c.bubble_shop_legacy_spend,
                 c.progression_version_id,
+                c.user_id,
                 c.manual_adventures_count,
                 c.manual_faction_rank,
                 c.is_filler,

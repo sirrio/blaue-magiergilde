@@ -33,7 +33,6 @@ const {
     countsBubbleAdjustmentsForProgression,
 } = require('../../utils/characterTier');
 const {
-    activeLevelProgressionVersionId,
     bubblesRequiredForLevel,
     ensureLevelProgressionLoaded,
 } = require('../../utils/levelProgression');
@@ -143,8 +142,7 @@ function buildCharacterSummaryLine(character, locale = null) {
     const downtimePart = `${hoursOnly(downtimeUsed)}/${hoursOnly(downtimeMax)}`.padEnd(10);
     let statusPart;
     try {
-        const hasProgressionUpgradeAvailable = safeInt(character.progression_version_id) > 0
-            && safeInt(character.progression_version_id) !== activeLevelProgressionVersionId();
+        const hasProgressionUpgradeAvailable = Boolean(character.has_progression_upgrade_available);
 
         if (hasProgressionUpgradeAvailable) {
             statusPart = t('characters.dashboardStatusCurve', {}, locale);
@@ -333,8 +331,7 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
     let hasProgressionUpgradeAvailable = false;
     try {
-        hasProgressionUpgradeAvailable = safeInt(character.progression_version_id) > 0
-            && safeInt(character.progression_version_id) !== activeLevelProgressionVersionId();
+        hasProgressionUpgradeAvailable = Boolean(character.has_progression_upgrade_available);
     } catch {
         hasProgressionUpgradeAvailable = false;
     }

@@ -498,6 +498,7 @@ export function CharacterCard({
       ? t('characters.levelAnchorHistoryHint')
       : trackingModeLabel
   const hasProgressionUpgrade =
+    Boolean(features?.level_curve_upgrade) &&
     !character.is_filler &&
     typeof activeLevelProgressionVersionId === 'number' &&
     activeLevelProgressionVersionId > 0 &&

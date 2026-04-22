@@ -7,6 +7,7 @@ use App\Models\Character;
 use App\Models\User;
 use App\Support\LevelProgression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -23,6 +24,29 @@ it('shows the character detail page for the owner', function () {
             ->where('activeLevelProgressionVersionId', LevelProgression::activeVersionId())
             ->where('character.id', $character->id)
             ->has('guildCharacters'));
+});
+
+it('shares the beta progression upgrade flag only for allowlisted users', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create();
+
+    Config::set('features.level_curve_upgrade_user_ids', [$user->id]);
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('features.level_curve_upgrade', true));
+
+    Config::set('features.level_curve_upgrade_user_ids', []);
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('features.level_curve_upgrade', false));
 });
 
 it('includes reviewed by name on character detail payload', function () {

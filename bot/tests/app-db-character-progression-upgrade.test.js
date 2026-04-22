@@ -7,6 +7,7 @@ const levelProgressionPath = require.resolve('../utils/levelProgression');
 const originalDbModule = require.cache[dbPath];
 const originalAppDbModule = require.cache[appDbPath];
 const originalLevelProgressionModule = require.cache[levelProgressionPath];
+const originalLevelCurveUpgradeUserIds = process.env.FEATURE_LEVEL_CURVE_UPGRADE_USER_IDS;
 
 let scenario = 'adventure';
 let updates = [];
@@ -322,6 +323,8 @@ const { getCharacterProgressionUpgradeStateForDiscord, upgradeCharacterProgressi
 
 Promise.resolve()
     .then(async () => {
+        process.env.FEATURE_LEVEL_CURVE_UPGRADE_USER_IDS = '7';
+
         const discordUser = {
             id: '117027601209360389',
             username: 'sirrio',
@@ -377,6 +380,14 @@ Promise.resolve()
         assert.equal(inserts[0].bindings[1], 'downtime');
         assert.equal(inserts[0].bindings[2], 7);
 
+        process.env.FEATURE_LEVEL_CURVE_UPGRADE_USER_IDS = '';
+        const disabledState = await getCharacterProgressionUpgradeStateForDiscord(discordUser, 42);
+        assert.equal(disabledState.ok, false);
+        assert.equal(disabledState.reason, 'feature_disabled');
+        const disabledUpgrade = await upgradeCharacterProgressionForDiscord(discordUser, 42, 14, 0);
+        assert.equal(disabledUpgrade.ok, false);
+        assert.equal(disabledUpgrade.reason, 'feature_disabled');
+
         console.log('app-db-character-progression-upgrade.test.js passed');
     })
     .finally(() => {
@@ -396,5 +407,11 @@ Promise.resolve()
             delete require.cache[levelProgressionPath];
         } else {
             require.cache[levelProgressionPath] = originalLevelProgressionModule;
+        }
+
+        if (originalLevelCurveUpgradeUserIds === undefined) {
+            delete process.env.FEATURE_LEVEL_CURVE_UPGRADE_USER_IDS;
+        } else {
+            process.env.FEATURE_LEVEL_CURVE_UPGRADE_USER_IDS = originalLevelCurveUpgradeUserIds;
         }
     });
