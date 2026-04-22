@@ -8,7 +8,7 @@ Route::middleware(['auth'])
     ->name('compendium.items.index');
 
 Route::middleware(['auth', 'admin'])
-    ->get('/admin/items', fn () => redirect()->route('compendium.items.index'))
+    ->get('/admin/items', [ItemController::class, 'index'])
     ->name('admin.items.index');
 
 Route::middleware(['auth', 'admin'])

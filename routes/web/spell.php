@@ -8,7 +8,7 @@ Route::middleware(['auth'])
     ->name('compendium.spells.index');
 
 Route::middleware(['auth', 'admin'])
-    ->get('/admin/spells', fn () => redirect()->route('compendium.spells.index'))
+    ->get('/admin/spells', [SpellController::class, 'index'])
     ->name('admin.spells.index');
 
 Route::middleware(['auth', 'admin'])

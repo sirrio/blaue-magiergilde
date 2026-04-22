@@ -8,7 +8,7 @@ Route::middleware(['auth'])
     ->name('compendium.mundane-item-variants.index');
 
 Route::middleware(['auth', 'admin'])
-    ->get('/admin/mundane-item-variants', fn () => redirect()->route('compendium.mundane-item-variants.index'))
+    ->get('/admin/mundane-item-variants', [MundaneItemVariantController::class, 'index'])
     ->name('admin.mundane-item-variants.index');
 
 Route::middleware(['auth', 'admin'])

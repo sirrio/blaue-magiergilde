@@ -9,7 +9,7 @@ Route::middleware(['auth'])
     ->name('compendium.character-classes.index');
 
 Route::middleware(['auth', 'admin'])
-    ->get('/admin/character-classes', fn () => redirect()->route('compendium.character-classes.index'))
+    ->get('/admin/character-classes', [CharacterClassController::class, 'index'])
     ->name('admin.character-classes.index');
 
 Route::middleware(['auth', 'admin'])
