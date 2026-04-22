@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { FileInput } from '@/components/ui/file-input'
 import { Modal, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
+import { Tooltip } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { TextArea } from '@/components/ui/text-area'
 import { getAllyDisplayName, getAllyOwnerName, getGuildCharacterOptionLabel, isDeletedLinkedAlly } from '@/helper/allyDisplay'
@@ -52,15 +53,19 @@ const buildSharedAdventureCountMap = (character: Character): Map<number, number>
 }
 
 const SharedAdventureSummary = ({ count }: { count: number }) => {
+  const t = useTranslate()
+
   if (count <= 0) {
     return null
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-0.5 self-center whitespace-nowrap text-[10px] leading-none text-base-content/50">
-      <span>{count}</span>
-      <Handshake size={11} className="text-base-content/60" />
-    </span>
+    <Tooltip content={t('characters.allySharedAdventures', { count })} placement="left">
+      <span className="inline-flex shrink-0 items-center gap-0.5 self-center whitespace-nowrap text-[10px] leading-none text-base-content/50">
+        <span>{count}</span>
+        <Handshake size={11} className="text-base-content/60" aria-label={t('characters.allySharedAdventures', { count })} />
+      </span>
+    </Tooltip>
   )
 }
 
@@ -225,47 +230,45 @@ const AllyCard: React.FC<AllyCardProps> = ({
     const ownerName = getAllyOwnerName(ally)
     const deletedLinked = isDeletedLinkedAlly(ally)
     return (
-      <div
-        className={`card bg-base-100 cursor-pointer border p-2 shadow-sm hover:shadow-md ${ally.notes && ally.notes.trim() !== '' ? 'tooltip tooltip-info' : ''}`}
-        data-tip={ally.notes && ally.notes.trim() !== '' ? ally.notes : ''}
-        onClick={onEdit}
-      >
-        <div className="flex items-center gap-2">
-          <div
-            className={`bg-base-200 flex-shrink-0 overflow-hidden rounded-full ${large ? 'h-20 w-20' : 'h-10 w-10'}`}
-          >
-            {avatarSrc ? (
-              <img src={avatarSrc} alt={`${displayName}'s avatar`} className="h-full w-full object-cover" />
-            ) : (
-              <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
-            )}
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 items-center gap-1">
-                <h4 className="truncate font-bold leading-tight">
-                  {displayName}
-                </h4>
-                <SharedAdventureSummary count={ally.shared_adventure_count ?? 0} />
-              </div>
-              <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
-                {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
-                {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
-              </span>
+      <Tooltip content={ally.notes && ally.notes.trim() !== '' ? ally.notes : undefined} placement="top" wrapperClassName="w-full" wrapperElement="div">
+        <div className="card bg-base-100 w-full cursor-pointer border p-2 shadow-sm hover:shadow-md" onClick={onEdit}>
+          <div className="flex items-center gap-2">
+            <div
+              className={`bg-base-200 flex-shrink-0 overflow-hidden rounded-full ${large ? 'h-20 w-20' : 'h-10 w-10'}`}
+            >
+              {avatarSrc ? (
+                <img src={avatarSrc} alt={`${displayName}'s avatar`} className="h-full w-full object-cover" />
+              ) : (
+                <div className="text-base-content flex h-full w-full items-center justify-center text-xs">N/A</div>
+              )}
             </div>
-            <p className="text-base-content text-xs">
-              {ally.classes && ally.classes.trim() !== '' ? ally.classes : t('characters.allyNoClasses')} &bull;{' '}
-              {ally.species && ally.species.trim() !== '' ? ally.species : t('characters.allyNoSpecies')}
-            </p>
-            {ownerName ? (
-              <p className="text-xs text-base-content/50">{t('characters.owner')}: {ownerName}</p>
-            ) : deletedLinked ? (
-              <p className="text-xs text-base-content/50">{t('characters.allyDeletedLinkedCharacter')}</p>
-            ) : null}
-            <RatingHearts rating={ally.rating} />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-1">
+                  <h4 className="truncate font-bold leading-tight">
+                    {displayName}
+                  </h4>
+                  <SharedAdventureSummary count={ally.shared_adventure_count ?? 0} />
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-base-200 px-2 py-0.5 text-[10px] uppercase text-base-content/60">
+                  {ally.linked_character_id ? <User size={10} /> : <Link2 size={10} />}
+                  {deletedLinked ? t('characters.linkedDeleted') : ally.linked_character_id ? t('characters.linked') : t('characters.custom')}
+                </span>
+              </div>
+              <p className="text-base-content text-xs">
+                {ally.classes && ally.classes.trim() !== '' ? ally.classes : t('characters.allyNoClasses')} &bull;{' '}
+                {ally.species && ally.species.trim() !== '' ? ally.species : t('characters.allyNoSpecies')}
+              </p>
+              {ownerName ? (
+                <p className="text-xs text-base-content/50">{t('characters.owner')}: {ownerName}</p>
+              ) : deletedLinked ? (
+                <p className="text-xs text-base-content/50">{t('characters.allyDeletedLinkedCharacter')}</p>
+              ) : null}
+              <RatingHearts rating={ally.rating} />
+            </div>
           </div>
         </div>
-      </div>
+      </Tooltip>
     )
   }
   return (

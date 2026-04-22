@@ -4,6 +4,7 @@ import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { List, ListRow } from '@/components/ui/list'
 import { Modal, ModalContent, ModalTitle } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
+import { Tooltip } from '@/components/ui/tooltip'
 import { getAllyDisplayName, getAllyOwnerName, isDeletedLinkedAlly } from '@/helper/allyDisplay'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
@@ -459,13 +460,11 @@ export default function Show({
               <InfoBoxTitle>
                 <Swords size={15} /> {t('characters.adventures')}
                 {!bubbleAdjustmentsCount ? (
-                  <span
-                    className="tooltip tooltip-warning tooltip-bottom text-warning/70 ml-auto cursor-help"
-                    data-tip={t('characters.bubbleShopNotCountedHint')}
-                    aria-label={t('characters.bubbleShopNotCountedHint')}
-                  >
-                    <AlertTriangle size={11} />
-                  </span>
+                  <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom">
+                    <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.bubbleShopNotCountedHint')}>
+                      <AlertTriangle size={11} />
+                    </span>
+                  </Tooltip>
                 ) : null}
               </InfoBoxTitle>
               <InfoBoxLine>
@@ -550,13 +549,11 @@ export default function Show({
                 <InfoBoxTitle>
                   <Crown size={15} /> {t('characters.gameMaster')}
                   {!bubbleAdjustmentsCount ? (
-                    <span
-                      className="tooltip tooltip-warning tooltip-bottom text-warning/70 ml-auto cursor-help"
-                      data-tip={t('characters.gmBubblesNotCountedHint')}
-                      aria-label={t('characters.gmBubblesNotCountedHint')}
-                    >
-                      <AlertTriangle size={11} />
-                    </span>
+                    <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom">
+                      <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.gmBubblesNotCountedHint')}>
+                        <AlertTriangle size={11} />
+                      </span>
+                    </Tooltip>
                   ) : null}
                 </InfoBoxTitle>
                 <InfoBoxLine>
@@ -600,17 +597,19 @@ export default function Show({
               </button>
               {!isReadOnly ? (
                 requiresSubmissionBeforeDowntime ? (
-                  <div className="tooltip tooltip-left shrink-0" data-tip={submissionRequiredReason} aria-label={submissionRequiredReason}>
-                    <Button
-                      size="sm"
-                      className="shrink-0 gap-1"
-                      disabled
-                      aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
-                    >
-                      {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
-                      <span className="hidden sm:inline">{simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventure')}</span>
-                    </Button>
-                  </div>
+                  <Tooltip content={submissionRequiredReason} placement="left" wrapperElement="div">
+                    <div className="shrink-0" aria-label={submissionRequiredReason}>
+                      <Button
+                        size="sm"
+                        className="shrink-0 gap-1"
+                        disabled
+                        aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
+                      >
+                        {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
+                        <span className="hidden sm:inline">{simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventure')}</span>
+                      </Button>
+                    </div>
+                  </Tooltip>
                 ) : simplifiedTracking ? (
                   <SetCharacterLevelModal
                     character={character}
@@ -912,12 +911,14 @@ export default function Show({
               </button>
               {!isReadOnly ? (
                 requiresSubmissionBeforeDowntime ? (
-                  <div className="tooltip tooltip-left shrink-0" data-tip={submissionRequiredReason} aria-label={submissionRequiredReason}>
-                    <Button size="sm" className="shrink-0 gap-1" disabled aria-label={t('characters.addDowntimeDisabled')}>
-                      <FlameKindling size={14} />
-                      <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
-                    </Button>
-                  </div>
+                  <Tooltip content={submissionRequiredReason} placement="left" wrapperElement="div">
+                    <div className="shrink-0" aria-label={submissionRequiredReason}>
+                      <Button size="sm" className="shrink-0 gap-1" disabled aria-label={t('characters.addDowntimeDisabled')}>
+                        <FlameKindling size={14} />
+                        <span className="hidden sm:inline">{t('characters.addDowntime')}</span>
+                      </Button>
+                    </div>
+                  </Tooltip>
                 ) : canLogActivity ? (
                   <StoreDowntimeModal
                     character={character}
@@ -1197,6 +1198,10 @@ export default function Show({
                                   <button
                                     type="button"
                                     className="text-base-content/60 hover:text-base-content inline-flex w-fit cursor-pointer items-center gap-1 text-xs transition-colors"
+                                    aria-label={t('characters.openAllyMeetingsWithCount', {
+                                      name: getAllyDisplayName(ally),
+                                      count: sharedAdventureCount,
+                                    })}
                                     onClick={() =>
                                       setActiveAllyMeetings({
                                         allyName: getAllyDisplayName(ally),
@@ -1204,8 +1209,10 @@ export default function Show({
                                       })
                                     }
                                   >
-                                    <Handshake size={12} className="text-base-content/45" />
-                                    {t('characters.allySharedAdventures', { count: sharedAdventureCount })}
+                                    <span className="inline-flex items-center gap-1">
+                                      <Handshake size={12} className="text-base-content/45" />
+                                      {t('characters.allySharedAdventures', { count: sharedAdventureCount })}
+                                    </span>
                                   </button>
                                 </div>
                               </div>
@@ -1221,8 +1228,8 @@ export default function Show({
                       })}
                     </List>
                     <div className="hidden overflow-x-auto md:block">
-                      <div className="min-w-[680px]">
-                        <div className="text-base-content/50 grid grid-cols-[minmax(0,1.45fr)_minmax(0,1.1fr)_104px_60px] gap-3 px-2 pb-2 text-xs font-semibold">
+                      <div className="min-w-[760px]">
+                        <div className="text-base-content/50 grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_104px_152px] gap-3 px-2 pb-2 text-xs font-semibold">
                           <button
                             type="button"
                             className="hover:text-base-content inline-flex cursor-pointer items-center gap-1 text-left transition-colors"
@@ -1249,7 +1256,7 @@ export default function Show({
                           </button>
                           <button
                             type="button"
-                            className="hover:text-base-content inline-flex cursor-pointer items-center justify-center gap-1 text-center transition-colors"
+                            className="hover:text-base-content inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap text-center transition-colors"
                             onClick={() => setAllySort('shared_adventures')}
                           >
                             {t('characters.sharedAdventuresShort')}
@@ -1265,7 +1272,7 @@ export default function Show({
                             return (
                               <ListRow
                                 key={ally.id}
-                                className="grid w-full grid-cols-[minmax(0,1.45fr)_minmax(0,1.1fr)_104px_60px] items-center gap-3"
+                                className="grid w-full grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_104px_152px] items-center gap-3"
                               >
                                 <div className="flex min-w-0 items-center gap-3">
                                   <AllyPortrait ally={ally} className="h-9 w-9" />
@@ -1294,7 +1301,10 @@ export default function Show({
                                 <button
                                   type="button"
                                   className="text-base-content/70 hover:text-base-content inline-flex cursor-pointer items-center justify-center gap-1 text-sm transition-colors"
-                                  aria-label={t('characters.openAllyMeetings', { name: getAllyDisplayName(ally) })}
+                                  aria-label={t('characters.openAllyMeetingsWithCount', {
+                                    name: getAllyDisplayName(ally),
+                                    count: sharedAdventureCount,
+                                  })}
                                   onClick={() =>
                                     setActiveAllyMeetings({
                                       allyName: getAllyDisplayName(ally),
@@ -1302,8 +1312,10 @@ export default function Show({
                                     })
                                   }
                                 >
-                                  <span>{sharedAdventureCount}</span>
-                                  <Handshake size={12} className="text-base-content/45" />
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>{sharedAdventureCount}</span>
+                                    <Handshake size={12} className="text-base-content/45" />
+                                  </span>
                                 </button>
                               </ListRow>
                             )

@@ -5,6 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
+import { Tooltip } from '@/components/ui/tooltip'
 import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -153,7 +154,7 @@ const SuggestSpellUpdateModal = ({ spell, sources }: { spell: Spell; sources: So
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} title="Suggest update" aria-label="Suggest update">
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Suggest update">
           <MessageSquarePlus size={14} />
         </Button>
       </ModalTrigger>
@@ -292,8 +293,7 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
             target="_blank"
             rel="noreferrer"
             className="link link-hover font-medium"
-            title={hasCurrentUrl ? 'Open current link' : 'Open legacy link'}
-          >
+            >
             {spell.name}
           </a>
         ) : (
@@ -316,8 +316,7 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
             target="_blank"
             rel="noreferrer"
             className="ml-2 rounded-full border border-info/40 bg-info/10 px-2 py-0.5 text-[9px] uppercase text-info hover:border-info/60"
-            title="Open current link"
-          >
+            >
             Current
           </a>
         ) : null}
@@ -327,32 +326,35 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
             target="_blank"
             rel="noreferrer"
             className="ml-2 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[9px] uppercase text-warning hover:border-warning/60"
-            title="Open legacy link"
-          >
+            >
             Legacy
           </a>
         ) : null}
       </div>
       <div className="flex items-center justify-center text-xs">
         {isGuildEnabled ? (
-          <Shield className="h-4 w-4 text-success" aria-label="Allowed in guild" />
+          <Tooltip content="Allowed in guild" placement="top">
+            <span className="inline-flex" aria-label="Allowed in guild">
+              <Shield className="h-4 w-4 text-success" />
+            </span>
+          </Tooltip>
         ) : (
-          <span
-            className="relative inline-flex h-4 w-4 items-center justify-center"
-            title="Not allowed in guild"
-            aria-label="Not allowed in guild"
-          >
-            <Shield className="h-4 w-4 text-base-content/40" />
-            <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
-          </span>
+          <Tooltip content="Not allowed in guild" placement="top">
+            <span className="relative inline-flex h-4 w-4 items-center justify-center" aria-label="Not allowed in guild">
+              <Shield className="h-4 w-4 text-base-content/40" />
+              <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
+            </span>
+          </Tooltip>
         )}
       </div>
-      <div className="flex items-center justify-center text-xs" title={rulingLabel} aria-label={rulingLabel}>
-        <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
-      </div>
+      <Tooltip content={rulingLabel} placement="top" wrapperElement="div">
+        <div className="flex items-center justify-center text-xs" aria-label={rulingLabel}>
+          <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
+        </div>
+      </Tooltip>
       <div className="flex items-center gap-1">
         <details className="dropdown dropdown-end">
-          <summary className="btn btn-xs btn-ghost btn-square" aria-label="Spell link options" title="Spell link options">
+          <summary className="btn btn-xs btn-ghost btn-square" aria-label="Spell link options">
             <Copy size={14} />
             <ChevronDown size={12} className="-ml-1 text-base-content/60" />
           </summary>
@@ -396,18 +398,18 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
             <Modal>
               <ModalTrigger>
-                <Button size="xs" variant="ghost" modifier="square" title="Edit spell" aria-label="Edit spell">
+                <Button size="xs" variant="ghost" modifier="square" aria-label="Edit spell">
                   <Pencil size={14} />
                 </Button>
               </ModalTrigger>
               <ModalTitle>
                 <div className="flex items-center">
                   Update Spell
-                  <div className="tooltip tooltip-right w-16" data-tip="Search on D&D Beyond">
-                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center">
+                  <Tooltip content="Search on D&D Beyond" placement="right">
+                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center" aria-label="Search on D&D Beyond">
                       <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
                     </a>
-                  </div>
+                  </Tooltip>
                 </div>
               </ModalTitle>
               <ModalContent>
@@ -521,7 +523,6 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
               variant="ghost"
               modifier="square"
               color="error"
-              title="Delete spell"
               aria-label="Delete spell"
               onClick={handleDeleteSpell}
             >

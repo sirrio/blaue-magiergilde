@@ -5,6 +5,7 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Select, SelectLabel, SelectOptions } from '@/components/ui/select'
 import { TextArea } from '@/components/ui/text-area'
 import { toast } from '@/components/ui/toast'
+import { Tooltip } from '@/components/ui/tooltip'
 import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import { renderDiscordLine } from '@/lib/shopLineTemplate'
@@ -338,7 +339,6 @@ const AddSpellModal = ({ shopItemId }: { shopItemId: number }) => {
           variant="ghost"
           modifier="square"
           onClick={() => setIsOpen(true)}
-          title="Add spell to listing"
           aria-label="Add spell to listing"
         >
           <Plus size={14} />
@@ -664,7 +664,7 @@ const SuggestItemUpdateModal = ({ item, sources, mundaneVariants }: { item: Item
   return (
     <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
       <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} title="Suggest update" aria-label="Suggest update">
+        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Suggest update">
           <MessageSquarePlus size={14} />
         </Button>
       </ModalTrigger>
@@ -1057,42 +1057,47 @@ export default function ItemRow({
       {!shopItem ? (
         <div className="flex items-center justify-center gap-2 text-xs">
           {isShopEnabled ? (
-            <Store className="h-4 w-4 text-success" aria-label="Included in shop rolls" />
+            <Tooltip content="Included in shop rolls" placement="top">
+              <span className="inline-flex" aria-label="Included in shop rolls">
+                <Store className="h-4 w-4 text-success" />
+              </span>
+            </Tooltip>
           ) : (
-            <span
-              className="relative inline-flex h-4 w-4 items-center justify-center"
-              title="Excluded from shop rolls"
-              aria-label="Excluded from shop rolls"
-            >
-              <Store className="h-4 w-4 text-base-content/40" />
-              <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
-            </span>
+            <Tooltip content="Excluded from shop rolls" placement="top">
+              <span className="relative inline-flex h-4 w-4 items-center justify-center" aria-label="Excluded from shop rolls">
+                <Store className="h-4 w-4 text-base-content/40" />
+                <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
+              </span>
+            </Tooltip>
           )}
           {isGuildEnabled ? (
-            <Shield className="h-4 w-4 text-success" aria-label="Allowed in guild" />
+            <Tooltip content="Allowed in guild" placement="top">
+              <span className="inline-flex" aria-label="Allowed in guild">
+                <Shield className="h-4 w-4 text-success" />
+              </span>
+            </Tooltip>
           ) : (
-            <span
-              className="relative inline-flex h-4 w-4 items-center justify-center"
-              title="Not allowed in guild"
-              aria-label="Not allowed in guild"
-            >
-              <Shield className="h-4 w-4 text-base-content/40" />
-              <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
-            </span>
+            <Tooltip content="Not allowed in guild" placement="top">
+              <span className="relative inline-flex h-4 w-4 items-center justify-center" aria-label="Not allowed in guild">
+                <Shield className="h-4 w-4 text-base-content/40" />
+                <span className="absolute h-0.5 w-5 rotate-45 bg-error"></span>
+              </span>
+            </Tooltip>
           )}
         </div>
       ) : null}
       {!shopItem ? (
-        <div className="flex items-center justify-center text-xs" title={rulingLabel} aria-label={rulingLabel}>
-          <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
-        </div>
+        <Tooltip content={rulingLabel} placement="top" wrapperElement="div">
+          <div className="flex items-center justify-center text-xs" aria-label={rulingLabel}>
+            <Scale className={cn('h-4 w-4', hasRulingChange ? 'text-warning' : 'text-base-content/40')} />
+          </div>
+        </Tooltip>
       ) : null}
       <div className="flex items-center gap-1">
         <Button
           size="xs"
           variant="ghost"
           modifier="square"
-          title="Copy Discord line"
           aria-label="Copy Discord line"
           onClick={() => copyToClipboard(discordLineText, 'Item line copied in Discord format.')}
         >
@@ -1105,7 +1110,6 @@ export default function ItemRow({
             variant="ghost"
             modifier="square"
             onClick={handleRemoveSpell}
-            title="Remove spell from listing"
             aria-label="Remove spell from listing"
           >
             <Minus size={14} />
@@ -1119,7 +1123,6 @@ export default function ItemRow({
               variant="ghost"
               modifier="square"
               onClick={handleSnapshotRefresh}
-              title="Refresh listing from base item"
               aria-label="Refresh listing from base item"
             >
               <RotateCcw size={14} />
@@ -1142,7 +1145,6 @@ export default function ItemRow({
               modifier="square"
               color="error"
               onClick={handleRerollShopLine}
-              title="Reroll line"
               aria-label="Reroll line"
             >
               <Dices size={14} />
@@ -1154,18 +1156,18 @@ export default function ItemRow({
             <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
             <Modal>
               <ModalTrigger>
-                <Button size="xs" variant="ghost" modifier="square" title="Edit item" aria-label="Edit item">
+                <Button size="xs" variant="ghost" modifier="square" aria-label="Edit item">
                   <Pencil size={14} />
                 </Button>
               </ModalTrigger>
               <ModalTitle>
                 <div className="flex items-center">
                   Update item
-                  <div className="tooltip tooltip-right w-16" data-tip="Search on D&D Beyond">
-                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center">
+                  <Tooltip content="Search on D&D Beyond" placement="right">
+                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center" aria-label="Search on D&D Beyond">
                       <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
                     </a>
-                  </div>
+                  </Tooltip>
                 </div>
               </ModalTitle>
               <ModalContent>
@@ -1354,7 +1356,7 @@ export default function ItemRow({
           </>
         ) : null}
         {!shopItem && canManage ? (
-          <Button size="xs" variant="ghost" modifier="square" color="error" onClick={handleDeleteItem} title="Delete item" aria-label="Delete item">
+          <Button size="xs" variant="ghost" modifier="square" color="error" onClick={handleDeleteItem} aria-label="Delete item">
             <Trash size={14} />
           </Button>
         ) : null}

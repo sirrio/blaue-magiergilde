@@ -6,6 +6,7 @@ import { InfoBox, InfoBoxLine, InfoBoxTitle } from '@/components/ui/info-box'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { Progress } from '@/components/ui/progress'
 import { TextArea } from '@/components/ui/text-area'
+import { Tooltip } from '@/components/ui/tooltip'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
@@ -103,9 +104,11 @@ function CharacterSettingsModal({
   const t = useTranslate()
 
   const SettingHelp = ({ text, label }: { text: string; label: string }) => (
-    <span className="text-base-content/45 inline-flex cursor-help items-center" title={text} aria-label={`${label}: ${text}`}>
-      <CircleHelp size={14} />
-    </span>
+    <Tooltip content={text} placement="top">
+      <span className="text-base-content/45 inline-flex cursor-help items-center" aria-label={`${label}: ${text}`}>
+        <CircleHelp size={14} />
+      </span>
+    </Tooltip>
   )
 
   return (
@@ -554,19 +557,18 @@ export function CharacterCard({
               onAvatarMaskedChange={onAvatarMaskedChange}
               onPrivateModeChange={onPrivateModeChange}
             />
-            <Button
-              className="flex"
-              size="xs"
-              modifier="square"
-              aria-label={t('characters.reorderCharacter')}
-              title={t('characters.reorderCharacter')}
-              {...attributes}
-              {...listeners}
-            >
+              <Button
+                className="flex"
+                size="xs"
+                modifier="square"
+                aria-label={t('characters.reorderCharacter')}
+                {...attributes}
+                {...listeners}
+              >
               <Grip size={14} />
             </Button>
             <UpdateCharacterModal character={character}>
-              <Button className="flex" size="xs" modifier="square" aria-label={t('characters.editCharacter')} title={t('characters.editCharacter')}>
+              <Button className="flex" size="xs" modifier="square" aria-label={t('characters.editCharacter')}>
                 <Pencil size={14} />
               </Button>
             </UpdateCharacterModal>
@@ -577,16 +579,17 @@ export function CharacterCard({
                 modifier="square"
                 color="error"
                 aria-label={t('characters.deleteCharacter')}
-                title={t('characters.deleteCharacter')}
               >
                 <XCircle size={14} />
               </Button>
             </DestroyCharacterModal>
           </CardAction>
           <CardTitle className={cn('flex items-center gap-2 pr-0 pb-0')}>
-            <span className={cn('tooltip tooltip-bottom inline-flex items-center', statusClass)} data-tip={statusTooltip} aria-label={statusTooltip}>
-              {statusIcon}
-            </span>
+            <Tooltip content={statusTooltip} placement="bottom">
+              <span className={cn('inline-flex items-center', statusClass)} aria-label={statusTooltip}>
+                {statusIcon}
+              </span>
+            </Tooltip>
             <span className="min-w-0 flex-1 truncate">{character.name}</span>
           </CardTitle>
           <CardContent>
@@ -596,13 +599,14 @@ export function CharacterCard({
                 Level {level} {calculateClassString(character)}
               </span>
               {hasRoom ? (
-                <span
-                  className="border-primary/15 bg-primary/8 text-primary/75 ml-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
-                  title={t('characters.roomAssigned')}
-                  aria-label={t('characters.roomAssigned')}
-                >
-                  <MapPin size={11} />
-                </span>
+                <Tooltip content={t('characters.roomAssigned')} placement="top">
+                  <span
+                    className="border-primary/15 bg-primary/8 text-primary/75 ml-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
+                    aria-label={t('characters.roomAssigned')}
+                  >
+                    <MapPin size={11} />
+                  </span>
+                </Tooltip>
               ) : null}
             </div>
             <div className="mt-2 grid grid-cols-3 gap-1.5 md:hidden">
@@ -627,7 +631,6 @@ export function CharacterCard({
                   variant="outline"
                   className="w-full justify-center"
                   aria-label={t('characters.editCharacter')}
-                  title={t('characters.editCharacter')}
                 >
                   <Pencil size={14} />
                 </Button>
@@ -639,7 +642,6 @@ export function CharacterCard({
                   color="error"
                   className="w-full justify-center"
                   aria-label={t('characters.deleteCharacter')}
-                  title={t('characters.deleteCharacter')}
                 >
                   <XCircle size={14} />
                 </Button>
@@ -703,13 +705,11 @@ export function CharacterCard({
                     <InfoBoxTitle>
                       <Swords size={15} /> {t('characters.adventures')}
                       {!bubbleAdjustmentsCount ? (
-                        <span
-                          className="tooltip tooltip-warning tooltip-bottom text-warning/70 ml-auto cursor-help"
-                          data-tip={t('characters.bubbleShopNotCountedHint')}
-                          aria-label={t('characters.bubbleShopNotCountedHint')}
-                        >
-                          <AlertTriangle size={11} />
-                        </span>
+                        <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom">
+                          <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.bubbleShopNotCountedHint')}>
+                            <AlertTriangle size={11} />
+                          </span>
+                        </Tooltip>
                       ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
@@ -785,27 +785,23 @@ export function CharacterCard({
                     <InfoBoxLine>
                       {t('characters.other')}: {formattedDowntimes.other}
                     </InfoBoxLine>
-                    <div
-                      className="tooltip tooltip-info tooltip-bottom w-full"
-                      data-tip={remainingDowntimeTooltip}
-                      aria-label={remainingDowntimeTooltip}
-                    >
-                      <InfoBoxLine className="cursor-help font-semibold">
-                        {t('characters.remaining')}: {remainingDowntimeDisplay}
-                      </InfoBoxLine>
-                    </div>
+                    <Tooltip content={remainingDowntimeTooltip} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                      <div className="w-full" aria-label={remainingDowntimeTooltip}>
+                        <InfoBoxLine className="cursor-help font-semibold">
+                          {t('characters.remaining')}: {remainingDowntimeDisplay}
+                        </InfoBoxLine>
+                      </div>
+                    </Tooltip>
                   </InfoBox>
                   <InfoBox>
                     <InfoBoxTitle>
                       <Crown size={15} /> {t('characters.gameMaster')}
                       {!bubbleAdjustmentsCount ? (
-                        <span
-                          className="tooltip tooltip-warning tooltip-bottom text-warning/70 ml-auto cursor-help"
-                          data-tip={t('characters.gmBubblesNotCountedHint')}
-                          aria-label={t('characters.gmBubblesNotCountedHint')}
-                        >
-                          <AlertTriangle size={11} />
-                        </span>
+                        <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom">
+                          <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.gmBubblesNotCountedHint')}>
+                            <AlertTriangle size={11} />
+                          </span>
+                        </Tooltip>
                       ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
@@ -854,19 +850,21 @@ export function CharacterCard({
               {canSubmitForApproval ? (
                 <div className="col-span-2 sm:col-span-5">
                   {submissionBlockedReason ? (
-                    <div className="tooltip tooltip-bottom w-full" data-tip={submissionBlockedReason} aria-label={submissionBlockedReason}>
-                      <Button
-                        size="sm"
-                        color="warning"
-                        className="w-full justify-center"
-                        disabled
-                        aria-label={t('characters.registerWithMagiergilde')}
-                        title={submissionBlockedReason}
-                      >
-                        <Clock size={14} />
-                        <span>{t('characters.registerWithMagiergilde')}</span>
-                      </Button>
-                    </div>
+                    <Tooltip content={submissionBlockedReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                      <div className="w-full" aria-label={submissionBlockedReason}>
+                        <Button
+                          size="sm"
+                          color="warning"
+                          className="w-full justify-center"
+                          disabled
+                          aria-label={t('characters.registerWithMagiergilde')}
+                          title={submissionBlockedReason}
+                        >
+                          <Clock size={14} />
+                          <span>{t('characters.registerWithMagiergilde')}</span>
+                        </Button>
+                      </div>
+                    </Tooltip>
                   ) : (
                     <SubmitForApprovalModal character={character} processing={isSubmittingForApproval} onSubmit={submitForApproval} />
                   )}
@@ -878,39 +876,45 @@ export function CharacterCard({
                 </Button>
               )}
               {requiresSubmissionBeforeDowntime ? (
-                <div className="tooltip tooltip-bottom w-full" data-tip={submissionRequiredReason} aria-label={submissionRequiredReason}>
-                  <Button
-                    size="sm"
-                    className="w-full justify-center gap-1"
-                    disabled
-                    aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
-                  >
-                    {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
-                    <span className="md:hidden">{simplifiedTracking ? t('characters.setLevel') : t('characters.adventure')}</span>
-                  </Button>
-                </div>
+                <Tooltip content={submissionRequiredReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                  <div className="w-full" aria-label={submissionRequiredReason}>
+                    <Button
+                      size="sm"
+                      className="w-full justify-center gap-1"
+                      disabled
+                      aria-label={simplifiedTracking ? t('characters.setLevel') : t('characters.addAdventureDisabled')}
+                    >
+                      {simplifiedTracking ? <Gauge size={14} /> : <Swords size={14} />}
+                      <span className="md:hidden">{simplifiedTracking ? t('characters.setLevel') : t('characters.adventure')}</span>
+                    </Button>
+                  </div>
+                </Tooltip>
               ) : simplifiedTracking ? (
                 <SetCharacterLevelModal character={character} />
               ) : (
                 <StoreAdventureModal character={character} guildCharacters={guildCharacters}></StoreAdventureModal>
               )}
               {requiresSubmissionBeforeDowntime ? (
-                <div className="tooltip tooltip-bottom w-full" data-tip={submissionRequiredReason} aria-label={submissionRequiredReason}>
-                  <Button size="sm" className="w-full justify-center gap-1" disabled aria-label={t('characters.addDowntimeDisabled')}>
-                    <FlameKindling size={14} />
-                    <span className="md:hidden">{t('characters.downtime')}</span>
-                  </Button>
-                </div>
+                <Tooltip content={submissionRequiredReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                  <div className="w-full" aria-label={submissionRequiredReason}>
+                    <Button size="sm" className="w-full justify-center gap-1" disabled aria-label={t('characters.addDowntimeDisabled')}>
+                      <FlameKindling size={14} />
+                      <span className="md:hidden">{t('characters.downtime')}</span>
+                    </Button>
+                  </div>
+                </Tooltip>
               ) : canLogActivity ? (
                 <StoreDowntimeModal character={character}></StoreDowntimeModal>
               ) : null}
               {requiresSubmissionBeforeDowntime ? (
-                <div className="tooltip tooltip-bottom w-full" data-tip={submissionRequiredReason} aria-label={submissionRequiredReason}>
-                  <Button size="sm" className="w-full justify-center gap-1" disabled aria-label={t('characters.manageAlliesDisabled')}>
-                    <BookHeart size={14} />
-                    <span className="md:hidden">{t('characters.allies')}</span>
-                  </Button>
-                </div>
+                <Tooltip content={submissionRequiredReason} placement="bottom" wrapperClassName="w-full" wrapperElement="div">
+                  <div className="w-full" aria-label={submissionRequiredReason}>
+                    <Button size="sm" className="w-full justify-center gap-1" disabled aria-label={t('characters.manageAlliesDisabled')}>
+                      <BookHeart size={14} />
+                      <span className="md:hidden">{t('characters.allies')}</span>
+                    </Button>
+                  </div>
+                </Tooltip>
               ) : (
                 <AlliesModal character={character} guildCharacters={guildCharacters} />
               )}
