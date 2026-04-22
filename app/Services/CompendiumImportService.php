@@ -780,6 +780,8 @@ class CompendiumImportService
         }
 
         $comparableFields = [
+            'name' => $payload['name'],
+            'type' => $payload['type'],
             'rarity' => $payload['rarity'],
             'cost' => $payload['cost'],
             'extra_cost_note' => $payload['extra_cost_note'],
@@ -1309,6 +1311,16 @@ class CompendiumImportService
 
         if ($exact) {
             return $exact;
+        }
+
+        $nameTypeRarityMatches = Item::query()
+            ->where('name', $payload['name'])
+            ->where('type', $payload['type'])
+            ->where('rarity', $payload['rarity'])
+            ->get();
+
+        if ($nameTypeRarityMatches->count() === 1) {
+            return $nameTypeRarityMatches->first();
         }
 
         if ($payload['source_id'] === null) {

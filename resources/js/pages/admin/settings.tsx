@@ -150,7 +150,7 @@ const getCompendiumPreviewTitle = (
   }
 }
 
-const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged' | 'deleted') => {
+const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged' | 'deleted' | 'invalid') => {
   if (action === 'new') {
     return 'border-success/40 bg-success/10 text-success'
   }
@@ -160,6 +160,10 @@ const getCompendiumActionBadgeClass = (action: 'new' | 'updated' | 'unchanged' |
   }
 
   if (action === 'deleted') {
+    return 'border-error/40 bg-error/10 text-error'
+  }
+
+  if (action === 'invalid') {
     return 'border-error/40 bg-error/10 text-error'
   }
 
@@ -289,6 +293,8 @@ export default function Settings({
   const [showUpdatedPreviewRows, setShowUpdatedPreviewRows] = useState(true)
   const [showUnchangedPreviewRows, setShowUnchangedPreviewRows] = useState(false)
   const [showDeletedPreviewRows, setShowDeletedPreviewRows] = useState(true)
+  const [showInvalidPreviewRows, setShowInvalidPreviewRows] = useState(true)
+  const [importPreviewSearch, setImportPreviewSearch] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const [applyBusy, setApplyBusy] = useState(false)
   const [importPreview, setImportPreview] = useState<{
@@ -839,6 +845,9 @@ export default function Settings({
       setShowNewPreviewRows(true)
       setShowUpdatedPreviewRows(true)
       setShowUnchangedPreviewRows(false)
+      setShowDeletedPreviewRows(true)
+      setShowInvalidPreviewRows(true)
+      setImportPreviewSearch('')
       toast.show('Preview ready.', 'info')
     } catch {
       toast.show('Preview failed.', 'error')
@@ -1006,22 +1015,65 @@ export default function Settings({
       return []
     }
 
-    return importPreview.row_samples.filter((sample) => {
-      if (sample.action === 'new') {
-        return showNewPreviewRows
-      }
+    const previewRows = [
+      ...importPreview.row_samples,
+      ...importPreview.error_samples.map((error) => ({
+        line: error.line ?? null,
+        action: 'invalid' as const,
+        message: error.message ?? 'Invalid row',
+      })),
+    ]
 
-      if (sample.action === 'updated') {
-        return showUpdatedPreviewRows
-      }
+    return previewRows
+      .filter((sample) => {
+        if (sample.action === 'invalid') {
+          return showInvalidPreviewRows
+        }
 
-      if (sample.action === 'deleted') {
-        return showDeletedPreviewRows
-      }
+        if (sample.action === 'new') {
+          return showNewPreviewRows
+        }
 
-      return showUnchangedPreviewRows
-    })
-  }, [importPreview, showDeletedPreviewRows, showNewPreviewRows, showUpdatedPreviewRows, showUnchangedPreviewRows])
+        if (sample.action === 'updated') {
+          return showUpdatedPreviewRows
+        }
+
+        if (sample.action === 'deleted') {
+          return showDeletedPreviewRows
+        }
+
+        return showUnchangedPreviewRows
+      })
+      .sort((left, right) => {
+        const leftLine = typeof left.line === 'number' ? left.line : Number.POSITIVE_INFINITY
+        const rightLine = typeof right.line === 'number' ? right.line : Number.POSITIVE_INFINITY
+
+        if (leftLine !== rightLine) {
+          return leftLine - rightLine
+        }
+
+        if (left.action === right.action) {
+          return 0
+        }
+
+        if (left.action === 'invalid') {
+          return -1
+        }
+
+        if (right.action === 'invalid') {
+          return 1
+        }
+
+        return 0
+      })
+  }, [
+    importPreview,
+    showDeletedPreviewRows,
+    showInvalidPreviewRows,
+    showNewPreviewRows,
+    showUpdatedPreviewRows,
+    showUnchangedPreviewRows,
+  ])
 
   const formatCompendiumChangeValue = useCallback((
     field: string,
@@ -1071,6 +1123,63 @@ export default function Settings({
 
     return String(value)
   }, [mundaneVariantSlugById, sourceShortcodeById])
+
+  const searchedImportPreviewRows = useMemo(() => {
+    const searchTerm = importPreviewSearch.trim().toLowerCase()
+
+    if (searchTerm === '' || !importPreview) {
+      return filteredImportPreviewRows
+    }
+
+    return filteredImportPreviewRows.filter((sample) => {
+      if (sample.action === 'invalid') {
+        const invalidHaystack = [
+          typeof sample.line === 'number' ? `line ${sample.line}` : '',
+          sample.message ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
+
+        return invalidHaystack.includes(searchTerm)
+      }
+
+      const sourceId = typeof sample.payload?.source_id === 'number'
+        ? sample.payload.source_id
+        : Number(sample.payload?.source_id)
+      const sourceLabel = Number.isFinite(sourceId) && sourceById[sourceId]
+        ? sourceById[sourceId]
+        : sample.source_shortcode
+      const previewLabel = getCompendiumPreviewTitle(importPreview.entity_type, sample.payload, sourceLabel)
+      const previewChanges = sample.changes ? Object.entries(sample.changes) : []
+      const changeHaystack = previewChanges
+        .flatMap(([field, change]) => ([
+          getCompendiumChangeLabel(field),
+          formatCompendiumChangeValue(field, change.from),
+          formatCompendiumChangeValue(field, change.to),
+        ]))
+        .join(' ')
+
+      const searchableText = [
+        typeof sample.line === 'number' ? `line ${sample.line}` : '',
+        sample.action,
+        previewLabel.title,
+        previewLabel.details,
+        sourceLabel,
+        changeHaystack,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return searchableText.includes(searchTerm)
+    })
+  }, [
+    filteredImportPreviewRows,
+    formatCompendiumChangeValue,
+    importPreview,
+    importPreviewSearch,
+    sourceById,
+  ])
 
   const approvalChannelLabel = useMemo(() => {
     if (botSettingsForm.data.character_approval_channel_name) {
@@ -1590,7 +1699,7 @@ export default function Settings({
                 {importPreview.override_missing ? (
                   <span className="rounded-full border border-error/40 px-2 py-1 text-error">Deleted on apply: {importPreview.summary.deleted_rows}</span>
                 ) : null}
-                <span className="rounded-full border border-base-200 px-2 py-1">Visible: {filteredImportPreviewRows.length}</span>
+                <span className="rounded-full border border-base-200 px-2 py-1">Visible: {searchedImportPreviewRows.length}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-base-content/60">Show:</span>
@@ -1632,17 +1741,56 @@ export default function Settings({
                     Deleted: {importPreview.summary.deleted_rows}
                   </label>
                 ) : null}
-                <span className="rounded-full border border-error/40 px-2 py-1 text-error">
+                <label className="flex items-center gap-2 rounded-full border border-error/40 px-2 py-1 text-error">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs"
+                    checked={showInvalidPreviewRows}
+                    onChange={(event) => setShowInvalidPreviewRows(event.target.checked)}
+                  />
                   Invalid: {importPreview.summary.invalid_rows}
-                </span>
+                </label>
               </div>
               {importPreview.override_missing ? (
                 <p className="text-xs text-warning">
                   Override mode is active. Existing {importPreview.entity_type} entries missing from this import will be removed on apply.
                 </p>
               ) : null}
+              <div className="max-w-md">
+                <Input
+                  value={importPreviewSearch}
+                  onChange={(event) => setImportPreviewSearch(event.target.value)}
+                  placeholder="Search preview rows"
+                >
+                  Filter rows
+                </Input>
+              </div>
               <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-                {filteredImportPreviewRows.map((sample, index) => {
+                {searchedImportPreviewRows.map((sample, index) => {
+                  if (sample.action === 'invalid') {
+                    return (
+                      <div
+                        key={`invalid-${sample.line ?? index}-${index}`}
+                        className="rounded-lg border border-error/30 bg-error/5 px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-start gap-2">
+                          <span className="text-xs font-semibold text-base-content/70">
+                            {typeof sample.line === 'number' ? `Line ${sample.line}` : 'Unknown line'}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                              getCompendiumActionBadgeClass(sample.action)
+                            )}
+                          >
+                            {sample.action}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-error">{sample.message}</p>
+                      </div>
+                    )
+                  }
+
                   const sourceId = typeof sample.payload?.source_id === 'number'
                     ? sample.payload.source_id
                     : Number(sample.payload?.source_id)
@@ -1654,11 +1802,11 @@ export default function Settings({
 
                   return (
                     <div
-                      key={`${sample.action}-${sample.existing_id ?? sample.line ?? index}`}
+                      key={`${sample.action}-${sample.existing_id ?? 'none'}-${sample.line ?? 'none'}-${index}`}
                       className="rounded-lg border border-base-200 bg-base-100 px-3 py-2"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1 space-y-1">
+                      <div className="space-y-2">
+                        <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-semibold text-base-content/70">
                               {typeof sample.line === 'number' ? `Line ${sample.line}` : 'Delete'}
@@ -1671,48 +1819,41 @@ export default function Settings({
                             >
                               {sample.action}
                             </span>
-                            <p className="truncate text-sm font-semibold text-base-content">{previewLabel.title}</p>
+                            <p className="min-w-0 flex-1 text-sm font-semibold text-base-content">{previewLabel.title}</p>
                           </div>
                           {previewLabel.details ? (
                             <p className="text-xs text-base-content/60">{previewLabel.details}</p>
                           ) : null}
                         </div>
                         {previewChanges.length > 0 ? (
-                        <div className="space-y-1 pt-0.5 text-right text-xs">
-                          {previewChanges.map(([field, change]) => (
-                            <div key={field} className="flex flex-wrap items-start justify-end gap-1 text-base-content/70">
-                              <span className="font-semibold text-base-content">{getCompendiumChangeLabel(field)}:</span>
-                              <span>{formatCompendiumChangeValue(field, change.from)}</span>
-                              <span aria-hidden="true">→</span>
-                              <span className="font-medium text-base-content">{formatCompendiumChangeValue(field, change.to)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className={cn('pt-0.5 text-xs', sample.action === 'deleted' ? 'text-error' : 'text-base-content/50')}>
-                          {sample.action === 'deleted' ? 'Missing from import. Will be removed on apply.' : 'No field changes'}
-                        </p>
-                      )}
+                          <div className="space-y-0.5 rounded-md bg-base-200/40 px-2.5 py-2 text-xs">
+                            {previewChanges.map(([field, change]) => (
+                              <div
+                                key={field}
+                                className="grid gap-x-2 gap-y-0.5 text-base-content/70 sm:grid-cols-[auto_max-content_auto_minmax(0,1fr)] sm:items-start"
+                              >
+                                <span className="font-semibold text-base-content">{getCompendiumChangeLabel(field)}:</span>
+                                <span className="max-w-[18rem] break-all">{formatCompendiumChangeValue(field, change.from)}</span>
+                                <span aria-hidden="true" className="hidden text-base-content/50 sm:block">→</span>
+                                <span className="break-all font-medium text-base-content">{formatCompendiumChangeValue(field, change.to)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className={cn('pt-0.5 text-xs', sample.action === 'deleted' ? 'text-error' : 'text-base-content/50')}>
+                            {sample.action === 'deleted' ? 'Missing from import. Will be removed on apply.' : 'No field changes'}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )
                 })}
-                {filteredImportPreviewRows.length === 0 ? (
+                {searchedImportPreviewRows.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-base-300 px-3 py-6 text-center text-sm text-base-content/60">
                     No preview rows match the current filter.
                   </div>
                 ) : null}
               </div>
-              {importPreview.error_samples.length > 0 ? (
-                <div className="space-y-2 rounded-lg border border-error/20 bg-error/5 p-3">
-                  <p className="text-xs font-semibold text-error">Errors</p>
-                  {importPreview.error_samples.map((error, index) => (
-                    <p key={`${error.line ?? index}-${index}`} className="text-xs text-error">
-                      Line {error.line ?? '-'}: {error.message ?? 'Invalid row'}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
             </div>
           ) : null}
           <div className="mt-4 space-y-2">

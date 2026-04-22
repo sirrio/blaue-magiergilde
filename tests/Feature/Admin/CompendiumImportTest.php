@@ -116,7 +116,9 @@ test('preview flags invalid spell rows with unknown source', function () {
     ], ['Accept' => 'application/json']);
 
     $response->assertOk();
-    expect((int) $response->json('summary.invalid_rows'))->toBe(1);
+    expect((int) $response->json('summary.invalid_rows'))->toBe(1)
+        ->and($response->json('error_samples.0.line'))->toBe(2)
+        ->and($response->json('error_samples.0.message'))->toContain("unknown source shortcode 'UNKNOWN'");
     expect(Spell::query()->count())->toBe(0);
 });
 
@@ -258,6 +260,63 @@ test('item import matches existing unsourced rows by unique url before falling b
     expect($target->fresh())
         ->source_id->toBe($source->id)
         ->cost->toBe('5500 GP');
+});
+
+test('item import matches existing rows by unique name type and rarity when url changes', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $legacySource = Source::factory()->create([
+        'name' => "Dungeon Master's Guide (2014)",
+        'shortcode' => 'DMG',
+    ]);
+    $newSource = Source::factory()->create([
+        'name' => "Dungeon Master's Guide",
+        'shortcode' => 'DMG2024',
+    ]);
+
+    $item = Item::factory()->create([
+        'name' => 'Wraps of Unarmed Power, +1',
+        'type' => 'item',
+        'rarity' => 'uncommon',
+        'cost' => '1000 GP',
+        'url' => 'https://example.test/items/wraps-of-unarmed-power-legacy',
+        'source_id' => $legacySource->id,
+        'guild_enabled' => true,
+        'shop_enabled' => true,
+        'ruling_changed' => false,
+        'ruling_note' => null,
+    ]);
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        '"Wraps of Unarmed Power, +1",item,uncommon,1000 GP,,https://example.test/items/wraps-of-unarmed-power-new,DMG2024,,false,,,true,true,false,',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+        'override_missing' => '1',
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $previewResponse->json('summary.new_rows'))->toBe(0)
+        ->and((int) $previewResponse->json('summary.deleted_rows'))->toBe(0)
+        ->and((int) $previewResponse->json('row_samples.0.existing_id'))->toBe($item->id)
+        ->and($previewResponse->json('row_samples.0.changes.url.from'))->toBe('https://example.test/items/wraps-of-unarmed-power-legacy')
+        ->and($previewResponse->json('row_samples.0.changes.url.to'))->toBe('https://example.test/items/wraps-of-unarmed-power-new')
+        ->and($previewResponse->json('row_samples.0.changes.source_id.from'))->toBe($legacySource->id)
+        ->and($previewResponse->json('row_samples.0.changes.source_id.to'))->toBe($newSource->id);
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+
+    expect(Item::query()->count())->toBe(1);
+    expect($item->fresh())
+        ->url->toBe('https://example.test/items/wraps-of-unarmed-power-new')
+        ->source_id->toBe($newSource->id);
 });
 
 test('template download returns csv content for items', function () {
@@ -835,6 +894,56 @@ test('spell import matches existing rows by url before level and school fallback
         ->and((bool) $spell->fresh()?->guild_enabled)->toBeTrue()
         ->and((bool) $spell->fresh()?->ruling_changed)->toBeTrue()
         ->and($spell->fresh()?->ruling_note)->toBe('Updated ruling');
+});
+
+test('item import preview shows name and type changes when matching by url', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = Source::factory()->create([
+        'name' => "Player's Handbook",
+        'shortcode' => 'PHB',
+    ]);
+
+    $item = Item::factory()->create([
+        'name' => 'Spell Scroll (1st Level)',
+        'type' => 'spellscroll',
+        'rarity' => 'common',
+        'url' => 'https://example.test/items/spell-scroll-level-1',
+        'source_id' => null,
+        'guild_enabled' => true,
+        'shop_enabled' => true,
+        'ruling_changed' => false,
+        'ruling_note' => null,
+    ]);
+
+    $csv = implode("\n", [
+        'name,type,rarity,cost,extra_cost_note,url,source_shortcode,mundane_variant_slugs,default_spell_roll_enabled,default_spell_levels,default_spell_schools,guild_enabled,shop_enabled,ruling_changed,ruling_note',
+        'Spell Scroll (Level 1),consumable,common,50 GP,Component cost,https://example.test/items/spell-scroll-level-1,PHB,,false,,,true,true,true,Updated ruling',
+    ]);
+
+    $previewResponse = $this->actingAs($admin)->post(route('admin.settings.compendium.preview'), [
+        'entity_type' => 'items',
+        'file' => UploadedFile::fake()->createWithContent('items.csv', $csv),
+    ], ['Accept' => 'application/json']);
+
+    $previewResponse->assertOk();
+    expect((int) $previewResponse->json('summary.updated_rows'))->toBe(1)
+        ->and((int) $previewResponse->json('summary.new_rows'))->toBe(0)
+        ->and((int) $previewResponse->json('row_samples.0.existing_id'))->toBe($item->id)
+        ->and($previewResponse->json('row_samples.0.changes.name.from'))->toBe('Spell Scroll (1st Level)')
+        ->and($previewResponse->json('row_samples.0.changes.name.to'))->toBe('Spell Scroll (Level 1)')
+        ->and($previewResponse->json('row_samples.0.changes.type.from'))->toBe('spellscroll')
+        ->and($previewResponse->json('row_samples.0.changes.type.to'))->toBe('consumable');
+
+    $applyResponse = $this->actingAs($admin)->postJson(route('admin.settings.compendium.apply'), [
+        'preview_token' => (string) $previewResponse->json('preview_token'),
+    ]);
+
+    $applyResponse->assertOk();
+    expect($item->fresh()?->name)->toBe('Spell Scroll (Level 1)')
+        ->and($item->fresh()?->type)->toBe('consumable')
+        ->and($item->fresh()?->source_id)->toBe($source->id)
+        ->and((bool) $item->fresh()?->ruling_changed)->toBeTrue()
+        ->and($item->fresh()?->ruling_note)->toBe('Updated ruling');
 });
 
 test('override spell compendium import keeps freshly created spells', function () {
