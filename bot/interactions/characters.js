@@ -3359,6 +3359,7 @@ async function handle(interaction) {
         }
 
         if (action === 'bubble_spend') {
+            const locale = await resolveInteractionLocale(interaction);
             const definitions = definitionsForCharacter(character);
             const quantities = quantitiesForCharacter(character);
             const modal = new ModalBuilder()
