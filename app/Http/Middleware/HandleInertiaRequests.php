@@ -102,7 +102,7 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
-            'classes' => CharacterClass::query()->select(['id', 'name'])->get(),
+            'classes' => CharacterClass::query()->select(['id', 'name', 'guild_enabled'])->get(),
             'factions' => [
                 'none' => 'Keine',
                 'heiler' => 'Heiler',

@@ -324,6 +324,7 @@ module.exports = {
         selectStartingTierPlaceholder: 'Start-Tier auswählen...',
         selectFactionPlaceholder: 'Faction auswählen...',
         selectVersionPlaceholder: 'Version auswählen...',
+        classNotAllowedShort: 'nicht erlaubt',
         classesTitle: 'Classes',
         factionTitle: 'Faction',
         selectedForCharacter: 'Ausgewählt für {name}.',

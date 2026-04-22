@@ -895,15 +895,16 @@ function buildCreationEmbed(step, title, description) {
 }
 
 function buildClassesRow({ ownerDiscordId, classes, selectedIds }) {
+    const visibleClasses = classes.filter(entry => Boolean(entry.guild_enabled));
     const select = new StringSelectMenuBuilder()
         .setCustomId(`charactersCreate_classes_${ownerDiscordId}`)
         .setPlaceholder(t('characters.selectClassesPlaceholder'))
         .setMinValues(1)
-        .setMaxValues(Math.min(25, classes.length));
+        .setMaxValues(Math.min(25, visibleClasses.length));
 
     const selectedSet = new Set(selectedIds.map(String));
 
-    classes.slice(0, 25).forEach(entry => {
+    visibleClasses.slice(0, 25).forEach(entry => {
         select.addOptions(
             new StringSelectMenuOptionBuilder()
                 .setLabel(String(entry.name).slice(0, 100))
@@ -1159,17 +1160,24 @@ async function buildCharacterClassesView({ interaction, character, ownerDiscordI
     const classes = await listCharacterClassesForDiscord();
     const selectedIds = await listCharacterClassIdsForDiscord(interaction.user, character.id);
     const selectedSet = new Set(selectedIds.map(String));
+    const visibleClasses = classes
+        .filter(entry => Boolean(entry.guild_enabled) || selectedSet.has(String(entry.id)))
+        .sort((left, right) => Number(Boolean(right.guild_enabled)) - Number(Boolean(left.guild_enabled)) || String(left.name).localeCompare(String(right.name)));
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`characterClassesSelect_${character.id}_${ownerDiscordId}`)
         .setPlaceholder(t('characters.selectClassesPlaceholder', {}, locale))
         .setMinValues(0)
-        .setMaxValues(Math.min(25, classes.length));
+        .setMaxValues(Math.min(25, visibleClasses.length));
 
-    classes.slice(0, 25).forEach(entry => {
+    visibleClasses.slice(0, 25).forEach(entry => {
         select.addOptions(
             new StringSelectMenuOptionBuilder()
-                .setLabel(String(entry.name).slice(0, 100))
+                .setLabel(
+                    entry.guild_enabled || !selectedSet.has(String(entry.id))
+                        ? String(entry.name).slice(0, 100)
+                        : `${String(entry.name)} (${t('characters.classNotAllowedShort', {}, locale)})`.slice(0, 100),
+                )
                 .setValue(String(entry.id))
                 .setDefault(selectedSet.has(String(entry.id))),
         );

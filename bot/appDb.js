@@ -1737,7 +1737,7 @@ async function updateAdventureForDiscord(
 }
 
 async function listCharacterClassesForDiscord() {
-    const [rows] = await db.execute('SELECT id, name FROM character_classes ORDER BY name ASC');
+    const [rows] = await db.execute('SELECT id, name, guild_enabled FROM character_classes ORDER BY name ASC');
     return rows;
 }
 
@@ -1778,8 +1778,21 @@ async function syncCharacterClassesForDiscord(discordUser, characterId, classIds
 
         const placeholders = safeIds.map(() => '?').join(', ');
         const [validRows] = await connection.execute(
-            `SELECT id FROM character_classes WHERE id IN (${placeholders})`,
-            safeIds,
+            `
+                SELECT cc.id
+                FROM character_classes cc
+                WHERE cc.id IN (${placeholders})
+                  AND (
+                    cc.guild_enabled = 1
+                    OR EXISTS (
+                        SELECT 1
+                        FROM character_character_class ccc
+                        WHERE ccc.character_id = ?
+                          AND ccc.character_class_id = cc.id
+                    )
+                  )
+            `,
+            [...safeIds, characterId],
         );
         const validIds = validRows.map(row => Number(row.id));
 
