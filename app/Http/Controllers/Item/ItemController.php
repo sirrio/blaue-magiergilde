@@ -5,23 +5,24 @@ namespace App\Http\Controllers\Item;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Item\StoreItemRequest;
 use App\Http\Requests\Item\UpdateItemRequest;
+use App\Models\CompendiumComment;
 use App\Models\Item;
 use App\Models\MundaneItemVariant;
 use App\Models\Source;
 use App\Support\ItemCostResolver;
 use App\Support\ItemPricing;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ItemController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(): Response
     {
+        $user = Auth::user();
         $rarity = request('rarity');
         $type = request('type');
         $guild = request('guild');
@@ -30,12 +31,19 @@ class ItemController extends Controller
         $source = request('source');
         $ruling = request('ruling');
         $searchTerm = request('search');
+        $perPageOptions = [25, 50, 100];
+        $perPage = (int) request('per_page', 50);
+        if (! in_array($perPage, $perPageOptions, true)) {
+            $perPage = 50;
+        }
 
         $itemQuery = Item::query();
         $itemQuery->with([
             'source:id,name,shortcode,kind',
             'mundaneVariants:id,name,slug,category,cost_gp,is_placeholder',
+            'comments.user:id,name',
         ]);
+        $itemQuery->withCount('comments');
 
         if (! empty($searchTerm)) {
             $itemQuery->where('name', 'LIKE', "%$searchTerm%");
@@ -49,21 +57,21 @@ class ItemController extends Controller
         if ($guild === 'allowed') {
             $itemQuery->where('guild_enabled', true);
         } elseif ($guild === 'blocked') {
-            $itemQuery->where(function ($query) {
+            $itemQuery->where(function ($query): void {
                 $query->whereNull('guild_enabled')->orWhere('guild_enabled', false);
             });
         }
         if ($shop === 'included') {
             $itemQuery->where('shop_enabled', true);
         } elseif ($shop === 'excluded') {
-            $itemQuery->where(function ($query) {
+            $itemQuery->where(function ($query): void {
                 $query->whereNull('shop_enabled')->orWhere('shop_enabled', false);
             });
         }
         if ($spell === 'attached') {
             $itemQuery->where('default_spell_roll_enabled', true);
         } elseif ($spell === 'none') {
-            $itemQuery->where(function ($query) {
+            $itemQuery->where(function ($query): void {
                 $query->whereNull('default_spell_roll_enabled')->orWhere('default_spell_roll_enabled', false);
             });
         }
@@ -75,7 +83,7 @@ class ItemController extends Controller
         if ($ruling === 'changed') {
             $itemQuery->where('ruling_changed', true);
         } elseif ($ruling === 'none') {
-            $itemQuery->where(function ($query) {
+            $itemQuery->where(function ($query): void {
                 $query->whereNull('ruling_changed')->orWhere('ruling_changed', false);
             });
         }
@@ -102,43 +110,15 @@ class ItemController extends Controller
                 'ruling_note',
                 'source_id',
             ])
-            ->get()
-            ->map(function (Item $item): array {
-                return [
-                    'id' => $item->id,
-                    'name' => $item->name,
-                    'cost' => $item->cost,
-                    'extra_cost_note' => $item->extra_cost_note,
-                    'display_cost' => ItemCostResolver::resolveForItem($item),
-                    'url' => $item->url,
-                    'rarity' => $item->rarity,
-                    'type' => $item->type,
-                    'pick_count' => $item->pick_count,
-                    'shop_enabled' => $item->shop_enabled,
-                    'guild_enabled' => $item->guild_enabled,
-                    'default_spell_roll_enabled' => $item->default_spell_roll_enabled,
-                    'default_spell_levels' => $item->default_spell_levels,
-                    'default_spell_schools' => $item->default_spell_schools,
-                    'ruling_changed' => $item->ruling_changed,
-                    'ruling_note' => $item->ruling_note,
-                    'source_id' => $item->source_id,
-                    'source' => $item->source,
-                    'mundane_variant_ids' => $item->mundaneVariants->pluck('id')->values(),
-                    'mundane_variants' => $item->mundaneVariants->map(static function (MundaneItemVariant $variant): array {
-                        return [
-                            'id' => $variant->id,
-                            'name' => $variant->name,
-                            'slug' => $variant->slug,
-                            'category' => $variant->category,
-                            'cost_gp' => $variant->cost_gp !== null ? (float) $variant->cost_gp : null,
-                            'is_placeholder' => $variant->is_placeholder,
-                        ];
-                    })->values(),
-                ];
-            });
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('item/index', [
-            'items' => Inertia::defer(fn () => $items),
+            'items' => Inertia::defer(fn () => $items->getCollection()->map(
+                fn (Item $item): array => $this->serializeItem($item, $user?->id, (bool) ($user?->is_admin))
+            )->values()->all()),
+            'pagination' => Inertia::defer(fn (): array => $this->paginationData($items)),
+            'perPageOptions' => $perPageOptions,
             'sources' => Source::query()
                 ->orderBy('shortcode')
                 ->orderBy('name')
@@ -158,24 +138,13 @@ class ItemController extends Controller
                         'is_placeholder' => $variant->is_placeholder,
                     ];
                 }),
-            'canManage' => request()->routeIs('admin.items.index'),
-            'indexRoute' => request()->routeIs('admin.items.index')
-                ? 'admin.items.index'
-                : 'compendium.items.index',
+            'canManage' => (bool) ($user?->is_admin),
+            'indexRoute' => 'compendium.items.index',
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
+    public function create() {}
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreItemRequest $request): RedirectResponse
     {
         $item = new Item;
@@ -197,25 +166,10 @@ class ItemController extends Controller
         return redirect()->back();
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Item $item)
-    {
-        //
-    }
+    public function show(Item $item) {}
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Item $item)
-    {
-        //
-    }
+    public function edit(Item $item) {}
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateItemRequest $request, Item $item): RedirectResponse
     {
         $item->name = $request->name;
@@ -235,9 +189,6 @@ class ItemController extends Controller
         return redirect()->back();
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Item $item): RedirectResponse
     {
         $item->delete();
@@ -328,5 +279,68 @@ class ItemController extends Controller
         $note = trim($note);
 
         return $note !== '' ? $note : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeItem(Item $item, ?int $currentUserId, bool $isAdmin): array
+    {
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'cost' => $item->cost,
+            'extra_cost_note' => $item->extra_cost_note,
+            'display_cost' => ItemCostResolver::resolveForItem($item),
+            'url' => $item->url,
+            'rarity' => $item->rarity,
+            'type' => $item->type,
+            'pick_count' => $item->pick_count,
+            'shop_enabled' => $item->shop_enabled,
+            'guild_enabled' => $item->guild_enabled,
+            'default_spell_roll_enabled' => $item->default_spell_roll_enabled,
+            'default_spell_levels' => $item->default_spell_levels,
+            'default_spell_schools' => $item->default_spell_schools,
+            'ruling_changed' => $item->ruling_changed,
+            'ruling_note' => $item->ruling_note,
+            'source_id' => $item->source_id,
+            'source' => $item->source,
+            'comments_count' => $item->comments_count ?? $item->comments->count(),
+            'comments' => $item->comments->map(fn (CompendiumComment $comment): array => [
+                'id' => $comment->id,
+                'body' => $comment->body,
+                'created_at' => optional($comment->created_at)?->toIso8601String(),
+                'user' => $comment->user ? [
+                    'id' => $comment->user->id,
+                    'name' => $comment->user->name,
+                ] : null,
+                'can_delete' => $isAdmin || ($currentUserId !== null && $comment->user_id === $currentUserId),
+            ])->values(),
+            'mundane_variant_ids' => $item->mundaneVariants->pluck('id')->values(),
+            'mundane_variants' => $item->mundaneVariants->map(static function (MundaneItemVariant $variant): array {
+                return [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'slug' => $variant->slug,
+                    'category' => $variant->category,
+                    'cost_gp' => $variant->cost_gp !== null ? (float) $variant->cost_gp : null,
+                    'is_placeholder' => $variant->is_placeholder,
+                ];
+            })->values(),
+        ];
+    }
+
+    /**
+     * @return array{currentPage:int,lastPage:int,perPage:int,total:int,hasMorePages:bool}
+     */
+    private function paginationData(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'currentPage' => $paginator->currentPage(),
+            'lastPage' => $paginator->lastPage(),
+            'perPage' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'hasMorePages' => $paginator->hasMorePages(),
+        ];
     }
 }

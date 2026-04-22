@@ -15,7 +15,6 @@ it('blocks non-admin users from admin pages', function (string $routeName) {
     'admin.auctions.index',
     'admin.items.index',
     'admin.spells.index',
-    'admin.compendium-suggestions.index',
     'admin.character-approvals.index',
     'admin.rooms.index',
 ]);
@@ -31,9 +30,17 @@ it('allows admin users to access admin pages', function (string $routeName) {
     'admin.shops.index',
     'admin.backstock.index',
     'admin.auctions.index',
-    'admin.items.index',
-    'admin.spells.index',
-    'admin.compendium-suggestions.index',
     'admin.character-approvals.index',
     'admin.rooms.index',
+]);
+
+it('redirects admin compendium shortcuts to the shared compendium pages', function (string $routeName, string $expectedRoute) {
+    $user = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($user)
+        ->get(route($routeName))
+        ->assertRedirect(route($expectedRoute));
+})->with([
+    ['admin.items.index', 'compendium.items.index'],
+    ['admin.spells.index', 'compendium.spells.index'],
 ]);

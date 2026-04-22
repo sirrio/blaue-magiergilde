@@ -9,10 +9,11 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { formatSourceOptionLabel, formatSourceKindShortLabel, sourceKindBadgeClass } from '@/helper/sourceDisplay'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { CompendiumCommentsModal } from '@/pages/compendium/compendium-comments-modal'
 import { PageProps, Source, Spell } from '@/types'
 import { useForm, usePage, router } from '@inertiajs/react'
-import { ChevronDown, Copy, MessageSquarePlus, Pencil, Scale, Shield, Trash, XCircle } from 'lucide-react'
-import { type MouseEvent, useEffect, useState } from 'react'
+import { ChevronDown, Copy, Pencil, Scale, Shield, Trash, XCircle } from 'lucide-react'
+import { type MouseEvent } from 'react'
 
 const schoolColors: Record<string, string> = {
   abjuration: 'text-spell-abjuration',
@@ -40,188 +41,6 @@ const closeMenu = (event: MouseEvent<HTMLElement>) => {
   if (details) {
     details.removeAttribute('open')
   }
-}
-
-const SuggestSpellUpdateModal = ({ spell, sources }: { spell: Spell; sources: Source[] }) => {
-  const t = useTranslate()
-  const [isOpen, setIsOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const { data, setData, reset, errors } = useForm({
-    name: spell.name ?? '',
-    url: spell.url ?? '',
-    legacy_url: spell.legacy_url ?? '',
-    spell_school: spell.spell_school ?? 'abjuration',
-    spell_level: spell.spell_level ?? 0,
-    source_id: spell.source_id ?? '',
-    source_url: '',
-    notes: '',
-  })
-
-  useEffect(() => {
-    if (!isOpen) return
-    reset()
-    setData('name', spell.name ?? '')
-    setData('url', spell.url ?? '')
-    setData('legacy_url', spell.legacy_url ?? '')
-    setData('spell_school', spell.spell_school ?? 'abjuration')
-    setData('spell_level', spell.spell_level ?? 0)
-    setData('source_id', spell.source_id ?? '')
-    setData('source_url', '')
-    setData('notes', '')
-  }, [isOpen, reset, setData, spell])
-
-  const normalizeText = (value: string) => {
-    const trimmed = value.trim()
-    return trimmed === '' ? null : trimmed
-  }
-
-  const handleSubmit = () => {
-    const changes: Record<string, string | number | null> = {}
-
-    const normalizedName = (data.name ?? '').trim()
-    if (normalizedName !== (spell.name ?? '').trim()) {
-      changes.name = normalizedName
-    }
-
-    const normalizedUrl = normalizeText(data.url ?? '')
-    const currentUrl = normalizeText(spell.url ?? '')
-    if (normalizedUrl !== currentUrl) {
-      changes.url = normalizedUrl
-    }
-
-    const normalizedLegacyUrl = normalizeText(data.legacy_url ?? '')
-    const currentLegacyUrl = normalizeText(spell.legacy_url ?? '')
-    if (normalizedLegacyUrl !== currentLegacyUrl) {
-      changes.legacy_url = normalizedLegacyUrl
-    }
-
-    if ((data.spell_school ?? 'abjuration') !== (spell.spell_school ?? 'abjuration')) {
-      changes.spell_school = data.spell_school
-    }
-
-    if (Number(data.spell_level ?? 0) !== Number(spell.spell_level ?? 0)) {
-      changes.spell_level = Number(data.spell_level)
-    }
-
-    const normalizedSource = data.source_id === '' ? null : Number(data.source_id)
-    const currentSource = spell.source_id ?? null
-    if (normalizedSource !== currentSource) {
-      changes.source_id = normalizedSource
-    }
-
-    const normalizedNotes = normalizeText(data.notes ?? '')
-    if (Object.keys(changes).length === 0 && !normalizedNotes) {
-      toast.show('Please change at least one field or add a note.', 'error')
-      return
-    }
-
-    setIsSubmitting(true)
-    router.post(route('compendium-suggestions.store'), {
-      kind: 'spell',
-      target_id: spell.id,
-      changes,
-      source_url: normalizeText(data.source_url ?? ''),
-      notes: normalizedNotes,
-    }, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setIsOpen(false)
-        toast.show('Suggestion submitted. Thank you!', 'info')
-      },
-      onError: (formErrors) => {
-        const message = formErrors.changes
-          || formErrors.target_id
-          || formErrors.kind
-          || formErrors.notes
-          || formErrors.source_url
-          || formErrors.name
-          || formErrors.url
-          || formErrors.legacy_url
-          || formErrors.spell_school
-          || formErrors.spell_level
-          || formErrors.source_id
-
-        if (message) {
-          toast.show(String(message), 'error')
-        }
-      },
-      onFinish: () => {
-        setIsSubmitting(false)
-      },
-    })
-  }
-
-  return (
-    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-      <ModalTrigger>
-        <Button size="xs" variant="ghost" modifier="square" onClick={() => setIsOpen(true)} aria-label="Suggest update">
-          <MessageSquarePlus size={14} />
-        </Button>
-      </ModalTrigger>
-      <ModalTitle>Suggest spell update</ModalTitle>
-      <ModalContent>
-        <div className="space-y-3">
-          <p className="text-xs text-base-content/70">
-            Suggest corrections. Your changes will be reviewed by the admin team before being applied.
-          </p>
-          <Input value={data.name} onChange={(e) => setData('name', e.target.value)} errors={errors.name}>
-            Name
-          </Input>
-          <Input value={data.url} onChange={(e) => setData('url', e.target.value)} errors={errors.url}>
-            URL
-          </Input>
-          <Input value={data.legacy_url} onChange={(e) => setData('legacy_url', e.target.value)} errors={errors.legacy_url}>
-            Legacy URL
-          </Input>
-          <Input
-            type="number"
-            value={data.spell_level}
-            onChange={(e) => setData('spell_level', Number(e.target.value))}
-            errors={errors.spell_level}
-          >
-            Spell Level
-          </Input>
-          <Select
-            value={data.spell_school}
-            onChange={(e) => setData('spell_school', e.target.value as Spell['spell_school'])}
-            errors={errors.spell_school}
-          >
-            <SelectLabel>School</SelectLabel>
-            <SelectOptions>
-              <option value="abjuration">Abjuration</option>
-              <option value="conjuration">Conjuration</option>
-              <option value="divination">Divination</option>
-              <option value="enchantment">Enchantment</option>
-              <option value="evocation">Evocation</option>
-              <option value="illusion">Illusion</option>
-              <option value="necromancy">Necromancy</option>
-              <option value="transmutation">Transmutation</option>
-            </SelectOptions>
-          </Select>
-          <Select value={data.source_id} onChange={(e) => setData('source_id', e.target.value ? Number(e.target.value) : '')}>
-            <SelectLabel>Source</SelectLabel>
-            <SelectOptions>
-              <option value="">No source</option>
-              {sources.map((source) => (
-                <option key={source.id} value={source.id}>
-                  {formatSourceOptionLabel(source, t)}
-                </option>
-              ))}
-            </SelectOptions>
-          </Select>
-          <Input value={data.source_url} onChange={(e) => setData('source_url', e.target.value)} errors={errors.source_url}>
-            Reference URL (optional)
-          </Input>
-          <TextArea value={data.notes} onChange={(e) => setData('notes', e.target.value)} errors={errors.notes}>
-            Note for reviewers (optional)
-          </TextArea>
-        </div>
-      </ModalContent>
-      <ModalAction onClick={handleSubmit} disabled={isSubmitting}>
-        Submit
-      </ModalAction>
-    </Modal>
-  )
 }
 
 export default function SpellRow({ spell, sources = [], canManage = true }: { spell: Spell; sources?: Source[]; canManage?: boolean }) {
@@ -529,13 +348,16 @@ export default function SpellRow({ spell, sources = [], canManage = true }: { sp
               <Trash size={14} />
             </Button>
           </>
-        ) : (
-          <>
-            <span className="mx-1 h-4 border-l border-base-200" aria-hidden="true" />
-            <SuggestSpellUpdateModal spell={spell} sources={sources} />
-          </>
-        )}
+        ) : null}
+        <CompendiumCommentsModal
+          title={`Kommentare zu ${spell.name}`}
+          comments={spell.comments}
+          count={spell.comments_count}
+          storeRoute={route('compendium.spells.comments.store', { spell: spell.id })}
+        />
       </div>
     </ListRow>
   )
 }
+
+

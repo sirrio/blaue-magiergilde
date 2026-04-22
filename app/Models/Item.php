@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -38,5 +39,10 @@ class Item extends Model
         return $this->belongsToMany(MundaneItemVariant::class, 'item_mundane_variant')
             ->orderBy('is_placeholder', 'desc')
             ->orderBy('name');
+    }
+
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(CompendiumComment::class, 'commentable')->latest();
     }
 }

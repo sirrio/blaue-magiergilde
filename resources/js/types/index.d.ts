@@ -332,6 +332,25 @@ export interface Auction {
   auction_items: AuctionItem[]
 }
 
+export interface CompendiumComment {
+  id: number
+  body: string
+  created_at?: string | null
+  can_delete?: boolean
+  user?: {
+    id: number
+    name: string
+  } | null
+}
+
+export interface PaginationMeta {
+  currentPage: number
+  lastPage: number
+  perPage: number
+  total: number
+  hasMorePages: boolean
+}
+
 export interface Item {
   id: number
   name: string
@@ -351,6 +370,8 @@ export interface Item {
   ruling_note?: string | null
   source_id?: number | null
   source?: Source | null
+  comments_count?: number
+  comments?: CompendiumComment[]
   mundane_variant_ids?: number[]
   mundane_variants?: MundaneItemVariant[]
 }
@@ -367,6 +388,8 @@ export interface Spell {
   ruling_note?: string | null
   source_id?: number | null
   source?: Source | null
+  comments_count?: number
+  comments?: CompendiumComment[]
 }
 
 export interface CharacterClass {
