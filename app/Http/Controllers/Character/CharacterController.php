@@ -9,6 +9,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Services\CharacterRetirementNotificationService;
 use App\Support\CharacterAvatarPrivacy;
 use App\Support\CharacterBubbleShop;
 use App\Support\LevelProgression;
@@ -185,8 +186,10 @@ class CharacterController extends Controller
     public function destroy(
         Character $character,
         CharacterApprovalNotificationService $notificationService,
+        CharacterRetirementNotificationService $retirementNotificationService,
     ): RedirectResponse {
         $this->ensureCharacterOwner($character);
+        $previousStatus = $character->guild_status;
 
         if ($character->approval_discord_channel_id && $character->approval_discord_message_id) {
             $result = $notificationService->removeAnnouncement($character);
@@ -212,6 +215,19 @@ class CharacterController extends Controller
             $character->guild_status = 'retired';
         }
         $character->save();
+
+        if (in_array($previousStatus, ['pending', 'approved', 'needs_changes'], true)) {
+            $result = $retirementNotificationService->notifyRetirement($character, [
+                'previous_status' => $previousStatus,
+            ]);
+
+            if (! $result['ok']) {
+                Log::warning('Character retirement notification failed.', [
+                    'character_id' => $character->id,
+                    'error' => $result['error'] ?? null,
+                ]);
+            }
+        }
 
         $character->adventures()->update([
             'deleted_by_character' => true,

@@ -11,6 +11,7 @@ const { guildIds: configuredGuildIds } = require('./config');
 const { resolveChannelId } = require('./channelOverride');
 const {
     postCharacterApprovalAnnouncement,
+    postCharacterRetirementAnnouncement,
     postNewAccountAnnouncement,
     sendCharacterApprovalDm,
     updateCharacterApprovalAnnouncement,
@@ -129,6 +130,7 @@ function startHttpServer(client) {
         const isCharacterApprovalAccountCreated = path === '/character-approval/account-created';
         const isCharacterApprovalUpdate = path === '/character-approval/update';
         const isCharacterApprovalDelete = path === '/character-approval/delete';
+        const isCharacterRetirementPost = path === '/character-retirement/post';
         const isDiscordLinePost = path === '/discord-line-post';
         const isShopPost = path === '/shop-post';
         const isShopUpdate = path === '/shop-update';
@@ -154,6 +156,7 @@ function startHttpServer(client) {
             isCharacterApprovalAccountCreated ||
             isCharacterApprovalUpdate ||
             isCharacterApprovalDelete ||
+            isCharacterRetirementPost ||
             isDiscordLinePost ||
             isShopPost ||
             isShopUpdate ||
@@ -423,6 +426,29 @@ function startHttpServer(client) {
             }
 
             respondJson(res, 200, { status: 'deleted', deleted: result.deleted ?? false });
+            return;
+        }
+
+        if (isCharacterRetirementPost) {
+            const channelId = readChannelId(payload);
+
+            const result = await postCharacterRetirementAnnouncement({
+                client,
+                channelId,
+                payload,
+            });
+
+            if (!result.ok) {
+                logReject(req, result.error || 'character retirement announcement failed');
+                respondJson(res, result.status || 500, { error: result.error || 'Retirement announcement failed.' });
+                return;
+            }
+
+            respondJson(res, 200, {
+                status: 'posted',
+                channel_id: result.channel_id,
+                message_id: result.message_id,
+            });
             return;
         }
 

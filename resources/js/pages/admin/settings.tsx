@@ -241,6 +241,9 @@ export default function Settings({
     character_approval_channel_id: discordBotSettings.character_approval_channel_id ?? '',
     character_approval_channel_name: discordBotSettings.character_approval_channel_name ?? '',
     character_approval_channel_guild_id: discordBotSettings.character_approval_channel_guild_id ?? '',
+    character_retirement_channel_id: discordBotSettings.character_retirement_channel_id ?? '',
+    character_retirement_channel_name: discordBotSettings.character_retirement_channel_name ?? '',
+    character_retirement_channel_guild_id: discordBotSettings.character_retirement_channel_guild_id ?? '',
     support_ticket_channel_id: discordBotSettings.support_ticket_channel_id ?? '',
     support_ticket_channel_name: discordBotSettings.support_ticket_channel_name ?? '',
     support_ticket_channel_guild_id: discordBotSettings.support_ticket_channel_guild_id ?? '',
@@ -1095,6 +1098,19 @@ export default function Settings({
     botSettingsForm.data.support_ticket_channel_name,
   ])
 
+  const retirementChannelLabel = useMemo(() => {
+    if (botSettingsForm.data.character_retirement_channel_name) {
+      return botSettingsForm.data.character_retirement_channel_name
+    }
+    if (botSettingsForm.data.character_retirement_channel_id) {
+      return botSettingsForm.data.character_retirement_channel_id
+    }
+    return 'Not configured'
+  }, [
+    botSettingsForm.data.character_retirement_channel_id,
+    botSettingsForm.data.character_retirement_channel_name,
+  ])
+
   const discordLinePostTargetLabel = useMemo(() => {
     if (discordLinePostForm.data.channel_name) {
       return discordLinePostForm.data.channel_name
@@ -1150,6 +1166,22 @@ export default function Settings({
     botSettingsForm.setData('support_ticket_channel_id', '')
     botSettingsForm.setData('support_ticket_channel_name', '')
     botSettingsForm.setData('support_ticket_channel_guild_id', '')
+  }, [botSettingsForm])
+
+  const handleRetirementChannelSelect = useCallback(
+    (selection: BotChannelSelection) => {
+      if (!selection || Array.isArray(selection)) return
+      botSettingsForm.setData('character_retirement_channel_id', selection.id)
+      botSettingsForm.setData('character_retirement_channel_name', selection.name)
+      botSettingsForm.setData('character_retirement_channel_guild_id', selection.guild_id)
+    },
+    [botSettingsForm],
+  )
+
+  const handleRetirementChannelClear = useCallback(() => {
+    botSettingsForm.setData('character_retirement_channel_id', '')
+    botSettingsForm.setData('character_retirement_channel_name', '')
+    botSettingsForm.setData('character_retirement_channel_guild_id', '')
   }, [botSettingsForm])
 
   const handleDiscordLinePostTargetSelect = useCallback(
@@ -1849,7 +1881,7 @@ export default function Settings({
           </div>
           {botChannelOverride?.active && botChannelOverride.channel_id ? (
             <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-              Local channel override active. The bot uses Discord channel <span className="font-semibold">{botChannelOverride.channel_id}</span> for character approvals and inbox threads instead of the saved channel settings while developing locally.
+              Local channel override active. The bot uses Discord channel <span className="font-semibold">{botChannelOverride.channel_id}</span> for character approvals, retirements, and inbox threads instead of the saved channel settings while developing locally.
             </div>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
@@ -1859,6 +1891,42 @@ export default function Settings({
             {botSettingsForm.errors.character_approval_channel_id ? (
               <span className="text-error">{botSettingsForm.errors.character_approval_channel_id}</span>
             ) : null}
+          </div>
+          <div className="mt-4 border-t border-base-200 pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Character retirements</h3>
+                <p className="text-xs text-base-content/60">
+                  Post a notice when a player unregisters a character so orga can follow up on items or auction handoff.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <DiscordChannelPickerModal
+                  title="Character retirement channel"
+                  description="Select a text channel for character retirement notices."
+                  confirmLabel="Use channel"
+                  channelsRouteName="admin.settings.backup.channels.refresh"
+                  mode="single"
+                  allowedChannelTypes={['GuildText', 'GuildAnnouncement']}
+                  onConfirm={handleRetirementChannelSelect}
+                >
+                  Select channel
+                </DiscordChannelPickerModal>
+                {botSettingsForm.data.character_retirement_channel_id ? (
+                  <Button size="sm" variant="ghost" onClick={handleRetirementChannelClear}>
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
+              <span>
+                Current: <span className="font-semibold text-base-content">{retirementChannelLabel}</span>
+              </span>
+              {botSettingsForm.errors.character_retirement_channel_id ? (
+                <span className="text-error">{botSettingsForm.errors.character_retirement_channel_id}</span>
+              ) : null}
+            </div>
           </div>
           <div className="mt-4 border-t border-base-200 pt-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
