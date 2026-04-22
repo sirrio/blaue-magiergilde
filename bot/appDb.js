@@ -13,10 +13,7 @@ const {
     structuredSpendForCharacter,
 } = require('./utils/characterBubbleShop');
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
-const {
-    calculateMinAllowedLevel,
-    calculateRequiredAdventureBubbles,
-} = require('./utils/quickMode');
+const { calculateMinAllowedLevel } = require('./utils/quickMode');
 const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded, levelFromAvailableBubbles } = require('./utils/levelProgression');
 
 function nowSql() {
@@ -158,12 +155,6 @@ function safeInt(value, fallback = 0) {
 
 function todaySqlDate() {
     return new Date().toISOString().slice(0, 10);
-}
-
-function bubblesForDuration(duration, hasAdditionalBubble) {
-    const normalizedDuration = safeInt(duration);
-    const bubbleCount = Math.floor(normalizedDuration / 10800);
-    return bubbleCount + (hasAdditionalBubble ? 1 : 0);
 }
 
 function calculateCharacterAvailableBubbles(character) {
@@ -309,7 +300,7 @@ async function getCharacterProgressionUpgradeStateForDiscord(discordUser, charac
     };
 }
 
-async function upgradeCharacterProgressionForDiscord(discordUser, characterId, targetLevel, bubblesInLevel = 0) {
+async function upgradeCharacterProgressionForDiscord(discordUser, characterId, targetLevel, bubblesInLevel = 0, allowOutsideRangeWithoutDowntime = false) {
     await ensureLevelProgressionLoaded();
 
     const state = await getCharacterProgressionUpgradeStateForDiscord(discordUser, characterId);
@@ -416,20 +407,90 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         return { ok: true };
     }
 
+    const currentLevelFloorOnNewCurve = bubblesRequiredForLevel(currentLevel, activeVersionId);
+    const rangeMinAvailableBubbles = Math.min(currentLevelFloorOnNewCurve, currentAvailableBubbles);
+    const rangeMaxAvailableBubbles = Math.max(currentLevelFloorOnNewCurve, currentAvailableBubbles);
+    const rangeMinLevel = Math.min(currentLevel, recalculatedLevel);
+    const rangeMaxLevel = Math.max(currentLevel, recalculatedLevel);
+    const targetLevelFloor = bubblesRequiredForLevel(normalizedLevel, activeVersionId);
+    const maxTargetBubblesInLevel = normalizedLevel >= 20
+        ? 0
+        : Math.max(0, bubblesRequiredForLevel(Math.min(20, normalizedLevel + 1), activeVersionId) - targetLevelFloor - 1);
+    const clampedTargetBubblesInLevel = Math.max(0, Math.min(safeInt(bubblesInLevel), maxTargetBubblesInLevel));
+    const targetAvailableBubbles = targetLevelFloor + clampedTargetBubblesInLevel;
+
+    if (!allowOutsideRangeWithoutDowntime) {
+        if (normalizedLevel < rangeMinLevel || normalizedLevel > rangeMaxLevel) {
+            return { ok: false, reason: 'outside_manual_range', minLevel: rangeMinLevel, maxLevel: rangeMaxLevel };
+        }
+
+        if (targetAvailableBubbles < rangeMinAvailableBubbles || targetAvailableBubbles > rangeMaxAvailableBubbles) {
+            return { ok: false, reason: 'outside_manual_range', minLevel: rangeMinLevel, maxLevel: rangeMaxLevel };
+        }
+    }
+
     await db.execute(
         'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
         [activeVersionId, nowSql(), characterId],
     );
 
-    const result = await updateCharacterManualLevelForDiscord(discordUser, characterId, normalizedLevel, bubblesInLevel);
-    if (result.ok) {
+    const result = await updateCharacterManualLevelForDiscord(discordUser, characterId, normalizedLevel, clampedTargetBubblesInLevel);
+    if (!result.ok) {
+        await db.execute(
+            'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
+            [currentVersionId, nowSql(), characterId],
+        );
+
         return result;
     }
 
-    await db.execute(
-        'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
-        [currentVersionId, nowSql(), characterId],
-    );
+    if (allowOutsideRangeWithoutDowntime) {
+        return result;
+    }
+
+    const currentSpend = safeInt(character.bubble_shop_spend);
+    const newSpend = Math.max(currentSpend, Math.max(0, currentAvailableBubbles - targetAvailableBubbles));
+    const currentQuantities = quantitiesForCharacter(character);
+    const currentDowntimeQuantity = safeInt(currentQuantities[TYPE_DOWNTIME]);
+    const nonDowntimeSpend = structuredSpendForCharacter(character, {
+        ...currentQuantities,
+        [TYPE_DOWNTIME]: 0,
+    });
+    const requiredDowntimeQuantity = Math.max(currentDowntimeQuantity, Math.max(0, newSpend - nonDowntimeSpend));
+    const updatedAt = nowSql();
+    const connection = await db.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        if (requiredDowntimeQuantity <= 0) {
+            await connection.execute(
+                'DELETE FROM character_bubble_shop_purchases WHERE character_id = ? AND type = ?',
+                [characterId, TYPE_DOWNTIME],
+            );
+        } else {
+            await connection.execute(
+                `
+                    INSERT INTO character_bubble_shop_purchases (character_id, type, quantity, details, created_at, updated_at)
+                    VALUES (?, ?, ?, NULL, ?, ?)
+                    ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), details = VALUES(details), updated_at = VALUES(updated_at)
+                `,
+                [characterId, TYPE_DOWNTIME, requiredDowntimeQuantity, updatedAt, updatedAt],
+            );
+        }
+
+        await connection.execute(
+            'UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ?',
+            [newSpend, updatedAt, characterId],
+        );
+
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 
     return result;
 }

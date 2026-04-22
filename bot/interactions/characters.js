@@ -92,7 +92,6 @@ const {
     buildAvatarUploadRow,
     buildParticipantOptions,
     buildCharacterCardPayload,
-    buildCharacterCardRows,
     buildCharacterProgressionUpgradeView,
     buildCharacterRegistrationBlockedContent,
     buildCharacterRegisterNoteModal,
@@ -211,19 +210,32 @@ async function buildCharacterCardPayloadForInteraction(interactionUser, characte
     });
 }
 
-function normalizeProgressionUpgradeSelection(state, selectedLevel, selectedBubbles) {
-    const minSelectableLevel = Math.max(1, safeInt(state.minSelectableLevel, 1));
-    const maxSelectableLevel = Math.max(minSelectableLevel, safeInt(state.maxSelectableLevel, minSelectableLevel));
+function normalizeProgressionUpgradeSelection(state, selectedLevel, selectedBubbles, allowOutsideRangeWithoutDowntime = false) {
+    const currentLevelFloor = bubblesRequiredForLevel(state.currentLevel, state.activeVersionId);
+    const defaultRangeMinAvailableBubbles = Math.min(currentLevelFloor, safeInt(state.currentAvailableBubbles));
+    const defaultRangeMaxAvailableBubbles = Math.max(currentLevelFloor, safeInt(state.currentAvailableBubbles));
+    const absoluteMinSelectableLevel = Math.max(1, safeInt(state.minSelectableLevel, 1));
+    const minSelectableLevel = state.usesManualTracking && !allowOutsideRangeWithoutDowntime
+        ? Math.min(state.currentLevel, state.recalculatedLevel)
+        : absoluteMinSelectableLevel;
+    const maxSelectableLevel = state.usesManualTracking && allowOutsideRangeWithoutDowntime
+        ? 20
+        : Math.max(minSelectableLevel, state.usesManualTracking ? Math.max(state.currentLevel, state.recalculatedLevel) : safeInt(state.maxSelectableLevel, minSelectableLevel));
     const level = Math.max(minSelectableLevel, Math.min(maxSelectableLevel, safeInt(selectedLevel, state.initialTargetLevel)));
     const levelFloor = bubblesRequiredForLevel(level, state.activeVersionId);
     const minBubbles = level >= 20
         ? 0
-        : Math.max(0, safeInt(state.minimumAvailableBubbles) - levelFloor);
+        : Math.max(
+            0,
+            (state.usesManualTracking && !allowOutsideRangeWithoutDowntime ? defaultRangeMinAvailableBubbles : safeInt(state.minimumAvailableBubbles)) - levelFloor,
+        );
     const maxBubbles = level >= 20
         ? 0
         : Math.max(0, Math.min(
             bubblesRequiredForLevel(Math.min(20, level + 1), state.activeVersionId) - levelFloor - 1,
-            state.usesManualTracking ? Number.MAX_SAFE_INTEGER : safeInt(state.currentAvailableBubbles) - levelFloor,
+            state.usesManualTracking
+                ? (allowOutsideRangeWithoutDowntime ? Number.MAX_SAFE_INTEGER : defaultRangeMaxAvailableBubbles) - levelFloor
+                : safeInt(state.currentAvailableBubbles) - levelFloor,
         ));
     const bubbles = level >= 20
         ? 0
@@ -2672,7 +2684,7 @@ async function handle(interaction) {
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpgradeLevel_')) {
-        const [, characterIdRaw, ownerDiscordId, selectedBubblesRaw] = interaction.customId.split('_');
+        const [, characterIdRaw, ownerDiscordId, selectedBubblesRaw, allowOutsideRaw] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
             return false;
@@ -2689,10 +2701,12 @@ async function handle(interaction) {
         }
 
         const locale = await resolveInteractionLocale(interaction);
+        const allowOutsideRangeWithoutDowntime = allowOutsideRaw === '1';
         const { level, bubbles } = normalizeProgressionUpgradeSelection(
             state,
             Number(interaction.values?.[0] || state.initialTargetLevel),
             Number(selectedBubblesRaw),
+            allowOutsideRangeWithoutDowntime,
         );
 
         await interaction.update({
@@ -2702,6 +2716,7 @@ async function handle(interaction) {
                 state,
                 selectedLevel: level,
                 selectedBubbles: bubbles,
+                allowOutsideRangeWithoutDowntime,
                 locale,
             }),
             content: '',
@@ -2710,7 +2725,7 @@ async function handle(interaction) {
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('characterUpgradeBubbles_')) {
-        const [, characterIdRaw, ownerDiscordId, selectedLevelRaw] = interaction.customId.split('_');
+        const [, characterIdRaw, ownerDiscordId, selectedLevelRaw, allowOutsideRaw] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
             return false;
@@ -2727,10 +2742,12 @@ async function handle(interaction) {
         }
 
         const locale = await resolveInteractionLocale(interaction);
+        const allowOutsideRangeWithoutDowntime = allowOutsideRaw === '1';
         const { level, bubbles } = normalizeProgressionUpgradeSelection(
             state,
             Number(selectedLevelRaw),
             Number(interaction.values?.[0] || state.initialTargetBubblesInLevel),
+            allowOutsideRangeWithoutDowntime,
         );
 
         await interaction.update({
@@ -2740,6 +2757,48 @@ async function handle(interaction) {
                 state,
                 selectedLevel: level,
                 selectedBubbles: bubbles,
+                allowOutsideRangeWithoutDowntime,
+                locale,
+            }),
+            content: '',
+        });
+        return true;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeToggleOutside_')) {
+        const [, characterIdRaw, ownerDiscordId, levelRaw, bubblesRaw, allowOutsideRaw] = interaction.customId.split('_');
+        const characterId = Number(characterIdRaw);
+        if (!Number.isFinite(characterId) || characterId < 1) {
+            return false;
+        }
+        if (!isOwnerOfInteraction(interaction, ownerDiscordId)) {
+            await updateActionDenied(interaction, { flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const state = await getCharacterProgressionUpgradeStateForDiscord(interaction.user, characterId);
+        if (!state.ok) {
+            await updateManageMessage(interaction, { content: await translateInteraction(interaction, 'characters.characterNotFound'), flags: MessageFlags.Ephemeral });
+            return true;
+        }
+
+        const locale = await resolveInteractionLocale(interaction);
+        const allowOutsideRangeWithoutDowntime = allowOutsideRaw !== '1';
+        const { level, bubbles } = normalizeProgressionUpgradeSelection(
+            state,
+            Number(levelRaw),
+            Number(bubblesRaw),
+            allowOutsideRangeWithoutDowntime,
+        );
+
+        await interaction.update({
+            ...buildCharacterProgressionUpgradeView({
+                character: state.character,
+                ownerDiscordId,
+                state,
+                selectedLevel: level,
+                selectedBubbles: bubbles,
+                allowOutsideRangeWithoutDowntime,
                 locale,
             }),
             content: '',
@@ -2748,7 +2807,7 @@ async function handle(interaction) {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('characterUpgradeConfirm_')) {
-        const [, characterIdRaw, ownerDiscordId, levelRaw, bubblesRaw] = interaction.customId.split('_');
+        const [, characterIdRaw, ownerDiscordId, levelRaw, bubblesRaw, allowOutsideRaw] = interaction.customId.split('_');
         const characterId = Number(characterIdRaw);
         if (!Number.isFinite(characterId) || characterId < 1) {
             return false;
@@ -2763,6 +2822,7 @@ async function handle(interaction) {
             characterId,
             Number(levelRaw),
             Number(bubblesRaw),
+            allowOutsideRaw === '1',
         );
 
         if (!result.ok) {
@@ -2773,6 +2833,8 @@ async function handle(interaction) {
                 content = t('characters.levelCannotBeBelowReal', { level: result.minLevel }, locale);
             } else if (result.reason === 'above_max' && result.maxLevel) {
                 content = t('characters.upgradeLevelCurveMaxLevelReason', { level: result.maxLevel }, locale);
+            } else if (result.reason === 'outside_manual_range' && result.minLevel && result.maxLevel) {
+                content = t('characters.upgradeLevelCurveManualRangeHint', { level: result.minLevel, maxLevel: result.maxLevel }, locale);
             } else if (result.reason === 'bubble_shop_floor') {
                 content = 'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.';
             } else if (result.reason === 'character_not_found' || result.reason === 'not_found') {
@@ -2916,6 +2978,7 @@ async function handle(interaction) {
                 state,
                 state.initialTargetLevel,
                 state.initialTargetBubblesInLevel,
+                false,
             );
 
             await interaction.update({
@@ -2925,6 +2988,7 @@ async function handle(interaction) {
                     state,
                     selectedLevel: level,
                     selectedBubbles: bubbles,
+                    allowOutsideRangeWithoutDowntime: false,
                     locale,
                 }),
                 content: '',

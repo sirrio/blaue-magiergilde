@@ -35,6 +35,7 @@ class UpgradeCharacterProgressionController extends Controller
         $previousVersionId = $character->progression_version_id;
         $targetLevel = $request->integer('level');
         $targetBubblesInLevel = $request->integer('bubbles_in_level', 0);
+        $allowOutsideRangeWithoutDowntime = $request->boolean('allow_outside_range_without_downtime');
 
         if ($this->progressionState->hasPseudoAdventures($character)) {
             $availableBubbles = $this->currentAvailableBubbles($character);
@@ -57,27 +58,19 @@ class UpgradeCharacterProgressionController extends Controller
             return redirect()->back();
         }
 
-        DB::transaction(function () use ($character, $activeVersionId): void {
-            $character->forceFill([
-                'progression_version_id' => $activeVersionId,
-            ])->save();
-        });
-
-        $result = $this->setQuickLevel->handle(
-            $character->fresh(),
+        $result = $this->upgradeManualTrackedCharacter(
+            $character,
+            $activeVersionId,
             $targetLevel,
             $targetBubblesInLevel,
+            $allowOutsideRangeWithoutDowntime,
         );
 
         if (! $result['ok']) {
-            $character->forceFill([
-                'progression_version_id' => $previousVersionId,
-            ])->save();
-
-            $minLevel = $result['minLevel'] ?? null;
-            $message = $minLevel
-                ? "Level cannot go below {$minLevel} with current adventure progress."
-                : 'Unable to upgrade level progression.';
+            $message = $result['message']
+                ?? (($result['minLevel'] ?? null)
+                    ? 'Level cannot go below '.($result['minLevel']).' with current adventure progress.'
+                    : 'Unable to upgrade level progression.');
 
             return redirect()->back()->withErrors(['level' => $message]);
         }
@@ -152,6 +145,100 @@ class UpgradeCharacterProgressionController extends Controller
         });
 
         return ['ok' => true];
+    }
+
+    /**
+     * @return array{ok: bool, message?: string, minLevel?: int}
+     */
+    private function upgradeManualTrackedCharacter(
+        Character $character,
+        int $activeVersionId,
+        int $targetLevel,
+        int $targetBubblesInLevel,
+        bool $allowOutsideRangeWithoutDowntime,
+    ): array {
+        $currentVersionId = $character->progression_version_id ?? $activeVersionId;
+        $currentAvailableBubbles = $this->currentAvailableBubbles($character);
+        $currentLevel = LevelProgression::levelFromAvailableBubbles($currentAvailableBubbles, $currentVersionId);
+        $currentBubblesInLevel = max(
+            0,
+            $currentAvailableBubbles - LevelProgression::bubblesRequiredForLevel($currentLevel, $currentVersionId),
+        );
+        $recalculatedLevel = LevelProgression::levelFromAvailableBubbles($currentAvailableBubbles, $activeVersionId);
+        $currentLevelFloorOnNewCurve = LevelProgression::bubblesRequiredForLevel($currentLevel, $activeVersionId);
+        $rangeMinAvailableBubbles = min($currentLevelFloorOnNewCurve, $currentAvailableBubbles);
+        $rangeMaxAvailableBubbles = max($currentLevelFloorOnNewCurve, $currentAvailableBubbles);
+        $rangeMinLevel = min($currentLevel, $recalculatedLevel);
+        $rangeMaxLevel = max($currentLevel, $recalculatedLevel);
+
+        $levelFloor = LevelProgression::bubblesRequiredForLevel($targetLevel, $activeVersionId);
+        $maxSelectableBubblesInLevel = $targetLevel >= 20
+            ? 0
+            : max(0, LevelProgression::bubblesRequiredForNextLevel($targetLevel, $activeVersionId) - 1);
+        $clampedBubblesInLevel = max(0, min($targetBubblesInLevel, $maxSelectableBubblesInLevel));
+        $targetAvailableBubbles = $levelFloor + $clampedBubblesInLevel;
+
+        if (! $allowOutsideRangeWithoutDowntime) {
+            if ($targetLevel < $rangeMinLevel || $targetLevel > $rangeMaxLevel) {
+                return [
+                    'ok' => false,
+                    'message' => "Level can only be chosen between {$rangeMinLevel} and {$rangeMaxLevel} when automatic downtime credit is enabled.",
+                ];
+            }
+
+            if ($targetAvailableBubbles < $rangeMinAvailableBubbles || $targetAvailableBubbles > $rangeMaxAvailableBubbles) {
+                return [
+                    'ok' => false,
+                    'message' => 'Selected bubble progress is outside the automatic downtime range for this curve change.',
+                ];
+            }
+        }
+
+        $currentSpend = $this->safeInt($character->bubble_shop_spend);
+        $newSpend = $allowOutsideRangeWithoutDowntime
+            ? $currentSpend
+            : max($currentSpend, max(0, $currentAvailableBubbles - $targetAvailableBubbles));
+        $result = ['ok' => true];
+
+        try {
+            DB::transaction(function () use (
+                $character,
+                $activeVersionId,
+                $targetLevel,
+                $clampedBubblesInLevel,
+                $allowOutsideRangeWithoutDowntime,
+                $newSpend,
+                &$result,
+            ): void {
+                $character->forceFill([
+                    'progression_version_id' => $activeVersionId,
+                ])->save();
+
+                $result = $this->setQuickLevel->handle(
+                    $character->fresh(),
+                    $targetLevel,
+                    $clampedBubblesInLevel,
+                );
+
+                if (! $result['ok']) {
+                    throw new \RuntimeException('manual-upgrade-validation');
+                }
+
+                if ($allowOutsideRangeWithoutDowntime) {
+                    return;
+                }
+
+                $updatedCharacter = $character->fresh();
+                $this->bubbleShop->syncDowntimeSpendTarget($updatedCharacter, $newSpend);
+                $updatedCharacter->save();
+            });
+        } catch (\RuntimeException $exception) {
+            if ($exception->getMessage() !== 'manual-upgrade-validation') {
+                throw $exception;
+            }
+        }
+
+        return $result;
     }
 
     private function baseAdventureTrackedBubbles(Character $character): int

@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
 import { calculateBubble } from '@/helper/calculateBubble'
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils'
 import type { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Droplets, RefreshCcw } from 'lucide-react'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 const MAX_LEVEL = 20
 
@@ -97,25 +98,46 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
       })()
     : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(recalculatedLevel, targetVersionId))
 
-  const minSelectableLevel = character.is_filler ? 1 : manualTracking ? levelFromAvailableBubbles(minimumAllowedAvailableBubbles, targetVersionId) : initialLevel
-
-  const maxSelectableLevel = hasPseudoAdventure ? recalculatedLevel : manualTracking ? MAX_LEVEL : recalculatedLevel
-  const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
-  const maxLevelRestrictionReason = t('characters.upgradeLevelCurveMaxLevelReason', { level: recalculatedLevel })
+  const absoluteMinSelectableLevel = character.is_filler ? 1 : manualTracking ? levelFromAvailableBubbles(minimumAllowedAvailableBubbles, targetVersionId) : initialLevel
+  const currentLevelFloorOnNewCurve = bubblesRequiredForLevel(initialLevel, targetVersionId)
+  const defaultRangeMinAvailableBubbles = Math.min(currentLevelFloorOnNewCurve, currentAvailableBubbles)
+  const defaultRangeMaxAvailableBubbles = Math.max(currentLevelFloorOnNewCurve, currentAvailableBubbles)
 
   const { data, setData, post, processing } = useForm({
-    level: manualTracking ? Math.max(initialLevel, minSelectableLevel) : recalculatedLevel,
+    level: manualTracking ? initialLevel : recalculatedLevel,
     bubbles_in_level: initialBubblesInLevel,
+    allow_outside_range_without_downtime: false,
   })
+  const maxLevelRestrictionReason = t('characters.upgradeLevelCurveMaxLevelReason', { level: recalculatedLevel })
   const [isOpen, setIsOpen] = useState(false)
+  const wasOpenRef = useRef(false)
+  const allowOutsideRangeWithoutDowntime = manualTracking && Boolean(data.allow_outside_range_without_downtime)
+
+  const defaultRangeMinSelectableLevel = manualTracking
+    ? Math.min(initialLevel, recalculatedLevel)
+    : initialLevel
+  const defaultRangeMaxSelectableLevel = manualTracking
+    ? Math.max(initialLevel, recalculatedLevel)
+    : recalculatedLevel
+  const minSelectableLevel = allowOutsideRangeWithoutDowntime ? absoluteMinSelectableLevel : defaultRangeMinSelectableLevel
+  const maxSelectableLevel = hasPseudoAdventure && !manualTracking
+    ? recalculatedLevel
+    : allowOutsideRangeWithoutDowntime && manualTracking
+      ? MAX_LEVEL
+      : defaultRangeMaxSelectableLevel
+  const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
 
   const rawTargetLevel = clampLevel(Number.isFinite(Number(data.level)) ? Number(data.level) : initialLevel)
   const targetLevel = Math.min(maxSelectableLevel, Math.max(minSelectableLevel, rawTargetLevel))
 
   const selectedLevelFloor = bubblesRequiredForLevel(targetLevel, targetVersionId)
   const selectedLevelMaxByCurve = targetLevel >= 20 ? 0 : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId) - 1)
-  const selectedLevelMinByExactFloor = manualTracking ? Math.max(0, minimumAllowedAvailableBubbles - selectedLevelFloor) : 0
-  const selectedLevelMaxByCurrent = manualTracking ? selectedLevelMaxByCurve : Math.max(0, currentAvailableBubbles - selectedLevelFloor)
+  const selectedLevelMinByExactFloor = manualTracking
+    ? Math.max(0, (allowOutsideRangeWithoutDowntime ? minimumAllowedAvailableBubbles : defaultRangeMinAvailableBubbles) - selectedLevelFloor)
+    : 0
+  const selectedLevelMaxByCurrent = manualTracking
+    ? Math.max(0, (allowOutsideRangeWithoutDowntime ? Number.POSITIVE_INFINITY : defaultRangeMaxAvailableBubbles) - selectedLevelFloor)
+    : Math.max(0, currentAvailableBubbles - selectedLevelFloor)
   const minBubblesInSelectedLevel = targetLevel >= 20 ? 0 : Math.min(selectedLevelMaxByCurve, selectedLevelMinByExactFloor)
   const maxBubblesInSelectedLevel = targetLevel >= 20 ? 0 : Math.min(selectedLevelMaxByCurve, selectedLevelMaxByCurrent)
   const displayedBubblesInSelectedLevel = selectedLevelMaxByCurve
@@ -134,45 +156,54 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
   const oldCurveBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(initialLevel, currentVersionId))
   const oldCurveMaxBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(initialLevel, currentVersionId))
   const newCurveMaxBubblesInLevel = targetLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId))
-  const additionalBubbleShopSpend = manualTracking ? 0 : Math.max(0, currentAvailableBubbles - targetAvailableBubbles)
+  const additionalBubbleShopSpend = manualTracking
+    ? allowOutsideRangeWithoutDowntime
+      ? 0
+      : Math.max(0, currentAvailableBubbles - targetAvailableBubbles)
+    : Math.max(0, currentAvailableBubbles - targetAvailableBubbles)
   const hasChanges = targetVersionId !== (character.progression_version_id ?? null) || targetAvailableBubbles !== initialAvailableBubbles
 
   useEffect(() => {
-    if (!isOpen) {
-      return
+    if (isOpen && !wasOpenRef.current) {
+      const defaultLevel = manualTracking ? initialLevel : recalculatedLevel
+      const defaultLevelFloor = bubblesRequiredForLevel(defaultLevel, targetVersionId)
+      const defaultMinBubbles =
+        defaultLevel >= 20
+          ? 0
+          : Math.min(
+              Math.max(0, bubblesRequiredForNextLevel(defaultLevel, targetVersionId) - 1),
+              manualTracking
+                ? Math.max(0, defaultRangeMinAvailableBubbles - defaultLevelFloor)
+                : 0,
+            )
+      const defaultMaxBubbles =
+        defaultLevel >= 20
+          ? 0
+          : Math.min(
+              Math.max(0, bubblesRequiredForNextLevel(defaultLevel, targetVersionId) - 1),
+              manualTracking
+                ? Math.max(0, defaultRangeMaxAvailableBubbles - defaultLevelFloor)
+                : Math.max(0, currentAvailableBubbles - defaultLevelFloor),
+            )
+      const defaultBubbles =
+        defaultLevel === initialLevel || (!manualTracking && defaultLevel === recalculatedLevel) ? initialBubblesInLevel : defaultMinBubbles
+
+      setData({
+        level: defaultLevel,
+        bubbles_in_level: clampBubbleProgress(defaultBubbles, defaultMinBubbles, defaultMaxBubbles),
+        allow_outside_range_without_downtime: false,
+      })
     }
 
-    const defaultLevel = manualTracking ? Math.max(initialLevel, minSelectableLevel) : recalculatedLevel
-    const defaultLevelFloor = bubblesRequiredForLevel(defaultLevel, targetVersionId)
-    const defaultMinBubbles =
-      defaultLevel >= 20
-        ? 0
-        : Math.min(
-            Math.max(0, bubblesRequiredForNextLevel(defaultLevel, targetVersionId) - 1),
-            manualTracking ? Math.max(0, minimumAllowedAvailableBubbles - defaultLevelFloor) : 0,
-          )
-    const defaultMaxBubbles =
-      defaultLevel >= 20
-        ? 0
-        : Math.min(
-            Math.max(0, bubblesRequiredForNextLevel(defaultLevel, targetVersionId) - 1),
-            manualTracking ? Number.POSITIVE_INFINITY : Math.max(0, currentAvailableBubbles - defaultLevelFloor),
-          )
-    const defaultBubbles =
-      defaultLevel === initialLevel || (!manualTracking && defaultLevel === recalculatedLevel) ? initialBubblesInLevel : defaultMinBubbles
-
-    setData({
-      level: defaultLevel,
-      bubbles_in_level: clampBubbleProgress(defaultBubbles, defaultMinBubbles, defaultMaxBubbles),
-    })
+    wasOpenRef.current = isOpen
   }, [
     currentAvailableBubbles,
-    minimumAllowedAvailableBubbles,
+    defaultRangeMaxAvailableBubbles,
+    defaultRangeMinAvailableBubbles,
     initialBubblesInLevel,
     initialLevel,
     isOpen,
     manualTracking,
-    minSelectableLevel,
     recalculatedLevel,
     setData,
     targetVersionId,
@@ -199,14 +230,18 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
         ? 0
         : Math.min(
             Math.max(0, bubblesRequiredForNextLevel(clampedLevel, targetVersionId) - 1),
-            manualTracking ? Math.max(0, minimumAllowedAvailableBubbles - levelFloor) : 0,
+            manualTracking
+              ? Math.max(0, (allowOutsideRangeWithoutDowntime ? minimumAllowedAvailableBubbles : defaultRangeMinAvailableBubbles) - levelFloor)
+              : 0,
           )
     const maxBubbles =
       clampedLevel >= 20
         ? 0
         : Math.min(
             Math.max(0, bubblesRequiredForNextLevel(clampedLevel, targetVersionId) - 1),
-            manualTracking ? Number.POSITIVE_INFINITY : Math.max(0, currentAvailableBubbles - levelFloor),
+            manualTracking
+              ? Math.max(0, (allowOutsideRangeWithoutDowntime ? Number.POSITIVE_INFINITY : defaultRangeMaxAvailableBubbles) - levelFloor)
+              : Math.max(0, currentAvailableBubbles - levelFloor),
           )
     const defaultBubbles =
       clampedLevel === initialLevel || (!manualTracking && clampedLevel === recalculatedLevel) ? initialBubblesInLevel : minBubbles
@@ -291,9 +326,12 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
               {t('characters.upgradeLevelCurveAdventureFloorHint', { level: minSelectableLevel, maxLevel: recalculatedLevel })}
             </p>
           ) : null}
-          {manualTracking && !character.is_filler && minSelectableLevel > 1 ? (
+          {manualTracking && !character.is_filler ? (
             <p className="text-[11px] text-base-content/50">
-              {t('characters.minAllowedLevel', { level: minSelectableLevel })}
+              {t('characters.upgradeLevelCurveManualRangeHint', {
+                level: initialLevel,
+                maxLevel: defaultRangeMaxSelectableLevel,
+              })}
             </p>
           ) : null}
 
@@ -378,7 +416,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
           ) : null}
 
           {/* Bubble-Shop-Impact — nur wenn tatsächlich Auswirkung */}
-          {!manualTracking && additionalBubbleShopSpend > 0 ? (
+          {additionalBubbleShopSpend > 0 ? (
             <div className="rounded-md border border-warning/20 bg-warning/8 px-3 py-2.5 text-xs leading-relaxed text-base-content/70">
               {t('characters.upgradeLevelCurveSpendPreview', { count: additionalBubbleShopSpend })}
             </div>
@@ -388,7 +426,29 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
 
           {/* Einzelner kontextueller Hinweis */}
           <div className="rounded-md border border-base-200 bg-base-200/30 px-3 py-2.5 text-[11px] leading-relaxed text-base-content/55">
-            {manualTracking ? t('characters.upgradeLevelCurveHint') : t('characters.upgradeLevelCurveAdventureHint')}
+            <div className="space-y-2">
+              <p>
+                {manualTracking
+                  ? allowOutsideRangeWithoutDowntime
+                    ? t('characters.upgradeLevelCurveManualOverrideHint')
+                    : t('characters.upgradeLevelCurveHint')
+                  : t('characters.upgradeLevelCurveAdventureHint')}
+              </p>
+
+              {manualTracking ? (
+                <div className="-mt-1 text-base-content/55">
+                  <Checkbox
+                    size="xs"
+                    checked={allowOutsideRangeWithoutDowntime}
+                    onChange={(event) => setData('allow_outside_range_without_downtime', event.target.checked)}
+                  >
+                    <span className="text-[10px] leading-4">
+                      {t('characters.upgradeLevelCurveManualOverride')}
+                    </span>
+                  </Checkbox>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </ModalContent>

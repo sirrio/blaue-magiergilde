@@ -17,11 +17,8 @@ const {
 } = require('../commands/game/characters');
 const { t } = require('../i18n');
 const {
-    definitionsForCharacter,
     extraDowntimeSecondsForCharacter,
     legacySpendForCharacter,
-    purchaseTypes,
-    quantitiesForCharacter,
     structuredSpendForCharacter,
 } = require('../utils/characterBubbleShop');
 const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
@@ -1270,7 +1267,7 @@ function buildDowntimeDeleteConfirmRow({ downtimeId, characterId, ownerDiscordId
     );
 }
 
-function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, hasPseudoAdventure = false, hasRealAdventure = false, guildStatus, registrationBlockedReason = null, registrationCounts = null, hasProgressionUpgradeAvailable = false, locale = null }) {
+function buildCharacterCardRows({ characterId, ownerDiscordId, isFiller, simplifiedTracking, guildStatus, registrationBlockedReason = null, hasProgressionUpgradeAvailable = false, locale = null }) {
     const primaryRow = new ActionRowBuilder();
     const normalizedStatus = String(guildStatus || '').trim().toLowerCase();
     const canRegister = normalizedStatus === 'draft' || normalizedStatus === 'needs_changes';
@@ -1383,10 +1380,16 @@ function buildProgressionUpgradeBubbleOptions({ maxBubbles, minBubbles, selected
     return options.slice(0, 25);
 }
 
-function buildCharacterProgressionUpgradeView({ character, ownerDiscordId, state, selectedLevel, selectedBubbles, locale = null }) {
+function buildCharacterProgressionUpgradeView({ character, ownerDiscordId, state, selectedLevel, selectedBubbles, allowOutsideRangeWithoutDowntime = false, locale = null }) {
     const currentText = formatProgressionTargetLabel(state.currentLevel, state.currentBubblesInLevel, state.currentVersionId, locale);
     const recalculatedText = formatProgressionTargetLabel(state.recalculatedLevel, state.recalculatedBubblesInLevel, state.activeVersionId, locale);
     const targetText = formatProgressionTargetLabel(selectedLevel, selectedBubbles, state.activeVersionId, locale);
+    const defaultRangeMinLevel = state.usesManualTracking
+        ? Math.min(state.currentLevel, state.recalculatedLevel)
+        : safeInt(state.minSelectableLevel, 1);
+    const defaultRangeMaxLevel = state.usesManualTracking
+        ? Math.max(state.currentLevel, state.recalculatedLevel)
+        : safeInt(state.maxSelectableLevel, safeInt(state.minSelectableLevel, 1));
     const embed = new EmbedBuilder()
         .setTitle(t('characters.upgradeLevelCurveTitle', {}, locale))
         .setColor(0x4f46e5)
@@ -1399,29 +1402,34 @@ function buildCharacterProgressionUpgradeView({ character, ownerDiscordId, state
 
     const components = [];
     const levelOptions = buildProgressionUpgradeLevelOptions({
-        minLevel: state.minSelectableLevel,
-        maxLevel: state.maxSelectableLevel,
+        minLevel: allowOutsideRangeWithoutDowntime && state.usesManualTracking ? state.minSelectableLevel : defaultRangeMinLevel,
+        maxLevel: allowOutsideRangeWithoutDowntime && state.usesManualTracking ? 20 : defaultRangeMaxLevel,
         selectedLevel,
         locale,
     });
     if (levelOptions.length > 0) {
         components.push(new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
-                .setCustomId(`characterUpgradeLevel_${character.id}_${ownerDiscordId}_${selectedBubbles}`)
+                .setCustomId(`characterUpgradeLevel_${character.id}_${ownerDiscordId}_${selectedBubbles}_${allowOutsideRangeWithoutDowntime ? 1 : 0}`)
                 .setPlaceholder(t('characters.selectLevel', {}, locale))
                 .addOptions(levelOptions),
         ));
     }
 
     const levelFloor = bubblesRequiredForLevel(selectedLevel, state.activeVersionId);
+    const currentLevelFloorOnNewCurve = bubblesRequiredForLevel(state.currentLevel, state.activeVersionId);
+    const defaultRangeMinAvailableBubbles = Math.min(currentLevelFloorOnNewCurve, safeInt(state.currentAvailableBubbles));
+    const defaultRangeMaxAvailableBubbles = Math.max(currentLevelFloorOnNewCurve, safeInt(state.currentAvailableBubbles));
     const minBubbles = selectedLevel >= 20
         ? 0
-        : Math.max(0, state.minimumAvailableBubbles - levelFloor);
+        : Math.max(0, (state.usesManualTracking && !allowOutsideRangeWithoutDowntime ? defaultRangeMinAvailableBubbles : state.minimumAvailableBubbles) - levelFloor);
     const maxBubbles = selectedLevel >= 20
         ? 0
         : Math.max(0, Math.min(
             bubblesRequiredForLevel(Math.min(20, selectedLevel + 1), state.activeVersionId) - levelFloor - 1,
-            state.usesManualTracking ? Number.MAX_SAFE_INTEGER : state.currentAvailableBubbles - levelFloor,
+            state.usesManualTracking
+                ? (allowOutsideRangeWithoutDowntime ? Number.MAX_SAFE_INTEGER : defaultRangeMaxAvailableBubbles) - levelFloor
+                : state.currentAvailableBubbles - levelFloor,
         ));
     const bubbleOptions = buildProgressionUpgradeBubbleOptions({
         minBubbles,
@@ -1432,37 +1440,50 @@ function buildCharacterProgressionUpgradeView({ character, ownerDiscordId, state
     if (bubbleOptions.length > 0) {
         components.push(new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
-                .setCustomId(`characterUpgradeBubbles_${character.id}_${ownerDiscordId}_${selectedLevel}`)
+                .setCustomId(`characterUpgradeBubbles_${character.id}_${ownerDiscordId}_${selectedLevel}_${allowOutsideRangeWithoutDowntime ? 1 : 0}`)
                 .setPlaceholder(t('characters.selectBubblesInLevel', {}, locale))
                 .addOptions(bubbleOptions),
                 ));
     }
 
-    if (!state.usesManualTracking) {
+    if (!allowOutsideRangeWithoutDowntime) {
         const selectedAvailableBubbles = levelFloor + selectedBubbles;
         const additionalSpend = Math.max(0, state.currentAvailableBubbles - selectedAvailableBubbles);
         const totalSpend = safeInt(character.bubble_shop_spend) + additionalSpend;
-        embed.addFields({
-            name: t('characters.manageBubbleShop', {}, locale),
-            value: [
-                t('characters.upgradeLevelCurveSpendPreview', { count: additionalSpend }, locale),
-                t('characters.upgradeLevelCurveTotalSpendPreview', { count: totalSpend }, locale),
-            ].join('\n'),
-            inline: false,
-        });
+        if (additionalSpend > 0) {
+            embed.addFields({
+                name: t('characters.manageBubbleShop', {}, locale),
+                value: [
+                    t('characters.upgradeLevelCurveSpendPreview', { count: additionalSpend }, locale),
+                    t('characters.upgradeLevelCurveTotalSpendPreview', { count: totalSpend }, locale),
+                ].join('\n'),
+                inline: false,
+            });
+        }
     }
 
     embed.addFields({
         name: t('characters.upgradeLevelCurveHintField', {}, locale),
         value: state.usesManualTracking
-            ? t('characters.upgradeLevelCurveHint', {}, locale)
+            ? allowOutsideRangeWithoutDowntime
+                ? t('characters.upgradeLevelCurveManualOverrideHint', {}, locale)
+                : [
+                    t('characters.upgradeLevelCurveManualRangeHint', { level: defaultRangeMinLevel, maxLevel: defaultRangeMaxLevel }, locale),
+                    t('characters.upgradeLevelCurveHint', {}, locale),
+                ].join('\n')
             : t('characters.upgradeLevelCurveAdventureHint', {}, locale),
         inline: false,
     });
 
     components.push(new ActionRowBuilder().addComponents(
+        ...(state.usesManualTracking
+            ? [new ButtonBuilder()
+                .setCustomId(`characterUpgradeToggleOutside_${character.id}_${ownerDiscordId}_${selectedLevel}_${selectedBubbles}_${allowOutsideRangeWithoutDowntime ? 1 : 0}`)
+                .setLabel(t('characters.upgradeLevelCurveManualOverrideShort', {}, locale))
+                .setStyle(allowOutsideRangeWithoutDowntime ? ButtonStyle.Primary : ButtonStyle.Secondary)]
+            : []),
         new ButtonBuilder()
-            .setCustomId(`characterUpgradeConfirm_${character.id}_${ownerDiscordId}_${selectedLevel}_${selectedBubbles}`)
+            .setCustomId(`characterUpgradeConfirm_${character.id}_${ownerDiscordId}_${selectedLevel}_${selectedBubbles}_${allowOutsideRangeWithoutDowntime ? 1 : 0}`)
             .setLabel(t('characters.upgradeLevelCurveApply', {}, locale))
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
