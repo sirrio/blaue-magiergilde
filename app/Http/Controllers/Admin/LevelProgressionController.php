@@ -4,19 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateLevelProgressionRequest;
+use App\Models\Character;
 use App\Models\LevelProgressionEntry;
 use App\Models\LevelProgressionVersion;
 use App\Support\LevelProgression;
-use App\Support\PseudoAdventureLevelAlignment;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 
 class LevelProgressionController extends Controller
 {
-    public function __construct(
-        public PseudoAdventureLevelAlignment $pseudoAdventureLevelAlignment,
-    ) {}
-
     public function update(UpdateLevelProgressionRequest $request): RedirectResponse
     {
         $entries = collect($request->validated('entries'))
@@ -40,10 +36,6 @@ class LevelProgressionController extends Controller
         }
 
         $report = DB::transaction(function () use ($entries): array {
-            $currentVersionId = LevelProgression::activeVersionId();
-
-            $backfillReport = $this->pseudoAdventureLevelAlignment->backfillMissingMetadata($currentVersionId);
-
             LevelProgressionVersion::query()
                 ->where('is_active', true)
                 ->update(['is_active' => false]);
@@ -60,7 +52,7 @@ class LevelProgressionController extends Controller
                 ]);
             }
 
-            $charactersPendingUpgrade = \App\Models\Character::query()
+            $charactersPendingUpgrade = Character::query()
                 ->whereNull('deleted_at')
                 ->where(function ($query) use ($newVersion): void {
                     $query
@@ -71,7 +63,6 @@ class LevelProgressionController extends Controller
 
             return [
                 'new_version_id' => $newVersion->id,
-                'backfill' => $backfillReport,
                 'characters_pending_upgrade' => $charactersPendingUpgrade,
             ];
         });

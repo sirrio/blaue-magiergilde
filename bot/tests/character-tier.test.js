@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { setLevelProgressionTotals } = require('../utils/levelProgression');
-const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
+const { calculateLevel, calculateRawLevel, calculateTierFromLevel } = require('../utils/characterTier');
 
 setLevelProgressionTotals({
     1: 0, 2: 1, 3: 3, 4: 6, 5: 10,
@@ -10,50 +10,35 @@ setLevelProgressionTotals({
 });
 
 const level = calculateLevel({
-    start_tier: 'bt',
-    adventure_bubbles: 10,
-    dm_bubbles: 0,
-    bubble_shop_spend: 0,
     is_filler: 0,
+    progression_state: { level: 5 },
 });
 
 assert.equal(level, 5);
 assert.equal(calculateTierFromLevel(level), 'LT');
 
 assert.equal(calculateLevel({
-    start_tier: 'bt',
-    adventure_bubbles: 54,
-    dm_bubbles: 0,
-    bubble_shop_spend: 0,
     is_filler: 0,
+    progression_state: { level: 10 },
 }), 10);
 
 assert.equal(calculateLevel({
-    start_tier: 'bt',
-    adventure_bubbles: 55,
-    dm_bubbles: 0,
-    bubble_shop_spend: 0,
     is_filler: 0,
+    progression_state: { level: 11 },
 }), 11);
 
-assert.equal(calculateLevel({
+assert.throws(() => calculateLevel({
     start_tier: 'bt',
     adventure_bubbles: 6,
-    dm_bubbles: 5,
-    bubble_shop_spend: 4,
     simplified_tracking: 1,
-    has_pseudo_adventure: 0,
     is_filler: 0,
-}), 4);
+    progression_state: { has_level_anchor: false },
+}), /Missing character progression snapshot value: level/);
 
-assert.equal(calculateLevel({
-    start_tier: 'bt',
-    adventure_bubbles: 6,
-    dm_bubbles: 5,
-    bubble_shop_spend: 4,
-    simplified_tracking: 0,
-    has_pseudo_adventure: 1,
+assert.equal(calculateRawLevel({
     is_filler: 0,
+    progression_version_id: 1,
+    progression_state: { tracked_available_bubbles: 6 },
 }), 4);
 
 console.log('character-tier.test.js passed');

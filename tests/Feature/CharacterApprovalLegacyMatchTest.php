@@ -12,10 +12,10 @@ it('includes legacy approval match data for matching characters', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $user = User::factory()->create();
 
-    Character::factory()->for($user)->create([
+    recordCharacterSnapshot(Character::factory()->for($user)->create([
         'name' => 'Liza',
         'external_link' => 'https://www.dndbeyond.com/characters/132337081',
-    ]);
+    ]));
 
     LegacyCharacterApproval::factory()->create([
         'discord_name' => 'sirrio',
@@ -43,15 +43,15 @@ it('filters character approvals by legacy match status', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $user = User::factory()->create();
 
-    Character::factory()->for($user)->create([
+    recordCharacterSnapshot(Character::factory()->for($user)->create([
         'name' => 'Matched',
         'external_link' => 'https://www.dndbeyond.com/characters/132337081',
-    ]);
+    ]));
 
-    Character::factory()->for($user)->create([
+    recordCharacterSnapshot(Character::factory()->for($user)->create([
         'name' => 'Missing',
         'external_link' => 'https://www.dndbeyond.com/characters/132337099',
-    ]);
+    ]));
 
     LegacyCharacterApproval::factory()->create([
         'character_name' => 'Matched',

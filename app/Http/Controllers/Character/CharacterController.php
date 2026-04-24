@@ -10,8 +10,9 @@ use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
 use App\Services\CharacterRetirementNotificationService;
+use App\Support\CharacterAuditTrail;
 use App\Support\CharacterAvatarPrivacy;
-use App\Support\CharacterBubbleShop;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\LevelProgression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -23,7 +24,10 @@ use Inertia\Response;
 
 class CharacterController extends Controller
 {
-    public function __construct(private readonly CharacterAvatarPrivacy $characterAvatarPrivacy) {}
+    public function __construct(
+        private readonly CharacterAvatarPrivacy $characterAvatarPrivacy,
+        private readonly CharacterProgressionSnapshotResolver $progressionSnapshots,
+    ) {}
 
     public function index(): Response
     {
@@ -37,6 +41,7 @@ class CharacterController extends Controller
             ->orderBy('position')
             ->get()
             ->withoutAppends();
+        $this->progressionSnapshots->attach($characters);
         $this->attachReviewerNamesToCharacters($characters);
         $characters->each(fn (Character $character) => $this->characterAvatarPrivacy->maskLinkedCharacterAvatars(
             $character,
@@ -69,7 +74,8 @@ class CharacterController extends Controller
      */
     public function store(
         StoreCharacterRequest $request,
-        CharacterBubbleShop $bubbleShop,
+        CharacterAuditTrail $auditTrail,
+        \App\Support\CharacterProgressionState $progressionState,
     ): RedirectResponse {
         $character = new Character;
         $character->name = $request->name;
@@ -77,10 +83,6 @@ class CharacterController extends Controller
         $character->notes = $request->notes;
         $character->is_filler = $request->is_filler;
         $character->version = $request->version;
-        $character->dm_bubbles = $request->dm_bubbles;
-        $character->dm_coins = $request->dm_coins;
-        $character->bubble_shop_spend = $request->integer('bubble_shop_spend', 0);
-        $bubbleShop->syncLegacySpend($character, $character->bubble_shop_spend);
         $character->user_id = Auth::user()->getAuthIdentifier();
         $character->simplified_tracking = (bool) (Auth::user()?->simplified_tracking ?? false);
         $character->start_tier = $request->start_tier;
@@ -95,6 +97,18 @@ class CharacterController extends Controller
         $classIds = array_values(array_unique($request->class));
         $character->characterClasses()->sync($classIds);
 
+        $startTierBonus = $progressionState->startTierBonus($character->start_tier);
+        $initialDmBubbles = $request->integer('dm_bubbles');
+        $initialDmCoins = $request->integer('dm_coins');
+        $auditTrail->record($character, 'character.created', delta: [
+            'available_bubbles' => $startTierBonus,
+            'bubbles' => $startTierBonus,
+            'dm_bubbles' => $initialDmBubbles,
+            'dm_coins' => $initialDmCoins,
+        ], metadata: [
+            'name' => $character->name,
+        ]);
+
         return to_route('characters.index');
     }
 
@@ -104,7 +118,8 @@ class CharacterController extends Controller
     public function show(Character $character): Response
     {
         $this->ensureCharacterOwner($character);
-        $character->load('adventures.allies.linkedCharacter', 'bubbleShopPurchases');
+        $character->load('adventures.allies.linkedCharacter', 'bubbleShopPurchases', 'auditEvents.actor:id,name');
+        $this->progressionSnapshots->attach($character);
         $this->attachReviewerNamesToCharacters(collect([$character]));
         $this->characterAvatarPrivacy->maskLinkedCharacterAvatars($character, Auth::id());
 
@@ -139,20 +154,24 @@ class CharacterController extends Controller
         UpdateCharacterRequest $request,
         Character $character,
         CharacterApprovalNotificationService $notificationService,
-        CharacterBubbleShop $bubbleShop,
+        CharacterAuditTrail $auditTrail,
     ): RedirectResponse {
         $this->ensureCharacterOwner($character);
 
         $previousStatus = $character->guild_status;
+        $previousState = [
+            'name' => $character->name,
+            'faction' => $character->faction,
+            'notes' => $character->notes,
+            'version' => $character->version,
+            'external_link' => $character->external_link,
+            'avatar' => $character->avatar,
+            'class_ids' => $this->sortedClassIds($character),
+        ];
         $character->name = $request->name;
         $character->faction = $request->faction;
         $character->notes = $request->notes;
         $character->version = $request->version;
-        $character->dm_bubbles = $request->dm_bubbles;
-        $character->dm_coins = $request->dm_coins;
-        if ($request->exists('bubble_shop_spend')) {
-            $bubbleShop->syncLegacySpend($character, $request->integer('bubble_shop_spend'));
-        }
         $character->external_link = $request->external_link;
         if ($request->file('avatar')) {
             $character->avatar = $request->file('avatar')->store('avatars', 'public');
@@ -160,7 +179,20 @@ class CharacterController extends Controller
         $character->save();
 
         $classIds = array_values(array_unique($request->class));
+        sort($classIds);
         $character->characterClasses()->sync($classIds);
+        $afterState = [
+            'name' => $character->name,
+            'faction' => $character->faction,
+            'notes' => $character->notes,
+            'version' => $character->version,
+            'external_link' => $character->external_link,
+            'avatar' => $character->avatar,
+            'class_ids' => $classIds,
+        ];
+        $changedFields = $this->changedFields($previousState, $afterState);
+
+        $this->recordCharacterUpdateAuditEvents($auditTrail, $character, $previousState, $afterState, $changedFields);
 
         $shouldSyncAnnouncement = $previousStatus !== $character->guild_status;
         if (! $shouldSyncAnnouncement && $character->guild_status === 'pending') {
@@ -187,6 +219,7 @@ class CharacterController extends Controller
         Character $character,
         CharacterApprovalNotificationService $notificationService,
         CharacterRetirementNotificationService $retirementNotificationService,
+        CharacterAuditTrail $auditTrail,
     ): RedirectResponse {
         $this->ensureCharacterOwner($character);
         $previousStatus = $character->guild_status;
@@ -215,7 +248,6 @@ class CharacterController extends Controller
             $character->guild_status = 'retired';
         }
         $character->save();
-
         if (in_array($previousStatus, ['pending', 'approved', 'needs_changes'], true)) {
             $result = $retirementNotificationService->notifyRetirement($character, [
                 'previous_status' => $previousStatus,
@@ -239,6 +271,10 @@ class CharacterController extends Controller
         $character->adventures()->delete();
         $character->downtimes()->delete();
         $character->delete();
+        $auditTrail->record($character, 'character.deleted', metadata: [
+            'previous_status' => $previousStatus,
+            'retired_instead_of_deleted' => $character->guild_status === 'retired',
+        ]);
 
         return redirect()->back();
     }
@@ -327,5 +363,72 @@ class CharacterController extends Controller
             $reviewedByName = $actorId ? $reviewerNames->get($actorId) : null;
             $character->setAttribute('reviewed_by_name', $reviewedByName);
         }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function sortedClassIds(Character $character): array
+    {
+        return $character->characterClasses()
+            ->pluck('character_classes.id')
+            ->map(fn ($id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     * @return list<string>
+     */
+    private function changedFields(array $before, array $after): array
+    {
+        return collect(array_keys($after))
+            ->filter(fn (string $key): bool => ($before[$key] ?? null) !== $after[$key])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     * @param  list<string>  $changedFields
+     */
+    private function recordCharacterUpdateAuditEvents(CharacterAuditTrail $auditTrail, Character $character, array $before, array $after, array $changedFields): void
+    {
+        foreach ($changedFields as $field) {
+            $auditTrail->record($character, $this->characterUpdateAuditAction($field), delta: $this->characterUpdateDelta($field, $before, $after), metadata: [
+                'field' => $field,
+                'before' => [$field => $before[$field] ?? null],
+                'after' => [$field => $after[$field] ?? null],
+                'changed_fields' => [$field],
+            ]);
+        }
+    }
+
+    private function characterUpdateAuditAction(string $field): string
+    {
+        return match ($field) {
+            'name' => 'character.name_updated',
+            'faction' => 'character.faction_updated',
+            'notes' => 'character.notes_updated',
+            'version' => 'character.version_updated',
+            'external_link' => 'character.external_link_updated',
+            'avatar' => 'character.avatar_updated',
+            'class_ids' => 'character.classes_updated',
+            default => 'character.updated',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     * @return array<string, int>
+     */
+    private function characterUpdateDelta(string $field, array $before, array $after): array
+    {
+        return [];
     }
 }

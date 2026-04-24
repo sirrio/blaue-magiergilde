@@ -343,14 +343,6 @@ async function loadEditableAdventure(interaction, adventureId, characterId) {
         return null;
     }
 
-    if (adventure.is_pseudo) {
-        await updateManageMessage(interaction, {
-            content: t('characters.pseudoAdventureNotEditable', {}, locale),
-            flags: MessageFlags.Ephemeral,
-        });
-        return null;
-    }
-
     return adventure;
 }
 

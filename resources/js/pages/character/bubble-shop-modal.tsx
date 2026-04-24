@@ -5,10 +5,8 @@ import {
   CharacterBubbleShopPurchaseType,
   characterBubbleShopPurchaseTypes,
   getCharacterBubbleShopCost,
-  getCharacterBubbleShopEffectiveSpend,
-  getCharacterBubbleShopLegacySpend,
-  getCharacterBubbleShopMaxEffectiveSpendWithoutDownlevel,
   getCharacterBubbleShopMaxQuantity,
+  getCharacterBubbleShopMaxSpendWithoutDownlevel,
   getCharacterBubbleShopQuantities,
   getCharacterBubbleShopStructuredSpend,
 } from '@/helper/characterBubbleShop'
@@ -16,7 +14,7 @@ import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
-import { AlertTriangle, Droplets, Minus, Plus, ShoppingBag } from 'lucide-react'
+import { Droplets, Minus, Plus, ShoppingBag } from 'lucide-react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 type BubbleShopFormData = Record<CharacterBubbleShopPurchaseType, number>
@@ -56,15 +54,11 @@ export default function BubbleShopModal({
     wasOpenRef.current = isOpen
   }, [character, form, isOpen])
 
-  const structuredSpend = getCharacterBubbleShopStructuredSpend(character, form.data)
-  const legacySpend = getCharacterBubbleShopLegacySpend(character)
   const currentLevel = calculateLevel(character)
-  const currentEffectiveSpend = getCharacterBubbleShopEffectiveSpend(character, form.data)
-  const maxEffectiveSpendWithoutDownlevel = getCharacterBubbleShopMaxEffectiveSpendWithoutDownlevel(character)
+  const currentSpend = getCharacterBubbleShopStructuredSpend(character, form.data)
+  const maxSpendWithoutDownlevel = getCharacterBubbleShopMaxSpendWithoutDownlevel(character)
   const remainingSpendableWithoutDownlevel =
-    maxEffectiveSpendWithoutDownlevel === null ? null : Math.max(0, maxEffectiveSpendWithoutDownlevel - currentEffectiveSpend)
-  const legacySpendRemaining = Math.max(legacySpend - structuredSpend, 0)
-  const hasOutstandingLegacyRedistribution = legacySpendRemaining > 0
+    maxSpendWithoutDownlevel === null ? null : Math.max(0, maxSpendWithoutDownlevel - currentSpend)
 
   const submit = () => {
     form.patch(route('characters.bubble-shop', character.id), {
@@ -84,7 +78,7 @@ export default function BubbleShopModal({
     <>
       <Button
         size="sm"
-        className={cn(triggerClassName ?? 'w-full justify-center gap-1', hasOutstandingLegacyRedistribution && 'relative')}
+        className={triggerClassName ?? 'w-full justify-center gap-1'}
         aria-label={t('characters.manageBubbleShop')}
         title={t('characters.manageBubbleShop')}
         onMouseDown={(event) => event.stopPropagation()}
@@ -96,42 +90,11 @@ export default function BubbleShopModal({
         ) : (
           <span className="md:hidden">{t('characters.bubbleShop')}</span>
         )}
-        {hasOutstandingLegacyRedistribution ? (
-          <span className="badge badge-warning badge-xs absolute -top-1 -right-1 min-w-4 px-1 text-[10px] leading-none">
-            {legacySpendRemaining > 9 ? '9+' : legacySpendRemaining}
-          </span>
-        ) : null}
       </Button>
       <Modal isOpen={isOpen} onClose={() => !form.processing && setIsOpen(false)}>
         <ModalTitle>{t('characters.manageBubbleShop')}</ModalTitle>
         <ModalContent>
           <div className="space-y-4">
-            {hasOutstandingLegacyRedistribution ? (
-              <div className="border-warning/30 bg-warning/10 text-base-content/75 rounded-md border px-3 py-3 text-xs">
-                <div className="flex items-start gap-2">
-                  <span className="text-warning mt-0.5">
-                    <AlertTriangle size={14} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-base-content font-medium">{t('characters.bubbleShopLegacyUnassigned')}</div>
-                        <div className="text-base-content/55 mt-1">{t('characters.bubbleShopLegacyReasonTitle')}</div>
-                      </div>
-                      <div className="border-warning/30 bg-base-100 text-base-content rounded-md border px-2 py-1 text-sm font-semibold">
-                        {legacySpendRemaining}
-                      </div>
-                    </div>
-
-                    <div className="mt-2">{t('characters.bubbleShopLegacyReasonBody')}</div>
-                    <div className="text-warning-content/90 dark:text-warning mt-2 font-medium">
-                      {t('characters.bubbleShopLegacySubhint', { count: legacySpendRemaining })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             {remainingSpendableWithoutDownlevel !== null ? (
               <div className="text-base-content/65 px-1 text-sm">
                 {remainingSpendableWithoutDownlevel > 0 ? (
@@ -208,11 +171,11 @@ export default function BubbleShopModal({
                               form.processing ||
                               isLocked ||
                               (max !== null && form.data[type] >= max) ||
-                              (maxEffectiveSpendWithoutDownlevel !== null &&
-                                getCharacterBubbleShopEffectiveSpend(character, {
+                              (maxSpendWithoutDownlevel !== null &&
+                                getCharacterBubbleShopStructuredSpend(character, {
                                   ...form.data,
                                   [type]: max === null ? form.data[type] + 1 : Math.min(max, form.data[type] + 1),
-                                }) > maxEffectiveSpendWithoutDownlevel)
+                                }) > maxSpendWithoutDownlevel)
                             }
                             aria-label={`${label} +1`}
                             title={`${label} +1`}

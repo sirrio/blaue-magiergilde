@@ -2,10 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Character\SetQuickLevel;
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\CharacterClass;
 use App\Models\User;
+use App\Support\CharacterAuditTrail;
+use App\Support\CharacterProgressionState;
+use App\Support\LevelProgression;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -13,11 +17,13 @@ use Illuminate\Support\Facades\DB;
  * @phpstan-type AdventureFixture array{
  *     duration: int,
  *     start_date: string,
- *     is_pseudo?: bool,
- *     target_level?: int,
  *     has_additional_bubble?: bool,
  *     title?: string|null,
  *     game_master?: string|null
+ * }
+ * @phpstan-type LevelAnchorFixture array{
+ *     level: int,
+ *     bubbles_in_level?: int
  * }
  * @phpstan-type CharacterFixture array{
  *     name: string,
@@ -37,6 +43,7 @@ use Illuminate\Support\Facades\DB;
  *     notes?: string|null,
  *     manual_adventures_count?: int|null,
  *     manual_faction_rank?: int|null,
+ *     level_anchor?: LevelAnchorFixture|null,
  *     adventures?: list<AdventureFixture>
  * }
  */
@@ -84,9 +91,6 @@ class SeedCharacterReviewFixturesCommand extends Command
                 $character->external_link = sprintf('https://www.dndbeyond.com/characters/%d', 98000000 + $index);
                 $character->start_tier = $fixture['start_tier'];
                 $character->version = '2024';
-                $character->dm_bubbles = $fixture['dm_bubbles'];
-                $character->dm_coins = $fixture['dm_coins'] ?? 0;
-                $character->bubble_shop_spend = $fixture['bubble_shop_spend'] ?? 0;
                 $character->is_filler = $fixture['is_filler'];
                 $character->faction = $fixture['faction'] ?? 'none';
                 $character->notes = $fixture['notes'] ?? null;
@@ -96,6 +100,7 @@ class SeedCharacterReviewFixturesCommand extends Command
                 $character->avatar = $fixture['avatar'] ?? null;
                 $character->private_mode = false;
                 $character->guild_status = $fixture['guild_status'];
+                $character->progression_version_id = LevelProgression::activeVersionId();
                 $character->registration_note = $fixture['registration_note'] ?? null;
                 $character->review_note = $fixture['review_note'] ?? null;
                 $character->manual_adventures_count = array_key_exists('manual_adventures_count', $fixture) ? $fixture['manual_adventures_count'] : null;
@@ -104,18 +109,58 @@ class SeedCharacterReviewFixturesCommand extends Command
 
                 $character->characterClasses()->sync([$characterClass->getKey()]);
 
+                $auditTrail = app(CharacterAuditTrail::class);
+                $progressionState = app(CharacterProgressionState::class);
+                $startTierBonus = $progressionState->startTierBonus($character->start_tier);
+                $dmBubbles = (int) ($fixture['dm_bubbles'] ?? 0);
+                $dmCoins = (int) ($fixture['dm_coins'] ?? 0);
+                $auditTrail->record($character, 'character.created', delta: [
+                    'available_bubbles' => $startTierBonus,
+                    'bubbles' => $startTierBonus,
+                    'dm_bubbles' => $dmBubbles,
+                    'dm_coins' => $dmCoins,
+                ], metadata: [
+                    'seed_review_fixture' => true,
+                    'name' => $character->name,
+                ]);
+
+                $levelAnchor = $fixture['level_anchor'] ?? null;
+                if (is_array($levelAnchor)) {
+                    app(SetQuickLevel::class)->handle(
+                        $character->fresh(),
+                        (int) ($levelAnchor['level'] ?? 1),
+                        (int) ($levelAnchor['bubbles_in_level'] ?? 0),
+                    );
+                }
+
                 foreach ($fixture['adventures'] ?? [] as $adventureData) {
+
                     $adventure = new Adventure;
                     $adventure->character_id = $character->getKey();
-                    $adventure->duration = $adventureData['duration'];
+                    $adventure->duration = (int) $adventureData['duration'];
                     $adventure->start_date = $adventureData['start_date'];
-                    $adventure->is_pseudo = $adventureData['is_pseudo'] ?? false;
-                    $adventure->target_level = $adventureData['target_level'] ?? null;
                     $adventure->has_additional_bubble = $adventureData['has_additional_bubble'] ?? false;
                     $adventure->title = $adventureData['title'] ?? null;
                     $adventure->game_master = $adventureData['game_master'] ?? null;
-                    $adventure->progression_version_id = null;
                     $adventure->save();
+
+                    $adventureBubbles = intdiv($adventure->duration, 10800) + ($adventure->has_additional_bubble ? 1 : 0);
+                    $auditTrail->record($character, 'adventure.created', delta: [
+                        'bubbles' => $adventureBubbles,
+                    ], metadata: [
+                        'adventure_id' => $adventure->getKey(),
+                        'seed_review_fixture' => true,
+                    ]);
+                }
+
+                $bubbleShopSpend = (int) ($fixture['bubble_shop_spend'] ?? 0);
+                if ($bubbleShopSpend > 0) {
+                    $auditTrail->record($character->fresh(), 'bubble_shop.updated', delta: [
+                        'bubbles' => -$bubbleShopSpend,
+                        'bubble_shop_spend' => $bubbleShopSpend,
+                    ], metadata: [
+                        'seed_review_fixture' => true,
+                    ]);
                 }
 
                 $createdCount++;
@@ -195,17 +240,6 @@ class SeedCharacterReviewFixturesCommand extends Command
         }
 
         return $adventures;
-    }
-
-    /** @return list<AdventureFixture> */
-    private function pseudoAdventure(int $targetLevel): array
-    {
-        return [[
-            'duration' => 0,
-            'start_date' => now()->subMonths(3)->format('Y-m-d'),
-            'is_pseudo' => true,
-            'target_level' => $targetLevel,
-        ]];
     }
 
     /**
@@ -432,7 +466,7 @@ class SeedCharacterReviewFixturesCommand extends Command
                 'faction' => 'arkanisten',
                 'simplified_tracking' => true,
                 'avatar' => $this->avatar('level-tracking-sorcerer'),
-                'adventures' => $this->pseudoAdventure(7),
+                'level_anchor' => ['level' => 7],
                 // manual_* deliberately absent → shows — in all fields
             ],
             [
@@ -446,7 +480,7 @@ class SeedCharacterReviewFixturesCommand extends Command
                 'faction' => 'diplomaten',
                 'simplified_tracking' => true,
                 'avatar' => $this->avatar('override-paladin'),
-                'adventures' => $this->pseudoAdventure(9),
+                'level_anchor' => ['level' => 9],
                 'manual_adventures_count' => 12,
                 'manual_faction_rank' => 2,
             ],
@@ -460,13 +494,11 @@ class SeedCharacterReviewFixturesCommand extends Command
                 'faction' => 'handwerker',
                 'simplified_tracking' => false,
                 'avatar' => $this->avatar('mixed-tracking-artificer'),
-                'adventures' => array_merge(
-                    $this->pseudoAdventure(4),
-                    $this->realAdventures(3)
-                ),
+                'level_anchor' => ['level' => 4],
+                'adventures' => $this->realAdventures(3),
             ],
             [
-                // ET (target_level=20) → zählt nicht gegen Standard- oder HT-Limits
+                // ET-Anker → zählt nicht gegen Standard- oder HT-Limits
                 'name' => 'Fixture 22 - Max Level (Level-Tracking, ET)',
                 'class_name' => 'Barbarian',
                 'guild_status' => 'approved',
@@ -478,7 +510,7 @@ class SeedCharacterReviewFixturesCommand extends Command
                 'simplified_tracking' => true,
                 'avatar_masked' => false,
                 'avatar' => $this->avatar('max-level-barbarian'),
-                'adventures' => $this->pseudoAdventure(20),
+                'level_anchor' => ['level' => 20],
                 'manual_adventures_count' => 35,
                 'manual_faction_rank' => 5,
             ],

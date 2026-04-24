@@ -9,7 +9,7 @@ const originalAppDbModule = require.cache[appDbPath];
 
 let scenario = 'success';
 const executed = [];
-let pseudoInsertions = 0;
+const auditEventInserts = [];
 
 setLevelProgressionTotals({
     1: 0, 2: 1, 3: 3, 4: 6, 5: 10,
@@ -17,6 +17,23 @@ setLevelProgressionTotals({
     11: 55, 12: 66, 13: 78, 14: 91, 15: 105,
     16: 120, 17: 136, 18: 153, 19: 171, 20: 190,
 });
+
+function progressionState(overrides = {}) {
+    return JSON.stringify({
+        level: 5,
+        tier: 'lt',
+        available_bubbles: 12,
+        bubbles_in_level: 2,
+        bubbles_required_for_next_level: 5,
+        progression_version_id: 1,
+        bubble_shop_spend: 8,
+        downtime_total_seconds: 0,
+        downtime_logged_seconds: 0,
+        faction_rank: 0,
+        has_level_anchor: false,
+        ...overrides,
+    });
+}
 
 const fakeConnection = {
     async beginTransaction() {},
@@ -49,10 +66,6 @@ const fakeDb = {
                     external_link: '',
                     avatar: null,
                     notes: null,
-                    dm_bubbles: 0,
-                    dm_coins: 0,
-                    bubble_shop_spend: 0,
-                    bubble_shop_legacy_spend: 0,
                     bubble_shop_skill_proficiency: 0,
                     bubble_shop_rare_language: 0,
                     bubble_shop_tool_or_language: 0,
@@ -70,12 +83,19 @@ const fakeDb = {
                     has_room: 0,
                     adventures_count: 1,
                     adventure_bubbles: 4,
-                    has_pseudo_adventure: 0,
                     has_real_adventure: 1,
                     total_downtime: 0,
                     faction_downtime: 0,
                     other_downtime: 0,
                     class_names: 'Wizard',
+                    progression_state_json: progressionState({
+                        level: 3,
+                        tier: 'bt',
+                        available_bubbles: 4,
+                        bubbles_in_level: 1,
+                        bubbles_required_for_next_level: 3,
+                        bubble_shop_spend: 0,
+                    }),
                 }]];
             }
 
@@ -89,10 +109,6 @@ const fakeDb = {
                     external_link: '',
                     avatar: null,
                     notes: null,
-                    dm_bubbles: 0,
-                    dm_coins: 0,
-                    bubble_shop_spend: 4,
-                    bubble_shop_legacy_spend: 4,
                     bubble_shop_skill_proficiency: 0,
                     bubble_shop_rare_language: 0,
                     bubble_shop_tool_or_language: 0,
@@ -110,12 +126,19 @@ const fakeDb = {
                     has_room: 0,
                     adventures_count: 1,
                     adventure_bubbles: 1,
-                    has_pseudo_adventure: 0,
                     has_real_adventure: 1,
                     total_downtime: 0,
                     faction_downtime: 0,
                     other_downtime: 0,
                     class_names: 'Wizard',
+                    progression_state_json: progressionState({
+                        level: 2,
+                        tier: 'bt',
+                        available_bubbles: 1,
+                        bubbles_in_level: 0,
+                        bubbles_required_for_next_level: 2,
+                        bubble_shop_spend: 4,
+                    }),
                 }]];
             }
 
@@ -129,10 +152,6 @@ const fakeDb = {
                     external_link: '',
                     avatar: null,
                     notes: null,
-                    dm_bubbles: 0,
-                    dm_coins: 0,
-                    bubble_shop_spend: 0,
-                    bubble_shop_legacy_spend: 0,
                     bubble_shop_skill_proficiency: 0,
                     bubble_shop_rare_language: 0,
                     bubble_shop_tool_or_language: 0,
@@ -150,12 +169,19 @@ const fakeDb = {
                     has_room: 0,
                     adventures_count: 1,
                     adventure_bubbles: 17,
-                    has_pseudo_adventure: pseudoInsertions > 0 ? 1 : 0,
                     has_real_adventure: 1,
                     total_downtime: 0,
                     faction_downtime: 0,
                     other_downtime: 0,
                     class_names: 'Wizard',
+                    progression_state_json: progressionState({
+                        level: 6,
+                        tier: 'lt',
+                        available_bubbles: 17,
+                        bubbles_in_level: 2,
+                        bubbles_required_for_next_level: 6,
+                        bubble_shop_spend: 0,
+                    }),
                 }]];
             }
 
@@ -168,10 +194,6 @@ const fakeDb = {
                 external_link: '',
                 avatar: null,
                 notes: null,
-                dm_bubbles: 0,
-                dm_coins: 0,
-                bubble_shop_spend: 8,
-                bubble_shop_legacy_spend: 8,
                 bubble_shop_skill_proficiency: 0,
                 bubble_shop_rare_language: 0,
                 bubble_shop_tool_or_language: 0,
@@ -189,12 +211,12 @@ const fakeDb = {
                 has_room: 0,
                 adventures_count: 3,
                 adventure_bubbles: 10,
-                has_pseudo_adventure: 0,
                 has_real_adventure: 1,
                 total_downtime: 0,
                 faction_downtime: 0,
                 other_downtime: 0,
                 class_names: 'Wizard',
+                progression_state_json: progressionState(),
             }]];
         }
 
@@ -203,42 +225,25 @@ const fakeDb = {
             return [{ affectedRows: 1 }];
         }
 
-        if (sql.includes('SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler, simplified_tracking, progression_version_id')) {
+        if (sql.includes('SELECT id, is_filler, progression_version_id') && sql.includes('FROM characters')) {
             return [[{
                 id: 42,
-                start_tier: 'bt',
-                dm_bubbles: 0,
-                bubble_shop_spend: 0,
                 is_filler: 0,
-                simplified_tracking: 1,
                 progression_version_id: 1,
             }]];
         }
 
-        if (sql.includes('SELECT id, start_date, target_level') && sql.includes('is_pseudo = 1')) {
-            return [pseudoInsertions > 0 ? [{ id: 900, start_date: '2026-04-22', target_level: 4 }] : []];
+        if (sql.includes('FROM character_audit_events')) {
+            return [[{ event_bubble_delta: 0 }]];
         }
 
-        if (sql.includes('SELECT id, is_pseudo') && sql.includes('FROM adventures')) {
-            return [pseudoInsertions > 0 ? [{ id: 900, is_pseudo: 1 }] : []];
-        }
-
-        if (sql.includes('SELECT COALESCE(SUM(FLOOR(duration / 10800)')) {
-            return [[{ bubbles: 17 }]];
-        }
-
-        if (sql.includes('INSERT INTO adventures')) {
-            pseudoInsertions += 1;
+        if (sql.includes('INSERT INTO character_audit_events')) {
+            auditEventInserts.push({ sql, bindings });
             executed.push({ sql, bindings });
-            return [{ affectedRows: 1, insertId: 900 }];
+            return [{ affectedRows: 1, insertId: 901 }];
         }
 
         if (sql.includes('INSERT INTO character_bubble_shop_purchases')) {
-            executed.push({ sql, bindings });
-            return [{ affectedRows: 1 }];
-        }
-
-        if (sql.startsWith('UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ? AND user_id = ?')) {
             executed.push({ sql, bindings });
             return [{ affectedRows: 1 }];
         }
@@ -273,6 +278,7 @@ Promise.resolve()
 
         scenario = 'success';
         executed.length = 0;
+        auditEventInserts.length = 0;
         const success = await updateCharacterBubbleShopForDiscord(discordUser, 42, {
             skill_proficiency: 1,
             rare_language: 0,
@@ -281,10 +287,11 @@ Promise.resolve()
         });
         assert.equal(success.ok, true);
         assert.equal(executed.filter((entry) => entry.sql.includes('INSERT INTO character_bubble_shop_purchases')).length, 3);
-        assert.equal(executed.some((entry) => entry.sql.startsWith('UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ? AND user_id = ?') && entry.bindings[0] === 10), true);
+        assert.equal(auditEventInserts.some((entry) => entry.bindings[2] === 'bubble_shop.updated'), true);
 
         scenario = 'invalid';
         executed.length = 0;
+        auditEventInserts.length = 0;
         const invalid = await updateCharacterBubbleShopForDiscord(discordUser, 42, {
             skill_proficiency: 0,
             rare_language: 0,
@@ -299,6 +306,7 @@ Promise.resolve()
 
         scenario = 'bubble-floor';
         executed.length = 0;
+        auditEventInserts.length = 0;
         const floorBlocked = await updateCharacterBubbleShopForDiscord(discordUser, 42, {
             skill_proficiency: 0,
             rare_language: 0,
@@ -311,16 +319,16 @@ Promise.resolve()
 
         scenario = 'manual-anchor';
         executed.length = 0;
-        pseudoInsertions = 0;
+        auditEventInserts.length = 0;
         const anchored = await updateCharacterBubbleShopForDiscord(discordUser, 42, {
-            skill_proficiency: 1,
+            skill_proficiency: 0,
             rare_language: 0,
-            tool_or_language: 0,
+            tool_or_language: 1,
             downtime: 0,
         });
         assert.equal(anchored.ok, true);
-        assert.equal(pseudoInsertions, 1);
-        assert.equal(executed.some((entry) => entry.sql.includes('INSERT INTO adventures')), true);
+        assert.equal(auditEventInserts.some((entry) => entry.bindings[2] === 'level.set'), true);
+        assert.equal(auditEventInserts.some((entry) => entry.bindings[2] === 'bubble_shop.updated'), true);
 
         console.log('app-db-character-bubble-shop.test.js passed');
     })

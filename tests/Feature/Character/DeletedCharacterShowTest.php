@@ -3,6 +3,7 @@
 use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
+use App\Models\CharacterAuditEvent;
 use App\Models\Downtime;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,11 +16,16 @@ it('shows deleted character details in read only mode for the owner', function (
     $character = Character::factory()->for($user)->create();
     $adventure = Adventure::factory()->for($character)->create();
     $downtime = Downtime::factory()->for($character)->create();
+    $auditEvent = CharacterAuditEvent::factory()->for($character)->create([
+        'action' => 'bubble_shop.updated',
+        'delta' => ['bubbles' => -2, 'bubble_shop_spend' => 2],
+    ]);
     $manuallyDeletedAdventure = Adventure::factory()->for($character)->create();
     $manuallyDeletedDowntime = Downtime::factory()->for($character)->create();
 
     $manuallyDeletedAdventure->delete();
     $manuallyDeletedDowntime->delete();
+    recordCharacterSnapshot($character);
     $character->delete();
 
     $this->actingAs($user)
@@ -32,7 +38,8 @@ it('shows deleted character details in read only mode for the owner', function (
             ->has('character.adventures', 1)
             ->has('character.downtimes', 1)
             ->where('character.adventures.0.id', $adventure->id)
-            ->where('character.downtimes.0.id', $downtime->id));
+            ->where('character.downtimes.0.id', $downtime->id)
+            ->where('character.audit_events', fn ($events) => collect($events)->contains(fn ($event) => ($event['id'] ?? null) === $auditEvent->id)));
 });
 
 it('forbids access to deleted character details for non owners', function () {
@@ -40,6 +47,7 @@ it('forbids access to deleted character details for non owners', function () {
     $otherUser = User::factory()->create();
     $character = Character::factory()->for($owner)->create();
 
+    recordCharacterSnapshot($character);
     $character->delete();
 
     $this->actingAs($otherUser)
@@ -62,6 +70,8 @@ it('hides private linked character avatars on deleted character detail page', fu
         'rating' => 3,
         'linked_character_id' => $privateCharacter->id,
     ]);
+    recordCharacterSnapshot($deletedCharacter);
+    recordCharacterSnapshot($privateCharacter);
     $deletedCharacter->delete();
 
     $this->actingAs($viewer)

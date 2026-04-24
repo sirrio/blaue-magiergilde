@@ -2,7 +2,7 @@ import { Character } from '@/types'
 
 const calculateCoinsSpend = (characters: Character[]): number => {
   return characters.reduce((bubble: number, character: Character): number => {
-    return bubble + character.dm_coins
+    return bubble + Number(character.progression_state?.dm_coins ?? 0)
   }, 0)
 }
 

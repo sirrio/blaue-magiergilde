@@ -13,6 +13,7 @@ it('returns a slimmed character payload for game master log index', function () 
     $character = Character::factory()->for($user)->create();
     Adventure::factory()->for($character)->create();
     Game::factory()->create(['user_id' => $user->id]);
+    recordCharacterSnapshot($character);
 
     $response = $this->actingAs($user)
         ->get(route('game-master-log.index'))
@@ -34,7 +35,6 @@ it('does not include deleted adventures in the game master log character payload
     $user = User::factory()->create();
     $character = Character::factory()->for($user)->create([
         'is_filler' => true,
-        'dm_bubbles' => 0,
     ]);
 
     $activeAdventure = Adventure::factory()->for($character)->create([
@@ -46,6 +46,7 @@ it('does not include deleted adventures in the game master log character payload
         'has_additional_bubble' => false,
     ]);
     $deletedAdventure->delete();
+    recordCharacterSnapshot($character);
 
     $response = $this->actingAs($user)
         ->get(route('game-master-log.index'))
@@ -63,11 +64,12 @@ it('does not include deleted adventures in the game master log character payload
 it('keeps deleted characters in the game master log payload for existing spends', function () {
     $user = User::factory()->create();
     $activeCharacter = Character::factory()->for($user)->create();
-    $deletedCharacter = Character::factory()->for($user)->create([
-        'dm_bubbles' => 3,
-        'dm_coins' => 2,
-    ]);
+    $deletedCharacter = Character::factory()->for($user)->create();
+    app(\App\Support\CharacterAuditTrail::class)->record($deletedCharacter, 'dm_bubbles.granted', delta: ['bubbles' => 3, 'dm_bubbles' => 3]);
+    app(\App\Support\CharacterAuditTrail::class)->record($deletedCharacter, 'dm_coins.granted', delta: ['dm_coins' => 2]);
+    recordCharacterSnapshot($activeCharacter);
     $deletedCharacter->delete();
+    recordCharacterSnapshot($deletedCharacter);
 
     $response = $this->actingAs($user)
         ->get(route('game-master-log.index'))
@@ -83,16 +85,16 @@ it('keeps deleted characters in the game master log payload for existing spends'
     $payloadCharacter = $characters->firstWhere('id', $deletedCharacter->id);
 
     expect($payloadCharacter)->toBeArray();
-    expect($payloadCharacter['dm_bubbles'])->toBe(3);
-    expect($payloadCharacter['dm_coins'])->toBe(2);
+    expect($payloadCharacter['progression_state']['dm_bubbles'] ?? null)->toBe(3);
+    expect($payloadCharacter['progression_state']['dm_coins'] ?? null)->toBe(2);
 });
 
 it('keeps only character-deletion adventures for deleted characters in the game master log payload', function () {
     $user = User::factory()->create();
     $character = Character::factory()->for($user)->create([
         'is_filler' => true,
-        'dm_bubbles' => 1,
     ]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'dm_bubbles.granted', delta: ['bubbles' => 1, 'dm_bubbles' => 1]);
 
     $stillActiveAdventure = Adventure::factory()->for($character)->create([
         'duration' => 10800,
@@ -113,6 +115,7 @@ it('keeps only character-deletion adventures for deleted characters in the game 
     $manuallyDeletedAdventure->delete();
 
     $character->delete();
+    recordCharacterSnapshot($character);
 
     $response = $this->actingAs($user)
         ->get(route('game-master-log.index'))

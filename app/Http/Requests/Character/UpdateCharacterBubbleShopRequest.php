@@ -4,7 +4,6 @@ namespace App\Http\Requests\Character;
 
 use App\Models\Character;
 use App\Support\CharacterBubbleShop;
-use App\Support\CharacterProgressionState;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -66,17 +65,12 @@ class UpdateCharacterBubbleShopRequest extends FormRequest
                     return;
                 }
 
-                $progressionState = app(CharacterProgressionState::class);
-                if (($character->simplified_tracking ?? false) && ! $progressionState->hasPseudoAdventures($character)) {
-                    return;
-                }
-
                 $quantities = [];
                 foreach (CharacterBubbleShop::purchaseTypes() as $type) {
                     $quantities[$type] = max(0, $this->integer($type));
                 }
 
-                if ($bubbleShop->effectiveSpendForQuantities($character, $quantities) > $maxEffectiveSpend) {
+                if ($bubbleShop->structuredSpendForQuantities($character, $quantities) > $maxEffectiveSpend) {
                     $validator->errors()->add(
                         'bubble_shop',
                         'Bubble-Shop-Ausgaben duerfen den Charakter nicht unter sein aktuelles Level druecken.',

@@ -13,6 +13,7 @@ let scenario = 'adventure';
 let updates = [];
 let inserts = [];
 let deletes = [];
+let auditEventInserts = [];
 
 const fakeConnection = {
     async beginTransaction() {},
@@ -58,6 +59,23 @@ function levelFromAvailableBubbles(availableBubbles, versionId = 2) {
     return level;
 }
 
+function progressionState(overrides = {}) {
+    return JSON.stringify({
+        level: 14,
+        tier: 'ht',
+        available_bubbles: 91,
+        bubbles_in_level: 0,
+        bubbles_required_for_next_level: 14,
+        progression_version_id: 1,
+        bubble_shop_spend: 0,
+        downtime_total_seconds: 0,
+        downtime_logged_seconds: 0,
+        faction_rank: 0,
+        has_level_anchor: false,
+        ...overrides,
+    });
+}
+
 require.cache[levelProgressionPath] = {
     id: levelProgressionPath,
     filename: levelProgressionPath,
@@ -91,9 +109,6 @@ const fakeDb = {
                     external_link: '',
                     avatar: null,
                     notes: null,
-                    dm_bubbles: 0,
-                    dm_coins: 0,
-                    bubble_shop_spend: 0,
                     bubble_shop_downtime: 0,
                     progression_version_id: 1,
                     manual_adventures_count: null,
@@ -108,12 +123,17 @@ const fakeDb = {
                     has_room: 0,
                     adventures_count: 12,
                     adventure_bubbles: 95,
-                    has_pseudo_adventure: 0,
                     has_real_adventure: 1,
                     total_downtime: 0,
                     faction_downtime: 0,
                     other_downtime: 0,
                     class_names: 'Wizard',
+                    progression_state_json: progressionState({
+                        level: 14,
+                        tier: 'ht',
+                        available_bubbles: 95,
+                        bubbles_in_level: 4,
+                    }),
                 }]];
             }
 
@@ -127,9 +147,6 @@ const fakeDb = {
                     external_link: '',
                     avatar: null,
                     notes: null,
-                    dm_bubbles: 0,
-                    dm_coins: 0,
-                    bubble_shop_spend: 0,
                     bubble_shop_downtime: 0,
                     progression_version_id: 1,
                     manual_adventures_count: null,
@@ -144,12 +161,19 @@ const fakeDb = {
                     has_room: 0,
                     adventures_count: 1,
                     adventure_bubbles: 27,
-                    has_pseudo_adventure: 1,
                     has_real_adventure: 0,
                     total_downtime: 0,
                     faction_downtime: 0,
                     other_downtime: 0,
                     class_names: 'Wizard',
+                    progression_state_json: progressionState({
+                        level: 7,
+                        tier: 'lt',
+                        available_bubbles: 27,
+                        bubbles_in_level: 6,
+                        bubbles_required_for_next_level: 7,
+                        has_level_anchor: true,
+                    }),
                 }]];
             }
 
@@ -162,9 +186,6 @@ const fakeDb = {
                 external_link: '',
                 avatar: null,
                 notes: null,
-                dm_bubbles: 0,
-                dm_coins: 0,
-                bubble_shop_spend: 0,
                 bubble_shop_downtime: 0,
                 progression_version_id: 1,
                 manual_adventures_count: null,
@@ -179,98 +200,35 @@ const fakeDb = {
                 has_room: 0,
                 adventures_count: 3,
                 adventure_bubbles: 91,
-                has_pseudo_adventure: 1,
                 has_real_adventure: 1,
                 total_downtime: 0,
                 faction_downtime: 0,
                 other_downtime: 0,
                 class_names: 'Wizard',
+                progression_state_json: progressionState({
+                    has_level_anchor: true,
+                }),
             }]];
         }
 
-        if (sql.includes('SELECT id, start_date, target_level, target_bubbles, progression_version_id') && sql.includes('is_pseudo = 1')) {
-            if (scenario === 'pseudo') {
-                return [[{
-                    id: 901,
-                    start_date: '2026-04-20',
-                    target_level: 14,
-                    target_bubbles: 91,
-                    progression_version_id: 1,
-                }]];
-            }
-
-            if (scenario === 'pseudo-current-level') {
-                return [[{
-                    id: 902,
-                    start_date: '2026-04-20',
-                    target_level: 7,
-                    target_bubbles: 27,
-                    progression_version_id: 1,
-                }]];
-            }
-
-            return [[]];
-        }
-
-        if (sql.includes('SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler, simplified_tracking, progression_version_id')) {
+        if (sql.includes('SELECT id, is_filler, progression_version_id') && sql.includes('FROM characters')) {
             if (scenario === 'pseudo-current-level') {
                 return [[{
                     id: 78,
-                    start_tier: 'bt',
-                    dm_bubbles: 0,
-                    bubble_shop_spend: 0,
                     is_filler: 0,
-                    simplified_tracking: 1,
                     progression_version_id: 2,
                 }]];
             }
 
             return [[{
                 id: 77,
-                start_tier: 'bt',
-                dm_bubbles: 0,
-                bubble_shop_spend: 0,
                 is_filler: 0,
-                simplified_tracking: 1,
                 progression_version_id: 2,
             }]];
         }
 
-        if (sql.includes('SELECT id, start_date, target_level') && sql.includes('is_pseudo = 1')) {
-            if (scenario === 'pseudo-current-level') {
-                return [[{
-                    id: 902,
-                    start_date: '2026-04-20',
-                    target_level: 7,
-                }]];
-            }
-
-            return [[{
-                id: 901,
-                start_date: '2026-04-20',
-                target_level: 14,
-            }]];
-        }
-
-        if (sql.includes('SELECT id, is_pseudo') && sql.includes('FROM adventures')) {
-            if (scenario === 'pseudo-current-level') {
-                return [[{ id: 902, is_pseudo: 1 }]];
-            }
-
-            return [[{ id: 901, is_pseudo: 1 }]];
-        }
-
-        if (sql.includes('SELECT COALESCE(SUM(FLOOR(duration / 10800)')) {
-            if (scenario === 'adventure') {
-                return [[{ bubbles: 95 }]];
-            }
-
-            return [[{ bubbles: 0 }]];
-        }
-
-        if (sql.startsWith('UPDATE characters SET progression_version_id = ?, bubble_shop_spend = ?, updated_at = ? WHERE id = ?')) {
-            updates.push({ sql, bindings });
-            return [{ affectedRows: 1 }];
+        if (sql.includes('FROM character_audit_events')) {
+            return [[{ event_bubble_delta: 0 }]];
         }
 
         if (sql.startsWith('DELETE FROM character_bubble_shop_purchases WHERE character_id = ? AND type = ?')) {
@@ -283,22 +241,12 @@ const fakeDb = {
             return [{ affectedRows: 1 }];
         }
 
-        if (sql.startsWith('UPDATE adventures SET duration = 0, has_additional_bubble = 0, target_level = ?, target_bubbles = ?, progression_version_id = ?, updated_at = ? WHERE id = ?')) {
-            updates.push({ sql, bindings });
-            return [{ affectedRows: 1 }];
-        }
-
-        if (sql.startsWith('UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?')) {
-            updates.push({ sql, bindings });
-            return [{ affectedRows: 1 }];
+        if (sql.includes('INSERT INTO character_audit_events')) {
+            auditEventInserts.push({ sql, bindings });
+            return [{ affectedRows: 1, insertId: 991 }];
         }
 
         if (sql.startsWith('UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?')) {
-            updates.push({ sql, bindings });
-            return [{ affectedRows: 1 }];
-        }
-
-        if (sql.startsWith('UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ?')) {
             updates.push({ sql, bindings });
             return [{ affectedRows: 1 }];
         }
@@ -337,6 +285,7 @@ Promise.resolve()
         updates = [];
         inserts = [];
         deletes = [];
+        auditEventInserts = [];
         const adventureState = await getCharacterProgressionUpgradeStateForDiscord(discordUser, 42);
         assert.equal(adventureState.ok, true);
         assert.equal(adventureState.currentLevel, 14);
@@ -347,29 +296,31 @@ Promise.resolve()
         assert.equal(updates.length, 1);
         assert.equal(inserts.length, 1);
         assert.equal(deletes.length, 0);
+        assert.equal(auditEventInserts.some((entry) => entry.bindings[2] === 'level_curve.upgraded'), true);
         assert.equal(inserts[0].bindings[1], 'downtime');
         assert.equal(inserts[0].bindings[2], 40);
         assert.equal(updates[0].bindings[0], 2);
-        assert.equal(updates[0].bindings[1], 40);
-        assert.equal(updates[0].bindings[3], 42);
+        assert.equal(updates[0].bindings[2], 42);
 
         scenario = 'pseudo';
         updates = [];
+        inserts = [];
+        auditEventInserts = [];
         const pseudoState = await getCharacterProgressionUpgradeStateForDiscord(discordUser, 77);
         assert.equal(pseudoState.ok, true);
         assert.equal(pseudoState.currentLevel, 14);
         assert.equal(pseudoState.recalculatedLevel, 20);
         const pseudoResult = await upgradeCharacterProgressionForDiscord(discordUser, 77, 10, 0);
         assert.equal(pseudoResult.ok, false);
-        assert.equal(pseudoResult.reason, 'outside_manual_range');
+        assert.equal(pseudoResult.reason, 'below_real');
         assert.equal(pseudoResult.minLevel, 14);
-        assert.equal(pseudoResult.maxLevel, 20);
         assert.equal(updates.length, 0);
 
         scenario = 'pseudo-current-level';
         updates = [];
         inserts = [];
         deletes = [];
+        auditEventInserts = [];
         const pseudoCurrentLevelState = await getCharacterProgressionUpgradeStateForDiscord(discordUser, 78);
         assert.equal(pseudoCurrentLevelState.ok, true);
         assert.equal(pseudoCurrentLevelState.currentLevel, 7);
@@ -379,6 +330,8 @@ Promise.resolve()
         assert.equal(inserts.length, 1);
         assert.equal(inserts[0].bindings[1], 'downtime');
         assert.equal(inserts[0].bindings[2], 7);
+        assert.equal(auditEventInserts.some((entry) => entry.bindings[2] === 'level.set'), true);
+        assert.equal(auditEventInserts.some((entry) => entry.bindings[2] === 'level_curve.upgraded'), true);
 
         process.env.FEATURE_LEVEL_CURVE_UPGRADE_USER_IDS = '';
         const disabledState = await getCharacterProgressionUpgradeStateForDiscord(discordUser, 42);

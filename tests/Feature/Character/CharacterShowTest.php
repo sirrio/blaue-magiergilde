@@ -4,6 +4,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
+use App\Models\CharacterAuditEvent;
 use App\Models\User;
 use App\Support\LevelProgression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,6 +16,7 @@ uses(RefreshDatabase::class);
 it('shows the character detail page for the owner', function () {
     $user = User::factory()->create();
     $character = Character::factory()->for($user)->create();
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)
         ->get(route('characters.show', $character))
@@ -29,6 +31,7 @@ it('shows the character detail page for the owner', function () {
 it('shares the beta progression upgrade flag only for allowlisted users', function () {
     $user = User::factory()->create();
     $character = Character::factory()->for($user)->create();
+    recordCharacterSnapshot($character);
 
     Config::set('features.level_curve_upgrade_user_ids', [$user->id]);
 
@@ -59,6 +62,7 @@ it('includes reviewed by name on character detail payload', function () {
         ->create([
             'guild_status' => 'needs_changes',
         ]);
+    recordCharacterSnapshot($character);
 
     AdminAuditLog::query()->create([
         'actor_user_id' => $reviewer->id,
@@ -87,6 +91,8 @@ it('hides private linked character avatars from other users on character detail 
         'private_mode' => true,
         'avatar' => 'avatars/private.png',
     ]);
+    recordCharacterSnapshot($viewerCharacter);
+    recordCharacterSnapshot($privateCharacter);
 
     Ally::factory()->create([
         'character_id' => $viewerCharacter->id,
@@ -121,6 +127,8 @@ it('includes adventure participants on the character detail payload', function (
     ]);
 
     $adventure->allies()->attach($ally->id);
+    recordCharacterSnapshot($character);
+    recordCharacterSnapshot($linkedCharacter);
 
     $this->actingAs($user)
         ->get(route('characters.show', $character))
@@ -132,14 +140,47 @@ it('includes adventure participants on the character detail payload', function (
             ->where('character.adventures.0.allies.0.name', $linkedCharacter->name));
 });
 
-it('includes pseudo adventure anchor metadata on the character detail payload', function () {
+it('includes backfilled progression audit events on the character detail payload', function () {
     $user = User::factory()->create();
     $character = Character::factory()->for($user)->create();
-    $pseudoAdventure = Adventure::factory()->for($character)->create([
-        'title' => 'Level tracking adjustment',
-        'is_pseudo' => true,
-        'target_level' => 7,
-        'progression_version_id' => LevelProgression::activeVersionId(),
+
+    CharacterAuditEvent::factory()->for($character)->create([
+        'action' => 'dm_bubbles.updated',
+        'delta' => ['bubbles' => 3, 'dm_bubbles' => 3],
+        'metadata' => ['backfilled' => true, 'hidden_from_history' => true],
+    ]);
+    recordCharacterSnapshot($character);
+
+    $this->actingAs($user)
+        ->get(route('characters.show', $character))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('character/show')
+            ->where('character.audit_events.0.action', 'test.snapshot')
+            ->where('character.audit_events.1.action', 'dm_bubbles.updated')
+            ->where('character.audit_events.1.delta.bubbles', 3)
+            ->where('character.audit_events.1.metadata.backfilled', true));
+});
+
+it('includes character audit events on the character detail payload', function () {
+    $user = User::factory()->create();
+    $character = Character::factory()->for($user)->create();
+
+    CharacterAuditEvent::factory()->for($character)->create([
+        'actor_user_id' => $user->id,
+        'action' => 'adventure.created',
+        'delta' => ['bubbles' => 2],
+        'state_after' => [
+            'level' => 3,
+            'tier' => 'bt',
+            'available_bubbles' => 3,
+            'bubbles_in_level' => 0,
+            'bubbles_required_for_next_level' => 3,
+            'downtime_total_seconds' => 0,
+            'downtime_logged_seconds' => 0,
+            'faction_rank' => 0,
+        ],
+        'metadata' => ['title' => 'Blue Road'],
     ]);
 
     $this->actingAs($user)
@@ -147,9 +188,10 @@ it('includes pseudo adventure anchor metadata on the character detail payload', 
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('character/show')
-            ->where('character.adventures.0.id', $pseudoAdventure->id)
-            ->where('character.adventures.0.target_level', 7)
-            ->where('character.adventures.0.progression_version_id', LevelProgression::activeVersionId()));
+            ->where('character.audit_events.0.action', 'adventure.created')
+            ->where('character.audit_events.0.delta.bubbles', 2)
+            ->where('character.audit_events.0.state_after.level', 3)
+            ->where('character.audit_events.0.actor.name', $user->name));
 });
 
 it('keeps deleted linked allies as snapshots on the character detail payload', function () {
@@ -161,6 +203,8 @@ it('keeps deleted linked allies as snapshots on the character detail payload', f
     $linkedCharacter = Character::factory()->for($linkedOwner)->create([
         'name' => 'Archived Ally',
     ]);
+    recordCharacterSnapshot($character);
+    recordCharacterSnapshot($linkedCharacter);
 
     $ally = Ally::factory()->create([
         'character_id' => $character->id,

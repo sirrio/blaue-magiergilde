@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
 import { calculateLevel } from '@/helper/calculateLevel'
 import { bubblesRequiredForLevel, bubblesRequiredForNextLevel, clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
+import { requireSnapshotNumber } from '@/helper/characterProgressionState'
 import { countsBubbleAdjustmentsForProgression } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -37,63 +38,27 @@ const SetCharacterLevelModal = ({
   const { errors } = usePage<PageProps>().props
   const initialLevel = clampLevel(calculateLevel(character))
   const progressionVersionId = character.progression_version_id ?? undefined
-  const initialBubblesInLevel = (() => {
-    const pseudo =
-      [...character.adventures]
-        .sort((a, b) => {
-          const d = String(b.start_date).localeCompare(String(a.start_date))
-          return d !== 0 ? d : b.id - a.id
-        })
-        .find((a) => a.is_pseudo) ?? null
-    if (!pseudo || pseudo.target_bubbles == null || pseudo.target_level == null) return 0
-    return Math.max(0, pseudo.target_bubbles - bubblesRequiredForLevel(pseudo.target_level, pseudo.progression_version_id ?? progressionVersionId))
-  })()
+  const initialBubblesInLevel = Math.max(0, requireSnapshotNumber(character, 'bubbles_in_level'))
   const { data, setData, post, processing } = useForm({ level: initialLevel, bubbles_in_level: initialBubblesInLevel })
   const [isOpen, setIsOpen] = useState(false)
   const targetLevel = clampLevel(Number.isFinite(Number(data.level)) ? Number(data.level) : initialLevel)
   const levelDelta = targetLevel - initialLevel
-  const adventuresSorted = [...character.adventures].sort((a, b) => {
-    const dateOrder = String(b.start_date).localeCompare(String(a.start_date))
-    if (dateOrder !== 0) {
-      return dateOrder
-    }
-    return b.id - a.id
-  })
-  const latestPseudoAdventure = adventuresSorted.find((a) => a.is_pseudo) ?? null
   const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
 
-  // Only real adventures AFTER the last pseudo count towards the immutable
-  // floor — earlier ones are superseded by the pseudo level override.
-  const immutableAdventureBubbles = latestPseudoAdventure
-    ? Math.max(
-        0,
-        character.adventures
-          .filter(
-            (a) =>
-              !a.is_pseudo &&
-              (String(a.start_date) > String(latestPseudoAdventure.start_date) ||
-                (String(a.start_date) === String(latestPseudoAdventure.start_date) && a.id > latestPseudoAdventure.id)),
-          )
-          .reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
-      )
-    : Math.max(
-        0,
-        character.adventures.reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
-      )
-  const minAllowedLevel = levelFromAvailableBubbles(
-    immutableAdventureBubbles +
-      (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0) +
-      additionalBubblesForStartTier(character.start_tier) -
-      (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
-    progressionVersionId,
+  const adventureBubbles = Math.max(
+    0,
+    character.adventures.reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
   )
+  const snapshotDmBubbles = Number(character.progression_state?.dm_bubbles ?? 0)
+  const snapshotShopSpend = Number(character.progression_state?.bubble_shop_spend ?? 0)
   const minAllowedAvailableBubbles = Math.max(
     0,
-    immutableAdventureBubbles +
-      (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0) +
+    adventureBubbles +
+      (bubbleAdjustmentsCount ? snapshotDmBubbles : 0) +
       additionalBubblesForStartTier(character.start_tier) -
-      (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
+      (bubbleAdjustmentsCount ? snapshotShopSpend : 0),
   )
+  const minAllowedLevel = levelFromAvailableBubbles(minAllowedAvailableBubbles, progressionVersionId)
   const minSelectableLevel = character.is_filler ? 1 : minAllowedLevel
   const levelRestrictionReason = t('characters.levelRestrictionReason', { level: minSelectableLevel })
   const bubblesForTargetLevel = bubblesRequiredForNextLevel(targetLevel, progressionVersionId)

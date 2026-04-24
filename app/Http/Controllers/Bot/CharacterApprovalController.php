@@ -9,6 +9,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Character;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\CharacterAuditTrail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,7 @@ class CharacterApprovalController extends Controller
     public function updateStatus(
         UpdateCharacterApprovalStatusRequest $request,
         CharacterApprovalNotificationService $notificationService,
+        CharacterAuditTrail $auditTrail,
     ): JsonResponse {
         $this->ensureBotToken($request);
 
@@ -58,6 +60,7 @@ class CharacterApprovalController extends Controller
         }
 
         $previousStatus = $character->guild_status;
+        $previousReviewNote = $character->review_note;
         $character->guild_status = $data['status'];
         if (in_array($data['status'], ['declined', 'needs_changes'], true)) {
             $character->review_note = trim((string) ($data['review_note'] ?? ''));
@@ -77,6 +80,24 @@ class CharacterApprovalController extends Controller
                 'via' => 'discord-bot',
             ],
         ]);
+
+        $auditTrail->record($character, 'character.guild_status_updated', metadata: [
+            'field' => 'guild_status',
+            'before' => ['guild_status' => $previousStatus],
+            'after' => ['guild_status' => $character->guild_status],
+            'changed_fields' => ['guild_status'],
+            'via' => 'discord-bot',
+        ], actorUserId: $actor->id);
+
+        if ($previousReviewNote !== $character->review_note) {
+            $auditTrail->record($character, 'character.review_note_updated', metadata: [
+                'field' => 'review_note',
+                'before' => ['review_note' => $previousReviewNote],
+                'after' => ['review_note' => $character->review_note],
+                'changed_fields' => ['review_note'],
+                'via' => 'discord-bot',
+            ], actorUserId: $actor->id);
+        }
 
         $syncResult = $notificationService->syncAnnouncement($character);
         if (! $syncResult['ok']) {

@@ -4,7 +4,7 @@ namespace App\Support;
 
 use App\Models\Character;
 use App\Models\CharacterBubbleShopPurchase;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection;
 
 class CharacterBubbleShop
 {
@@ -22,7 +22,10 @@ class CharacterBubbleShop
 
     private const DOWNTIME_SECONDS_PER_PURCHASE = 28800;
 
-    public function __construct(private readonly CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+    public function __construct(
+        private readonly CharacterProgressionState $progressionState = new CharacterProgressionState,
+        private readonly CharacterProgressionSnapshotResolver $progressionSnapshots = new CharacterProgressionSnapshotResolver,
+    ) {}
 
     /**
      * @return list<string>
@@ -45,10 +48,10 @@ class CharacterBubbleShop
         $quantities = $this->quantitiesFor($character);
 
         return [
-            self::TYPE_SKILL_PROFICIENCY => ['cost' => 6, 'max' => 1],
-            self::TYPE_RARE_LANGUAGE => ['cost' => 4, 'max' => 1],
-            self::TYPE_TOOL_OR_LANGUAGE => ['cost' => 2, 'max' => 3],
-            self::TYPE_DOWNTIME => ['cost' => 1, 'max' => $this->downtimeMaxFor($character, $quantities[self::TYPE_DOWNTIME] ?? 0)],
+            self::TYPE_SKILL_PROFICIENCY => ['cost' => $this->costFor(self::TYPE_SKILL_PROFICIENCY), 'max' => 1],
+            self::TYPE_RARE_LANGUAGE => ['cost' => $this->costFor(self::TYPE_RARE_LANGUAGE), 'max' => 1],
+            self::TYPE_TOOL_OR_LANGUAGE => ['cost' => $this->costFor(self::TYPE_TOOL_OR_LANGUAGE), 'max' => 3],
+            self::TYPE_DOWNTIME => ['cost' => $this->costFor(self::TYPE_DOWNTIME), 'max' => $this->downtimeMaxFor($character, $quantities[self::TYPE_DOWNTIME] ?? 0)],
         ];
     }
 
@@ -80,45 +83,10 @@ class CharacterBubbleShop
      */
     public function structuredSpendForQuantities(Character $character, array $quantities): int
     {
-        $definitions = $this->definitionsFor($character);
-
         return collect(self::purchaseTypes())
-            ->reduce(function (int $total, string $type) use ($definitions, $quantities): int {
-                return $total + (max(0, $this->safeInt($quantities[$type] ?? 0)) * ($definitions[$type]['cost'] ?? 0));
+            ->reduce(function (int $total, string $type) use ($quantities): int {
+                return $total + (max(0, $this->safeInt($quantities[$type] ?? 0)) * $this->costFor($type));
             }, 0);
-    }
-
-    public function legacySpend(Character $character): int
-    {
-        $legacy = $character->bubble_shop_legacy_spend;
-        if ($legacy === null) {
-            return max(0, $this->safeInt($character->bubble_shop_spend));
-        }
-
-        return max(0, $this->safeInt($legacy));
-    }
-
-    public function effectiveSpend(Character $character): int
-    {
-        return max($this->legacySpend($character), $this->structuredSpend($character));
-    }
-
-    /**
-     * @param  array<string, int>  $quantities
-     */
-    public function effectiveSpendForQuantities(Character $character, array $quantities): int
-    {
-        return max($this->legacySpend($character), $this->structuredSpendForQuantities($character, $quantities));
-    }
-
-    public function coveredByLegacy(Character $character): int
-    {
-        return min($this->legacySpend($character), $this->structuredSpend($character));
-    }
-
-    public function additionalSpendBeyondLegacy(Character $character): int
-    {
-        return max(0, $this->structuredSpend($character) - $this->legacySpend($character));
     }
 
     public function extraDowntimeSeconds(Character $character): int
@@ -126,22 +94,6 @@ class CharacterBubbleShop
         $quantities = $this->quantitiesFor($character);
 
         return ($quantities[self::TYPE_DOWNTIME] ?? 0) * self::DOWNTIME_SECONDS_PER_PURCHASE;
-    }
-
-    public function syncEffectiveSpend(Character $character): Character
-    {
-        $character->bubble_shop_spend = $this->effectiveSpend($character);
-
-        return $character;
-    }
-
-    public function syncLegacySpend(Character $character, int $spend): Character
-    {
-        $normalizedSpend = max(0, $spend);
-        $character->bubble_shop_legacy_spend = max($this->legacySpend($character), $normalizedSpend);
-        $character->bubble_shop_spend = max($normalizedSpend, $this->structuredSpend($character));
-
-        return $character;
     }
 
     public function syncDowntimeSpendTarget(Character $character, int $targetSpend): Character
@@ -164,7 +116,7 @@ class CharacterBubbleShop
         $character->unsetRelation('bubbleShopPurchases');
         $character->load('bubbleShopPurchases');
 
-        return $this->syncEffectiveSpend($character);
+        return $character;
     }
 
     public function maxQuantity(Character $character, string $type): ?int
@@ -184,7 +136,7 @@ class CharacterBubbleShop
             return null;
         }
 
-        return $this->effectiveSpend($character) + $this->currentBubblesInCurrentLevel($character);
+        return $this->structuredSpend($character) + $this->currentBubblesInCurrentLevel($character);
     }
 
     /**
@@ -215,6 +167,17 @@ class CharacterBubbleShop
         return max($unlockedMax, max(0, $currentQuantity));
     }
 
+    private function costFor(string $type): int
+    {
+        return match ($type) {
+            self::TYPE_SKILL_PROFICIENCY => 6,
+            self::TYPE_RARE_LANGUAGE => 4,
+            self::TYPE_TOOL_OR_LANGUAGE => 2,
+            self::TYPE_DOWNTIME => 1,
+            default => 0,
+        };
+    }
+
     private function highestUnlockedTierRank(Character $character): int
     {
         return max(
@@ -225,122 +188,12 @@ class CharacterBubbleShop
 
     private function currentTier(Character $character): string
     {
-        return match ($this->currentLevel($character)) {
-            1, 2, 3, 4 => 'bt',
-            5, 6, 7, 8, 9, 10 => 'lt',
-            11, 12, 13, 14, 15, 16 => 'ht',
-            17, 18, 19, 20 => 'et',
-            default => 'bt',
-        };
-    }
-
-    private function currentLevel(Character $character): int
-    {
-        if ($character->is_filler) {
-            return 3;
-        }
-
-        $progressionVersionId = $this->progressionState->progressionVersionId($character);
-        $additionalBubbles = $this->progressionState->hasPseudoAdventures($character)
-            ? 0
-            : $this->additionalBubblesForStartTier($character->start_tier);
-        $availableBubbles = max(
-            0,
-            $this->adventureBubbles($character)
-            + $this->progressionState->dmBubblesForProgression($character)
-            + $additionalBubbles
-            - $this->progressionState->bubbleShopSpendForProgression($character),
-        );
-
-        return LevelProgression::levelFromAvailableBubbles($availableBubbles, $progressionVersionId);
-    }
-
-    private function currentAvailableBubbles(Character $character): int
-    {
-        if ($character->is_filler) {
-            return 0;
-        }
-
-        $progressionVersionId = $this->progressionState->progressionVersionId($character);
-        $additionalBubbles = $this->progressionState->hasPseudoAdventures($character)
-            ? 0
-            : $this->additionalBubblesForStartTier($character->start_tier);
-
-        return max(
-            0,
-            $this->adventureBubbles($character)
-            + $this->progressionState->dmBubblesForProgression($character)
-            + $additionalBubbles
-            - $this->progressionState->bubbleShopSpendForProgression($character),
-        );
+        return strtolower((string) $this->progressionSnapshots->snapshot($character)['tier']);
     }
 
     private function currentBubblesInCurrentLevel(Character $character): int
     {
-        $progressionVersionId = $this->progressionState->progressionVersionId($character);
-        $currentLevel = $this->currentLevel($character);
-        $currentLevelFloor = LevelProgression::bubblesRequiredForLevel($currentLevel, $progressionVersionId);
-
-        return max(0, $this->currentAvailableBubbles($character) - $currentLevelFloor);
-    }
-
-    private function adventureBubbles(Character $character): int
-    {
-        return $this->adventures($character)
-            ->sortBy([['start_date', 'asc'], ['id', 'asc']])
-            ->values()
-            ->pipe(function (Collection $adventures): int {
-                $lastPseudoIndex = $adventures->reverse()->search(
-                    fn (mixed $adventure): bool => (bool) $adventure->is_pseudo,
-                );
-
-                if ($lastPseudoIndex === false) {
-                    return $adventures->reduce(fn (int $sum, mixed $adventure): int => $sum + $this->realBubblesFor($adventure), 0);
-                }
-
-                $lastPseudo = $adventures->get($lastPseudoIndex);
-                $progressionVersionId = is_numeric($lastPseudo?->progression_version_id) && (int) $lastPseudo->progression_version_id > 0
-                    ? (int) $lastPseudo->progression_version_id
-                    : LevelProgression::activeVersionId();
-                $pseudoBubbles = $lastPseudo->target_bubbles !== null
-                    ? $this->safeInt($lastPseudo->target_bubbles)
-                    : LevelProgression::bubblesRequiredForLevel(
-                        max(1, min(20, $this->safeInt($lastPseudo->target_level, 1))),
-                        $progressionVersionId,
-                    );
-
-                return $pseudoBubbles + $adventures->slice($lastPseudoIndex + 1)
-                    ->filter(fn (mixed $adventure): bool => ! $adventure->is_pseudo)
-                    ->reduce(fn (int $sum, mixed $adventure): int => $sum + $this->realBubblesFor($adventure), 0);
-            });
-    }
-
-    /**
-     * @return Collection<int, mixed>
-     */
-    private function adventures(Character $character): Collection
-    {
-        if ($character->relationLoaded('adventures')) {
-            return $character->adventures;
-        }
-
-        return $character->adventures()->get();
-    }
-
-    private function realBubblesFor(mixed $adventure): int
-    {
-        $duration = $this->safeInt($adventure->duration);
-
-        return (int) floor($duration / 10800) + ($adventure->has_additional_bubble ? 1 : 0);
-    }
-
-    private function additionalBubblesForStartTier(?string $startTier): int
-    {
-        return match ($startTier) {
-            'lt' => 10,
-            'ht' => 55,
-            default => 0,
-        };
+        return max(0, (int) $this->progressionSnapshots->snapshot($character)['bubbles_in_level']);
     }
 
     private function tierRank(?string $tier): int

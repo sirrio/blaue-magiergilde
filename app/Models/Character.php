@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\FactionRankCalculator;
+use App\Support\CharacterProgressionSnapshotResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,9 +19,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $version
  * @property int $user_id
  * @property string $avatar
- * @property mixed $dm_bubbles
- * @property mixed $dm_coins
- * @property mixed $bubble_shop_spend
  * @property mixed $is_filler
  * @property mixed $faction
  * @property mixed $notes
@@ -31,11 +28,6 @@ class Character extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * The relationships that should always be loaded.
-     *
-     * @var array
-     */
     protected $with = ['allies.linkedCharacter', 'downtimes', 'characterClasses'];
 
     protected $casts = [
@@ -47,7 +39,6 @@ class Character extends Model
         'progression_version_id' => 'integer',
         'manual_adventures_count' => 'integer',
         'manual_faction_rank' => 'integer',
-        'bubble_shop_legacy_spend' => 'integer',
     ];
 
     protected $appends = ['faction_rank'];
@@ -77,6 +68,20 @@ class Character extends Model
         return $this->hasMany(CharacterBubbleShopPurchase::class);
     }
 
+    public function auditEvents(): HasMany
+    {
+        return $this->hasMany(CharacterAuditEvent::class)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id');
+    }
+
+    public function latestAuditSnapshot(): HasOne
+    {
+        return $this->hasOne(CharacterAuditEvent::class)
+            ->whereNotNull('state_after')
+            ->latestOfMany();
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -94,6 +99,6 @@ class Character extends Model
 
     public function getFactionRankAttribute(): int
     {
-        return (new FactionRankCalculator)->calculate($this);
+        return (int) app(CharacterProgressionSnapshotResolver::class)->snapshot($this)['faction_rank'];
     }
 }

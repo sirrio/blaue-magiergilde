@@ -57,10 +57,11 @@ class DownloadCharacterController extends Controller
             'External Link: '.((string) ($data['external_link'] ?? '-')),
             '',
             '## Progress',
+            'Level: '.((string) ($data['level'] ?? 1)),
+            'Available Bubbles: '.((string) ($data['available_bubbles'] ?? 0)),
             'DM Bubbles: '.((string) ($data['dm_bubbles'] ?? 0)),
             'DM Coins: '.((string) ($data['dm_coins'] ?? 0)),
             'Bubble Shop Spend: '.((string) ($data['bubble_shop_spend'] ?? 0)),
-            'Bubble Shop Legacy Spend: '.((string) ($data['bubble_shop_legacy_spend'] ?? 0)),
             '',
             '## Notes',
             (string) ($data['notes'] ?? '-'),
@@ -117,8 +118,7 @@ class DownloadCharacterController extends Controller
                 $duration = (int) ($adventure['duration'] ?? 0);
                 $hours = $duration > 0 ? rtrim(rtrim(number_format($duration / 3600, 2, '.', ''), '0'), '.') : '0';
                 $bonusBubble = (bool) ($adventure['bonus_bubble'] ?? false) ? 'Yes' : 'No';
-                $pseudo = (bool) ($adventure['is_pseudo'] ?? false) ? 'Yes' : 'No';
-                $lines[] = '- '.$title.' | GM: '.$gameMaster.' | Date: '.$date.' | Duration: '.$hours.'h | Bonus Bubble: '.$bonusBubble.' | Auto: '.$pseudo;
+                $lines[] = '- '.$title.' | GM: '.$gameMaster.' | Date: '.$date.' | Duration: '.$hours.'h | Bonus Bubble: '.$bonusBubble;
             }
         }
 

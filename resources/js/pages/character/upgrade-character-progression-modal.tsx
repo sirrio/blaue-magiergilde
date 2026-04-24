@@ -1,23 +1,18 @@
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/components/ui/modal'
-import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
-import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateLevel } from '@/helper/calculateLevel'
 import { bubblesRequiredForLevel, bubblesRequiredForNextLevel, clampLevel, levelFromAvailableBubbles } from '@/helper/levelProgression'
-import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
+import { requireSnapshotNumber } from '@/helper/characterProgressionState'
+import { usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { Character, PageProps } from '@/types'
 import { useForm, usePage } from '@inertiajs/react'
 import { Droplets, RefreshCcw } from 'lucide-react'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 const MAX_LEVEL = 20
-
-const bubblesForAdventure = (duration: number, hasAdditionalBubble: boolean): number => {
-  return Math.floor(duration / 10800) + (hasAdditionalBubble ? 1 : 0)
-}
 
 const clampBubbleProgress = (value: number, min: number, max: number): number => {
   return Math.max(min, Math.min(max, value))
@@ -33,70 +28,17 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
   const targetVersionId = activeLevelProgressionVersionId
   const currentVersionId = character.progression_version_id ?? targetVersionId
   const manualTracking = usesManualLevelTracking(character)
-  const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
 
-  const adventuresSorted = useMemo(() => {
-    return [...character.adventures].sort((a, b) => {
-      const dateOrder = String(b.start_date).localeCompare(String(a.start_date))
-      if (dateOrder !== 0) {
-        return dateOrder
-      }
+  const hasLevelAnchor = Boolean(character.progression_state?.has_level_anchor)
 
-      return b.id - a.id
-    })
-  }, [character.adventures])
-
-  const latestPseudoAdventure = adventuresSorted.find((a) => a.is_pseudo) ?? null
-  const hasPseudoAdventure = latestPseudoAdventure !== null
-
-  const immutableAdventureBubbles = latestPseudoAdventure
-    ? Math.max(
-        0,
-        character.adventures
-          .filter(
-            (a) =>
-              !a.is_pseudo &&
-              (String(a.start_date) > String(latestPseudoAdventure.start_date) ||
-                (String(a.start_date) === String(latestPseudoAdventure.start_date) && a.id > latestPseudoAdventure.id)),
-          )
-          .reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
-      )
-    : Math.max(
-        0,
-        character.adventures.reduce((sum, a) => sum + bubblesForAdventure(a.duration, a.has_additional_bubble), 0),
-      )
-
-  const currentAvailableBubbles = Math.max(
-    0,
-    calculateBubble(character) +
-      additionalBubblesForStartTier(character.start_tier) -
-      (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
-  )
+  const currentAvailableBubbles = Math.max(0, requireSnapshotNumber(character, 'available_bubbles'))
   const minimumAllowedAvailableBubbles = manualTracking
-    ? Math.max(
-        0,
-        immutableAdventureBubbles +
-          (bubbleAdjustmentsCount ? Number(character.dm_bubbles ?? 0) : 0) +
-          additionalBubblesForStartTier(character.start_tier) -
-          (bubbleAdjustmentsCount ? Number(character.bubble_shop_spend ?? 0) : 0),
-      )
+    ? Math.max(0, requireSnapshotNumber(character, 'tracked_available_bubbles'))
     : bubblesRequiredForLevel(initialLevel, targetVersionId)
 
   const recalculatedLevel = levelFromAvailableBubbles(currentAvailableBubbles, targetVersionId)
 
-  const initialBubblesInLevel = manualTracking
-    ? (() => {
-        const pseudo = adventuresSorted.find((a) => a.is_pseudo) ?? null
-        if (!pseudo || pseudo.target_bubbles == null || pseudo.target_level == null) {
-          return 0
-        }
-
-        return Math.max(
-          0,
-          Number(pseudo.target_bubbles) - bubblesRequiredForLevel(Number(pseudo.target_level), pseudo.progression_version_id ?? targetVersionId),
-        )
-      })()
-    : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(recalculatedLevel, targetVersionId))
+  const initialBubblesInLevel = Math.max(0, requireSnapshotNumber(character, 'bubbles_in_level'))
 
   const absoluteMinSelectableLevel = character.is_filler ? 1 : manualTracking ? levelFromAvailableBubbles(minimumAllowedAvailableBubbles, targetVersionId) : initialLevel
   const currentLevelFloorOnNewCurve = bubblesRequiredForLevel(initialLevel, targetVersionId)
@@ -120,7 +62,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
     ? Math.max(initialLevel, recalculatedLevel)
     : recalculatedLevel
   const minSelectableLevel = allowOutsideRangeWithoutDowntime ? absoluteMinSelectableLevel : defaultRangeMinSelectableLevel
-  const maxSelectableLevel = hasPseudoAdventure && !manualTracking
+  const maxSelectableLevel = hasLevelAnchor && !manualTracking
     ? recalculatedLevel
     : allowOutsideRangeWithoutDowntime && manualTracking
       ? MAX_LEVEL
@@ -153,7 +95,7 @@ const UpgradeCharacterProgressionModal = ({ character, trigger }: { character: C
     : currentAvailableBubbles
   const canSetBubbles = targetLevel < 20 && displayedBubblesInSelectedLevel > 0
 
-  const oldCurveBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, currentAvailableBubbles - bubblesRequiredForLevel(initialLevel, currentVersionId))
+  const oldCurveBubblesInLevel = initialLevel >= 20 ? null : initialBubblesInLevel
   const oldCurveMaxBubblesInLevel = initialLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(initialLevel, currentVersionId))
   const newCurveMaxBubblesInLevel = targetLevel >= 20 ? null : Math.max(0, bubblesRequiredForNextLevel(targetLevel, targetVersionId))
   const additionalBubbleShopSpend = manualTracking

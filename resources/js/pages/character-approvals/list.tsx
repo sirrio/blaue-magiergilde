@@ -36,9 +36,6 @@ type AdminCharacter = Pick<
   | 'admin_notes'
   | 'admin_managed'
   | 'notes'
-  | 'dm_bubbles'
-  | 'dm_coins'
-  | 'bubble_shop_spend'
   | 'is_filler'
   | 'room_count'
   | 'faction'
@@ -46,6 +43,7 @@ type AdminCharacter = Pick<
   | 'character_classes'
   | 'avatar'
   | 'simplified_tracking'
+  | 'progression_state'
 > & {
   adventures: Adventure[]
   dndbeyond_character_id?: number | null
@@ -488,10 +486,9 @@ const AdminCharacterModal = ({
     faction: character?.faction ?? 'none',
     version: character?.version ?? '2024',
     start_tier: character?.start_tier ?? 'bt',
-    dm_bubbles: character?.dm_bubbles ?? 0,
-    dm_coins: character?.dm_coins ?? 0,
+    dm_bubbles: Number(character?.progression_state?.dm_bubbles ?? 0),
+    dm_coins: Number(character?.progression_state?.dm_coins ?? 0),
     notes: character?.notes ?? '',
-    bubble_shop_spend: character?.bubble_shop_spend ?? 0,
     external_link: character?.external_link ?? '',
     is_filler: character?.is_filler ?? false,
     guild_status: canEditStatus ? currentStatus : null,
@@ -688,16 +685,6 @@ const AdminCharacterModal = ({
                   DM Coins
                 </Input>
               </div>
-              <Input
-                errors={errors.bubble_shop_spend}
-                type="number"
-                min={0}
-                max={1024}
-                value={data.bubble_shop_spend}
-                onChange={(e) => setData('bubble_shop_spend', Number(e.target.value))}
-              >
-                Bubble Shop Spend
-              </Input>
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
                 Notes
               </TextArea>
@@ -1207,8 +1194,8 @@ const tierTextClassMap: Record<string, string> = {
                     const legacyMatch = character.legacy_approval_match
                     const hasLegacyApproval = Boolean(character.has_legacy_approval && legacyMatch)
                     const isFirstSubmission = Boolean(character.is_first_submission)
-                    const dmBubblesSpent = Number(character.dm_bubbles ?? 0)
-                    const dmCoinsSpent = Number(character.dm_coins ?? 0)
+                    const dmBubblesSpent = Number(character.progression_state?.dm_bubbles ?? 0)
+                    const dmCoinsSpent = Number(character.progression_state?.dm_coins ?? 0)
                     const legacyTitle = hasLegacyApproval
                       ? [
                         `Legacy approved as ${legacyMatch?.character_name}`,

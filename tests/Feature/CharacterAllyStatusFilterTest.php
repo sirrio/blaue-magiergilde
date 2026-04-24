@@ -4,11 +4,19 @@ use App\Models\Adventure;
 use App\Models\Ally;
 use App\Models\Character;
 use App\Models\User;
+use App\Support\CharacterAuditTrail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+function recordAllyStatusSnapshot(Character $character): Character
+{
+    app(CharacterAuditTrail::class)->record($character, 'test.snapshot', metadata: ['hidden_from_history' => true]);
+
+    return $character->fresh('latestAuditSnapshot');
+}
 
 it('includes draft guild characters in ally candidates when status switching is disabled', function () {
     Config::set('features.character_status_switch', false);
@@ -20,6 +28,8 @@ it('includes draft guild characters in ally candidates when status switching is 
     $approvedCharacter = Character::factory()->create(['guild_status' => 'approved']);
     $needsChangesCharacter = Character::factory()->create(['guild_status' => 'needs_changes']);
     $retiredCharacter = Character::factory()->create(['guild_status' => 'retired']);
+    collect([$character, $draftCharacter, $pendingCharacter, $approvedCharacter, $needsChangesCharacter, $retiredCharacter])
+        ->each(fn (Character $candidate): Character => recordAllyStatusSnapshot($candidate));
 
     $this->actingAs($owner)
         ->get(route('characters.show', $character))
@@ -43,6 +53,8 @@ it('resolves draft guild character ids as allies when status switching is disabl
     $owner = User::factory()->create();
     $character = Character::factory()->for($owner)->create(['guild_status' => 'draft']);
     $draftCharacter = Character::factory()->create(['guild_status' => 'draft']);
+    recordAllyStatusSnapshot($character);
+    recordAllyStatusSnapshot($draftCharacter);
 
     $this->actingAs($owner)
         ->post(route('adventures.store'), [

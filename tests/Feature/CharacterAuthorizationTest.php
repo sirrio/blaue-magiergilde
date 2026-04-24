@@ -18,10 +18,7 @@ test('users cannot update characters they do not own', function () {
         'class' => [$class->id],
         'external_link' => 'https://www.dndbeyond.com/characters/7654321',
         'version' => '2024',
-        'dm_bubbles' => 1,
-        'dm_coins' => 1,
         'is_filler' => false,
-        'bubble_shop_spend' => 1,
         'faction' => 'none',
         'notes' => 'Attempted change.',
     ]);

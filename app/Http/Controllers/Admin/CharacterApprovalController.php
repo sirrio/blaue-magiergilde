@@ -8,6 +8,8 @@ use App\Models\Character;
 use App\Models\LegacyCharacterApproval;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
+use App\Support\CharacterAuditTrail;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\DndBeyondCharacterLink;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -23,6 +25,8 @@ use Inertia\Response;
 
 class CharacterApprovalController extends Controller
 {
+    public function __construct(private readonly CharacterProgressionSnapshotResolver $progressionSnapshots) {}
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -102,9 +106,6 @@ class CharacterApprovalController extends Controller
                 'review_note',
                 'notes',
                 'admin_notes',
-                'dm_bubbles',
-                'dm_coins',
-                'bubble_shop_spend',
                 'is_filler',
                 'admin_managed',
                 'avatar',
@@ -123,6 +124,7 @@ class CharacterApprovalController extends Controller
                 return strcasecmp($left->name, $right->name);
             })
             ->values();
+        $this->progressionSnapshots->attach($characters);
 
         $characterUserIdsOnPage = $characters
             ->pluck('user_id')
@@ -277,7 +279,7 @@ class CharacterApprovalController extends Controller
             ->withCount(['room'])
             ->with([
                 'adventures' => fn ($query) => $query
-                    ->select(['id', 'character_id', 'start_date', 'duration', 'is_pseudo', 'has_additional_bubble', 'target_level', 'target_bubbles']),
+                    ->select(['id', 'character_id', 'start_date', 'duration', 'has_additional_bubble']),
                 'user' => fn ($query) => $query
                     ->select(['id', 'name', 'discord_id', 'discord_username', 'discord_display_name', 'avatar'])
                     ->withCount([
@@ -382,6 +384,7 @@ class CharacterApprovalController extends Controller
         Request $request,
         Character $character,
         CharacterApprovalNotificationService $notificationService,
+        CharacterAuditTrail $auditTrail,
     ): RedirectResponse {
         $user = $request->user();
         abort_unless($user && $user->is_admin, 403);
@@ -397,12 +400,17 @@ class CharacterApprovalController extends Controller
             ],
         ]);
         $statusChange = null;
+        $previousStatus = $character->guild_status;
+        $previousReviewNote = $character->review_note;
+        $previousAdminNotes = $character->admin_notes;
 
         if (array_key_exists('guild_status', $data)) {
             if ($character->guild_status === $data['guild_status']) {
-                return redirect()->back();
+                unset($data['guild_status'], $data['review_note']);
             }
+        }
 
+        if (array_key_exists('guild_status', $data)) {
             if ($character->guild_status === 'retired') {
                 return redirect()->back()->withErrors([
                     'guild_status' => 'Retired characters cannot change status.',
@@ -423,13 +431,29 @@ class CharacterApprovalController extends Controller
                 ]);
             }
 
-            $previousStatus = $character->guild_status;
             $character->guild_status = $data['guild_status'];
             if (in_array($data['guild_status'], ['declined', 'needs_changes'], true)) {
                 $character->review_note = trim((string) ($data['review_note'] ?? ''));
             } else {
                 $character->review_note = null;
             }
+            $statusChange = $data['guild_status'];
+        }
+
+        if (array_key_exists('admin_notes', $data)) {
+            $notes = is_string($data['admin_notes']) ? trim($data['admin_notes']) : null;
+            $character->admin_notes = $notes !== '' ? $notes : null;
+        }
+
+        $guildStatusChanged = $previousStatus !== $character->guild_status;
+        $reviewNoteChanged = $previousReviewNote !== $character->review_note;
+        $adminNotesChanged = $previousAdminNotes !== $character->admin_notes;
+
+        if (! $guildStatusChanged && ! $reviewNoteChanged && ! $adminNotesChanged) {
+            return redirect()->back();
+        }
+
+        if ($guildStatusChanged) {
             AdminAuditLog::query()->create([
                 'actor_user_id' => $user->id,
                 'action' => 'character.guild_status.updated',
@@ -437,29 +461,55 @@ class CharacterApprovalController extends Controller
                 'subject_id' => $character->id,
                 'metadata' => [
                     'from' => $previousStatus,
-                    'to' => $data['guild_status'],
+                    'to' => $character->guild_status,
                 ],
             ]);
-            $statusChange = $data['guild_status'];
         }
 
-        if (array_key_exists('admin_notes', $data)) {
-            $notes = is_string($data['admin_notes']) ? trim($data['admin_notes']) : null;
-            $previousNotes = $character->admin_notes;
-            $character->admin_notes = $notes !== '' ? $notes : null;
+        if ($adminNotesChanged) {
             AdminAuditLog::query()->create([
                 'actor_user_id' => $user->id,
                 'action' => 'character.admin_notes.updated',
                 'subject_type' => Character::class,
                 'subject_id' => $character->id,
                 'metadata' => [
-                    'had_notes' => $previousNotes !== null,
+                    'had_notes' => $previousAdminNotes !== null,
                     'has_notes' => $character->admin_notes !== null,
                 ],
             ]);
         }
 
         $character->save();
+
+        if ($guildStatusChanged) {
+            $auditTrail->record($character, 'character.guild_status_updated', metadata: [
+                'field' => 'guild_status',
+                'before' => ['guild_status' => $previousStatus],
+                'after' => ['guild_status' => $character->guild_status],
+                'changed_fields' => ['guild_status'],
+                'via' => 'admin-approval',
+            ], actorUserId: $user->id);
+        }
+
+        if ($reviewNoteChanged) {
+            $auditTrail->record($character, 'character.review_note_updated', metadata: [
+                'field' => 'review_note',
+                'before' => ['review_note' => $previousReviewNote],
+                'after' => ['review_note' => $character->review_note],
+                'changed_fields' => ['review_note'],
+                'via' => 'admin-approval',
+            ], actorUserId: $user->id);
+        }
+
+        if ($adminNotesChanged) {
+            $auditTrail->record($character, 'character.admin_notes_updated', metadata: [
+                'field' => 'admin_notes',
+                'before' => ['admin_notes' => $previousAdminNotes],
+                'after' => ['admin_notes' => $character->admin_notes],
+                'changed_fields' => ['admin_notes'],
+                'via' => 'admin-approval',
+            ], actorUserId: $user->id);
+        }
 
         if ($statusChange) {
             $syncResult = $notificationService->syncAnnouncement($character);

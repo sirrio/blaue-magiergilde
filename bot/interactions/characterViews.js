@@ -18,8 +18,6 @@ const {
 const { t } = require('../i18n');
 const {
     extraDowntimeSecondsForCharacter,
-    legacySpendForCharacter,
-    structuredSpendForCharacter,
 } = require('../utils/characterBubbleShop');
 const { calculateLevel, calculateTierFromLevel } = require('../utils/characterTier');
 const { bubblesRequiredForLevel } = require('../utils/levelProgression');
@@ -172,25 +170,13 @@ function safeInt(value, fallback = 0) {
 }
 
 function buildBubbleShopSummary(character, locale = null) {
-    const legacySpend = legacySpendForCharacter(character);
     const extraDowntimeSeconds = extraDowntimeSecondsForCharacter(character);
-    const structuredSpend = structuredSpendForCharacter(character);
-    const unassignedLegacySpend = Math.max(legacySpend - structuredSpend, 0);
 
-    if (unassignedLegacySpend <= 0) {
-        return `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`;
-    }
-
-    return [
-        `${t('characters.bubbleShopLegacyUnassigned', {}, locale)}: **${unassignedLegacySpend}**`,
-        t('characters.bubbleShopLegacyReasonBody', {}, locale),
-        t('characters.bubbleShopLegacySubhint', { count: unassignedLegacySpend }, locale),
-        `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`,
-    ].join('\n');
+    return `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${formatDurationSeconds(extraDowntimeSeconds)}**`;
 }
 
-function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, hasPseudoAdventure = false, avatarMasked, privateMode, locale = null }) {
-    const showManualOverrideButtons = simplifiedTracking || hasPseudoAdventure;
+function buildCharacterManageRows({ characterId, ownerDiscordId, simplifiedTracking, hasLevelAnchor = false, avatarMasked, privateMode, locale = null }) {
+    const showManualOverrideButtons = simplifiedTracking || hasLevelAnchor;
 
     const dmRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -343,7 +329,7 @@ function buildCharacterManageView(character, { ownerDiscordId, locale = null }) 
             characterId: character.id,
             ownerDiscordId,
             simplifiedTracking,
-            hasPseudoAdventure: Boolean(character.has_pseudo_adventure),
+            hasLevelAnchor: Boolean(character.has_level_anchor),
             avatarMasked,
             privateMode,
             locale,
@@ -373,8 +359,6 @@ function buildCharacterCardPayload({ character, ownerDiscordId, registrationBloc
             characterId: character.id,
             isFiller: character.is_filler,
             simplifiedTracking,
-            hasPseudoAdventure: Boolean(character.has_pseudo_adventure),
-            hasRealAdventure: Boolean(character.has_real_adventure),
             guildStatus: character.guild_status,
             registrationBlockedReason,
             registrationCounts,
@@ -1955,48 +1939,39 @@ function buildAdventureManageNotesModal({ adventureId, characterId, ownerDiscord
     return modal;
 }
 
-function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId, isPseudo, locale = null }) {
-    const disabled = Boolean(isPseudo);
-
+function buildAdventureManageRows({ adventureId, characterId, ownerDiscordId, locale = null }) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advManage_duration_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.durationField', {}, locale))
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_date_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.dateField', {}, locale))
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_title_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.titleAndGmTitle', {}, locale))
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_quest_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.characterQuestField', {}, locale))
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advManage_notes_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.notesField', {}, locale))
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Secondary),
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`advManage_participants_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('characters.participantsField', {}, locale))
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`advDelete_${adventureId}_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('common.delete', {}, locale))
-                .setStyle(ButtonStyle.Danger)
-                .setDisabled(disabled),
+                .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
                 .setCustomId(`advBack_${characterId}_${ownerDiscordId}`)
                 .setLabel(t('common.back', {}, locale))
@@ -2022,9 +1997,7 @@ function buildAdventureManageEmbed(adventure, participants) {
             { name: t('characters.dateField', {}, locale), value: formatIsoDate(adventure.start_date), inline: true },
             {
                 name: t('characters.durationField', {}, locale),
-                value: adventure.is_pseudo && Number.isFinite(Number(adventure.target_level))
-                    ? t('characters.levelTrackingAnchorWithLevel', { level: Number(adventure.target_level) }, locale)
-                    : formatDurationSeconds(adventure.duration),
+                value: formatDurationSeconds(adventure.duration),
                 inline: true,
             },
             { name: t('characters.characterQuestField', {}, locale), value: questValue, inline: true },
@@ -2033,18 +2006,6 @@ function buildAdventureManageEmbed(adventure, participants) {
             { name: t('characters.notesField', {}, locale), value: notesValue.slice(0, 1024), inline: false },
             { name: t('characters.participantsField', {}, locale), value: participantValue, inline: false },
         );
-
-    if (adventure.is_pseudo) {
-        const anchorDetails = Number.isFinite(Number(adventure.target_level))
-            ? t('characters.levelTrackingAnchorWithLevel', {
-                level: Number(adventure.target_level),
-            }, locale)
-            : null;
-        embed.setDescription([
-            t('characters.pseudoAdventureNotEditable', {}, locale),
-            anchorDetails,
-        ].filter(Boolean).join('\n'));
-    }
 
     return embed;
 }
@@ -2057,7 +2018,6 @@ function buildAdventureManageView({ adventure, participants, ownerDiscordId, cha
             adventureId: adventure.id,
             characterId,
             ownerDiscordId,
-            isPseudo: adventure.is_pseudo,
             locale,
         }),
     };
@@ -2221,10 +2181,7 @@ function buildDowntimeTypeManageView({ downtime, ownerDiscordId, characterId }) 
 
 function buildAdventureEmbed(adventure, title, participants = []) {
     const extra = adventure.has_additional_bubble ? ' +1' : '';
-    const isPseudoWithLevel = adventure.is_pseudo && Number.isFinite(Number(adventure.target_level));
-    const durationValue = isPseudoWithLevel
-        ? t('characters.levelTrackingAnchorWithLevel', { level: Number(adventure.target_level) })
-        : `${formatDurationSeconds(adventure.duration)}${extra}`;
+    const durationValue = `${formatDurationSeconds(adventure.duration)}${extra}`;
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(0x4f46e5)

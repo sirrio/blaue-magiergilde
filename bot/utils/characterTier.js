@@ -18,34 +18,47 @@ function additionalBubblesForStartTier(startTier) {
 }
 
 function countsBubbleAdjustmentsForProgression(character) {
-    return !character.simplified_tracking && !safeInt(character.has_pseudo_adventure);
+    return !character.is_filler;
+}
+
+function snapshotNumber(character, key) {
+    const value = character?.progression_state?.[key];
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+function requireSnapshotNumber(character, key) {
+    const value = snapshotNumber(character, key);
+    if (value === null) {
+        throw new Error(`Missing character progression snapshot value: ${key}`);
+    }
+
+    return value;
+}
+
+function calculateRawAvailableBubbles(character) {
+    return Math.max(0, requireSnapshotNumber(character, 'tracked_available_bubbles'));
 }
 
 function calculateAvailableBubbles(character) {
-    if (character.is_filler) return 0;
-
-    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
-    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    // Pseudo-adventures encode the level directly via target_level — start_tier
-    // is already accounted for in that stored value and must not be added again.
-    const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
-    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
-
-    return Math.max(0, bubbles + additional - spend);
+    return Math.max(0, requireSnapshotNumber(character, 'available_bubbles'));
 }
 
-function calculateBubblesInCurrentLevel(character, level) {
-    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
-    const bubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    const additional = safeInt(character.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character.start_tier);
-    const spend = bubbleAdjustmentsCount ? safeInt(character.bubble_shop_spend) : 0;
-    const currentTotal = bubblesRequiredForLevel(level, character.progression_version_id) - additional;
-    return Math.max(0, bubbles - currentTotal - spend);
+function calculateRawBubblesInCurrentLevel(character, level) {
+    const currentTotal = bubblesRequiredForLevel(level, character.progression_version_id);
+    return Math.max(0, calculateRawAvailableBubbles(character) - currentTotal);
+}
+
+function calculateBubblesInCurrentLevel(character) {
+    return Math.max(0, requireSnapshotNumber(character, 'bubbles_in_level'));
+}
+
+function calculateRawLevel(character) {
+    return levelFromAvailableBubbles(calculateRawAvailableBubbles(character), character.progression_version_id);
 }
 
 function calculateLevel(character) {
-    if (character.is_filler) return 3;
-    return levelFromAvailableBubbles(calculateAvailableBubbles(character), character.progression_version_id);
+    return Math.max(1, Math.min(20, Math.floor(requireSnapshotNumber(character, 'level'))));
 }
 
 function calculateTierFromLevel(level) {
@@ -57,8 +70,12 @@ function calculateTierFromLevel(level) {
 
 module.exports = {
     additionalBubblesForStartTier,
+    calculateAvailableBubbles,
     calculateBubblesInCurrentLevel,
     calculateLevel,
+    calculateRawAvailableBubbles,
+    calculateRawBubblesInCurrentLevel,
+    calculateRawLevel,
     calculateTierFromLevel,
     countsBubbleAdjustmentsForProgression,
 };

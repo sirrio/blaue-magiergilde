@@ -32,7 +32,6 @@ class StoreCharacterForUserRequest extends FormRequest
             'dm_bubbles' => 'required|integer|min:0|max:1024',
             'dm_coins' => 'required|integer|min:0|max:1024',
             'is_filler' => 'required|boolean',
-            'bubble_shop_spend' => 'required|integer|min:0|max:1024',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'guild_status' => 'nullable|in:pending,draft',
             'faction' => 'nullable|string',

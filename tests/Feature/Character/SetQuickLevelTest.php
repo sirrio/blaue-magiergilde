@@ -1,8 +1,8 @@
 <?php
 
 use App\Actions\Character\SetQuickLevel;
-use App\Models\Adventure;
 use App\Models\Character;
+use App\Models\CharacterAuditEvent;
 use App\Models\LevelProgressionEntry;
 use App\Models\LevelProgressionVersion;
 use App\Support\LevelProgression;
@@ -15,89 +15,56 @@ afterEach(function () {
     LevelProgression::clearCache();
 });
 
-it('updates the latest pseudo adventure when it is the most recent adventure', function () {
+it('records a new level.set event when called twice in a row', function () {
     $character = Character::factory()->create([
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'is_filler' => false,
-    ]);
-
-    $pseudo = Adventure::factory()->create([
-        'character_id' => $character->id,
-        'duration' => 10800,
-        'start_date' => now()->toDateString(),
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-    ]);
-
-    $result = app(SetQuickLevel::class)->handle($character, 4);
-
-    expect($result['ok'])->toBeTrue();
-    expect(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(1);
-    expect($pseudo->fresh()->duration)->toBe(0);
-    expect($pseudo->fresh()->target_level)->toBe(4);
-    expect($pseudo->fresh()->progression_version_id)->toBe(LevelProgression::activeVersionId());
-});
-
-it('creates a new pseudo adventure when a real adventure follows the latest pseudo', function () {
-    $character = Character::factory()->create([
-        'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'is_filler' => false,
-    ]);
-
-    Adventure::factory()->create([
-        'character_id' => $character->id,
-        'duration' => 10800,
-        'start_date' => now()->subDays(2)->toDateString(),
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-    ]);
-
-    Adventure::factory()->create([
-        'character_id' => $character->id,
-        'duration' => 10800,
-        'start_date' => now()->subDay()->toDateString(),
-        'has_additional_bubble' => false,
-        'is_pseudo' => false,
-    ]);
-
-    $result = app(SetQuickLevel::class)->handle($character, 4);
-
-    expect($result['ok'])->toBeTrue();
-    expect(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(2);
-    expect(
-        Adventure::query()
-            ->where('character_id', $character->id)
-            ->where('is_pseudo', true)
-            ->orderByDesc('id')
-            ->first()?->target_level
-    )->toBe(4);
-});
-
-it('ignores dm bubbles and bubble shop spend when setting levels in level tracking', function () {
-    $character = Character::factory()->create([
-        'start_tier' => 'bt',
-        'dm_bubbles' => 5,
-        'bubble_shop_spend' => 4,
         'is_filler' => false,
         'simplified_tracking' => true,
     ]);
 
+    recordCharacterSnapshot($character);
+
+    $first = app(SetQuickLevel::class)->handle($character, 4);
+    recordCharacterSnapshot($character);
+    $second = app(SetQuickLevel::class)->handle($character, 5);
+
+    expect($first['ok'])->toBeTrue()
+        ->and($second['ok'])->toBeTrue();
+
+    $anchorCount = CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->where('action', 'level.set')
+        ->count();
+
+    expect($anchorCount)->toBe(2);
+});
+
+it('anchors against the current snapshot-adjusted progression when setting levels in level tracking', function () {
+    $character = Character::factory()->create([
+        'start_tier' => 'bt',
+        'is_filler' => false,
+        'simplified_tracking' => true,
+    ]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'dm_bubbles.granted', delta: ['bubbles' => 5, 'dm_bubbles' => 5]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'bubble_shop.updated', delta: ['bubbles' => -4, 'bubble_shop_spend' => 4]);
+
+    recordCharacterSnapshot($character);
+
     $result = app(SetQuickLevel::class)->handle($character, 4);
 
     expect($result['ok'])->toBeTrue();
 
-    $pseudo = Adventure::query()
+    $levelAnchor = CharacterAuditEvent::query()
         ->where('character_id', $character->id)
-        ->where('is_pseudo', true)
+        ->where('action', 'level.set')
+        ->latest('id')
         ->first();
 
-    expect($pseudo)->not->toBeNull()
-        ->and($pseudo?->duration)->toBe(0)
-        ->and($pseudo?->target_level)->toBe(4);
+    $expectedFloor = LevelProgression::bubblesRequiredForLevel(4, $character->progression_version_id);
+
+    expect($levelAnchor)->not->toBeNull()
+        ->and($levelAnchor?->delta['target_level'] ?? null)->toBe(4)
+        ->and($levelAnchor?->delta['available_bubbles'] ?? null)->toBe($expectedFloor);
 });
 
 it('uses the character progression version instead of the active version', function () {
@@ -121,22 +88,25 @@ it('uses the character progression version instead of the active version', funct
 
     $character = Character::factory()->create([
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
         'is_filler' => false,
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersionId,
     ]);
 
+    recordCharacterSnapshot($character);
+
     $result = app(SetQuickLevel::class)->handle($character, 4);
 
-    $pseudo = Adventure::query()
+    $levelAnchor = CharacterAuditEvent::query()
         ->where('character_id', $character->id)
-        ->where('is_pseudo', true)
+        ->where('action', 'level.set')
+        ->latest('id')
         ->first();
 
+    $expectedFloor = LevelProgression::bubblesRequiredForLevel(4, $originalVersionId);
+
     expect($result['ok'])->toBeTrue()
-        ->and($pseudo)->not->toBeNull()
-        ->and($pseudo?->progression_version_id)->toBe($originalVersionId)
-        ->and($pseudo?->target_bubbles)->toBe(LevelProgression::bubblesRequiredForLevel(4, $originalVersionId));
+        ->and($levelAnchor)->not->toBeNull()
+        ->and($levelAnchor?->delta['target_level'] ?? null)->toBe(4)
+        ->and($levelAnchor?->delta['available_bubbles'] ?? null)->toBe($expectedFloor);
 });

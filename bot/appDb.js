@@ -1,5 +1,10 @@
 const db = require('./db');
-const { additionalBubblesForStartTier, calculateBubblesInCurrentLevel, calculateLevel, calculateTierFromLevel } = require('./utils/characterTier');
+const {
+    calculateAvailableBubbles,
+    calculateBubblesInCurrentLevel,
+    calculateLevel,
+    calculateTierFromLevel,
+} = require('./utils/characterTier');
 const {
     TYPE_SKILL_PROFICIENCY,
     TYPE_RARE_LANGUAGE,
@@ -11,14 +16,142 @@ const {
     effectiveSpendForCharacter,
     maxEffectiveSpendWithoutDownlevelForCharacter,
     structuredSpendForCharacter,
+    extraDowntimeSecondsForCharacter,
 } = require('./utils/characterBubbleShop');
 const { getBidStepForItem, getStartingBidFromRepair, getMinimumBid } = require('./utils/auctionBidding');
-const { calculateMinAllowedLevel } = require('./utils/quickMode');
 const { activeLevelProgressionVersionId, bubblesRequiredForLevel, ensureLevelProgressionLoaded, levelFromAvailableBubbles } = require('./utils/levelProgression');
 const { canUseLevelCurveUpgradeForUserId } = require('./utils/featureAccess');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+async function findCharacterAuditState(connection, characterId, pendingDelta = null, pendingOccurredAt = null, pendingMetadata = null) {
+    const executor = connection ?? db;
+    const [rows] = await executor.execute(
+        `
+            SELECT
+                c.id,
+                c.name,
+                c.start_tier,
+                c.version,
+                c.faction,
+                c.progression_version_id,
+                c.manual_adventures_count,
+                c.manual_faction_rank,
+                c.is_filler,
+                c.guild_status,
+                c.simplified_tracking,
+${auditSnapshotSelect}
+                0 AS class_names
+            FROM characters c
+${auditSnapshotJoin}
+            WHERE c.id = ?
+            LIMIT 1
+        `,
+        [characterId],
+    );
+
+    const character = rows[0];
+    if (!character) return null;
+
+    const progressionVersionId = safeInt(character.progression_version_id) || activeLevelProgressionVersionId();
+    const snapshot = parseJsonObject(character.progression_state_json) || {};
+
+    const pendingBubbleDelta = bubbleDeltaFromPayload(pendingDelta);
+    const pendingDmBubblesDelta = safeInt(pendingDelta?.dm_bubbles);
+    const pendingDmCoinsDelta = safeInt(pendingDelta?.dm_coins);
+    const pendingBubbleShopSpendDelta = safeInt(pendingDelta?.bubble_shop_spend);
+    const pendingDowntimeSecondsDelta = safeInt(pendingDelta?.downtime_seconds);
+
+    const availableBubbles = Math.max(0, safeInt(snapshot.available_bubbles) + pendingBubbleDelta);
+    const trackedAvailableBubbles = Math.max(0, safeInt(snapshot.tracked_available_bubbles) + pendingBubbleDelta);
+    const level = levelFromAvailableBubbles(availableBubbles, progressionVersionId);
+    const bubblesInLevel = Math.max(0, availableBubbles - bubblesRequiredForLevel(level, progressionVersionId));
+
+    const baseDowntimeLoggedSeconds = safeInt(snapshot.downtime_logged_seconds);
+    const baseBubbleShopDowntimeSeconds = safeInt(snapshot.bubble_shop_downtime_seconds);
+    const baseFactionDowntimeSeconds = safeInt(snapshot.faction_downtime_seconds);
+    const baseOtherDowntimeSeconds = safeInt(snapshot.other_downtime_seconds);
+    const pendingDowntimeType = String(pendingMetadata?.type || pendingMetadata?.after?.type || '').trim().toLowerCase();
+    const pendingFactionDowntimeDelta = pendingDowntimeType === 'faction' ? pendingDowntimeSecondsDelta : 0;
+    const pendingOtherDowntimeDelta = pendingDowntimeType === 'other' ? pendingDowntimeSecondsDelta : 0;
+
+    return {
+        level,
+        tier: calculateTierFromLevel(level).toLowerCase(),
+        available_bubbles: availableBubbles,
+        tracked_available_bubbles: trackedAvailableBubbles,
+        bubbles_in_level: bubblesInLevel,
+        bubbles_required_for_next_level: level >= 20 ? 0 : Math.max(0, bubblesRequiredForLevel(Math.min(20, level + 1), progressionVersionId) - bubblesRequiredForLevel(level, progressionVersionId)),
+        progression_version_id: progressionVersionId,
+        simplified_tracking: Boolean(character.simplified_tracking),
+        dm_bubbles: Math.max(0, safeInt(snapshot.dm_bubbles) + pendingDmBubblesDelta),
+        dm_coins: Math.max(0, safeInt(snapshot.dm_coins) + pendingDmCoinsDelta),
+        bubble_shop_spend: Math.max(0, safeInt(snapshot.bubble_shop_spend) + pendingBubbleShopSpendDelta),
+        bubble_shop_downtime_seconds: baseBubbleShopDowntimeSeconds,
+        real_adventures_count: safeInt(snapshot.real_adventures_count),
+        pseudo_adventures_count: safeInt(snapshot.pseudo_adventures_count),
+        downtime_logged_seconds: Math.max(0, baseDowntimeLoggedSeconds + pendingDowntimeSecondsDelta),
+        faction_downtime_seconds: Math.max(0, baseFactionDowntimeSeconds + pendingFactionDowntimeDelta),
+        other_downtime_seconds: Math.max(0, baseOtherDowntimeSeconds + pendingOtherDowntimeDelta),
+        downtime_total_seconds: Math.max(0, baseDowntimeLoggedSeconds + pendingDowntimeSecondsDelta) + baseBubbleShopDowntimeSeconds,
+        faction: character.faction,
+        faction_rank: safeInt(snapshot.faction_rank),
+        guild_status: character.guild_status,
+        has_level_anchor: Boolean(snapshot.has_level_anchor),
+    };
+}
+
+async function appendCharacterAuditEvent(connection, {
+    characterId,
+    actorUserId = null,
+    action,
+    subjectType = 'character',
+    subjectId = null,
+    delta = null,
+    metadata = null,
+    occurredAt = null,
+}) {
+    try {
+        const executor = connection ?? db;
+        const timestamp = occurredAt || nowSql();
+        const stateAfter = await findCharacterAuditState(executor, characterId, delta, timestamp, metadata);
+
+        await executor.execute(
+            `
+                INSERT INTO character_audit_events (
+                    character_id,
+                    actor_user_id,
+                    action,
+                    occurred_at,
+                    subject_type,
+                    subject_id,
+                    delta,
+                    state_after,
+                    metadata,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+                characterId,
+                actorUserId,
+                action,
+                timestamp,
+                subjectType,
+                subjectId == null ? characterId : subjectId,
+                delta ? JSON.stringify(delta) : null,
+                stateAfter ? JSON.stringify(stateAfter) : null,
+                metadata ? JSON.stringify(metadata) : null,
+                timestamp,
+                timestamp,
+            ],
+        );
+    } catch (error) {
+        if (!String(error.message || '').includes('Unexpected')) {
+            console.warn('[bot] Character audit event could not be written.', error.message);
+        }
+    }
 }
 
 function pickDiscordDisplayName(discordUser) {
@@ -90,6 +223,59 @@ const bubbleShopPurchaseJoin = `
             ) shop ON shop.character_id = c.id
 `;
 
+const auditSnapshotSelect = `
+                audit_snapshot.state_after AS progression_state_json,
+`;
+
+const auditSnapshotJoin = `
+            LEFT JOIN (
+                SELECT cae.character_id, cae.state_after
+                FROM character_audit_events cae
+                INNER JOIN (
+                    SELECT character_id, MAX(id) AS id
+                    FROM character_audit_events
+                    WHERE state_after IS NOT NULL
+                    GROUP BY character_id
+                ) latest_snapshot ON latest_snapshot.id = cae.id
+            ) audit_snapshot ON audit_snapshot.character_id = c.id
+`;
+
+function parseJsonObject(value) {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === 'object') {
+        return value;
+    }
+
+    try {
+        const parsed = JSON.parse(String(value));
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function normalizeCharacterRow(row) {
+    const { progression_state_json: progressionStateJson, ...character } = row;
+    const progressionState = parseJsonObject(progressionStateJson);
+
+    if (progressionState) {
+        character.progression_state = progressionState;
+        character.dm_bubbles = safeInt(progressionState.dm_bubbles);
+        character.dm_coins = safeInt(progressionState.dm_coins);
+        character.bubble_shop_spend = safeInt(progressionState.bubble_shop_spend);
+        character.adventures_count = safeInt(progressionState.real_adventures_count);
+        character.total_downtime = safeInt(progressionState.downtime_logged_seconds);
+        character.faction_downtime = safeInt(progressionState.faction_downtime_seconds);
+        character.other_downtime = safeInt(progressionState.other_downtime_seconds);
+        character.has_level_anchor = Boolean(progressionState.has_level_anchor);
+    }
+
+    return character;
+}
+
 function guildCharacterStatusesForAllies() {
     const statuses = ['pending', 'approved', 'needs_changes'];
     if (!isCharacterStatusSwitchEnabled) {
@@ -159,8 +345,20 @@ function safeInt(value, fallback = 0) {
     return Number.isFinite(number) ? number : fallback;
 }
 
+function bubbleDeltaFromPayload(delta) {
+    if (!delta || typeof delta !== 'object') {
+        return 0;
+    }
+
+    return safeInt(delta.bubbles);
+}
+
 function todaySqlDate() {
     return new Date().toISOString().slice(0, 10);
+}
+
+function bubblesForAdventureRow(adventure) {
+    return Math.floor(safeInt(adventure?.duration) / 10800) + (safeInt(adventure?.has_additional_bubble) ? 1 : 0);
 }
 
 function calculateCharacterAvailableBubbles(character) {
@@ -168,74 +366,7 @@ function calculateCharacterAvailableBubbles(character) {
         return 0;
     }
 
-    const bubbleAdjustmentsCount = !character?.simplified_tracking && !safeInt(character?.has_pseudo_adventure);
-    const adventureBubbles = safeInt(character?.adventure_bubbles);
-    const dmBubbles = bubbleAdjustmentsCount ? safeInt(character?.dm_bubbles) : 0;
-    const additional = safeInt(character?.has_pseudo_adventure) ? 0 : additionalBubblesForStartTier(character?.start_tier);
-    const bubbleSpend = bubbleAdjustmentsCount ? safeInt(character?.bubble_shop_spend) : 0;
-
-    return Math.max(0, adventureBubbles + dmBubbles + additional - bubbleSpend);
-}
-
-async function getLatestPseudoAdventureState(connection, characterId) {
-    const executor = connection ?? db;
-    const [rows] = await executor.execute(
-        `
-            SELECT id, start_date, target_level, target_bubbles, progression_version_id
-            FROM adventures
-            WHERE character_id = ?
-              AND deleted_at IS NULL
-              AND is_pseudo = 1
-            ORDER BY start_date DESC, id DESC
-            LIMIT 1
-        `,
-        [characterId],
-    );
-
-    return rows[0] ?? null;
-}
-
-async function countImmutableAdventureBubbles(connection, characterId, latestPseudo = null) {
-    const executor = connection ?? db;
-
-    if (latestPseudo) {
-        const [rows] = await executor.execute(
-            `
-                SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
-                FROM adventures
-                WHERE character_id = ?
-                  AND deleted_at IS NULL
-                  AND is_pseudo = 0
-                  AND (start_date > ? OR (start_date = ? AND id > ?))
-            `,
-            [characterId, latestPseudo.start_date, latestPseudo.start_date, latestPseudo.id],
-        );
-
-        return Math.max(0, safeInt(rows[0]?.bubbles));
-    }
-
-    const [rows] = await executor.execute(
-        `
-            SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
-            FROM adventures
-            WHERE character_id = ?
-              AND deleted_at IS NULL
-              AND is_pseudo = 0
-        `,
-        [characterId],
-    );
-
-    return Math.max(0, safeInt(rows[0]?.bubbles));
-}
-
-async function countAdventureTrackedBaseBubbles(connection, characterId, startTier, dmBubbles) {
-    const executor = connection ?? db;
-    const immutableAdventureBubbles = await countImmutableAdventureBubbles(executor, characterId, null);
-
-    return Math.max(
-        0,
-        immutableAdventureBubbles + safeInt(dmBubbles) + additionalBubblesForStartTier(startTier),
-    );
+    return calculateAvailableBubbles(character);
 }
 
 async function getCharacterProgressionUpgradeStateForDiscord(discordUser, characterId) {
@@ -255,7 +386,8 @@ async function getCharacterProgressionUpgradeStateForDiscord(discordUser, charac
     const currentVersionId = safeInt(character.progression_version_id) > 0
         ? safeInt(character.progression_version_id)
         : activeVersionId;
-    const usesManualTracking = Boolean(character.simplified_tracking) || Boolean(safeInt(character.has_pseudo_adventure));
+    const hasLevelAnchor = Boolean(character.progression_state?.has_level_anchor);
+    const usesManualTracking = Boolean(character.simplified_tracking) || hasLevelAnchor;
     const currentAvailableBubbles = calculateCharacterAvailableBubbles(character);
     const currentLevel = calculateLevel(character);
     const currentBubblesInLevel = Math.max(
@@ -267,29 +399,13 @@ async function getCharacterProgressionUpgradeStateForDiscord(discordUser, charac
         0,
         currentAvailableBubbles - bubblesRequiredForLevel(recalculatedLevel, activeVersionId),
     );
-    const latestPseudo = usesManualTracking
-        ? await getLatestPseudoAdventureState(null, characterId)
-        : null;
-    const immutableAdventureBubbles = await countImmutableAdventureBubbles(null, characterId, latestPseudo);
-    const additional = additionalBubblesForStartTier(character.start_tier);
     const minimumAvailableBubbles = usesManualTracking
-        ? Math.max(0, immutableAdventureBubbles + additional)
+        ? 0
         : Math.max(0, bubblesRequiredForLevel(currentLevel, activeVersionId));
-    const minSelectableLevel = usesManualTracking
-        ? levelFromAvailableBubbles(minimumAvailableBubbles, activeVersionId)
-        : currentLevel;
-    const maxSelectableLevel = latestPseudo ? recalculatedLevel : (usesManualTracking ? 20 : recalculatedLevel);
+    const minSelectableLevel = currentLevel;
+    const maxSelectableLevel = usesManualTracking ? 20 : recalculatedLevel;
     const initialTargetLevel = usesManualTracking ? currentLevel : recalculatedLevel;
-    let initialTargetBubblesInLevel = usesManualTracking ? 0 : recalculatedBubblesInLevel;
-
-    if (latestPseudo && latestPseudo.target_level !== null) {
-        const pseudoVersionId = safeInt(latestPseudo.progression_version_id) > 0
-            ? safeInt(latestPseudo.progression_version_id)
-            : currentVersionId;
-        const targetLevel = Math.max(1, safeInt(latestPseudo.target_level, currentLevel));
-        const levelFloor = bubblesRequiredForLevel(targetLevel, pseudoVersionId);
-        initialTargetBubblesInLevel = Math.max(0, safeInt(latestPseudo.target_bubbles) - levelFloor);
-    }
+    const initialTargetBubblesInLevel = usesManualTracking ? currentBubblesInLevel : recalculatedBubblesInLevel;
 
     return {
         ok: true,
@@ -297,7 +413,7 @@ async function getCharacterProgressionUpgradeStateForDiscord(discordUser, charac
         activeVersionId,
         currentVersionId,
         usesManualTracking,
-        hasPseudoAdventure: Boolean(latestPseudo),
+        hasPseudoAdventure: hasLevelAnchor,
         currentAvailableBubbles,
         currentLevel,
         currentBubblesInLevel,
@@ -319,6 +435,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         return state;
     }
 
+    const userId = await getLinkedUserIdForDiscord(discordUser);
     const { character, activeVersionId, currentVersionId, usesManualTracking, currentAvailableBubbles, currentLevel, recalculatedLevel, minSelectableLevel, maxSelectableLevel, minimumAvailableBubbles } = state;
 
     if (character.is_filler) {
@@ -343,8 +460,8 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
     }
 
     if (!usesManualTracking) {
-        const baseBubbles = await countAdventureTrackedBaseBubbles(null, characterId, character.start_tier, character.dm_bubbles);
-        const currentSpend = safeInt(character.bubble_shop_spend);
+        const currentSpend = safeInt(character.progression_state?.bubble_shop_spend);
+        const baseBubbles = currentAvailableBubbles + currentSpend;
         const levelFloor = bubblesRequiredForLevel(normalizedLevel, activeVersionId);
         const minBubblesInLevel = normalizedLevel >= 20
             ? 0
@@ -359,7 +476,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
             ? 0
             : Math.max(minBubblesInLevel, Math.min(safeInt(bubblesInLevel), maxBubblesInLevel));
         const targetAvailableBubbles = levelFloor + clampedBubblesInLevel;
-        const maxAllowedSpend = safeInt(character.bubble_shop_spend) + Math.max(0, currentAvailableBubbles - minimumAvailableBubbles);
+        const maxAllowedSpend = currentSpend + Math.max(0, currentAvailableBubbles - minimumAvailableBubbles);
 
         if (normalizedLevel > recalculatedLevel) {
             return { ok: false, reason: 'above_max', maxLevel: recalculatedLevel };
@@ -381,6 +498,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         });
         const requiredDowntimeQuantity = Math.max(currentDowntimeQuantity, Math.max(0, newSpend - nonDowntimeSpend));
         const updatedAt = nowSql();
+        const previousDowntimeSeconds = extraDowntimeSecondsForCharacter(character);
         const connection = await db.getConnection();
 
         try {
@@ -403,9 +521,28 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
             }
 
             await connection.execute(
-                'UPDATE characters SET progression_version_id = ?, bubble_shop_spend = ?, updated_at = ? WHERE id = ?',
-                [activeVersionId, newSpend, updatedAt, characterId],
+                'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
+                [activeVersionId, updatedAt, characterId],
             );
+            await appendCharacterAuditEvent(connection, {
+                characterId,
+                actorUserId: userId,
+                action: 'level_curve.upgraded',
+                delta: {
+                    bubble_shop_spend: newSpend - currentSpend,
+                    bubbles: currentSpend - newSpend,
+                    downtime_seconds: (requiredDowntimeQuantity * 8 * 60 * 60) - previousDowntimeSeconds,
+                },
+                metadata: {
+                    source: 'discord_bot',
+                    previous_progression_version_id: currentVersionId,
+                    new_progression_version_id: activeVersionId,
+                    target_level: normalizedLevel,
+                    target_bubbles_in_level: clampedBubblesInLevel,
+                    tracking_mode: 'adventure',
+                },
+                occurredAt: updatedAt,
+            });
 
             await connection.commit();
         } catch (error) {
@@ -445,7 +582,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
         [activeVersionId, nowSql(), characterId],
     );
 
-    const result = await updateCharacterManualLevelForDiscord(discordUser, characterId, normalizedLevel, clampedTargetBubblesInLevel);
+    const result = await updateCharacterManualLevelForDiscord(discordUser, characterId, normalizedLevel, clampedTargetBubblesInLevel, true);
     if (!result.ok) {
         await db.execute(
             'UPDATE characters SET progression_version_id = ?, updated_at = ? WHERE id = ?',
@@ -456,10 +593,24 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
     }
 
     if (allowOutsideRangeWithoutDowntime) {
+        await appendCharacterAuditEvent(db, {
+            characterId,
+            actorUserId: userId,
+            action: 'level_curve.upgraded',
+            metadata: {
+                source: 'discord_bot',
+                previous_progression_version_id: currentVersionId,
+                new_progression_version_id: activeVersionId,
+                target_level: normalizedLevel,
+                target_bubbles_in_level: clampedTargetBubblesInLevel,
+                tracking_mode: 'level',
+                allow_outside_range_without_downtime: true,
+            },
+        });
         return result;
     }
 
-    const currentSpend = safeInt(character.bubble_shop_spend);
+    const currentSpend = safeInt(character.progression_state?.bubble_shop_spend);
     const newSpend = Math.max(currentSpend, Math.max(0, currentAvailableBubbles - targetAvailableBubbles));
     const currentQuantities = quantitiesForCharacter(character);
     const currentDowntimeQuantity = safeInt(currentQuantities[TYPE_DOWNTIME]);
@@ -469,6 +620,7 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
     });
     const requiredDowntimeQuantity = Math.max(currentDowntimeQuantity, Math.max(0, newSpend - nonDowntimeSpend));
     const updatedAt = nowSql();
+    const previousDowntimeSeconds = extraDowntimeSecondsForCharacter(character);
     const connection = await db.getConnection();
 
     try {
@@ -490,10 +642,26 @@ async function upgradeCharacterProgressionForDiscord(discordUser, characterId, t
             );
         }
 
-        await connection.execute(
-            'UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ?',
-            [newSpend, updatedAt, characterId],
-        );
+        await appendCharacterAuditEvent(connection, {
+            characterId,
+            actorUserId: userId,
+            action: 'level_curve.upgraded',
+            delta: {
+                bubble_shop_spend: newSpend - currentSpend,
+                bubbles: currentSpend - newSpend,
+                downtime_seconds: (requiredDowntimeQuantity * 8 * 60 * 60) - previousDowntimeSeconds,
+            },
+            metadata: {
+                source: 'discord_bot',
+                previous_progression_version_id: currentVersionId,
+                new_progression_version_id: activeVersionId,
+                target_level: normalizedLevel,
+                target_bubbles_in_level: clampedTargetBubblesInLevel,
+                tracking_mode: 'level',
+                allow_outside_range_without_downtime: false,
+            },
+            occurredAt: updatedAt,
+        });
 
         await connection.commit();
     } catch (error) {
@@ -694,10 +862,6 @@ async function listCharactersForDiscord(discordUser) {
                 c.external_link,
                 c.avatar,
                 c.notes,
-                c.dm_bubbles,
-                c.dm_coins,
-                c.bubble_shop_spend,
-                c.bubble_shop_legacy_spend,
                 c.progression_version_id,
                 c.user_id,
                 c.manual_adventures_count,
@@ -710,64 +874,12 @@ async function listCharactersForDiscord(discordUser) {
                 c.avatar_masked,
                 c.private_mode,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
-                COALESCE(a.adventures_count, 0) AS adventures_count,
-                COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
-                COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
-                COALESCE(a.has_real_adventure, 0) AS has_real_adventure,
-                COALESCE(dt.total_downtime, 0) AS total_downtime,
-                COALESCE(dt.faction_downtime, 0) AS faction_downtime,
-                COALESCE(dt.other_downtime, 0) AS other_downtime,
+${auditSnapshotSelect}
 ${bubbleShopPurchaseSelect}
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
             LEFT JOIN rooms r ON r.character_id = c.id
-            LEFT JOIN (
-                SELECT
-                    a.character_id,
-                    COUNT(*) AS adventures_count,
-                    SUM(
-                        CASE
-                            WHEN lp.id IS NULL THEN
-                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
-                            WHEN a.id = lp.id THEN
-                                -- target_bubbles stores the exact available-bubble count at pseudo-creation
-                                -- time (preserving fractional progress).  Fall back to the level-floor via
-                                -- level_progressions for rows that pre-date the column.
-                                COALESCE(lp.target_bubbles, lprog.required_bubbles, 0)
-                            WHEN a.is_pseudo = 0 AND (a.start_date > lp.start_date OR (a.start_date = lp.start_date AND a.id > lp.id)) THEN
-                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
-                            ELSE 0
-                        END
-                    ) AS adventure_bubbles,
-                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure,
-                    MAX(CASE WHEN a.is_pseudo = 0 THEN 1 ELSE 0 END) AS has_real_adventure
-                FROM adventures a
-                LEFT JOIN (
-                    SELECT character_id, id, start_date, target_level, target_bubbles, progression_version_id,
-                           ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY start_date DESC, id DESC) AS rn
-                    FROM adventures
-                    WHERE deleted_at IS NULL AND is_pseudo = 1
-                ) lp ON lp.character_id = a.character_id AND lp.rn = 1
-                LEFT JOIN level_progressions lprog
-                    ON lprog.level = lp.target_level
-                    AND lprog.version_id = COALESCE(
-                        lp.progression_version_id,
-                        (SELECT c2.progression_version_id FROM characters c2 WHERE c2.id = a.character_id LIMIT 1),
-                        (SELECT id FROM level_progression_versions WHERE is_active = 1 LIMIT 1)
-                    )
-                WHERE a.deleted_at IS NULL
-                GROUP BY a.character_id
-            ) a ON a.character_id = c.id
-            LEFT JOIN (
-                SELECT
-                    character_id,
-                    SUM(duration) AS total_downtime,
-                    SUM(CASE WHEN type = 'faction' THEN duration ELSE 0 END) AS faction_downtime,
-                    SUM(CASE WHEN type = 'other' THEN duration ELSE 0 END) AS other_downtime
-                FROM downtimes
-                WHERE deleted_at IS NULL
-                GROUP BY character_id
-            ) dt ON dt.character_id = c.id
+${auditSnapshotJoin}
 ${bubbleShopPurchaseJoin}
             LEFT JOIN (
                 SELECT
@@ -784,7 +896,7 @@ ${bubbleShopPurchaseJoin}
         [userId],
     );
     return rows.map((row) => ({
-        ...row,
+        ...normalizeCharacterRow(row),
         has_progression_upgrade_available: canUseLevelCurveUpgrade
             && safeInt(row.progression_version_id) > 0
             && safeInt(row.progression_version_id) !== activeLevelProgressionVersionId(),
@@ -880,10 +992,6 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.external_link,
                 c.avatar,
                 c.notes,
-                c.dm_bubbles,
-                c.dm_coins,
-                c.bubble_shop_spend,
-                c.bubble_shop_legacy_spend,
                 c.progression_version_id,
                 c.user_id,
                 c.manual_adventures_count,
@@ -896,64 +1004,12 @@ async function findCharacterForDiscord(discordUser, characterId) {
                 c.avatar_masked,
                 c.private_mode,
                 CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_room,
-                COALESCE(a.adventures_count, 0) AS adventures_count,
-                COALESCE(a.adventure_bubbles, 0) AS adventure_bubbles,
-                COALESCE(a.has_pseudo_adventure, 0) AS has_pseudo_adventure,
-                COALESCE(a.has_real_adventure, 0) AS has_real_adventure,
-                COALESCE(dt.total_downtime, 0) AS total_downtime,
-                COALESCE(dt.faction_downtime, 0) AS faction_downtime,
-                COALESCE(dt.other_downtime, 0) AS other_downtime,
+${auditSnapshotSelect}
 ${bubbleShopPurchaseSelect}
                 COALESCE(cls.class_names, '') AS class_names
             FROM characters c
             LEFT JOIN rooms r ON r.character_id = c.id
-            LEFT JOIN (
-                SELECT
-                    a.character_id,
-                    COUNT(*) AS adventures_count,
-                    SUM(
-                        CASE
-                            WHEN lp.id IS NULL THEN
-                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
-                            WHEN a.id = lp.id THEN
-                                -- target_bubbles stores the exact available-bubble count at pseudo-creation
-                                -- time (preserving fractional progress).  Fall back to the level-floor via
-                                -- level_progressions for rows that pre-date the column.
-                                COALESCE(lp.target_bubbles, lprog.required_bubbles, 0)
-                            WHEN a.is_pseudo = 0 AND (a.start_date > lp.start_date OR (a.start_date = lp.start_date AND a.id > lp.id)) THEN
-                                FLOOR(a.duration / 10800) + CASE WHEN a.has_additional_bubble = 1 THEN 1 ELSE 0 END
-                            ELSE 0
-                        END
-                    ) AS adventure_bubbles,
-                    MAX(CASE WHEN a.is_pseudo = 1 THEN 1 ELSE 0 END) AS has_pseudo_adventure,
-                    MAX(CASE WHEN a.is_pseudo = 0 THEN 1 ELSE 0 END) AS has_real_adventure
-                FROM adventures a
-                LEFT JOIN (
-                    SELECT character_id, id, start_date, target_level, target_bubbles, progression_version_id,
-                           ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY start_date DESC, id DESC) AS rn
-                    FROM adventures
-                    WHERE deleted_at IS NULL AND is_pseudo = 1
-                ) lp ON lp.character_id = a.character_id AND lp.rn = 1
-                LEFT JOIN level_progressions lprog
-                    ON lprog.level = lp.target_level
-                    AND lprog.version_id = COALESCE(
-                        lp.progression_version_id,
-                        (SELECT c2.progression_version_id FROM characters c2 WHERE c2.id = a.character_id LIMIT 1),
-                        (SELECT id FROM level_progression_versions WHERE is_active = 1 LIMIT 1)
-                    )
-                WHERE a.deleted_at IS NULL
-                GROUP BY a.character_id
-            ) a ON a.character_id = c.id
-            LEFT JOIN (
-                SELECT
-                    character_id,
-                    SUM(duration) AS total_downtime,
-                    SUM(CASE WHEN type = 'faction' THEN duration ELSE 0 END) AS faction_downtime,
-                    SUM(CASE WHEN type = 'other' THEN duration ELSE 0 END) AS other_downtime
-                FROM downtimes
-                WHERE deleted_at IS NULL
-                GROUP BY character_id
-            ) dt ON dt.character_id = c.id
+${auditSnapshotJoin}
 ${bubbleShopPurchaseJoin}
             LEFT JOIN (
                 SELECT
@@ -969,7 +1025,7 @@ ${bubbleShopPurchaseJoin}
         `,
         [characterId, userId],
     );
-    return rows[0] ?? null;
+    return rows[0] ? normalizeCharacterRow(rows[0]) : null;
 }
 
 async function updateCharacterManualLevelForDiscord(discordUser, characterId, manualLevel, bubblesInLevel = 0, forceAnchor = false) {
@@ -990,7 +1046,7 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
 
         const [[character]] = await connection.execute(
             `
-                SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler, simplified_tracking, progression_version_id
+                SELECT id, is_filler, progression_version_id
                 FROM characters
                 WHERE id = ? AND user_id = ?
                 LIMIT 1
@@ -1003,154 +1059,48 @@ async function updateCharacterManualLevelForDiscord(discordUser, characterId, ma
             return { ok: false, reason: 'not_found' };
         }
 
-        const progressionVersionId = safeInt(character.progression_version_id) > 0 ? safeInt(character.progression_version_id) : null;
-        const additional = additionalBubblesForStartTier(character.start_tier);
+        const progressionVersionId = safeInt(character.progression_version_id) > 0
+            ? safeInt(character.progression_version_id)
+            : activeLevelProgressionVersionId();
+        const currentLevel = calculateLevel(existing);
+        const currentAvailableBubbles = calculateCharacterAvailableBubbles(existing);
 
-        // Find the latest pseudo-adventure (regardless of whether it's the latest overall)
-        const [[latestPseudoRow]] = await connection.execute(
-            `
-                SELECT id, start_date, target_level
-                FROM adventures
-                WHERE character_id = ?
-                  AND deleted_at IS NULL
-                  AND is_pseudo = 1
-                ORDER BY start_date DESC, id DESC
-                LIMIT 1
-            `,
-            [characterId],
-        );
-
-        const [[latestAdventure]] = await connection.execute(
-            `
-                SELECT id, is_pseudo
-                FROM adventures
-                WHERE character_id = ?
-                  AND deleted_at IS NULL
-                ORDER BY start_date DESC, id DESC
-                LIMIT 1
-            `,
-            [characterId],
-        );
-
-        const latestPseudoIsLast = latestPseudoRow && latestAdventure && latestPseudoRow.id === latestAdventure.id;
-
-        // Manual level tracking is active when character has simplified_tracking
-        // or already has pseudo-adventures — in that case DM bubbles and shop
-        // spend are excluded from the minimum-level floor (matching PHP logic).
-        const usesManualTracking = Boolean(character.simplified_tracking) || Boolean(latestPseudoRow);
-        const dmBubbles = usesManualTracking ? 0 : safeInt(character.dm_bubbles);
-        const bubbleSpend = usesManualTracking ? 0 : safeInt(character.bubble_shop_spend);
-
-        let immutableAdventureBubbles;
-        if (latestPseudoRow) {
-            // Only real adventures AFTER the last pseudo count towards the
-            // immutable floor — earlier ones are superseded by the pseudo.
-            const [[afterPseudo]] = await connection.execute(
-                `
-                    SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
-                    FROM adventures
-                    WHERE character_id = ?
-                      AND deleted_at IS NULL
-                      AND is_pseudo = 0
-                      AND (start_date > ? OR (start_date = ? AND id > ?))
-                `,
-                [characterId, latestPseudoRow.start_date, latestPseudoRow.start_date, latestPseudoRow.id],
-            );
-            immutableAdventureBubbles = Math.max(0, safeInt(afterPseudo?.bubbles));
-        } else {
-            const [[allBubbles]] = await connection.execute(
-                `
-                    SELECT COALESCE(SUM(FLOOR(duration / 10800) + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles
-                    FROM adventures
-                    WHERE character_id = ?
-                      AND deleted_at IS NULL
-                      AND is_pseudo = 0
-                `,
-                [characterId],
-            );
-            immutableAdventureBubbles = Math.max(0, safeInt(allBubbles?.bubbles));
-        }
-
-        const minAllowedLevel = calculateMinAllowedLevel({
-            immutableAdventureBubbles,
-            dmBubbles,
-            additionalBubbles: additional,
-            bubbleSpend,
-            progressionVersionId,
-        });
-
-        if (!forceAnchor && !character.is_filler && level < minAllowedLevel) {
+        if (!forceAnchor && !character.is_filler && level < currentLevel) {
             await connection.rollback();
-            return { ok: false, reason: 'below_real', minLevel: minAllowedLevel };
+            return { ok: false, reason: 'below_real', minLevel: currentLevel };
         }
 
-        // Pseudo-adventures use target_level directly — no duration needed.
-        const maxBubblesInLevel = Math.max(
-            0,
-            bubblesRequiredForLevel(Math.min(20, level + 1), progressionVersionId) - bubblesRequiredForLevel(level, progressionVersionId),
-        );
-        const maxSelectableBubblesInLevel = Math.max(0, maxBubblesInLevel - 1);
-        const clampedBubblesInLevel = forceAnchor
-            ? Math.max(0, Math.min(safeInt(bubblesInLevel), maxSelectableBubblesInLevel))
-            : Math.max(0, Math.min(safeInt(bubblesInLevel), maxSelectableBubblesInLevel));
-        const targetBubbles = bubblesRequiredForLevel(level, progressionVersionId) + clampedBubblesInLevel;
-        const editablePseudo = latestPseudoIsLast ? latestPseudoRow : null;
-        const needsPseudo = forceAnchor || level > minAllowedLevel || latestPseudoRow;
-
-        if (!forceAnchor && needsPseudo && level <= minAllowedLevel) {
-            if (editablePseudo) {
-                const now = nowSql();
-                await connection.execute(
-                    'UPDATE adventures SET deleted_at = ?, updated_at = ? WHERE id = ?',
-                    [now, now, editablePseudo.id],
-                );
-            }
-        } else if (needsPseudo) {
-            if (editablePseudo) {
-                const now = nowSql();
-                await connection.execute(
-                    'UPDATE adventures SET duration = 0, has_additional_bubble = 0, target_level = ?, target_bubbles = ?, progression_version_id = ?, updated_at = ? WHERE id = ?',
-                    [level, targetBubbles, progressionVersionId, now, editablePseudo.id],
-                );
-            } else {
-                const now = nowSql();
-                await connection.execute(
-                `
-                    INSERT INTO adventures (
-                        duration,
-                        start_date,
-                        has_additional_bubble,
-                        is_pseudo,
-                        target_level,
-                        target_bubbles,
-                        progression_version_id,
-                        character_id,
-                        title,
-                        game_master,
-                        notes,
-                        created_at,
-                        updated_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `,
-                    [
-                        0,
-                        todaySqlDate(),
-                        0,
-                        1,
-                        level,
-                        targetBubbles,
-                        progressionVersionId,
-                        characterId,
-                        'Level tracking adjustment',
-                        'Level tracking',
-                        'Auto-generated to align the level tracking value.',
-                        now,
-                        now,
-                    ],
-                );
-            }
+        const hasLevelAnchor = Boolean(existing.progression_state?.has_level_anchor);
+        const needsAnchor = forceAnchor || level > currentLevel || hasLevelAnchor;
+        if (!needsAnchor) {
+            await connection.commit();
+            return { ok: true };
         }
+
+        const levelFloor = bubblesRequiredForLevel(level, progressionVersionId);
+        const nextLevelFloor = bubblesRequiredForLevel(Math.min(20, level + 1), progressionVersionId);
+        const maxSelectableBubblesInLevel = Math.max(0, (nextLevelFloor - levelFloor) - 1);
+        const minBubblesInLevel = forceAnchor ? 0 : Math.max(0, currentAvailableBubbles - levelFloor);
+        const clampedBubblesInLevel = Math.max(minBubblesInLevel, Math.min(safeInt(bubblesInLevel), maxSelectableBubblesInLevel));
+        const targetBubbles = levelFloor + clampedBubblesInLevel;
+        const now = nowSql();
+
+        await appendCharacterAuditEvent(connection, {
+            characterId,
+            actorUserId: userId,
+            action: 'level.set',
+            delta: {
+                available_bubbles: targetBubbles,
+                target_level: level,
+                bubbles_in_level: clampedBubblesInLevel,
+            },
+            metadata: {
+                force_anchor: forceAnchor,
+                previous_level: currentLevel,
+                previous_available_bubbles: currentAvailableBubbles,
+            },
+            occurredAt: now,
+        });
 
         await connection.commit();
 
@@ -1197,6 +1147,22 @@ async function updateCharacterManualOverridesForDiscord(discordUser, characterId
         `UPDATE characters SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
         values,
     );
+    await appendCharacterAuditEvent(db, {
+        characterId,
+        actorUserId: userId,
+        action: 'manual_overrides.updated',
+        metadata: {
+            source: 'discord_bot',
+            before: {
+                manual_adventures_count: existing.manual_adventures_count,
+                manual_faction_rank: existing.manual_faction_rank,
+            },
+            after: {
+                manual_adventures_count: typeof adventuresCount !== 'undefined' ? adventuresCount : existing.manual_adventures_count,
+                manual_faction_rank: typeof factionRank !== 'undefined' ? factionRank : existing.manual_faction_rank,
+            },
+        },
+    });
 
     return { ok: true };
 }
@@ -1236,7 +1202,7 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
         }
     }
 
-    const shouldCreateAnchor = Boolean(existing.simplified_tracking) && !safeInt(existing.has_pseudo_adventure)
+    const shouldCreateAnchor = Boolean(existing.simplified_tracking) && !Boolean(existing.progression_state?.has_level_anchor)
         && !existing.is_filler
         && purchaseTypes().some((type) => normalizedQuantities[type] !== quantitiesForCharacter(existing)[type]);
     let anchoredCharacter = existing;
@@ -1262,9 +1228,7 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
         }
     }
 
-    const maxEffectiveSpend = (Boolean(existing.simplified_tracking) && !safeInt(existing.has_pseudo_adventure))
-        ? null
-        : maxEffectiveSpendWithoutDownlevelForCharacter(anchoredCharacter);
+    const maxEffectiveSpend = maxEffectiveSpendWithoutDownlevelForCharacter(anchoredCharacter);
     const nextEffectiveSpend = effectiveSpendForCharacter({
         ...anchoredCharacter,
         bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
@@ -1281,6 +1245,8 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
     }
 
     const updatedAt = nowSql();
+    const previousEffectiveSpend = safeInt(existing.progression_state?.bubble_shop_spend);
+    const previousDowntimeSeconds = extraDowntimeSecondsForCharacter(existing);
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
@@ -1312,11 +1278,30 @@ async function updateCharacterBubbleShopForDiscord(discordUser, characterId, pur
             bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
             bubble_shop_downtime: normalizedQuantities[TYPE_DOWNTIME],
         });
+        const nextDowntimeSeconds = extraDowntimeSecondsForCharacter({
+            ...anchoredCharacter,
+            bubble_shop_skill_proficiency: normalizedQuantities[TYPE_SKILL_PROFICIENCY],
+            bubble_shop_rare_language: normalizedQuantities[TYPE_RARE_LANGUAGE],
+            bubble_shop_tool_or_language: normalizedQuantities[TYPE_TOOL_OR_LANGUAGE],
+            bubble_shop_downtime: normalizedQuantities[TYPE_DOWNTIME],
+        });
 
-        await connection.execute(
-            'UPDATE characters SET bubble_shop_spend = ?, updated_at = ? WHERE id = ? AND user_id = ?',
-            [effectiveSpend, updatedAt, characterId, userId],
-        );
+        await appendCharacterAuditEvent(connection, {
+            characterId,
+            actorUserId: userId,
+            action: 'bubble_shop.updated',
+            delta: {
+                bubble_shop_spend: effectiveSpend - previousEffectiveSpend,
+                bubbles: previousEffectiveSpend - effectiveSpend,
+                downtime_seconds: nextDowntimeSeconds - previousDowntimeSeconds,
+            },
+            metadata: {
+                previous_quantities: quantitiesForCharacter(existing),
+                new_quantities: normalizedQuantities,
+                created_level_anchor: shouldCreateAnchor,
+            },
+            occurredAt: updatedAt,
+        });
 
         await connection.commit();
 
@@ -1381,17 +1366,13 @@ async function createCharacterForDiscord(
         const [insertCharacter] = await connection.execute(
             `
             INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, bubble_shop_legacy_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, progression_version_id, created_at, updated_at)
+                    (name, start_tier, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, progression_version_id, created_at, updated_at)
             VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 safeName,
                 safeTier,
-                safeDmBubbles,
-                safeDmCoins,
-                safeBubbleShop,
-                safeBubbleShop,
                 safeExternal,
                 safeAvatar,
                 safeFaction,
@@ -1440,6 +1421,23 @@ async function createCharacterForDiscord(
                 [notes, createdAt, characterId, userId],
             );
         }
+
+        await appendCharacterAuditEvent(connection, {
+            characterId,
+            actorUserId: userId,
+            action: 'character.created',
+            delta: {
+                bubbles: safeDmBubbles - safeBubbleShop,
+                dm_bubbles: safeDmBubbles,
+                dm_coins: safeDmCoins,
+                bubble_shop_spend: safeBubbleShop,
+            },
+            metadata: {
+                name: safeName,
+                source: 'discord_bot',
+            },
+            occurredAt: createdAt,
+        });
 
         await connection.commit();
         return { ok: true, id: characterId };
@@ -1500,20 +1498,14 @@ async function updateCharacterForDiscord(
     const newFaction = typeof faction === 'string' ? normalizeFaction(faction, existing.faction) : existing.faction;
     const newVersion = typeof version === 'string' ? normalizeVersion(version, existing.version) : existing.version;
     const newAvatar = typeof avatar === 'string' ? normalizeAvatar(avatar) : existing.avatar;
-    const newDmBubbles = typeof dmBubbles !== 'undefined' ? normalizeNumber(dmBubbles, existing.dm_bubbles) : existing.dm_bubbles;
-    const newDmCoins = typeof dmCoins !== 'undefined' ? normalizeNumber(dmCoins, existing.dm_coins) : existing.dm_coins;
-    const requestedBubbleShopSpend = typeof bubbleShopSpend !== 'undefined'
-        ? normalizeNumber(bubbleShopSpend, existing.bubble_shop_spend)
-        : existing.bubble_shop_spend;
-    const newBubbleShopLegacySpend = typeof bubbleShopSpend !== 'undefined'
-        ? Math.max(safeInt(existing.bubble_shop_legacy_spend), requestedBubbleShopSpend)
-        : safeInt(existing.bubble_shop_legacy_spend);
+    const existingDmBubbles = safeInt(existing.progression_state?.dm_bubbles);
+    const existingDmCoins = safeInt(existing.progression_state?.dm_coins);
+    const existingBubbleShopSpend = safeInt(existing.progression_state?.bubble_shop_spend);
+    const newDmBubbles = typeof dmBubbles !== 'undefined' ? normalizeNumber(dmBubbles, existingDmBubbles) : existingDmBubbles;
+    const newDmCoins = typeof dmCoins !== 'undefined' ? normalizeNumber(dmCoins, existingDmCoins) : existingDmCoins;
     const newBubbleShopSpend = typeof bubbleShopSpend !== 'undefined'
-        ? effectiveSpendForCharacter({
-            ...existing,
-            bubble_shop_legacy_spend: newBubbleShopLegacySpend,
-        })
-        : existing.bubble_shop_spend;
+        ? normalizeNumber(bubbleShopSpend, existingBubbleShopSpend)
+        : existingBubbleShopSpend;
     const newIsFiller = typeof isFiller !== 'undefined' ? normalizeBoolean(isFiller, existing.is_filler) : existing.is_filler;
     const newRegistrationNote = typeof registrationNote === 'string'
         ? registrationNote.trim()
@@ -1534,37 +1526,77 @@ async function updateCharacterForDiscord(
         ? normalizeBoolean(privateMode, existingPrivateMode)
         : existingPrivateMode;
 
-    await db.execute(
-        `
-            UPDATE characters
-            SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, dm_bubbles = ?, dm_coins = ?, bubble_shop_spend = ?, bubble_shop_legacy_spend = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, private_mode = ?, updated_at = ?
-            WHERE id = ? AND user_id = ?
-        `,
-        [
-            newName,
-            newStartTier,
-            newExternalLink,
-            newNotes,
-            newFaction,
-            newVersion,
-            newAvatar,
-            newDmBubbles,
-            newDmCoins,
-            newBubbleShopSpend,
-            newBubbleShopLegacySpend,
-            newIsFiller ? 1 : 0,
-            newGuildStatus,
-            newRegistrationNote || null,
-            newSimplifiedTracking ? 1 : 0,
-            newAvatarMasked ? 1 : 0,
-            newPrivateMode ? 1 : 0,
-            updatedAt,
-            characterId,
-            userId,
-        ],
-    );
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
 
-    return { ok: true };
+        await connection.execute(
+            `
+                UPDATE characters
+                SET name = ?, start_tier = ?, external_link = ?, notes = ?, faction = ?, version = ?, avatar = ?, is_filler = ?, guild_status = ?, registration_note = ?, simplified_tracking = ?, avatar_masked = ?, private_mode = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+            `,
+            [
+                newName,
+                newStartTier,
+                newExternalLink,
+                newNotes,
+                newFaction,
+                newVersion,
+                newAvatar,
+                newIsFiller ? 1 : 0,
+                newGuildStatus,
+                newRegistrationNote || null,
+                newSimplifiedTracking ? 1 : 0,
+                newAvatarMasked ? 1 : 0,
+                newPrivateMode ? 1 : 0,
+                updatedAt,
+                characterId,
+                userId,
+            ],
+        );
+
+        const dmBubblesDelta = newDmBubbles - existingDmBubbles;
+        const dmCoinsDelta = newDmCoins - existingDmCoins;
+        const bubbleShopSpendDelta = newBubbleShopSpend - existingBubbleShopSpend;
+        await appendCharacterAuditEvent(connection, {
+            characterId,
+            actorUserId: userId,
+            action: 'character.updated',
+            delta: {
+                bubbles: dmBubblesDelta - bubbleShopSpendDelta,
+                dm_bubbles: dmBubblesDelta,
+                dm_coins: dmCoinsDelta,
+                bubble_shop_spend: bubbleShopSpendDelta,
+            },
+            metadata: {
+                source: 'discord_bot',
+                before: {
+                    name: existing.name,
+                    start_tier: existing.start_tier,
+                    faction: existing.faction,
+                    version: existing.version,
+                    guild_status: existing.guild_status,
+                },
+                after: {
+                    name: newName,
+                    start_tier: newStartTier,
+                    faction: newFaction,
+                    version: newVersion,
+                    guild_status: newGuildStatus,
+                },
+            },
+            occurredAt: updatedAt,
+        });
+
+        await connection.commit();
+        return { ok: true };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 }
 
 async function softDeleteCharacterForDiscord(discordUser, characterId) {
@@ -1604,6 +1636,16 @@ async function softDeleteCharacterForDiscord(discordUser, characterId) {
             'UPDATE characters SET deleted_at = ?, updated_at = ?, guild_status = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
             [updatedAt, updatedAt, 'declined', characterId, userId],
         );
+        await appendCharacterAuditEvent(connection, {
+            characterId,
+            actorUserId: userId,
+            action: 'character.deleted',
+            metadata: {
+                source: 'discord_bot',
+                new_status: 'declined',
+            },
+            occurredAt: updatedAt,
+        });
 
         await connection.commit();
         return { ok: true };
@@ -1629,7 +1671,7 @@ async function listAdventuresForDiscord(discordUser, characterId, limit = 25) {
     const safeLimit = Math.max(1, Math.min(25, Number(limit) || 25));
         const [rows] = await db.execute(
             `
-            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id, a.is_pseudo, a.target_level, a.progression_version_id
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id
             FROM adventures a
             INNER JOIN characters c ON c.id = a.character_id
             WHERE a.character_id = ?
@@ -1649,7 +1691,7 @@ async function findAdventureForDiscord(discordUser, adventureId) {
 
     const [rows] = await db.execute(
         `
-            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id, a.is_pseudo, a.target_level, a.progression_version_id
+            SELECT a.id, a.duration, a.start_date, a.has_additional_bubble, a.notes, a.title, a.game_master, a.character_id
             FROM adventures a
             INNER JOIN characters c ON c.id = a.character_id
             WHERE a.id = ?
@@ -1708,6 +1750,23 @@ async function createAdventureForDiscord(
     } catch {
         participantsOk = false;
     }
+    await appendCharacterAuditEvent(db, {
+        characterId,
+        actorUserId: userId,
+        action: 'adventure.created',
+        subjectType: 'adventure',
+        subjectId: result.insertId,
+        delta: {
+            bubbles: Math.floor(Math.floor(safeDuration) / 10800) + (hasAdditionalBubble ? 1 : 0),
+            duration_seconds: Math.floor(safeDuration),
+        },
+        metadata: {
+            source: 'discord_bot',
+            title: title ?? null,
+            game_master: gameMaster ?? null,
+            start_date: date,
+        },
+    });
 
     return { ok: true, id: result.insertId, participantsOk };
 }
@@ -1740,6 +1799,34 @@ async function updateAdventureForDiscord(
         `,
         [safeDuration, date, newNotes ?? null, newTitle ?? null, newGameMaster ?? null, newHasAdditionalBubble, nowSql(), adventureId],
     );
+    await appendCharacterAuditEvent(db, {
+        characterId: existing.character_id,
+        actorUserId: userId,
+        action: 'adventure.updated',
+        subjectType: 'adventure',
+        subjectId: adventureId,
+        delta: {
+            bubbles: (Math.floor(safeDuration / 10800) + (safeInt(newHasAdditionalBubble) ? 1 : 0)) - bubblesForAdventureRow(existing),
+            duration_seconds: safeDuration - safeInt(existing.duration),
+        },
+        metadata: {
+            source: 'discord_bot',
+            before: {
+                title: existing.title,
+                duration: safeInt(existing.duration),
+                start_date: existing.start_date,
+                game_master: existing.game_master,
+                has_additional_bubble: Boolean(safeInt(existing.has_additional_bubble)),
+            },
+            after: {
+                title: newTitle,
+                duration: safeDuration,
+                start_date: date,
+                game_master: newGameMaster,
+                has_additional_bubble: Boolean(safeInt(newHasAdditionalBubble)),
+            },
+        },
+    });
 
     let participantsOk = true;
     try {
@@ -2033,6 +2120,7 @@ async function softDeleteAdventureForDiscord(discordUser, adventureId) {
     const existing = await findAdventureForDiscord(discordUser, adventureId);
     if (!existing) return { ok: false, reason: 'not_found' };
 
+    const deletedAt = nowSql();
     await db.execute(
         `
             UPDATE adventures a
@@ -2040,8 +2128,26 @@ async function softDeleteAdventureForDiscord(discordUser, adventureId) {
             SET a.deleted_at = ?, a.updated_at = ?
             WHERE a.id = ? AND c.user_id = ? AND a.deleted_at IS NULL
         `,
-        [nowSql(), nowSql(), adventureId, userId],
+        [deletedAt, deletedAt, adventureId, userId],
     );
+    await appendCharacterAuditEvent(db, {
+        characterId: existing.character_id,
+        actorUserId: userId,
+        action: 'adventure.deleted',
+        subjectType: 'adventure',
+        subjectId: adventureId,
+        delta: {
+            bubbles: -bubblesForAdventureRow(existing),
+            duration_seconds: -safeInt(existing.duration),
+        },
+        metadata: {
+            source: 'discord_bot',
+            title: existing.title,
+            game_master: existing.game_master,
+            start_date: existing.start_date,
+        },
+        occurredAt: deletedAt,
+    });
 
     return { ok: true };
 }
@@ -2110,6 +2216,21 @@ async function createDowntimeForDiscord(discordUser, { characterId, duration, st
         `,
         [Math.floor(safeDuration), date, safeType, notes ?? null, characterId, createdAt, createdAt],
     );
+    await appendCharacterAuditEvent(db, {
+        characterId,
+        actorUserId: userId,
+        action: 'downtime.created',
+        subjectType: 'downtime',
+        subjectId: result.insertId,
+        delta: {
+            downtime_seconds: Math.floor(safeDuration),
+        },
+        metadata: {
+            source: 'discord_bot',
+            type: safeType,
+            start_date: date,
+        },
+    });
 
     return { ok: true, id: result.insertId };
 }
@@ -2135,6 +2256,29 @@ async function updateDowntimeForDiscord(discordUser, downtimeId, { duration, sta
         `,
         [safeDuration, date, safeType, newNotes ?? null, nowSql(), downtimeId],
     );
+    await appendCharacterAuditEvent(db, {
+        characterId: existing.character_id,
+        actorUserId: userId,
+        action: 'downtime.updated',
+        subjectType: 'downtime',
+        subjectId: downtimeId,
+        delta: {
+            downtime_seconds: safeDuration - safeInt(existing.duration),
+        },
+        metadata: {
+            source: 'discord_bot',
+            before: {
+                duration: safeInt(existing.duration),
+                start_date: existing.start_date,
+                type: existing.type,
+            },
+            after: {
+                duration: safeDuration,
+                start_date: date,
+                type: safeType,
+            },
+        },
+    });
 
     return { ok: true };
 }
@@ -2146,6 +2290,7 @@ async function softDeleteDowntimeForDiscord(discordUser, downtimeId) {
     const existing = await findDowntimeForDiscord(discordUser, downtimeId);
     if (!existing) return { ok: false, reason: 'not_found' };
 
+    const deletedAt = nowSql();
     await db.execute(
         `
             UPDATE downtimes d
@@ -2153,8 +2298,24 @@ async function softDeleteDowntimeForDiscord(discordUser, downtimeId) {
             SET d.deleted_at = ?, d.updated_at = ?
             WHERE d.id = ? AND c.user_id = ? AND d.deleted_at IS NULL
         `,
-        [nowSql(), nowSql(), downtimeId, userId],
+        [deletedAt, deletedAt, downtimeId, userId],
     );
+    await appendCharacterAuditEvent(db, {
+        characterId: existing.character_id,
+        actorUserId: userId,
+        action: 'downtime.deleted',
+        subjectType: 'downtime',
+        subjectId: downtimeId,
+        delta: {
+            downtime_seconds: -safeInt(existing.duration),
+        },
+        metadata: {
+            source: 'discord_bot',
+            type: existing.type,
+            start_date: existing.start_date,
+        },
+        occurredAt: deletedAt,
+    });
 
     return { ok: true };
 }

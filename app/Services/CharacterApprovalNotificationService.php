@@ -6,6 +6,7 @@ use App\Models\Character;
 use App\Models\DiscordBotSetting;
 use App\Models\User;
 use App\Support\BotRequestFailure;
+use App\Support\CharacterProgressionSnapshotResolver;
 use Illuminate\Support\Facades\Http;
 
 class CharacterApprovalNotificationService
@@ -180,6 +181,8 @@ class CharacterApprovalNotificationService
             ? $character->user->characters()->where('guild_status', '!=', 'draft')->count()
             : 0;
 
+        $snapshot = app(CharacterProgressionSnapshotResolver::class)->snapshot($character);
+
         return array_merge([
             'character_id' => $character->id,
             'character_name' => $character->name,
@@ -191,9 +194,9 @@ class CharacterApprovalNotificationService
             'character_registration_note' => $character->registration_note,
             'character_review_note' => $character->review_note,
             'character_is_filler' => $character->is_filler,
-            'character_dm_bubbles' => $character->dm_bubbles,
-            'character_dm_coins' => $character->dm_coins,
-            'character_shop_spend' => $character->bubble_shop_spend,
+            'character_dm_bubbles' => (int) ($snapshot['dm_bubbles'] ?? 0),
+            'character_dm_coins' => (int) ($snapshot['dm_coins'] ?? 0),
+            'character_shop_spend' => (int) ($snapshot['bubble_shop_spend'] ?? 0),
             'character_classes' => $classes,
             'character_avatar_url' => $avatarUrl,
             'external_link' => $this->sanitizeExternalLink($character->external_link),

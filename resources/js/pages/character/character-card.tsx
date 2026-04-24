@@ -7,8 +7,6 @@ import { Modal, ModalAction, ModalContent, ModalTitle, ModalTrigger } from '@/co
 import { Progress } from '@/components/ui/progress'
 import { TextArea } from '@/components/ui/text-area'
 import { Tooltip } from '@/components/ui/tooltip'
-import { additionalBubblesForStartTier } from '@/helper/additionalBubblesForStartTier'
-import { calculateBubble } from '@/helper/calculateBubble'
 import { calculateBubblesInCurrentLevel } from '@/helper/calculateBubblesInCurrentLevel'
 import { calculateClassString } from '@/helper/calculateClassString'
 import { calculateFactionDowntime, calculateOtherDowntime } from '@/helper/calculateDowntime'
@@ -17,6 +15,7 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
+import { requireSnapshotNumber } from '@/helper/characterProgressionState'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import { useTranslate } from '@/lib/i18n'
@@ -336,10 +335,10 @@ export function CharacterCard({
   const progressValue = calculateBubblesInCurrentLevel(character)
   const progressMax = calculateTotalBubblesToNextLevel(character)
   const isMaxLevel = level >= 20 || progressMax === 0
-  const additionalBubbles = additionalBubblesForStartTier(character.start_tier)
-  const earnedBubbles = calculateBubble(character) + additionalBubbles
+  const earnedBubbles = requireSnapshotNumber(character, 'available_bubbles') + requireSnapshotNumber(character, 'bubble_shop_spend')
   const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character)
-  const isBubbleOverspent = bubbleAdjustmentsCount && character.bubble_shop_spend > earnedBubbles
+  const bubbleShopSpend = Number(character.progression_state?.bubble_shop_spend ?? 0)
+  const isBubbleOverspent = bubbleAdjustmentsCount && bubbleShopSpend > earnedBubbles
   const guildStatus = character.guild_status ?? 'pending'
   const reviewNote = character.review_note?.trim() ?? ''
   const reviewedByName = character.reviewed_by_name?.trim() ?? ''
@@ -485,9 +484,8 @@ export function CharacterCard({
     remaining: secondsToHourMinuteString(remainingDowntimeSeconds),
   }
   const factionLevel = character.faction_rank ?? calculateFactionLevel(character)
-  const pseudoAdventureCount = character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length
-  const realAdventureCount = character.adventures.length - pseudoAdventureCount
-  const hasLevelAnchors = pseudoAdventureCount > 0
+  const realAdventureCount = character.adventures.length
+  const hasLevelAnchors = Boolean(character.progression_state?.has_level_anchor)
   const usesManualDerivedValues = usesManualLevelTracking(character)
   const isMixedTrackingHistory = hasLevelAnchors && realAdventureCount > 0
   const trackingModeLabel = simplifiedTracking ? t('characters.levelTrackingBadge') : t('characters.adventureTrackingBadge')
@@ -706,8 +704,8 @@ export function CharacterCard({
                     <InfoBoxTitle>
                       <Swords size={15} /> {t('characters.adventures')}
                       {!bubbleAdjustmentsCount ? (
-                        <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom">
-                          <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.bubbleShopNotCountedHint')}>
+                        <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom" wrapperClassName="ml-auto inline-flex shrink-0">
+                          <span className="cursor-help text-warning/70" aria-label={t('characters.bubbleShopNotCountedHint')}>
                             <AlertTriangle size={11} />
                           </span>
                         </Tooltip>
@@ -741,7 +739,7 @@ export function CharacterCard({
                       {t('characters.startedIn')}: <LogoTier width={13} tier={character.start_tier} />
                     </InfoBoxLine>
                     <InfoBoxLine>
-                      {t('characters.bubbleShop')}: {character.bubble_shop_spend}
+                      {t('characters.bubbleShop')}: {bubbleShopSpend}
                       <Droplets size={13} />
                     </InfoBoxLine>
                   </InfoBox>
@@ -798,19 +796,19 @@ export function CharacterCard({
                     <InfoBoxTitle>
                       <Crown size={15} /> {t('characters.gameMaster')}
                       {!bubbleAdjustmentsCount ? (
-                        <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom">
-                          <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.gmBubblesNotCountedHint')}>
+                        <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom" wrapperClassName="ml-auto inline-flex shrink-0">
+                          <span className="cursor-help text-warning/70" aria-label={t('characters.gmBubblesNotCountedHint')}>
                             <AlertTriangle size={11} />
                           </span>
                         </Tooltip>
                       ) : null}
                     </InfoBoxTitle>
                     <InfoBoxLine>
-                      {t('characters.bubbles')}: {character.dm_bubbles}
+                      {t('characters.bubbles')}: {Number(character.progression_state?.dm_bubbles ?? 0)}
                       <Droplets size={13} />
                     </InfoBoxLine>
                     <InfoBoxLine>
-                      {t('characters.coins')}: {character.dm_coins}
+                      {t('characters.coins')}: {Number(character.progression_state?.dm_coins ?? 0)}
                       <Coins size={13} />
                     </InfoBoxLine>
                   </InfoBox>

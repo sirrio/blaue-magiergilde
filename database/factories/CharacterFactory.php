@@ -4,6 +4,8 @@ namespace Database\Factories;
 
 use App\Models\Character;
 use App\Models\User;
+use App\Support\CharacterAuditTrail;
+use App\Support\CharacterProgressionState;
 use App\Support\LevelProgression;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -16,8 +18,6 @@ class CharacterFactory extends Factory
 
     public function definition(): array
     {
-        $bubbleShopSpend = $this->faker->numberBetween(0, 10);
-
         return [
             'user_id' => User::factory(),
             'name' => $this->faker->name(),
@@ -25,10 +25,6 @@ class CharacterFactory extends Factory
             'start_tier' => $this->faker->randomElement(['bt', 'lt', 'ht']),
             'version' => '2024',
             'avatar' => $this->faker->imageUrl(200, 200, 'people'),
-            'dm_bubbles' => $this->faker->numberBetween(0, 10),
-            'dm_coins' => $this->faker->numberBetween(0, 10),
-            'bubble_shop_spend' => $bubbleShopSpend,
-            'bubble_shop_legacy_spend' => $bubbleShopSpend,
             'is_filler' => $this->faker->boolean(),
             'faction' => $this->faker->randomElement([
                 'none', 'heiler', 'handwerker', 'feldforscher', 'bibliothekare', 'diplomaten', 'gardisten', 'unterhalter', 'logistiker', 'flora & fauna', 'waffenmeister', 'ermittler', 'arkanisten',
@@ -41,5 +37,22 @@ class CharacterFactory extends Factory
             'avatar_masked' => true,
             'private_mode' => false,
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Character $character): void {
+            if ($character->auditEvents()->where('action', 'character.created')->exists()) {
+                return;
+            }
+
+            $progressionState = app(CharacterProgressionState::class);
+            $startTierBonus = $progressionState->startTierBonus($character->start_tier);
+
+            app(CharacterAuditTrail::class)->record($character, 'character.created', delta: [
+                'available_bubbles' => $startTierBonus,
+                'bubbles' => $startTierBonus,
+            ], metadata: ['factory' => true]);
+        });
     }
 }

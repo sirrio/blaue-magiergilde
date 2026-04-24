@@ -8,39 +8,90 @@ const originalDbModule = require.cache[dbPath];
 const originalAppDbModule = require.cache[appDbPath];
 const originalLevelProgressionModule = require.cache[levelProgressionPath];
 
-const makeCharacterRow = (overrides = {}) => ({
-    id: 1,
-    name: 'Character',
-    start_tier: 'bt',
-    version: '2024',
-    faction: 'none',
-    external_link: '',
-    avatar: null,
-    notes: null,
-    dm_bubbles: 0,
-    dm_coins: 0,
-    bubble_shop_spend: 0,
-    progression_version_id: 1,
-    manual_adventures_count: null,
-    manual_faction_rank: null,
-    is_filler: 0,
-    guild_status: 'approved',
-    registration_note: null,
-    review_note: null,
-    simplified_tracking: 0,
-    avatar_masked: 1,
-    private_mode: 0,
-    has_room: 0,
-    adventures_count: 0,
-    adventure_bubbles: 0,
-    has_pseudo_adventure: 0,
-    has_real_adventure: 0,
-    total_downtime: 0,
-    faction_downtime: 0,
-    other_downtime: 0,
-    class_names: 'Wizard',
-    ...overrides,
-});
+const totals = { 1: 0, 2: 1, 3: 3, 4: 6, 5: 10, 6: 15, 7: 21, 8: 28, 9: 36, 10: 45, 11: 55, 12: 66, 13: 78, 14: 91, 15: 105, 16: 120, 17: 136, 18: 153, 19: 171, 20: 190 };
+
+function additionalBubblesForStartTier(startTier) {
+    if (startTier === 'ht') return 55;
+    if (startTier === 'lt') return 10;
+    return 0;
+}
+
+function levelFromAvailableBubbles(availableBubbles) {
+    let level = 1;
+    for (let current = 20; current >= 1; current -= 1) {
+        if (Number(availableBubbles) >= totals[current]) {
+            level = current;
+            break;
+        }
+    }
+    return level;
+}
+
+function tierForLevel(level) {
+    if (level >= 17) return 'et';
+    if (level >= 11) return 'ht';
+    if (level >= 5) return 'lt';
+    return 'bt';
+}
+
+function progressionStateFor(row) {
+    const availableBubbles = Math.max(
+        0,
+        Number(row.adventure_bubbles || 0) + additionalBubblesForStartTier(row.start_tier),
+    );
+    const level = levelFromAvailableBubbles(availableBubbles);
+
+    return JSON.stringify({
+        level,
+        tier: tierForLevel(level),
+        available_bubbles: availableBubbles,
+        bubbles_in_level: Math.max(0, availableBubbles - totals[level]),
+        bubbles_required_for_next_level: level >= 20 ? 0 : totals[level + 1] - totals[level],
+        progression_version_id: row.progression_version_id ?? 1,
+        bubble_shop_spend: 0,
+        downtime_total_seconds: row.total_downtime ?? 0,
+        downtime_logged_seconds: row.total_downtime ?? 0,
+        faction_rank: 0,
+        has_level_anchor: false,
+    });
+}
+
+const makeCharacterRow = (overrides = {}) => {
+    const row = {
+        id: 1,
+        name: 'Character',
+        start_tier: 'bt',
+        version: '2024',
+        faction: 'none',
+        external_link: '',
+        avatar: null,
+        notes: null,
+        progression_version_id: 1,
+        manual_adventures_count: null,
+        manual_faction_rank: null,
+        is_filler: 0,
+        guild_status: 'approved',
+        registration_note: null,
+        review_note: null,
+        simplified_tracking: 0,
+        avatar_masked: 1,
+        private_mode: 0,
+        has_room: 0,
+        adventures_count: 0,
+        adventure_bubbles: 0,
+        has_real_adventure: 0,
+        total_downtime: 0,
+        faction_downtime: 0,
+        other_downtime: 0,
+        class_names: 'Wizard',
+        ...overrides,
+    };
+
+    return {
+        progression_state_json: progressionStateFor(row),
+        ...row,
+    };
+};
 
 const targetCharacter = makeCharacterRow({
     id: 99,
@@ -113,7 +164,6 @@ require.cache[levelProgressionPath] = {
         }[level]),
         ensureLevelProgressionLoaded: async () => true,
         levelFromAvailableBubbles: (availableBubbles) => {
-            const totals = { 1: 0, 2: 1, 3: 3, 4: 6, 5: 10, 6: 15, 7: 21, 8: 28, 9: 36, 10: 45, 11: 55, 12: 66, 13: 78, 14: 91, 15: 105, 16: 120, 17: 136, 18: 153, 19: 171, 20: 190 };
             let level = 1;
             for (let current = 20; current >= 1; current -= 1) {
                 if (Number(availableBubbles) >= totals[current]) {

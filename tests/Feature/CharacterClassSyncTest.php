@@ -43,10 +43,7 @@ test('character class selections are synced without duplicates on update', funct
         'class' => [$firstClass->id, $secondClass->id, $firstClass->id],
         'external_link' => $character->external_link,
         'version' => $character->version,
-        'dm_bubbles' => $character->dm_bubbles,
-        'dm_coins' => $character->dm_coins,
         'is_filler' => $character->is_filler,
-        'bubble_shop_spend' => $character->bubble_shop_spend,
         'faction' => $character->faction,
         'notes' => $character->notes,
     ]);
@@ -105,10 +102,7 @@ test('disabled guild classes cannot be newly added on update', function () {
         'class' => [$enabledClass->id, $disabledClass->id],
         'external_link' => $character->external_link,
         'version' => $character->version,
-        'dm_bubbles' => $character->dm_bubbles,
-        'dm_coins' => $character->dm_coins,
         'is_filler' => $character->is_filler,
-        'bubble_shop_spend' => $character->bubble_shop_spend,
         'faction' => $character->faction,
         'notes' => $character->notes,
     ]);
@@ -132,10 +126,7 @@ test('existing disabled guild classes can remain selected on update', function (
         'class' => [$disabledClass->id],
         'external_link' => $character->external_link,
         'version' => $character->version,
-        'dm_bubbles' => $character->dm_bubbles,
-        'dm_coins' => $character->dm_coins,
         'is_filler' => $character->is_filler,
-        'bubble_shop_spend' => $character->bubble_shop_spend,
         'faction' => $character->faction,
         'notes' => $character->notes,
     ]);

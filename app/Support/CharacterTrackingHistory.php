@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Character;
+use App\Models\CharacterAuditEvent;
 use Illuminate\Support\Collection;
 
 class CharacterTrackingHistory
@@ -33,7 +34,7 @@ class CharacterTrackingHistory
 
     public function permanentDeleteBlockReason(Character $character): ?string
     {
-        if ($this->safeInt($character->dm_bubbles) > 0 || $this->safeInt($character->dm_coins) > 0 || $this->safeInt($character->bubble_shop_spend) > 0) {
+        if ($this->hasProgressionBalances($character)) {
             return 'Nicht möglich, da der Charakter noch Bubbles oder Coins für die Nachverfolgung enthält.';
         }
 
@@ -46,6 +47,22 @@ class CharacterTrackingHistory
         }
 
         return null;
+    }
+
+    private function hasProgressionBalances(Character $character): bool
+    {
+        $events = $character->relationLoaded('auditEvents')
+            ? $character->getRelation('auditEvents')
+            : $character->auditEvents()->get();
+
+        foreach (['dm_bubbles', 'dm_coins', 'bubble_shop_spend'] as $counter) {
+            $sum = $events->sum(fn (CharacterAuditEvent $event): int => (int) ($event->delta[$counter] ?? 0));
+            if ($sum > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -75,10 +92,5 @@ class CharacterTrackingHistory
             : $character->{$relation}()->withTrashed()->get();
 
         return $this->filterEntries($character, $entries);
-    }
-
-    private function safeInt(mixed $value): int
-    {
-        return is_numeric($value) ? (int) $value : 0;
     }
 }

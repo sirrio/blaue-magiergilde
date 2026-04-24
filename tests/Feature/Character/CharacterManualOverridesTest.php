@@ -9,11 +9,11 @@ it('stores manual character overrides for the owner', function () {
         'name' => 'Override Test',
         'faction' => 'bibliothekare',
         'version' => '2024',
-        'dm_bubbles' => 2,
-        'dm_coins' => 4,
-        'bubble_shop_spend' => 1,
         'is_filler' => false,
     ]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'dm_bubbles.granted', delta: ['bubbles' => 2, 'dm_bubbles' => 2]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'dm_coins.granted', delta: ['dm_coins' => 4]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'bubble_shop.updated', delta: ['bubbles' => -1, 'bubble_shop_spend' => 1]);
 
     $response = $this->actingAs($user)->patch(route('characters.manual-overrides', $character), [
         'manual_adventures_count_enabled' => true,

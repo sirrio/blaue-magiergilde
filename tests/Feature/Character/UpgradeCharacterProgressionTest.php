@@ -2,9 +2,11 @@
 
 use App\Models\Adventure;
 use App\Models\Character;
+use App\Models\CharacterAuditEvent;
 use App\Models\LevelProgressionEntry;
 use App\Models\LevelProgressionVersion;
 use App\Models\User;
+use App\Support\CharacterAuditTrail;
 use App\Support\CharacterBubbleShop;
 use App\Support\LevelProgression;
 use Illuminate\Support\Facades\Config;
@@ -18,6 +20,32 @@ afterEach(function () {
     LevelProgression::clearCache();
 });
 
+function snapshotSpend(Character $character): int
+{
+    $fresh = $character->fresh('latestAuditSnapshot');
+
+    return (int) ($fresh?->latestAuditSnapshot?->state_after['bubble_shop_spend'] ?? 0);
+}
+
+function levelSetCount(Character $character): int
+{
+    return CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->where('action', 'level.set')
+        ->count();
+}
+
+function anchorLevel(Character $character, int $versionId, int $targetLevel, int $targetBubbles): void
+{
+    $bubblesInLevel = max(0, $targetBubbles - LevelProgression::bubblesRequiredForLevel($targetLevel, $versionId));
+
+    app(CharacterAuditTrail::class)->record($character, 'level.set', delta: [
+        'available_bubbles' => $targetBubbles,
+        'target_level' => $targetLevel,
+        'bubbles_in_level' => $bubblesInLevel,
+    ]);
+}
+
 it('forbids the progression upgrade route for users outside the beta allowlist', function () {
     Config::set('features.level_curve_upgrade_user_ids', []);
 
@@ -27,6 +55,8 @@ it('forbids the progression upgrade route for users outside the beta allowlist',
         'progression_version_id' => LevelProgression::activeVersionId(),
         'is_filler' => false,
     ]);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 2,
@@ -58,11 +88,11 @@ it('upgrades a character to the active progression version and stores the chosen
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersionId,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 6,
@@ -70,15 +100,15 @@ it('upgrades a character to the active progression version and stores the chosen
         'allow_outside_range_without_downtime' => true,
     ])->assertRedirect();
 
-    $pseudo = Adventure::query()
+    $latestAnchor = CharacterAuditEvent::query()
         ->where('character_id', $character->id)
-        ->where('is_pseudo', true)
+        ->where('action', 'level.set')
+        ->latest('id')
         ->first();
 
     expect($character->fresh()->progression_version_id)->toBe($newVersion->id)
-        ->and($pseudo)->not->toBeNull()
-        ->and($pseudo?->target_level)->toBe(6)
-        ->and($pseudo?->progression_version_id)->toBe($newVersion->id);
+        ->and($latestAnchor)->not->toBeNull()
+        ->and($latestAnchor?->delta['target_level'] ?? null)->toBe(6);
 });
 
 it('rolls back the version change when the chosen target level is below the new minimum', function () {
@@ -88,8 +118,6 @@ it('rolls back the version change when the chosen target level is below the new 
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersionId,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -98,9 +126,10 @@ it('rolls back the version change when the chosen target level is below the new 
         'character_id' => $character->id,
         'duration' => 5 * 10800,
         'has_additional_bubble' => false,
-        'is_pseudo' => false,
         'start_date' => '2026-01-01',
     ]);
+
+    recordCharacterSnapshot($character);
 
     LevelProgressionVersion::query()->whereKey($originalVersionId)->update(['is_active' => false]);
 
@@ -118,16 +147,18 @@ it('rolls back the version change when the chosen target level is below the new 
 
     LevelProgression::clearCache();
 
+    $anchorsBefore = levelSetCount($character);
+
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 2,
         'bubbles_in_level' => 0,
     ])->assertSessionHasErrors('level');
 
     expect($character->fresh()->progression_version_id)->toBe($originalVersionId)
-        ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0);
+        ->and(levelSetCount($character))->toBe($anchorsBefore);
 });
 
-it('upgrades an adventure-tracked character without creating a pseudo adventure and only spends bubbles from the current level progress', function () {
+it('upgrades an adventure-tracked character without creating a level anchor and only spends bubbles from the current level progress', function () {
     $user = User::factory()->create();
     $previousActiveVersionId = LevelProgression::activeVersionId();
 
@@ -166,9 +197,6 @@ it('upgrades an adventure-tracked character without creating a pseudo adventure 
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => false,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -177,9 +205,10 @@ it('upgrades an adventure-tracked character without creating a pseudo adventure 
         'character_id' => $character->id,
         'duration' => 6 * 10800,
         'has_additional_bubble' => false,
-        'is_pseudo' => false,
         'start_date' => '2026-01-01',
     ]);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 6,
@@ -187,13 +216,13 @@ it('upgrades an adventure-tracked character without creating a pseudo adventure 
     ])->assertRedirect();
 
     $character->refresh();
+    recordCharacterSnapshot($character);
 
     expect($character->progression_version_id)->toBe($newVersion->id)
-        ->and($character->bubble_shop_legacy_spend)->toBe(0)
-        ->and($character->bubble_shop_spend)->toBe(1)
+        ->and(snapshotSpend($character))->toBe(1)
         ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(1)
-        ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0)
-        ->and(LevelProgression::levelFromAvailableBubbles(6 - $character->bubble_shop_spend, $newVersion->id))->toBe(6);
+        ->and(levelSetCount($character))->toBe(0)
+        ->and(LevelProgression::levelFromAvailableBubbles(6 - snapshotSpend($character), $newVersion->id))->toBe(6);
 });
 
 it('supports selecting bubbles within the target level during an adventure-tracking upgrade', function () {
@@ -235,9 +264,6 @@ it('supports selecting bubbles within the target level during an adventure-track
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => false,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -246,9 +272,10 @@ it('supports selecting bubbles within the target level during an adventure-track
         'character_id' => $character->id,
         'duration' => 13 * 10800,
         'has_additional_bubble' => false,
-        'is_pseudo' => false,
         'start_date' => '2026-01-01',
     ]);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 5,
@@ -256,14 +283,14 @@ it('supports selecting bubbles within the target level during an adventure-track
     ])->assertRedirect();
 
     $character->refresh();
+    recordCharacterSnapshot($character);
 
     expect($character->progression_version_id)->toBe($newVersion->id)
-        ->and($character->bubble_shop_legacy_spend)->toBe(0)
-        ->and($character->bubble_shop_spend)->toBe(2)
+        ->and(snapshotSpend($character))->toBe(2)
         ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(2)
-        ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0)
-        ->and(LevelProgression::levelFromAvailableBubbles(13 - $character->bubble_shop_spend, $newVersion->id))->toBe(5)
-        ->and((13 - $character->bubble_shop_spend) - LevelProgression::bubblesRequiredForLevel(5, $newVersion->id))->toBe(1);
+        ->and(levelSetCount($character))->toBe(0)
+        ->and(LevelProgression::levelFromAvailableBubbles(13 - snapshotSpend($character), $newVersion->id))->toBe(5)
+        ->and((13 - snapshotSpend($character)) - LevelProgression::bubblesRequiredForLevel(5, $newVersion->id))->toBe(1);
 });
 
 it('allows an adventure-tracked character to choose between the old displayed level and the newly calculated level', function () {
@@ -328,9 +355,6 @@ it('allows an adventure-tracked character to choose between the old displayed le
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => false,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -339,9 +363,10 @@ it('allows an adventure-tracked character to choose between the old displayed le
         'character_id' => $character->id,
         'duration' => 95 * 10800,
         'has_additional_bubble' => false,
-        'is_pseudo' => false,
         'start_date' => '2026-01-01',
     ]);
+
+    recordCharacterSnapshot($character);
 
     expect(LevelProgression::levelFromAvailableBubbles(95, $originalVersion->id))->toBe(14)
         ->and(LevelProgression::levelFromAvailableBubbles(95, $newVersion->id))->toBe(20);
@@ -352,12 +377,13 @@ it('allows an adventure-tracked character to choose between the old displayed le
     ])->assertRedirect();
 
     $character->refresh();
+    recordCharacterSnapshot($character);
 
     expect($character->progression_version_id)->toBe($newVersion->id)
-        ->and($character->bubble_shop_spend)->toBe(40)
+        ->and(snapshotSpend($character))->toBe(40)
         ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(40)
-        ->and(Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->count())->toBe(0)
-        ->and(LevelProgression::levelFromAvailableBubbles(95 - $character->bubble_shop_spend, $newVersion->id))->toBe(14);
+        ->and(levelSetCount($character))->toBe(0)
+        ->and(LevelProgression::levelFromAvailableBubbles(95 - snapshotSpend($character), $newVersion->id))->toBe(14);
 });
 
 it('credits downtime automatically for a manual-tracked character within the current-to-recalculated range', function () {
@@ -422,24 +448,13 @@ it('credits downtime automatically for a manual-tracked character within the cur
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
 
-    Adventure::forceCreate([
-        'character_id' => $character->id,
-        'title' => 'Pseudo level',
-        'duration' => 0,
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-        'target_level' => 14,
-        'target_bubbles' => 91,
-        'progression_version_id' => $originalVersion->id,
-        'start_date' => '2026-01-01',
-    ]);
+    anchorLevel($character, $originalVersion->id, 14, 91);
+
+    recordCharacterSnapshot($character);
 
     expect(LevelProgression::levelFromAvailableBubbles(91, $originalVersion->id))->toBe(14)
         ->and(LevelProgression::levelFromAvailableBubbles(91, $newVersion->id))->toBe(20);
@@ -450,13 +465,17 @@ it('credits downtime automatically for a manual-tracked character within the cur
     ])->assertRedirect();
 
     $character->refresh();
-    $pseudo = Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->first();
+    recordCharacterSnapshot($character);
+    $latestAnchor = CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->where('action', 'level.set')
+        ->latest('id')
+        ->first();
 
     expect($character->progression_version_id)->toBe($newVersion->id)
-        ->and($character->bubble_shop_spend)->toBe(36)
+        ->and(snapshotSpend($character))->toBe(36)
         ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(36)
-        ->and($pseudo?->target_level)->toBe(14)
-        ->and($pseudo?->progression_version_id)->toBe($newVersion->id);
+        ->and($latestAnchor?->delta['target_level'] ?? null)->toBe(14);
 });
 
 it('allows a manual-tracked character to choose the current visible level during a curve upgrade and credits downtime automatically', function () {
@@ -519,24 +538,13 @@ it('allows a manual-tracked character to choose the current visible level during
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
 
-    Adventure::forceCreate([
-        'character_id' => $character->id,
-        'title' => 'Pseudo level',
-        'duration' => 0,
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-        'target_level' => 7,
-        'target_bubbles' => 27,
-        'progression_version_id' => $originalVersion->id,
-        'start_date' => '2026-01-01',
-    ]);
+    anchorLevel($character, $originalVersion->id, 7, 27);
+
+    recordCharacterSnapshot($character);
 
     expect(LevelProgression::levelFromAvailableBubbles(27, $originalVersion->id))->toBe(7)
         ->and(27 - LevelProgression::bubblesRequiredForLevel(7, $originalVersion->id))->toBe(6)
@@ -549,13 +557,17 @@ it('allows a manual-tracked character to choose the current visible level during
     ])->assertRedirect();
 
     $character->refresh();
-    $pseudo = Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->first();
+    recordCharacterSnapshot($character);
+    $latestAnchor = CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->where('action', 'level.set')
+        ->latest('id')
+        ->first();
 
     expect($character->progression_version_id)->toBe($newVersion->id)
-        ->and($character->bubble_shop_spend)->toBe(7)
+        ->and(snapshotSpend($character))->toBe(7)
         ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->value('quantity'))->toBe(7)
-        ->and($pseudo?->target_level)->toBe(7)
-        ->and($pseudo?->progression_version_id)->toBe($newVersion->id);
+        ->and($latestAnchor?->delta['target_level'] ?? null)->toBe(7);
 });
 
 it('allows a manual-tracked character to choose outside the automatic range without downtime credit', function () {
@@ -618,24 +630,13 @@ it('allows a manual-tracked character to choose outside the automatic range with
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-        'bubble_shop_legacy_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
 
-    Adventure::forceCreate([
-        'character_id' => $character->id,
-        'title' => 'Pseudo level',
-        'duration' => 0,
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-        'target_level' => 14,
-        'target_bubbles' => 91,
-        'progression_version_id' => $originalVersion->id,
-        'start_date' => '2026-01-01',
-    ]);
+    anchorLevel($character, $originalVersion->id, 14, 91);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 10,
@@ -644,13 +645,17 @@ it('allows a manual-tracked character to choose outside the automatic range with
     ])->assertRedirect();
 
     $character->refresh();
-    $pseudo = Adventure::query()->where('character_id', $character->id)->where('is_pseudo', true)->first();
+    recordCharacterSnapshot($character);
+    $latestAnchor = CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->where('action', 'level.set')
+        ->latest('id')
+        ->first();
 
     expect($character->progression_version_id)->toBe($newVersion->id)
-        ->and($character->bubble_shop_spend)->toBe(0)
+        ->and(snapshotSpend($character))->toBe(0)
         ->and($character->bubbleShopPurchases()->where('type', CharacterBubbleShop::TYPE_DOWNTIME)->count())->toBe(0)
-        ->and($pseudo?->target_level)->toBe(10)
-        ->and($pseudo?->progression_version_id)->toBe($newVersion->id);
+        ->and($latestAnchor?->delta['target_level'] ?? null)->toBe(10);
 });
 
 it('does not allow an adventure-tracked character to switch below the current displayed level on the new curve', function () {
@@ -692,8 +697,6 @@ it('does not allow an adventure-tracked character to switch below the current di
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => false,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
@@ -702,17 +705,21 @@ it('does not allow an adventure-tracked character to switch below the current di
         'character_id' => $character->id,
         'duration' => 65 * 10800,
         'has_additional_bubble' => false,
-        'is_pseudo' => false,
         'start_date' => '2026-01-01',
     ]);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 13,
         'bubbles_in_level' => 0,
     ])->assertSessionHasErrors('level');
 
-    expect($character->fresh()->progression_version_id)->toBe($originalVersion->id)
-        ->and($character->fresh()->bubble_shop_spend)->toBe(0);
+    $character->refresh();
+    recordCharacterSnapshot($character);
+
+    expect($character->progression_version_id)->toBe($originalVersion->id)
+        ->and(snapshotSpend($character))->toBe(0);
 });
 
 it('does not allow a pseudo-tracked character to switch above the recalculated level on the new curve', function () {
@@ -754,23 +761,13 @@ it('does not allow a pseudo-tracked character to switch above the recalculated l
     $character = Character::factory()->for($user)->create([
         'simplified_tracking' => true,
         'progression_version_id' => $originalVersion->id,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
         'start_tier' => 'bt',
         'is_filler' => false,
     ]);
 
-    Adventure::forceCreate([
-        'character_id' => $character->id,
-        'title' => 'Pseudo level',
-        'duration' => 0,
-        'has_additional_bubble' => false,
-        'is_pseudo' => true,
-        'target_level' => 5,
-        'target_bubbles' => 4,
-        'progression_version_id' => $originalVersion->id,
-        'start_date' => '2026-01-01',
-    ]);
+    anchorLevel($character, $originalVersion->id, 5, 4);
+
+    recordCharacterSnapshot($character);
 
     $this->actingAs($user)->post(route('characters.upgrade-progression', $character), [
         'level' => 5,

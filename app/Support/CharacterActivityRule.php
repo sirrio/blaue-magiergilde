@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -13,9 +12,7 @@ class CharacterActivityRule
 
     private const EXEMPT_HIGH_TIER_CHARACTERS = 2;
 
-    private const MIN_BUBBLE_DURATION = 10800;
-
-    public function __construct(private CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+    public function __construct(private CharacterProgressionSnapshotResolver $progressionSnapshots = new CharacterProgressionSnapshotResolver) {}
 
     public function blocksSubmission(Character $character): bool
     {
@@ -97,7 +94,7 @@ class CharacterActivityRule
             ->whereNull('deleted_at')
             ->whereIn('guild_status', ['approved', 'pending'])
             ->when($excludeCharacterId !== null, fn ($query) => $query->whereKeyNot($excludeCharacterId))
-            ->with('adventures')
+            ->with('latestAuditSnapshot')
             ->get()
             ->filter(fn (Character $character): bool => $this->countsAsActiveCharacter($character))
             ->values();
@@ -148,97 +145,6 @@ class CharacterActivityRule
 
     private function calculateTier(Character $character): string
     {
-        return match ($this->calculateLevel($character)) {
-            1, 2, 3, 4 => 'bt',
-            5, 6, 7, 8, 9, 10 => 'lt',
-            11, 12, 13, 14, 15, 16 => 'ht',
-            17, 18, 19, 20 => 'et',
-            default => 'error',
-        };
-    }
-
-    private function calculateLevel(Character $character): int
-    {
-        if ($character->is_filler) {
-            return 3;
-        }
-
-        $progressionVersionId = $this->progressionState->progressionVersionId($character);
-        $bubbles = $this->calculateBubbles($character);
-        // Pseudo-adventures encode the level directly via target_level — start_tier
-        // is already accounted for in that stored value and must not be added again.
-        $additionalBubbles = $this->progressionState->hasPseudoAdventures($character)
-            ? 0
-            : $this->additionalBubblesForStartTier($character->start_tier);
-        $bubbleShopSpend = $this->progressionState->bubbleShopSpendForProgression($character);
-        $availableBubbles = max(0, $bubbles + $additionalBubbles - $bubbleShopSpend);
-
-        return LevelProgression::levelFromAvailableBubbles($availableBubbles, $progressionVersionId);
-    }
-
-    private function calculateBubbles(Character $character): int
-    {
-        return $this->progressionState->dmBubblesForProgression($character) + $this->calculateAdventureBubbles($character);
-    }
-
-    private function calculateAdventureBubbles(Character $character): int
-    {
-        $adventures = $this->adventures($character)
-            ->sortBy([['start_date', 'asc'], ['id', 'asc']])
-            ->values();
-
-        $lastPseudoIndex = $adventures->reverse()->search(
-            fn (Adventure $a): bool => (bool) $a->is_pseudo,
-        );
-
-        if ($lastPseudoIndex === false) {
-            return $adventures->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);
-        }
-
-        $lastPseudo = $adventures->get($lastPseudoIndex);
-        $progressionVersionId = is_numeric($lastPseudo?->progression_version_id) && (int) $lastPseudo->progression_version_id > 0
-            ? (int) $lastPseudo->progression_version_id
-            : $this->progressionState->progressionVersionId($character);
-        // Use the exact bubble count stored at pseudo-creation time when available
-        // (target_bubbles preserves fractional progress within a level).  Fall back
-        // to the level-floor for rows that pre-date the target_bubbles column.
-        $pseudoBubbles = $lastPseudo->target_bubbles !== null
-            ? $this->safeInt($lastPseudo->target_bubbles)
-            : LevelProgression::bubblesRequiredForLevel(max(1, min(20, $this->safeInt($lastPseudo->target_level, 1))), $progressionVersionId);
-        $realBubblesAfter = $adventures->slice($lastPseudoIndex + 1)
-            ->filter(fn (Adventure $a): bool => ! $a->is_pseudo)
-            ->reduce(fn (int $sum, Adventure $a): int => $sum + $this->realBubblesFor($a), 0);
-
-        return $pseudoBubbles + $realBubblesAfter;
-    }
-
-    private function realBubblesFor(Adventure $adventure): int
-    {
-        $duration = $this->safeInt($adventure->duration);
-
-        return (int) floor($duration / self::MIN_BUBBLE_DURATION) + ($adventure->has_additional_bubble ? 1 : 0);
-    }
-
-    private function adventures(Character $character): Collection
-    {
-        if ($character->relationLoaded('adventures')) {
-            return $character->adventures;
-        }
-
-        return $character->adventures()->get();
-    }
-
-    private function additionalBubblesForStartTier(?string $startTier): int
-    {
-        return match (strtolower((string) $startTier)) {
-            'lt' => 10,
-            'ht' => 55,
-            default => 0,
-        };
-    }
-
-    private function safeInt(mixed $value): int
-    {
-        return is_numeric($value) ? (int) $value : 0;
+        return strtolower((string) $this->progressionSnapshots->snapshot($character)['tier']);
     }
 }

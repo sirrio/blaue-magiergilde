@@ -23,8 +23,8 @@ it('does not include unused games prop on characters index', function () {
 
 it('returns a slimmed guild character payload on characters index', function () {
     $user = User::factory()->create();
-    Character::factory()->for($user)->create(['guild_status' => 'draft']);
-    $guildCharacter = Character::factory()->create(['guild_status' => 'approved']);
+    recordCharacterSnapshot(Character::factory()->for($user)->create(['guild_status' => 'draft']));
+    $guildCharacter = recordCharacterSnapshot(Character::factory()->create(['guild_status' => 'approved']));
 
     $response = $this->actingAs($user)
         ->get(route('characters.index'))
@@ -52,6 +52,7 @@ it('includes reviewed by name for reviewed characters on characters index', func
         ->create([
             'guild_status' => 'approved',
         ]);
+    recordCharacterSnapshot($character);
 
     AdminAuditLog::query()->create([
         'actor_user_id' => $reviewer->id,
@@ -90,6 +91,8 @@ it('hides private linked character avatars from other users in characters index 
         'avatar' => 'avatars/public.png',
         'guild_status' => 'approved',
     ]);
+    collect([$viewerCharacter, $privateCharacter, $publicCharacter])
+        ->each(fn (Character $character): Character => recordCharacterSnapshot($character));
 
     Ally::factory()->create([
         'character_id' => $viewerCharacter->id,
@@ -128,6 +131,7 @@ it('includes adventure ally ids on characters index payload', function () {
     ]);
     $adventure = Adventure::factory()->for($character)->create();
     $adventure->allies()->sync([$ally->id]);
+    recordCharacterSnapshot($character);
 
     $response = $this->actingAs($user)
         ->get(route('characters.index'))

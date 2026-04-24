@@ -6,7 +6,9 @@ use App\Actions\Character\SetQuickLevel;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Character\UpdateCharacterBubbleShopRequest;
 use App\Models\Character;
+use App\Support\CharacterAuditTrail;
 use App\Support\CharacterBubbleShop;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\CharacterProgressionState;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -17,12 +19,14 @@ class CharacterBubbleShopController extends Controller
     public function __construct(
         private SetQuickLevel $setQuickLevel,
         private CharacterProgressionState $progressionState = new CharacterProgressionState,
+        private CharacterProgressionSnapshotResolver $progressionSnapshots = new CharacterProgressionSnapshotResolver,
     ) {}
 
     public function __invoke(
         UpdateCharacterBubbleShopRequest $request,
         Character $character,
         CharacterBubbleShop $bubbleShop,
+        CharacterAuditTrail $auditTrail,
     ): RedirectResponse {
         $requestedQuantities = [];
         foreach (CharacterBubbleShop::purchaseTypes() as $type) {
@@ -31,13 +35,20 @@ class CharacterBubbleShopController extends Controller
 
         $currentQuantities = $bubbleShop->quantitiesFor($character);
         $shouldCreateAnchor = (bool) $character->simplified_tracking
-            && ! $this->progressionState->hasPseudoAdventures($character)
+            && ! $this->progressionState->hasLevelAnchor($character)
             && ! $character->is_filler
             && $requestedQuantities !== $currentQuantities;
-        $currentLevel = $shouldCreateAnchor ? $this->progressionState->currentLevel($character) : null;
-        $currentBubblesInLevel = $shouldCreateAnchor ? $this->progressionState->bubblesInCurrentLevel($character) : 0;
+        $currentSnapshot = $shouldCreateAnchor ? $this->progressionSnapshots->snapshot($character) : null;
+        $currentLevel = $currentSnapshot !== null ? (int) $currentSnapshot['level'] : null;
+        $currentBubblesInLevel = $currentSnapshot !== null ? (int) $currentSnapshot['bubbles_in_level'] : 0;
 
-        DB::transaction(function () use ($request, $character, $bubbleShop, $shouldCreateAnchor, $currentLevel, $currentBubblesInLevel): void {
+        $previousBubbleShopSpend = $bubbleShop->structuredSpend($character);
+        $previousDowntimeSeconds = $bubbleShop->extraDowntimeSeconds($character);
+
+        $newBubbleShopSpend = $previousBubbleShopSpend;
+        $newDowntimeSeconds = $previousDowntimeSeconds;
+
+        DB::transaction(function () use ($request, $character, $bubbleShop, $shouldCreateAnchor, $currentLevel, $currentBubblesInLevel, &$newBubbleShopSpend, &$newDowntimeSeconds): void {
             if ($shouldCreateAnchor && $currentLevel !== null) {
                 $result = $this->setQuickLevel->handle(
                     $character->fresh(),
@@ -67,9 +78,18 @@ class CharacterBubbleShopController extends Controller
             }
 
             $character->load('bubbleShopPurchases');
-            $bubbleShop->syncEffectiveSpend($character);
-            $character->save();
+            $newBubbleShopSpend = $bubbleShop->structuredSpend($character);
+            $newDowntimeSeconds = $bubbleShop->extraDowntimeSeconds($character);
         });
+        $auditTrail->record($character, 'bubble_shop.updated', delta: [
+            'bubble_shop_spend' => $newBubbleShopSpend - $previousBubbleShopSpend,
+            'bubbles' => $previousBubbleShopSpend - $newBubbleShopSpend,
+            'downtime_seconds' => $newDowntimeSeconds - $previousDowntimeSeconds,
+        ], metadata: [
+            'previous_quantities' => $currentQuantities,
+            'new_quantities' => $requestedQuantities,
+            'created_level_anchor' => $shouldCreateAnchor,
+        ]);
 
         return back();
     }

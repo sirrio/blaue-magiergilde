@@ -7,12 +7,17 @@ use App\Http\Requests\Game\StoreGameRequest;
 use App\Http\Requests\Game\UpdateGameRequest;
 use App\Models\Character;
 use App\Models\Game;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\CharacterTrackingHistory;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class GameController extends Controller
 {
+    public function __construct(
+        private readonly CharacterProgressionSnapshotResolver $progressionSnapshots,
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -25,12 +30,14 @@ class GameController extends Controller
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->with(['adventures' => fn ($q) => $q
                 ->withTrashed()
-                ->select(['id', 'character_id', 'duration', 'has_additional_bubble', 'deleted_at', 'deleted_by_character'])])
+                ->select(['id', 'character_id', 'duration', 'has_additional_bubble', 'start_date', 'deleted_at', 'deleted_by_character'])])
+            ->with('latestAuditSnapshot')
             ->withTrashed()
             ->orderBy('position')
-            ->get(['id', 'is_filler', 'dm_bubbles', 'dm_coins', 'deleted_at'])
+            ->get(['id', 'is_filler', 'progression_version_id', 'deleted_at'])
             ->withoutAppends()
             ->each(fn (Character $character) => $history->filterTrackedRelations($character));
+        $this->progressionSnapshots->attach($characters);
         $games = Game::query()
             ->where('user_id', Auth::user()->getAuthIdentifier())
             ->orderby('start_date', 'desc')

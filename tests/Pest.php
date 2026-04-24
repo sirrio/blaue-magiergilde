@@ -41,7 +41,9 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function recordCharacterSnapshot(\App\Models\Character $character, string $action = 'test.snapshot'): \App\Models\Character
 {
-    // ..
+    app(\App\Support\CharacterAuditTrail::class)->record($character, $action, metadata: ['hidden_from_history' => true]);
+
+    return $character->fresh('latestAuditSnapshot');
 }

@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\Downtime;
+use App\Support\CharacterAuditTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 
 class RestoreDeletedCharacterController extends Controller
 {
-    public function __invoke(Character $character): RedirectResponse
+    public function __invoke(Character $character, CharacterAuditTrail $auditTrail): RedirectResponse
     {
         $userId = Auth::user()?->getAuthIdentifier();
         if (! $userId || $character->user_id !== $userId) {
@@ -35,6 +36,7 @@ class RestoreDeletedCharacterController extends Controller
                 $downtime->save();
             });
         $character->restore();
+        $auditTrail->record($character, 'character.restored');
 
         return to_route('characters.index');
     }

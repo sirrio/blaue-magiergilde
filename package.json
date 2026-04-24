@@ -4,6 +4,7 @@
   "scripts": {
     "build": "vite build",
     "build:ssr": "vite build && vite build --ssr",
+    "db:restore-prod-backup": "powershell -ExecutionPolicy Bypass -File tools/restore-db-from-backup.ps1",
     "dev": "vite",
     "dev:queue": "php artisan queue:work --tries=1",
     "dev:schedule": "php artisan schedule:work",

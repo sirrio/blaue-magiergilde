@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Character;
+use App\Models\CharacterAuditEvent;
 use App\Models\User;
 use App\Services\CharacterApprovalNotificationService;
 use Illuminate\Support\Facades\Config;
@@ -55,6 +56,19 @@ it('accepts character approval actions from the discord bot', function () {
     $character->refresh();
     expect($character->guild_status)->toBe('approved');
 
+    $auditEvent = CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->where('action', 'character.guild_status_updated')
+        ->first();
+
+    expect($auditEvent)->not->toBeNull()
+        ->and($auditEvent?->actor_user_id)->toBe($admin->id)
+        ->and($auditEvent?->metadata)->toMatchArray([
+            'field' => 'guild_status',
+            'via' => 'discord-bot',
+        ])
+        ->and($auditEvent?->state_after['guild_status'] ?? null)->toBe('approved');
+
     $notificationService->shouldHaveReceived('syncAnnouncement')->once();
     $notificationService->shouldHaveReceived('notifyStatusChange')->once();
 });
@@ -99,6 +113,18 @@ it('accepts needs changes status from the discord bot', function () {
     $character->refresh();
     expect($character->guild_status)->toBe('needs_changes')
         ->and($character->review_note)->toBe('Please update your external link and notes.');
+
+    $events = CharacterAuditEvent::query()
+        ->where('character_id', $character->id)
+        ->whereIn('action', ['character.guild_status_updated', 'character.review_note_updated'])
+        ->orderBy('id')
+        ->get();
+
+    expect($events->pluck('action')->all())->toBe([
+        'character.guild_status_updated',
+        'character.review_note_updated',
+    ])
+        ->and($events->last()?->state_after['review_note'] ?? null)->toBe('Please update your external link and notes.');
 
     $notificationService->shouldHaveReceived('syncAnnouncement')->once();
     $notificationService->shouldHaveReceived('notifyStatusChange')->once();

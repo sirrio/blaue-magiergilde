@@ -6,12 +6,16 @@ use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\DiscordBotSetting;
 use App\Support\BotRequestFailure;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\CharacterProgressionState;
 use Illuminate\Support\Facades\Http;
 
 class CharacterRetirementNotificationService
 {
-    public function __construct(private readonly CharacterProgressionState $progressionState = new CharacterProgressionState) {}
+    public function __construct(
+        private readonly CharacterProgressionState $progressionState = new CharacterProgressionState,
+        private readonly CharacterProgressionSnapshotResolver $progressionSnapshots = new CharacterProgressionSnapshotResolver,
+    ) {}
 
     /**
      * @param  array{previous_status?: string|null}  $context
@@ -23,7 +27,8 @@ class CharacterRetirementNotificationService
 
         $settings = DiscordBotSetting::current();
         $channelId = trim((string) ($settings->character_retirement_channel_id ?? ''));
-        $currentLevel = $this->progressionState->currentLevel($character);
+        $progressionState = $this->progressionSnapshots->snapshot($character);
+        $currentLevel = (int) $progressionState['level'];
 
         if ($channelId === '') {
             return [
@@ -40,7 +45,7 @@ class CharacterRetirementNotificationService
             'character_status' => $character->guild_status,
             'previous_status' => isset($context['previous_status']) ? trim((string) $context['previous_status']) : null,
             'character_level' => $currentLevel,
-            'character_tier' => $this->tierForLevel($currentLevel),
+            'character_tier' => strtoupper((string) $progressionState['tier']),
             'character_version' => $character->version,
             'character_faction' => $character->faction,
             'character_played_adventures' => $this->playedAdventureCount($character),
@@ -104,18 +109,8 @@ class CharacterRetirementNotificationService
         }
 
         return $character->adventures
-            ->filter(fn (Adventure $adventure): bool => ! $adventure->trashed() && ! (bool) $adventure->is_pseudo)
+            ->filter(fn (Adventure $adventure): bool => ! $adventure->trashed())
             ->count();
-    }
-
-    private function tierForLevel(int $level): string
-    {
-        return match (true) {
-            $level >= 17 => 'ET',
-            $level >= 11 => 'HT',
-            $level >= 5 => 'LT',
-            default => 'BT',
-        };
     }
 
     /**

@@ -25,8 +25,6 @@ const UpdateCharacterModal = ({
     class: character.character_classes.map((cc) => cc.id),
     faction: character.faction,
     version: character.version,
-    dm_bubbles: character.dm_bubbles,
-    dm_coins: character.dm_coins,
     notes: character.notes,
     external_link: character.external_link,
     is_filler: character.is_filler,
@@ -121,18 +119,6 @@ const UpdateCharacterModal = ({
             </div>
           ) : (
             <div className="space-y-3">
-              {!character.is_filler && (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input errors={errors.dm_bubbles} type="number" min={0} max={1024} value={data.dm_bubbles} onChange={(e) => setData('dm_bubbles', Number(e.target.value))}>
-                      {t('characters.dmBubbles')}
-                    </Input>
-                    <Input errors={errors.dm_coins} type="number" min={0} max={1024} value={data.dm_coins} onChange={(e) => setData('dm_coins', Number(e.target.value))}>
-                      {t('characters.dmCoins')}
-                    </Input>
-                  </div>
-                </>
-              )}
               <TextArea placeholder="Notes" errors={errors.notes} value={data.notes ?? ''} onChange={(e) => setData('notes', e.target.value)}>
                 {t('characters.notesLabel')}
               </TextArea>

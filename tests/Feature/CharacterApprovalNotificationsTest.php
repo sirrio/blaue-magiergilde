@@ -25,6 +25,7 @@ it('sends a discord DM when a character is approved', function () {
     ]);
     $owner = User::factory()->create(['discord_id' => '1234567890']);
     $character = Character::factory()->for($owner)->create(['guild_status' => 'pending']);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($admin)->patch(route('admin.character-approvals.update', $character), [
         'guild_status' => 'approved',
@@ -53,6 +54,7 @@ it('includes review note when notifying about needs changes', function () {
     ]);
     $owner = User::factory()->create(['discord_id' => '1234567890']);
     $character = Character::factory()->for($owner)->create(['guild_status' => 'pending']);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($admin)->patch(route('admin.character-approvals.update', $character), [
         'guild_status' => 'needs_changes',
@@ -139,6 +141,7 @@ it('posts a discord announcement when an existing draft character is submitted f
         'guild_status' => 'draft',
     ]);
     $character->characterClasses()->sync([$characterClass->id]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -174,6 +177,7 @@ it('does not send dashboard URLs as external link in approval announcements', fu
         'guild_status' => 'draft',
         'external_link' => 'https://blaue-magiergilde.test/characters',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -202,6 +206,7 @@ it('removes the discord announcement when a character is deleted', function () {
         'approval_discord_channel_id' => '9876543210',
         'approval_discord_message_id' => '1234567890',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)->delete(route('characters.destroy', $character))->assertRedirect();
 

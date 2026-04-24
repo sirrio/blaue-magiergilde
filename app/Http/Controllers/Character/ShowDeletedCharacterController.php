@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Character;
 use App\Http\Controllers\Controller;
 use App\Models\Character;
 use App\Support\CharacterAvatarPrivacy;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\CharacterTrackingHistory;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -12,7 +13,10 @@ use Inertia\Response;
 
 class ShowDeletedCharacterController extends Controller
 {
-    public function __construct(private readonly CharacterAvatarPrivacy $characterAvatarPrivacy) {}
+    public function __construct(
+        private readonly CharacterAvatarPrivacy $characterAvatarPrivacy,
+        private readonly CharacterProgressionSnapshotResolver $progressionSnapshots,
+    ) {}
 
     public function __invoke(Character $character): Response
     {
@@ -26,8 +30,10 @@ class ShowDeletedCharacterController extends Controller
             'allies.linkedCharacter',
             'adventures' => fn ($query) => $query->withTrashed()->with('allies.linkedCharacter'),
             'downtimes' => fn ($query) => $query->withTrashed(),
+            'auditEvents.actor:id,name',
         ]);
         $history->filterTrackedRelations($character);
+        $this->progressionSnapshots->attach($character);
         $this->characterAvatarPrivacy->maskLinkedCharacterAvatars($character, Auth::id());
 
         return Inertia::render('character/show', [

@@ -14,7 +14,6 @@ import { calculateLevel } from '@/helper/calculateLevel'
 import { calculateRemainingDowntime } from '@/helper/calculateRemainingDowntime'
 import { calculateTier } from '@/helper/calculateTier'
 import { calculateTotalBubblesToNextLevel } from '@/helper/calculateTotalBubblesToNextLevel'
-import { bubblesRequiredForLevel } from '@/helper/levelProgression'
 import { secondsToHourMinuteString } from '@/helper/secondsToHourMinuteString'
 import { countsBubbleAdjustmentsForProgression, usesManualLevelTracking } from '@/helper/usesManualLevelTracking'
 import AppLayout from '@/layouts/app-layout'
@@ -22,6 +21,7 @@ import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { AlliesModal } from '@/pages/character/allies-modal'
 import BubbleShopModal from '@/pages/character/bubble-shop-modal'
+import CharacterAuditHistoryModal from '@/pages/character/character-audit-history-modal'
 import CharacterManualOverrideModal from '@/pages/character/character-manual-override-modal'
 import SetCharacterLevelModal from '@/pages/character/set-character-level-modal'
 import StoreAdventureModal from '@/pages/character/store-adventure-modal'
@@ -203,21 +203,6 @@ export default function Show({
     })
   }, [character.adventures, adventureSortDir])
 
-  const supersededAdventureIds = useMemo(() => {
-    const chronological = [...character.adventures].sort((a, b) => {
-      const aDate = new Date(a.start_date).getTime()
-      const bDate = new Date(b.start_date).getTime()
-      return aDate !== bDate ? aDate - bDate : a.id - b.id
-    })
-    const lastPseudoIdx = chronological.reduceRight((found, adv, i) => (found === -1 && adv.is_pseudo ? i : found), -1)
-    if (lastPseudoIdx === -1) return new Set<number>()
-    return new Set(
-      chronological
-        .slice(0, lastPseudoIdx)
-        .filter((a) => !a.is_pseudo)
-        .map((a) => a.id),
-    )
-  }, [character.adventures])
 
   const sortedDowntimes = useMemo(() => {
     const direction = downtimeSortDir === 'desc' ? -1 : 1
@@ -315,7 +300,7 @@ export default function Show({
   }
 
   const adventureTotalDuration = useMemo(
-    () => character.adventures.filter((adv) => !adv.is_pseudo).reduce((total, adv) => total + adv.duration, 0),
+    () => character.adventures.reduce((total, adv) => total + adv.duration, 0),
     [character.adventures],
   )
   const downtimeTotalDuration = useMemo(() => character.downtimes.reduce((total, dt) => total + dt.duration, 0), [character.downtimes])
@@ -325,8 +310,7 @@ export default function Show({
   const remainingDowntimeDuration = useMemo(() => Math.max(0, calculateRemainingDowntime(character)), [character])
   const totalDowntimeDuration = downtimeTotalDuration + remainingDowntimeDuration
   const usesManualDerivedValues = usesManualLevelTracking(character)
-  const pseudoAdventureCount = useMemo(() => character.adventures.filter((adventure) => Boolean(adventure.is_pseudo)).length, [character.adventures])
-  const realAdventureCount = character.adventures.length - pseudoAdventureCount
+  const realAdventureCount = character.adventures.length
   const manualAdventuresCount = character.manual_adventures_count ?? null
   const manualFactionRank = character.manual_faction_rank ?? null
   const totalDowntimeDisplay = secondsToHourMinuteString(totalDowntimeDuration)
@@ -391,6 +375,14 @@ export default function Show({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-bold sm:text-2xl">{t('characters.detailsHeading', { name: character.name })}</h1>
             <div className="flex flex-wrap items-center gap-2">
+              {!character.is_filler ? (
+                <CharacterAuditHistoryModal
+                  character={character}
+                  triggerClassName="shrink-0 gap-1 px-2 sm:px-3"
+                  showLabel
+                  labelClassName="hidden sm:inline"
+                />
+              ) : null}
               {!isReadOnly && !character.is_filler ? (
                 <BubbleShopModal character={character} triggerClassName="shrink-0 gap-1 px-2 sm:px-3" showLabel labelClassName="hidden sm:inline" />
               ) : null}
@@ -460,8 +452,8 @@ export default function Show({
               <InfoBoxTitle>
                 <Swords size={15} /> {t('characters.adventures')}
                 {!bubbleAdjustmentsCount ? (
-                  <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom">
-                    <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.bubbleShopNotCountedHint')}>
+                  <Tooltip content={t('characters.bubbleShopNotCountedHint')} placement="bottom" wrapperClassName="ml-auto inline-flex shrink-0">
+                    <span className="cursor-help text-warning/70" aria-label={t('characters.bubbleShopNotCountedHint')}>
                       <AlertTriangle size={11} />
                     </span>
                   </Tooltip>
@@ -496,7 +488,7 @@ export default function Show({
               </InfoBoxLine>
               {!character.is_filler && (
                 <InfoBoxLine>
-                  {t('characters.bubbleShop')}: {character.bubble_shop_spend}
+                  {t('characters.bubbleShop')}: {Number(character.progression_state?.bubble_shop_spend ?? 0)}
                   <Droplets size={13} />
                 </InfoBoxLine>
               )}
@@ -549,19 +541,19 @@ export default function Show({
                 <InfoBoxTitle>
                   <Crown size={15} /> {t('characters.gameMaster')}
                   {!bubbleAdjustmentsCount ? (
-                    <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom">
-                      <span className="text-warning/70 ml-auto cursor-help" aria-label={t('characters.gmBubblesNotCountedHint')}>
+                    <Tooltip content={t('characters.gmBubblesNotCountedHint')} placement="bottom" wrapperClassName="ml-auto inline-flex shrink-0">
+                      <span className="cursor-help text-warning/70" aria-label={t('characters.gmBubblesNotCountedHint')}>
                         <AlertTriangle size={11} />
                       </span>
                     </Tooltip>
                   ) : null}
                 </InfoBoxTitle>
                 <InfoBoxLine>
-                  {t('characters.bubbles')}: {character.dm_bubbles}
+                  {t('characters.bubbles')}: {Number(character.progression_state?.dm_bubbles ?? 0)}
                   <Droplets size={13} />
                 </InfoBoxLine>
                 <InfoBoxLine>
-                  {t('characters.coins')}: {character.dm_coins}
+                  {t('characters.coins')}: {Number(character.progression_state?.dm_coins ?? 0)}
                   <Coins size={13} />
                 </InfoBoxLine>
               </InfoBox>
@@ -650,30 +642,9 @@ export default function Show({
                         const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                         const gameMasterName = adv.game_master?.trim() || '-'
                         const adventureTitle = adv.title || 'Adventure'
-                        const pseudoBubblesInLevel =
-                          adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
-                            ? adv.target_bubbles -
-                              bubblesRequiredForLevel(adv.target_level, adv.progression_version_id ?? character.progression_version_id)
-                            : 0
-                        const pseudoAnchorLabel =
-                          adv.is_pseudo && adv.target_level ? (
-                            <>
-                              {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
-                              {pseudoBubblesInLevel > 0 && (
-                                <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">
-                                  (+{pseudoBubblesInLevel} <Droplets size={11} />)
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            t('characters.levelTrackingAnchor')
-                          )
-                        const isSuperseded = supersededAdventureIds.has(adv.id)
                         return (
                           <ListRow key={adv.id} className="block">
-                            <div
-                              className={`rounded-box bg-base-100 space-y-3 border p-3.5 ${isSuperseded ? 'border-base-200 opacity-50' : 'border-base-200'}`}
-                            >
+                            <div className="rounded-box bg-base-100 space-y-3 border border-base-200 p-3.5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex min-w-0 items-center gap-1">
@@ -697,7 +668,6 @@ export default function Show({
                                     </p>
                                   ) : null}
                                   <p className="text-base-content/50 text-xs">DM: {gameMasterName}</p>
-                                  {isSuperseded && <p className="text-base-content/40 mt-0.5 text-xs italic">{t('characters.supersededByPseudo')}</p>}
                                 </div>
                                 <span className="badge badge-ghost badge-sm shrink-0 font-normal">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
@@ -705,12 +675,10 @@ export default function Show({
                               </div>
                               <div className="border-base-200 flex items-center justify-between gap-2 border-t pt-2">
                                 <span className="badge badge-ghost badge-sm font-medium">
-                                  {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
+                                  {secondsToHourMinuteString(adv.duration)}
                                 </span>
                                 <div className="flex items-center gap-2">
-                                  {adv.is_pseudo ? (
-                                    <span className="text-base-content/50 text-xs">{t('characters.auto')}</span>
-                                  ) : !isReadOnly ? (
+                                  {!isReadOnly ? (
                                     <>
                                       <UpdateAdventureModal
                                         adventure={adv}
@@ -771,29 +739,10 @@ export default function Show({
                             const participantSummary = adventureParticipantMap.get(adv.id) ?? ''
                             const gameMasterName = adv.game_master?.trim() || '-'
                             const adventureTitle = adv.title || 'Adventure'
-                            const pseudoBubblesInLevel =
-                              adv.is_pseudo && adv.target_bubbles != null && adv.target_level != null
-                                ? adv.target_bubbles -
-                                  bubblesRequiredForLevel(adv.target_level, adv.progression_version_id ?? character.progression_version_id)
-                                : 0
-                            const pseudoAnchorLabel =
-                              adv.is_pseudo && adv.target_level ? (
-                                <>
-                                  {t('characters.levelTrackingAnchorWithLevel', { level: adv.target_level })}
-                                  {pseudoBubblesInLevel > 0 && (
-                                    <span className="ml-1 inline-flex items-center gap-0.5 opacity-60">
-                                      (+{pseudoBubblesInLevel} <Droplets size={11} />)
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                t('characters.levelTrackingAnchor')
-                              )
-                            const isSuperseded = supersededAdventureIds.has(adv.id)
                             return (
                               <ListRow
                                 key={adv.id}
-                                className={`grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4 ${isSuperseded ? 'opacity-50' : ''}`}
+                                className="grid w-full grid-cols-[minmax(0,1fr)_96px_110px_92px] !items-start gap-4"
                               >
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -820,19 +769,16 @@ export default function Show({
                                         {t('characters.playedWith')}: {participantSummary}
                                       </span>
                                     ) : null}
-                                    {isSuperseded && <span className="text-base-content/40 italic">{t('characters.supersededByPseudo')}</span>}
                                   </div>
                                 </div>
                                 <p className="self-center text-right text-xs font-medium">
-                                  {adv.is_pseudo ? pseudoAnchorLabel : secondsToHourMinuteString(adv.duration)}
+                                  {secondsToHourMinuteString(adv.duration)}
                                 </p>
                                 <div className="text-base-content/70 self-center text-right text-xs">
                                   {format(new Date(adv.start_date), 'dd.MM.yyyy')}
                                 </div>
                                 <div className="flex justify-end gap-2 self-center">
-                                  {adv.is_pseudo ? (
-                                    <span className="text-base-content/50 text-xs">{t('characters.auto')}</span>
-                                  ) : !isReadOnly ? (
+                                  {!isReadOnly ? (
                                     <>
                                       <UpdateAdventureModal
                                         adventure={adv}

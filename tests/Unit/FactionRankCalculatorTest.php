@@ -3,6 +3,7 @@
 use App\Models\Adventure;
 use App\Models\Character;
 use App\Models\Downtime;
+use App\Support\CharacterAuditTrail;
 use App\Support\LevelProgression;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
@@ -17,9 +18,16 @@ test('it calculates faction ranks based on level, downtime, and adventures', fun
         'faction' => 'heiler',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => requiredBubblesForLevel($level),
-        'bubble_shop_spend' => 0,
     ]);
+
+    $trail = app(CharacterAuditTrail::class);
+    $bubbles = requiredBubblesForLevel($level);
+    if ($bubbles > 0) {
+        $trail->record($character, 'dm_bubbles.granted', delta: [
+            'bubbles' => $bubbles,
+            'dm_bubbles' => $bubbles,
+        ]);
+    }
 
     Adventure::factory()
         ->count($adventures)
@@ -31,18 +39,22 @@ test('it calculates faction ranks based on level, downtime, and adventures', fun
         ->create();
 
     if ($downtime > 0) {
-        Downtime::factory()
+        $downtimeRow = Downtime::factory()
             ->for($character)
             ->state([
                 'duration' => $downtime,
                 'type' => 'faction',
             ])
             ->create();
+
+        $trail->record($character, 'downtime.created', delta: [
+            'downtime_seconds' => $downtime,
+        ], metadata: ['type' => 'faction'], subject: $downtimeRow);
     }
 
-    $character->load('adventures', 'downtimes');
+    $trail->record($character, 'test.snapshot', metadata: ['hidden_from_history' => true]);
 
-    expect($character->faction_rank)->toBe($expectedRank);
+    expect($character->fresh('latestAuditSnapshot')->faction_rank)->toBe($expectedRank);
 })->with([
     'rank 0 for below LT' => [4, 0, 0, 0],
     'rank 1 for guild member without 10 adventures' => [5, 0, 0, 1],

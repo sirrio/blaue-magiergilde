@@ -18,10 +18,6 @@ const payload = buildCharacterManageView({
     notes: 'Testnotiz',
     avatar: '',
     external_link: 'https://www.dndbeyond.com/characters/123',
-    dm_bubbles: 3,
-    dm_coins: 5,
-    bubble_shop_spend: 2,
-    bubble_shop_legacy_spend: 2,
     bubble_shop_skill_proficiency: 1,
     bubble_shop_rare_language: 0,
     bubble_shop_tool_or_language: 0,
@@ -31,10 +27,18 @@ const payload = buildCharacterManageView({
     avatar_masked: true,
     private_mode: true,
     level: 5,
+    progression_state: {
+        level: 5,
+        tier: 'lt',
+        available_bubbles: 10,
+        bubbles_in_level: 0,
+        bubbles_required_for_next_level: 5,
+        bubble_shop_spend: 2,
+        has_level_anchor: false,
+    },
     start_tier: 'bt',
     version: '2024',
     bubbles: 0,
-    has_pseudo_adventure: false,
 }, { ownerDiscordId: '123', locale: 'de' });
 
 assert.equal(payload.embeds[0].data.title, 'Charakter verwalten');

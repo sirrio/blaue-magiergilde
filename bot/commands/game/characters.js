@@ -14,8 +14,6 @@ const { commandName } = require('../../commandConfig');
 const { t } = require('../../i18n');
 const {
     extraDowntimeSecondsForCharacter,
-    legacySpendForCharacter,
-    structuredSpendForCharacter,
 } = require('../../utils/characterBubbleShop');
 const {
     DiscordNotLinkedError,
@@ -26,14 +24,11 @@ const {
 } = require('../../appDb');
 const { replyNotLinked, buildPolicyUpdateContent, buildPolicyUpdateButtons } = require('../../linkingUi');
 const {
-    additionalBubblesForStartTier,
     calculateBubblesInCurrentLevel,
     calculateLevel,
     calculateTierFromLevel,
-    countsBubbleAdjustmentsForProgression,
 } = require('../../utils/characterTier');
 const {
-    bubblesRequiredForLevel,
     ensureLevelProgressionLoaded,
 } = require('../../utils/levelProgression');
 const { formatDurationSeconds } = require('../../utils/time');
@@ -110,10 +105,9 @@ function hoursOnly(seconds) {
 }
 
 function calculateTotalBubblesToNextLevel(character, level) {
-    const additional = additionalBubblesForStartTier(character.start_tier);
-    const currentTotal = bubblesRequiredForLevel(level, character.progression_version_id) - additional;
-    const nextTotal = bubblesRequiredForLevel(level + 1, character.progression_version_id) - additional;
-    return Math.max(0, nextTotal - currentTotal);
+    void level;
+
+    return Math.max(0, safeInt(character?.progression_state?.bubbles_required_for_next_level));
 }
 
 
@@ -123,14 +117,8 @@ function buildCharacterSummaryLine(character, locale = null) {
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
     const inCurrent = calculateBubblesInCurrentLevel(character, level);
     const isMaxLevel = level >= 20 || toNextTotal === 0;
-    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
-    const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
-    const downtimeBubbles = isMixed
-        ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
-        : totalBubbles;
-    const downtimeMax = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
-    const downtimeUsed = safeInt(character.total_downtime);
+    const downtimeMax = safeInt(character?.progression_state?.downtime_total_seconds);
+    const downtimeUsed = safeInt(character?.progression_state?.downtime_logged_seconds);
 
     const name = String(character.name || `Character ${character.id}`).slice(0, 16).padEnd(16);
     const tierPart = (character.is_filler ? 'Filler' : tier).padEnd(6);
@@ -309,42 +297,26 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const statusNextStep = guildStatusNextStep(character.guild_status, locale);
     const hasRoom = safeInt(character.has_room) > 0;
     const simplifiedTracking = Boolean(character.simplified_tracking);
-    const hasAutoLevelAdventure = Boolean(safeInt(character.has_pseudo_adventure));
-    const usesManualDerivedValues = simplifiedTracking || hasAutoLevelAdventure;
+    const hasLevelAnchor = Boolean(character?.progression_state?.has_level_anchor ?? character.has_level_anchor);
+    const usesManualDerivedValues = simplifiedTracking || hasLevelAnchor;
     const manualAdventuresCount = nullableInt(character.manual_adventures_count);
     const manualFactionRank = nullableInt(character.manual_faction_rank);
-    const bubbleAdjustmentsCount = countsBubbleAdjustmentsForProgression(character);
-    const totalBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0);
-    const earnedBubbles = safeInt(character.adventure_bubbles) + (bubbleAdjustmentsCount ? safeInt(character.dm_bubbles) : 0) + (bubbleAdjustmentsCount ? additionalBubblesForStartTier(character.start_tier) : 0);
-    const isBubbleOverspent = bubbleAdjustmentsCount && safeInt(character.bubble_shop_spend) > earnedBubbles;
     const toNextTotal = calculateTotalBubblesToNextLevel(character, level);
     const inCurrent = calculateBubblesInCurrentLevel(character, level);
     const toNext = Math.max(0, toNextTotal - inCurrent);
     const isMaxLevel = level >= 20 || toNextTotal === 0;
 
-    const downtimeTotal = safeInt(character.total_downtime);
+    const downtimeTotal = safeInt(character?.progression_state?.downtime_logged_seconds);
     const downtimeFaction = safeInt(character.faction_downtime);
     const downtimeOther = safeInt(character.other_downtime);
-    // In mixed tracking mode (pseudo anchor + real adventures), target_bubbles bakes in
-    // the start-tier bonus (which was never earned through play) and deducts bubble shop
-    // spend (which was earned). Correct the downtime base accordingly.
-    const isMixed = safeInt(character.has_pseudo_adventure) && safeInt(character.has_real_adventure);
     let hasProgressionUpgradeAvailable = false;
     try {
         hasProgressionUpgradeAvailable = Boolean(character.has_progression_upgrade_available);
     } catch {
         hasProgressionUpgradeAvailable = false;
     }
-    const downtimeBubbles = isMixed
-        ? Math.max(0, totalBubbles - additionalBubblesForStartTier(character.start_tier) + safeInt(character.bubble_shop_spend))
-        : totalBubbles;
-    const downtimeAllowed = (downtimeBubbles * 8 * 60 * 60) + extraDowntimeSecondsForCharacter(character);
+    const downtimeAllowed = safeInt(character?.progression_state?.downtime_total_seconds);
     const downtimeRemaining = downtimeAllowed - downtimeTotal;
-    const bubbleShopLegacy = legacySpendForCharacter(character);
-    const bubbleShopUnassigned = Math.max(
-        bubbleShopLegacy - structuredSpendForCharacter(character),
-        0
-    );
     const bubbleShopExtraDowntime = extraDowntimeSecondsForCharacter(character);
 
     const factionLevel = calculateFactionLevel(character, level, tier);
@@ -372,25 +344,16 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
             { name: 'Room', value: hasRoom ? 'Assigned' : 'None', inline: true },
             { name: 'Progress', value: isMaxLevel
                 ? `${buildProgressBar(1, 1)}\nMax. Level erreicht${inCurrent > 0 ? ` (+**${inCurrent}** Bubble(s))` : ''}`
-                : isBubbleOverspent
-                    ? `${buildProgressBar(inCurrent, toNextTotal)}\n⚠️ Bubble-Shop überzogen`
-                    : `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`,
+                : `${buildProgressBar(inCurrent, toNextTotal)}\nRemaining: **${toNext}** Bubble(s)`,
               inline: false },
-            { name: 'Tracking', value: simplifiedTracking ? 'Level-Tracking' : isMixed ? 'Gemischt' : 'Abenteuer-Tracking', inline: true },
+            { name: 'Tracking', value: simplifiedTracking ? 'Level-Tracking' : hasLevelAnchor ? 'Gemischt' : 'Abenteuer-Tracking', inline: true },
             { name: 'Adventures', value: adventuresValue, inline: true },
             { name: 'Factions', value: factionsValue, inline: true },
             { name: 'Downtime', value: downtimeValue, inline: false },
             { name: 'Game Master', value: `Bubbles: **${safeInt(character.dm_bubbles)}**\nCoins: **${safeInt(character.dm_coins)}**`, inline: true },
                 {
                     name: t('characters.manageBubbleShop', {}, locale),
-                    value: bubbleShopUnassigned > 0
-                        ? [
-                        `${t('characters.bubbleShopLegacyUnassigned', {}, locale)}: **${bubbleShopUnassigned}**`,
-                        t('characters.bubbleShopLegacyReasonBody', {}, locale),
-                        t('characters.bubbleShopLegacySubhint', { count: bubbleShopUnassigned }, locale),
-                        `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
-                        ].join('\n')
-                    : `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
+                    value: `${t('characters.bubbleShopExtraDowntime', {}, locale)}: **${secondsToHourMinuteString(bubbleShopExtraDowntime)}**`,
                   inline: true,
               },
         );
@@ -402,19 +365,6 @@ function buildCharacterEmbed(character, { thumbnailUrlOrAttachment, locale }) {
     const reviewNote = String(character.review_note || '').trim();
     if (reviewNote && (character.guild_status === 'declined' || character.guild_status === 'needs_changes')) {
         embed.addFields({ name: 'Notiz', value: reviewNote, inline: false });
-    }
-
-    if (!bubbleAdjustmentsCount) {
-        const warningLines = [];
-        if (simplifiedTracking) {
-            warningLines.push('⚠️ **Level-Tracking aktiv** – DM-Bubbles und Bubble-Shop fließen nicht in die Levelberechnung ein.');
-        } else {
-            warningLines.push('⚠️ **Gemischtes Tracking** – DM-Bubbles und Bubble-Shop fließen nicht in die Levelberechnung ein.');
-        }
-        if (isMixed) {
-            warningLines.push('ℹ️ Bubble-Shop-Ausgaben werden ABER für die maximale Downtime berücksichtigt.');
-        }
-        embed.addFields({ name: 'Hinweise', value: warningLines.join('\n'), inline: false });
     }
 
     if (hasProgressionUpgradeAvailable) {

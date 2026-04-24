@@ -18,6 +18,7 @@ it('restores only adventures and downtimes deleted with the character', function
     $activeDowntime = Downtime::factory()->create(['character_id' => $character->id]);
     $previouslyDeletedDowntime = Downtime::factory()->create(['character_id' => $character->id]);
     $previouslyDeletedDowntime->delete();
+    recordCharacterSnapshot($character);
 
     actingAs($user)->delete(route('characters.destroy', $character));
 

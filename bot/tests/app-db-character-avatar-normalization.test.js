@@ -30,7 +30,7 @@ const fakeConnection = {
         }
 
         if (sql.includes('INSERT INTO characters')) {
-            insertedAvatarParam = params[7];
+            insertedAvatarParam = params[3];
             return [{ insertId: 777 }];
         }
 
@@ -40,6 +40,10 @@ const fakeConnection = {
 
         if (sql.startsWith('INSERT IGNORE INTO character_character_class')) {
             return [{ affectedRows: 1 }];
+        }
+
+        if (sql.includes('INSERT INTO character_audit_events')) {
+            return [{ affectedRows: 1, insertId: 901 }];
         }
 
         throw new Error(`Unexpected connection SQL: ${sql}`);

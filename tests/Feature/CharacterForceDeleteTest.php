@@ -10,11 +10,7 @@ uses(RefreshDatabase::class);
 
 it('permanently deletes an eligible deleted character', function () {
     $user = User::factory()->create();
-    $character = Character::factory()->for($user)->create([
-        'dm_bubbles' => 0,
-        'dm_coins' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    $character = Character::factory()->for($user)->create();
 
     $adventure = Adventure::factory()->for($character)->create();
     $downtime = Downtime::factory()->for($character)->create();
@@ -33,11 +29,7 @@ it('permanently deletes an eligible deleted character', function () {
 
 it('does not permanently delete a deleted character with tracking relevance', function () {
     $user = User::factory()->create();
-    $character = Character::factory()->for($user)->create([
-        'dm_bubbles' => 0,
-        'dm_coins' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    $character = Character::factory()->for($user)->create();
 
     Adventure::factory()->for($character)->create();
     $character->delete();

@@ -412,6 +412,46 @@ export interface CharacterSubclass {
   source?: Source | null
 }
 
+export interface CharacterAuditEvent {
+  id: number
+  character_id: number
+  actor_user_id?: number | null
+  action: string
+  occurred_at: string
+  subject_type?: string | null
+  subject_id?: number | null
+  delta?: Record<string, unknown> | null
+  state_after?: Record<string, unknown> | null
+  metadata?: Record<string, unknown> | null
+  actor?: {
+    id: number
+    name: string
+  } | null
+}
+
+export interface CharacterProgressionState {
+  level?: number | null
+  tier?: string | null
+  available_bubbles?: number | null
+  tracked_available_bubbles?: number | null
+  bubbles_in_level?: number | null
+  bubbles_required_for_next_level?: number | null
+  progression_version_id?: number | null
+  simplified_tracking?: boolean | null
+  has_level_anchor?: boolean | null
+  dm_bubbles?: number | null
+  dm_coins?: number | null
+  bubble_shop_spend?: number | null
+  bubble_shop_downtime_seconds?: number | null
+  real_adventures_count?: number | null
+  pseudo_adventures_count?: number | null
+  downtime_logged_seconds?: number | null
+  downtime_total_seconds?: number | null
+  faction?: string | null
+  faction_rank?: number | null
+  guild_status?: string | null
+}
+
 export interface Character {
   position: number
   character_classes: CharacterClass[]
@@ -447,12 +487,10 @@ export interface Character {
   class: Array<CharacterClass>
   start_tier: 'bt' | 'lt' | 'ht'
   version: '2014' | '2024'
-  dm_bubbles: number
-  dm_coins: number
   is_filler: boolean
-  bubble_shop_spend: number
-  bubble_shop_legacy_spend?: number
   bubble_shop_purchases?: CharacterBubbleShopPurchase[]
+  progression_state?: CharacterProgressionState | null
+  audit_events?: CharacterAuditEvent[]
   faction_rank?: number
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
@@ -549,11 +587,8 @@ export interface Adventure {
   title: string
   duration: number
   start_date: string
+  created_at?: string
   has_additional_bubble: boolean
-  is_pseudo?: boolean
-  target_level?: number | null
-  target_bubbles?: number | null
-  progression_version_id?: number | null
   notes: string
   game_master: string
   character_id: number

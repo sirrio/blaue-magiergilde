@@ -62,10 +62,6 @@ const characterState = {
     external_link: '',
     avatar: null,
     notes: null,
-    dm_bubbles: 0,
-    dm_coins: 0,
-    bubble_shop_spend: 15,
-    bubble_shop_legacy_spend: 15,
     progression_version_id: 1,
     manual_adventures_count: null,
     manual_faction_rank: null,
@@ -79,7 +75,6 @@ const characterState = {
     has_room: 0,
     adventures_count: 30,
     adventure_bubbles: 30,
-    has_pseudo_adventure: 0,
     has_real_adventure: 1,
     total_downtime: 0,
     faction_downtime: 0,
@@ -91,15 +86,36 @@ const characterState = {
     class_names: 'Wizard',
 };
 
-let pseudoRows = [];
+function progressionStateJson(row) {
+    const available = Math.max(0, Number(row.adventure_bubbles || 0));
+    const level = levelFromAvailableBubbles(available);
+    return JSON.stringify({
+        level,
+        tier: level >= 17 ? 'et' : level >= 11 ? 'ht' : level >= 5 ? 'lt' : 'bt',
+        available_bubbles: available,
+        bubbles_in_level: Math.max(0, available - floorFor(level)),
+        bubbles_required_for_next_level: level >= 20 ? 0 : floorFor(level + 1) - floorFor(level),
+        progression_version_id: row.progression_version_id ?? 1,
+        bubble_shop_spend: 15,
+        downtime_total_seconds: 0,
+        downtime_logged_seconds: 0,
+        faction_rank: 0,
+        has_level_anchor: false,
+    });
+}
 
 function currentCharacterRow() {
-    return {
+    const row = {
         ...characterState,
-        has_pseudo_adventure: pseudoRows.length > 0 ? 1 : 0,
         simplified_tracking: characterState.simplified_tracking,
     };
+    return {
+        ...row,
+        progression_state_json: progressionStateJson(row),
+    };
 }
+
+const auditEventInserts = [];
 
 const fakeConnection = {
     async beginTransaction() {},
@@ -125,57 +141,18 @@ const fakeDb = {
             return [[currentCharacterRow()]];
         }
 
-        if (sql.includes('SELECT id, start_date, target_level') && sql.includes('is_pseudo = 1')) {
-            return [pseudoRows.length > 0 ? [pseudoRows[pseudoRows.length - 1]] : []];
-        }
-
-        if (sql.includes('SELECT id, is_pseudo') && sql.includes('FROM adventures')) {
-            if (pseudoRows.length === 0) {
-                return [[]];
-            }
-
-            const latestPseudo = pseudoRows[pseudoRows.length - 1];
-            return [[{ id: latestPseudo.id, is_pseudo: 1 }]];
-        }
-
-        if (sql.includes('SELECT COALESCE(SUM(FLOOR(duration / 10800)')) {
-            return [[{ bubbles: 30 }]];
-        }
-
         if (sql.includes('UPDATE characters') && sql.includes('simplified_tracking')) {
-            characterState.simplified_tracking = bindings[14];
+            characterState.simplified_tracking = bindings[10];
             return [{ affectedRows: 1 }];
         }
 
-        if (sql.includes('SELECT id, start_tier, dm_bubbles, bubble_shop_spend, is_filler, simplified_tracking, progression_version_id')) {
-            return [[{
-                id: characterState.id,
-                start_tier: characterState.start_tier,
-                dm_bubbles: characterState.dm_bubbles,
-                bubble_shop_spend: characterState.bubble_shop_spend,
-                is_filler: characterState.is_filler,
-                simplified_tracking: characterState.simplified_tracking,
-                progression_version_id: characterState.progression_version_id,
-            }]];
+        if (sql.includes('INSERT INTO character_audit_events')) {
+            auditEventInserts.push({ sql, bindings });
+            return [{ affectedRows: 1, insertId: 901 }];
         }
 
-        if (sql.includes('INSERT INTO adventures')) {
-            pseudoRows.push({
-                id: 900 + pseudoRows.length,
-                start_date: bindings[1],
-                target_level: bindings[4],
-                target_bubbles: bindings[5],
-                progression_version_id: bindings[6],
-            });
-            return [{ affectedRows: 1, insertId: pseudoRows[pseudoRows.length - 1].id }];
-        }
-
-        if (sql.startsWith('UPDATE adventures SET duration = 0')) {
-            const latestPseudo = pseudoRows[pseudoRows.length - 1];
-            latestPseudo.target_level = bindings[0];
-            latestPseudo.target_bubbles = bindings[1];
-            latestPseudo.progression_version_id = bindings[2];
-            return [{ affectedRows: 1 }];
+        if (sql.includes('FROM character_audit_events')) {
+            return [[{ event_bubble_delta: 0 }]];
         }
 
         throw new Error(`Unexpected SQL: ${sql}`);
@@ -206,18 +183,15 @@ Promise.resolve()
             displayAvatarURL: () => 'https://example.test/avatar.png',
         };
 
-        pseudoRows = [];
         characterState.simplified_tracking = 0;
 
         const enableResult = await updateCharacterTrackingModeForDiscord(discordUser, 42, true);
         assert.equal(enableResult.ok, true);
         assert.equal(characterState.simplified_tracking, 1);
-        assert.equal(pseudoRows.length, 0);
 
         const disableResult = await updateCharacterTrackingModeForDiscord(discordUser, 42, false);
         assert.equal(disableResult.ok, true);
         assert.equal(characterState.simplified_tracking, 0);
-        assert.equal(pseudoRows.length, 0);
 
         console.log('app-db-character-tracking-mode.test.js passed');
     })

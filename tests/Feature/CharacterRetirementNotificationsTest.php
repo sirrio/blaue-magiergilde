@@ -33,21 +33,20 @@ it('posts a discord retirement notice when a pending character is deleted', func
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'pending',
         'start_tier' => 'bt',
-        'dm_bubbles' => 55,
         'avatar' => 'avatars/test-character.png',
         'external_link' => 'https://www.dndbeyond.com/characters/1234567',
     ]);
+    app(\App\Support\CharacterAuditTrail::class)->record($character, 'dm_bubbles.granted', delta: ['bubbles' => 55, 'dm_bubbles' => 55]);
     $character->characterClasses()->sync([$characterClass->id]);
     Adventure::factory()->for($character)->create([
         'duration' => 10800,
         'has_additional_bubble' => false,
-        'is_pseudo' => false,
     ]);
     Adventure::factory()->for($character)->create([
         'duration' => 21600,
         'has_additional_bubble' => true,
-        'is_pseudo' => false,
     ]);
+    recordCharacterSnapshot($character);
 
     $progressionState = app(CharacterProgressionState::class);
     $expectedLevel = $progressionState->currentLevel($character->fresh()->load('adventures'));
@@ -98,6 +97,7 @@ it('marks approved characters as retired before posting the retirement notice', 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'approved',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->delete(route('characters.destroy', $character))
@@ -126,6 +126,7 @@ it('does not post a retirement notice for draft character deletions', function (
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->delete(route('characters.destroy', $character))

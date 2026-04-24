@@ -3,6 +3,7 @@
 use App\Models\Character;
 use App\Models\CharacterClass;
 use App\Models\User;
+use App\Support\CharacterAuditTrail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -79,10 +80,10 @@ it('allows admins to set quick levels for characters', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $character = Character::factory()->create([
         'admin_managed' => false,
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
         'start_tier' => 'bt',
+        'is_filler' => false,
     ]);
+    app(CharacterAuditTrail::class)->record($character, 'test.snapshot', metadata: ['hidden_from_history' => true]);
 
     $this->actingAs($admin)
         ->post(route('admin.character-approvals.characters.quick-level', $character), [
@@ -93,5 +94,5 @@ it('allows admins to set quick levels for characters', function () {
     $character->refresh();
 
     expect($character->admin_managed)->toBeTrue();
-    expect($character->adventures()->where('is_pseudo', true)->exists())->toBeTrue();
+    expect($character->auditEvents()->where('action', 'level.set')->exists())->toBeTrue();
 });

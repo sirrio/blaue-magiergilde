@@ -21,9 +21,6 @@ const character = {
     start_tier: 'bt',
     faction: 'none',
     adventure_bubbles: 0,
-    dm_bubbles: 0,
-    bubble_shop_spend: 0,
-    bubble_shop_legacy_spend: 0,
     bubble_shop_skill_proficiency: 0,
     bubble_shop_rare_language: 0,
     bubble_shop_tool_or_language: 0,
@@ -32,8 +29,19 @@ const character = {
     faction_downtime: 0,
     other_downtime: 0,
     adventures_count: 0,
-    dm_coins: 0,
     external_link: 'https://www.dndbeyond.com/characters/42',
+    progression_state: {
+        level: 1,
+        tier: 'bt',
+        available_bubbles: 0,
+        bubbles_in_level: 0,
+        bubbles_required_for_next_level: 1,
+        bubble_shop_spend: 0,
+        downtime_total_seconds: 0,
+        downtime_logged_seconds: 0,
+        faction_rank: 0,
+        has_level_anchor: false,
+    },
 };
 
 const embed = buildCharacterEmbed(character, { thumbnailUrlOrAttachment: null });
@@ -53,7 +61,6 @@ assert.equal(draftNextStep?.value, 'Registriere diesen Charakter bei der Magierg
 const simpleModeEmbed = buildCharacterEmbed({
     ...character,
     simplified_tracking: 1,
-    has_pseudo_adventure: 1,
     faction: 'bibliothekare',
     adventures_count: 12,
     manual_adventures_count: 9,
@@ -62,6 +69,18 @@ const simpleModeEmbed = buildCharacterEmbed({
     faction_downtime: 360000,
     total_downtime: 400000,
     manual_faction_rank: 4,
+    progression_state: {
+        level: 6,
+        tier: 'lt',
+        available_bubbles: 20,
+        bubbles_in_level: 5,
+        bubbles_required_for_next_level: 6,
+        bubble_shop_spend: 0,
+        downtime_total_seconds: 633600,
+        downtime_logged_seconds: 400000,
+        faction_rank: 4,
+        has_level_anchor: true,
+    },
 }, { thumbnailUrlOrAttachment: null }).toJSON();
 
 const simpleModeAdventures = simpleModeEmbed.fields.find((field) => field.name === 'Adventures');

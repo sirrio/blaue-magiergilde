@@ -12,23 +12,18 @@ uses(RefreshDatabase::class);
 it('shows permanent delete availability only for deleted characters without tracking relevance', function () {
     $user = User::factory()->create();
 
-    $eligibleCharacter = Character::factory()->for($user)->create([
-        'dm_bubbles' => 0,
-        'dm_coins' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    $eligibleCharacter = Character::factory()->for($user)->create();
     $eligibleAdventure = Adventure::factory()->for($eligibleCharacter)->create();
     $eligibleDowntime = Downtime::factory()->for($eligibleCharacter)->create();
     $eligibleAdventure->delete();
     $eligibleDowntime->delete();
+    recordCharacterSnapshot($eligibleCharacter);
     $eligibleCharacter->delete();
 
-    $ineligibleCharacter = Character::factory()->for($user)->create([
-        'dm_bubbles' => 1,
-        'dm_coins' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    $ineligibleCharacter = Character::factory()->for($user)->create();
+    app(\App\Support\CharacterAuditTrail::class)->record($ineligibleCharacter, 'dm_bubbles.granted', delta: ['bubbles' => 1, 'dm_bubbles' => 1]);
     Adventure::factory()->for($ineligibleCharacter)->create();
+    recordCharacterSnapshot($ineligibleCharacter);
     $ineligibleCharacter->delete();
 
     $this->actingAs($user)

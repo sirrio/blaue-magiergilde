@@ -6,7 +6,9 @@ use App\Actions\Character\SetQuickLevel;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Character\UpgradeCharacterProgressionRequest;
 use App\Models\Character;
+use App\Support\CharacterAuditTrail;
 use App\Support\CharacterBubbleShop;
+use App\Support\CharacterProgressionSnapshotResolver;
 use App\Support\CharacterProgressionState;
 use App\Support\FeatureAccess;
 use App\Support\LevelProgression;
@@ -19,6 +21,8 @@ class UpgradeCharacterProgressionController extends Controller
         private SetQuickLevel $setQuickLevel,
         private CharacterBubbleShop $bubbleShop = new CharacterBubbleShop,
         private CharacterProgressionState $progressionState = new CharacterProgressionState,
+        private CharacterAuditTrail $auditTrail = new CharacterAuditTrail,
+        private CharacterProgressionSnapshotResolver $progressionSnapshots = new CharacterProgressionSnapshotResolver,
     ) {}
 
     public function __invoke(UpgradeCharacterProgressionRequest $request, Character $character): RedirectResponse
@@ -40,7 +44,7 @@ class UpgradeCharacterProgressionController extends Controller
         $targetBubblesInLevel = $request->integer('bubbles_in_level', 0);
         $allowOutsideRangeWithoutDowntime = $request->boolean('allow_outside_range_without_downtime');
 
-        if ($this->progressionState->hasPseudoAdventures($character)) {
+        if ($this->progressionState->hasLevelAnchor($character)) {
             $availableBubbles = $this->currentAvailableBubbles($character);
             $maxLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $activeVersionId);
 
@@ -57,6 +61,15 @@ class UpgradeCharacterProgressionController extends Controller
             if (! $result['ok']) {
                 return redirect()->back()->withErrors(['level' => $result['message'] ?? 'Unable to upgrade level progression.']);
             }
+
+            $this->auditTrail->record($character, 'level_curve.upgraded', delta: $result['delta'] ?? [], metadata: [
+                'previous_progression_version_id' => $previousVersionId,
+                'new_progression_version_id' => $activeVersionId,
+                'target_level' => $targetLevel,
+                'target_bubbles_in_level' => $targetBubblesInLevel,
+                'tracking_mode' => 'adventure',
+                ...($result['metadata'] ?? []),
+            ]);
 
             return redirect()->back();
         }
@@ -78,20 +91,29 @@ class UpgradeCharacterProgressionController extends Controller
             return redirect()->back()->withErrors(['level' => $message]);
         }
 
+        $this->auditTrail->record($character, 'level_curve.upgraded', delta: $result['delta'] ?? [], metadata: [
+            'previous_progression_version_id' => $previousVersionId,
+            'new_progression_version_id' => $activeVersionId,
+            'target_level' => $targetLevel,
+            'target_bubbles_in_level' => $targetBubblesInLevel,
+            'tracking_mode' => 'level',
+            'allow_outside_range_without_downtime' => $allowOutsideRangeWithoutDowntime,
+            ...($result['metadata'] ?? []),
+        ]);
+
         return redirect()->back();
     }
 
     /**
-     * @return array{ok: bool, message?: string}
+     * @return array{ok: bool, message?: string, delta?: array<string, int>, metadata?: array<string, mixed>}
      */
     private function upgradeAdventureTrackedCharacter(Character $character, int $activeVersionId, int $targetLevel, int $targetBubblesInLevel): array
     {
-        $baseBubbles = $this->baseAdventureTrackedBubbles($character);
-        $currentSpend = $this->safeInt($character->bubble_shop_spend);
-        $availableBubbles = max(0, $baseBubbles - $currentSpend);
+        $availableBubbles = $this->progressionState->availableBubbles($character);
+        $currentSpend = $this->currentBubbleShopSpend($character);
+        $baseBubbles = $availableBubbles + $currentSpend;
         $autoLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $activeVersionId);
-        $currentVersionId = $character->progression_version_id ?? $activeVersionId;
-        $currentLevel = LevelProgression::levelFromAvailableBubbles($availableBubbles, $currentVersionId);
+        $currentLevel = $this->currentLevel($character);
         $minimumAllowedLevel = $currentLevel;
         $minimumAllowedAvailableBubbles = LevelProgression::bubblesRequiredForLevel($minimumAllowedLevel, $activeVersionId);
         $maximumAllowedSpend = $currentSpend + max(0, $availableBubbles - $minimumAllowedAvailableBubbles);
@@ -139,19 +161,33 @@ class UpgradeCharacterProgressionController extends Controller
             ];
         }
 
-        DB::transaction(function () use ($character, $activeVersionId, $newSpend): void {
+        $previousDowntimeSeconds = $this->bubbleShop->extraDowntimeSeconds($character);
+        $previousQuantities = $this->bubbleShop->quantitiesFor($character);
+        $newDowntimeSeconds = $previousDowntimeSeconds;
+        $newQuantities = $previousQuantities;
+
+        DB::transaction(function () use ($character, $activeVersionId, $newSpend, &$newDowntimeSeconds, &$newQuantities): void {
             $character->forceFill([
                 'progression_version_id' => $activeVersionId,
             ]);
             $this->bubbleShop->syncDowntimeSpendTarget($character, $newSpend);
+            $newDowntimeSeconds = $this->bubbleShop->extraDowntimeSeconds($character);
+            $newQuantities = $this->bubbleShop->quantitiesFor($character);
             $character->save();
         });
 
-        return ['ok' => true];
+        return ['ok' => true, 'delta' => [
+            'bubble_shop_spend' => $newSpend - $currentSpend,
+            'bubbles' => $currentSpend - $newSpend,
+            'downtime_seconds' => $newDowntimeSeconds - $previousDowntimeSeconds,
+        ], 'metadata' => [
+            'previous_quantities' => $previousQuantities,
+            'new_quantities' => $newQuantities,
+        ]];
     }
 
     /**
-     * @return array{ok: bool, message?: string, minLevel?: int}
+     * @return array{ok: bool, message?: string, minLevel?: int, delta?: array<string, int>, metadata?: array<string, mixed>}
      */
     private function upgradeManualTrackedCharacter(
         Character $character,
@@ -160,13 +196,8 @@ class UpgradeCharacterProgressionController extends Controller
         int $targetBubblesInLevel,
         bool $allowOutsideRangeWithoutDowntime,
     ): array {
-        $currentVersionId = $character->progression_version_id ?? $activeVersionId;
         $currentAvailableBubbles = $this->currentAvailableBubbles($character);
-        $currentLevel = LevelProgression::levelFromAvailableBubbles($currentAvailableBubbles, $currentVersionId);
-        $currentBubblesInLevel = max(
-            0,
-            $currentAvailableBubbles - LevelProgression::bubblesRequiredForLevel($currentLevel, $currentVersionId),
-        );
+        $currentLevel = $this->currentLevel($character);
         $recalculatedLevel = LevelProgression::levelFromAvailableBubbles($currentAvailableBubbles, $activeVersionId);
         $currentLevelFloorOnNewCurve = LevelProgression::bubblesRequiredForLevel($currentLevel, $activeVersionId);
         $rangeMinAvailableBubbles = min($currentLevelFloorOnNewCurve, $currentAvailableBubbles);
@@ -197,11 +228,15 @@ class UpgradeCharacterProgressionController extends Controller
             }
         }
 
-        $currentSpend = $this->safeInt($character->bubble_shop_spend);
+        $currentSpend = $this->currentBubbleShopSpend($character);
         $newSpend = $allowOutsideRangeWithoutDowntime
             ? $currentSpend
             : max($currentSpend, max(0, $currentAvailableBubbles - $targetAvailableBubbles));
         $result = ['ok' => true];
+        $previousDowntimeSeconds = $this->bubbleShop->extraDowntimeSeconds($character);
+        $previousQuantities = $this->bubbleShop->quantitiesFor($character);
+        $newDowntimeSeconds = $previousDowntimeSeconds;
+        $newQuantities = $previousQuantities;
 
         try {
             DB::transaction(function () use (
@@ -212,6 +247,7 @@ class UpgradeCharacterProgressionController extends Controller
                 $allowOutsideRangeWithoutDowntime,
                 $newSpend,
                 &$result,
+                &$newDowntimeSeconds,
             ): void {
                 $character->forceFill([
                     'progression_version_id' => $activeVersionId,
@@ -221,6 +257,7 @@ class UpgradeCharacterProgressionController extends Controller
                     $character->fresh(),
                     $targetLevel,
                     $clampedBubblesInLevel,
+                    true,
                 );
 
                 if (! $result['ok']) {
@@ -233,6 +270,8 @@ class UpgradeCharacterProgressionController extends Controller
 
                 $updatedCharacter = $character->fresh();
                 $this->bubbleShop->syncDowntimeSpendTarget($updatedCharacter, $newSpend);
+                $newDowntimeSeconds = $this->bubbleShop->extraDowntimeSeconds($updatedCharacter);
+                $newQuantities = $this->bubbleShop->quantitiesFor($updatedCharacter);
                 $updatedCharacter->save();
             });
         } catch (\RuntimeException $exception) {
@@ -241,95 +280,31 @@ class UpgradeCharacterProgressionController extends Controller
             }
         }
 
+        $result['delta'] = [
+            'bubble_shop_spend' => $newSpend - $currentSpend,
+            'bubbles' => $currentSpend - $newSpend,
+            'downtime_seconds' => $allowOutsideRangeWithoutDowntime ? 0 : $newDowntimeSeconds - $previousDowntimeSeconds,
+        ];
+        $result['metadata'] = [
+            'previous_quantities' => $previousQuantities,
+            'new_quantities' => $allowOutsideRangeWithoutDowntime ? $previousQuantities : $newQuantities,
+        ];
+
         return $result;
-    }
-
-    private function baseAdventureTrackedBubbles(Character $character): int
-    {
-        $realAdventureBubbles = $this->safeInt(
-            $character->adventures()
-                ->whereNull('deleted_at')
-                ->where('is_pseudo', false)
-                ->selectRaw('COALESCE(SUM('.$this->durationBubbleSql().' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles')
-                ->value('bubbles')
-        );
-
-        return max(
-            0,
-            $realAdventureBubbles
-            + $this->progressionState->dmBubblesForProgression($character)
-            + $this->additionalBubblesForStartTier($character->start_tier),
-        );
     }
 
     private function currentAvailableBubbles(Character $character): int
     {
-        $durationBubbleSql = $this->durationBubbleSql();
-
-        $latestPseudo = $character->adventures()
-            ->whereNull('deleted_at')
-            ->where('is_pseudo', true)
-            ->orderByDesc('start_date')
-            ->orderByDesc('id')
-            ->first();
-
-        if (! $latestPseudo) {
-            return max(
-                0,
-                $this->baseAdventureTrackedBubbles($character)
-                - $this->progressionState->bubbleShopSpendForProgression($character),
-            );
-        }
-
-        $pseudoBubbles = $latestPseudo->target_bubbles !== null
-            ? $this->safeInt($latestPseudo->target_bubbles)
-            : LevelProgression::bubblesRequiredForLevel(
-                $this->safeInt($latestPseudo->target_level, 1),
-                $latestPseudo->progression_version_id,
-            );
-
-        $realBubblesAfterPseudo = $this->safeInt(
-            $character->adventures()
-                ->whereNull('deleted_at')
-                ->where('is_pseudo', false)
-                ->where(function ($query) use ($latestPseudo): void {
-                    $query->where('start_date', '>', $latestPseudo->start_date)
-                        ->orWhere(function ($nestedQuery) use ($latestPseudo): void {
-                            $nestedQuery->where('start_date', $latestPseudo->start_date)
-                                ->where('id', '>', $latestPseudo->id);
-                        });
-                })
-                ->selectRaw('COALESCE(SUM('.$durationBubbleSql.' + CASE WHEN has_additional_bubble = 1 THEN 1 ELSE 0 END), 0) AS bubbles')
-                ->value('bubbles')
-        );
-
-        return max(0, $pseudoBubbles + $realBubblesAfterPseudo);
+        return (int) $this->progressionSnapshots->snapshot($character)['available_bubbles'];
     }
 
-    private function additionalBubblesForStartTier(?string $startTier): int
+    private function currentLevel(Character $character): int
     {
-        return match (strtolower((string) $startTier)) {
-            'lt' => 10,
-            'ht' => 55,
-            default => 0,
-        };
+        return (int) $this->progressionSnapshots->snapshot($character)['level'];
     }
 
-    private function safeInt(mixed $value, int $fallback = 0): int
+    private function currentBubbleShopSpend(Character $character): int
     {
-        $number = filter_var($value, FILTER_VALIDATE_INT);
-
-        return $number !== false ? (int) $number : $fallback;
-    }
-
-    private function durationBubbleSql(): string
-    {
-        $driver = DB::connection()->getDriverName();
-
-        return match ($driver) {
-            'sqlite' => 'CAST(duration / 10800 AS INTEGER)',
-            'mysql', 'mariadb' => 'FLOOR(duration / 10800)',
-            default => 'FLOOR(duration / 10800)',
-        };
+        return (int) ($this->progressionSnapshots->snapshot($character)['bubble_shop_spend'] ?? 0);
     }
 }

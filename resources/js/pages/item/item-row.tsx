@@ -866,8 +866,8 @@ export default function ItemRow({
                 <div className="flex items-center">
                   Update item
                   <Tooltip content="Search on D&D Beyond" placement="right">
-                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 flex items-center" aria-label="Search on D&D Beyond">
-                      <img src="/images/dnd-beyond-logo.svg" className="absolute" alt="dnd-beyond-link" />
+                    <a href={dndBeyondLink} target="_blank" rel="noreferrer" className="ml-4 inline-flex items-center" aria-label="Search on D&D Beyond">
+                      <img src="/images/dnd-beyond-logo.svg" className="block h-7 w-auto" alt="dnd-beyond-link" />
                     </a>
                   </Tooltip>
                 </div>
@@ -1077,6 +1077,5 @@ export default function ItemRow({
     </ListRow>
   )
 }
-
 
 

@@ -145,9 +145,6 @@ it('rejects dashboard URLs as external link on character update', function () {
             'class' => [$class->id],
             'external_link' => 'https://blaue-magiergilde.test/characters',
             'version' => $character->version,
-            'dm_bubbles' => $character->dm_bubbles,
-            'dm_coins' => $character->dm_coins,
-            'bubble_shop_spend' => $character->bubble_shop_spend,
             'is_filler' => $character->is_filler,
             'faction' => $character->faction,
             'notes' => $character->notes,
@@ -231,9 +228,6 @@ it('preserves existing status on update when character status switching is disab
             'class' => [$class->id],
             'external_link' => $character->external_link,
             'version' => $character->version,
-            'dm_bubbles' => $character->dm_bubbles,
-            'dm_coins' => $character->dm_coins,
-            'bubble_shop_spend' => $character->bubble_shop_spend,
             'is_filler' => $character->is_filler,
             'faction' => $character->faction,
             'notes' => $character->notes,
@@ -265,6 +259,8 @@ it('allows owners to register draft characters with Magiergilde for review', fun
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
     ]);
+    recordCharacterSnapshot($character);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -286,6 +282,7 @@ it('allows owners to re-register characters in needs changes status', function (
         'registration_note' => 'Old note',
         'review_note' => 'Old requested changes',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -306,6 +303,7 @@ it('allows empty registration info when submitting a character for review', func
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -325,6 +323,7 @@ it('does not allow draft submission when character status switching is disabled'
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -344,17 +343,14 @@ it('blocks submission when the user already has eight active characters', functi
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -374,17 +370,14 @@ it('allows submitting a first high-tier character beyond eight occupied general 
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => false,
         'start_tier' => 'ht',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -404,24 +397,19 @@ it('allows submitting a second high-tier character beyond eight occupied general
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
-    Character::factory()->for($owner)->create([
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
+    recordCharacterSnapshot(Character::factory()->for($owner)->create([
         'guild_status' => 'pending',
         'is_filler' => false,
         'start_tier' => 'ht',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ]));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => false,
         'start_tier' => 'ht',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -441,24 +429,19 @@ it('blocks submitting a third high-tier character when eight general slots are a
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
     Character::factory()->count(2)->for($owner)->create([
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'ht',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => false,
         'start_tier' => 'ht',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -478,17 +461,14 @@ it('allows filler character submission even when the user already has eight acti
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => true,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -508,24 +488,19 @@ it('counts pending characters against the active character submission limit', fu
         'guild_status' => 'approved',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
-    Character::factory()->for($owner)->create([
+    ])->each(fn (Character $activeCharacter): Character => recordCharacterSnapshot($activeCharacter));
+    recordCharacterSnapshot(Character::factory()->for($owner)->create([
         'guild_status' => 'pending',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ]));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => false,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -541,21 +516,18 @@ it('blocks submission of a second filler character when one filler is already ap
     Config::set('features.character_status_switch', true);
 
     $owner = User::factory()->create();
-    Character::factory()->for($owner)->create([
+    recordCharacterSnapshot(Character::factory()->for($owner)->create([
         'guild_status' => 'approved',
         'is_filler' => true,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
-    ]);
+    ]));
 
     $character = Character::factory()->for($owner)->create([
         'guild_status' => 'draft',
         'is_filler' => true,
         'start_tier' => 'bt',
-        'dm_bubbles' => 0,
-        'bubble_shop_spend' => 0,
     ]);
+    recordCharacterSnapshot($character);
 
     $this->actingAs($owner)
         ->post(route('characters.submit-approval', $character), [
@@ -583,9 +555,6 @@ it('ignores direct status changes from owners on update', function () {
             'class' => [$class->id],
             'external_link' => $character->external_link,
             'version' => $character->version,
-            'dm_bubbles' => $character->dm_bubbles,
-            'dm_coins' => $character->dm_coins,
-            'bubble_shop_spend' => $character->bubble_shop_spend,
             'is_filler' => $character->is_filler,
             'faction' => $character->faction,
             'notes' => $character->notes,

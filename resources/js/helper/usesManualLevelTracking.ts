@@ -1,15 +1,16 @@
 import { Character } from '@/types'
 
-const hasPseudoAdventures = (character: Pick<Character, 'adventures'>): boolean => {
-  return (character.adventures ?? []).some((adventure) => Boolean(adventure.is_pseudo))
+const hasLevelAnchor = (character: Pick<Character, 'progression_state'>): boolean => {
+  return Boolean(character.progression_state?.has_level_anchor)
 }
 
-const usesManualLevelTracking = (character: Pick<Character, 'simplified_tracking' | 'adventures'>): boolean => {
-  return Boolean(character.simplified_tracking) || hasPseudoAdventures(character)
+const usesManualLevelTracking = (character: Pick<Character, 'simplified_tracking' | 'progression_state'>): boolean => {
+  return Boolean(character.simplified_tracking) || hasLevelAnchor(character)
 }
 
-const countsBubbleAdjustmentsForProgression = (character: Pick<Character, 'simplified_tracking' | 'adventures'>): boolean => {
-  return !usesManualLevelTracking(character)
+const countsBubbleAdjustmentsForProgression = (character?: Pick<Character, 'simplified_tracking' | 'progression_state'>): boolean => {
+  void character
+  return true
 }
 
-export { countsBubbleAdjustmentsForProgression, hasPseudoAdventures, usesManualLevelTracking }
+export { countsBubbleAdjustmentsForProgression, hasLevelAnchor, usesManualLevelTracking }

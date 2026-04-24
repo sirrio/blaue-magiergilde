@@ -84,11 +84,11 @@ function structuredSpendForCharacter(character, quantities = quantitiesForCharac
 }
 
 function legacySpendForCharacter(character) {
-    if (character?.bubble_shop_legacy_spend === null || character?.bubble_shop_legacy_spend === undefined) {
-        return Math.max(0, safeInt(character?.bubble_shop_spend));
-    }
-
-    return Math.max(0, safeInt(character?.bubble_shop_legacy_spend));
+    // The legacy bubble-shop spend column has been retired; progression state is
+    // the sole source of truth. Retained for API compatibility — callers that
+    // pass a character with a progression snapshot can still see the structured
+    // spend baseline through effectiveSpendForCharacter.
+    return Math.max(0, safeInt(character?.progression_state?.bubble_shop_spend));
 }
 
 function coveredByLegacyForCharacter(character, quantities = quantitiesForCharacter(character)) {
