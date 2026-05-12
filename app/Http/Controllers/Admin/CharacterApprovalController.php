@@ -107,6 +107,7 @@ class CharacterApprovalController extends Controller
                 'bubble_shop_spend',
                 'is_filler',
                 'admin_managed',
+                'creation_source',
                 'avatar',
                 'simplified_tracking',
             ]);

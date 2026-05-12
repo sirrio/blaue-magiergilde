@@ -89,6 +89,15 @@ function normalizeLocale(value) {
     return null;
 }
 
+function resolveCharacterCreationSource(rawSource) {
+    const source = String(rawSource || '').trim().toLowerCase();
+    if (source === 'discord' || source === 'website' || source === 'admin') {
+        return source;
+    }
+
+    return null;
+}
+
 async function getLocaleForDiscordId(discordUserId) {
     if (!discordUserId) {
         return null;
@@ -119,6 +128,7 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     const notes = trimField(payload?.character_notes || '');
     const registrationNote = trimField(payload?.character_registration_note || '');
     const reviewNote = trimField(payload?.character_review_note || '');
+    const creationSource = resolveCharacterCreationSource(payload?.character_creation_source);
     const externalLink = payload?.external_link || '';
     const approvalUrl = payload?.approval_url || '';
     const avatarUrl = options.avatarUrlOverride || payload?.character_avatar_url || '';
@@ -143,6 +153,17 @@ function buildCharacterApprovalMessage(payload, options = {}) {
     fields.push({ name: t('approvals.userField'), value: trimField(userLine, 1024), inline: false });
     if (isFirstSubmission) {
         fields.push({ name: t('approvals.firstSubmissionField'), value: t('approvals.firstSubmissionValue'), inline: true });
+    }
+    if (creationSource) {
+        fields.push({
+            name: t('approvals.characterSourceField'),
+            value: creationSource === 'discord'
+                ? t('approvals.characterSourceDiscord')
+                : creationSource === 'admin'
+                    ? t('approvals.characterSourceAdmin')
+                    : t('approvals.characterSourceWebsite'),
+            inline: true,
+        });
     }
     fields.push({ name: 'DM', value: dmSummary, inline: true });
     fields.push({ name: 'Filler', value: filler, inline: true });

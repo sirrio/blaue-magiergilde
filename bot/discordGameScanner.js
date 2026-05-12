@@ -1,5 +1,30 @@
 const { MessageType } = require('discord.js');
 
+function isRetryableDiscordError(error) {
+    const status = Number(error?.status);
+
+    return status >= 500 && status <= 599;
+}
+
+async function withDiscordRetries(operation, retries = 2) {
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt <= retries) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableDiscordError(error) || attempt === retries) {
+                throw error;
+            }
+            attempt += 1;
+        }
+    }
+
+    throw lastError;
+}
+
 function isThreadStarterSystemMessage(message) {
     const messageType = message?.type;
     if (messageType === MessageType.ThreadStarterMessage) {
@@ -522,77 +547,86 @@ function parseAnnouncement(message) {
 }
 
 async function scanGameAnnouncements(client, { channelId, since }) {
-    const channel = await client.channels.fetch(channelId);
-    const cutoff = since ? new Date(since) : null;
-    const games = [];
+    try {
+        const channel = await withDiscordRetries(() => client.channels.fetch(channelId));
+        const cutoff = since ? new Date(since) : null;
+        const games = [];
 
-    if (channel && typeof channel.isTextBased === 'function' && channel.isTextBased()) {
-        let before;
+        if (channel && typeof channel.isTextBased === 'function' && channel.isTextBased()) {
+            let before;
 
-        while (true) {
-            const batch = await channel.messages.fetch({ limit: 100, before });
-            if (!batch.size) break;
+            while (true) {
+                const batch = await withDiscordRetries(() => channel.messages.fetch({ limit: 100, before }));
+                if (!batch.size) break;
 
-            const messages = [...batch.values()];
-            for (const message of messages) {
-                if (cutoff && message.createdAt < cutoff) {
+                const messages = [...batch.values()];
+                for (const message of messages) {
+                    if (cutoff && message.createdAt < cutoff) {
+                        continue;
+                    }
+                    const parsed = parseAnnouncement(message);
+                    if (parsed) {
+                        games.push(parsed);
+                    }
+                }
+
+                const last = messages[messages.length - 1];
+                if (!last) break;
+                if (cutoff && last.createdAt < cutoff) {
+                    break;
+                }
+                before = last.id;
+            }
+
+            return { ok: true, games };
+        }
+
+        if (channel?.threads?.fetchActive) {
+            const activeThreads = await withDiscordRetries(() => channel.threads.fetchActive());
+            const archivedThreads = await withDiscordRetries(() => channel.threads.fetchArchived({ type: 'public' }));
+            const threads = [
+                ...activeThreads.threads.values(),
+                ...archivedThreads.threads.values(),
+            ];
+
+            for (const thread of threads) {
+                if (cutoff && thread.createdAt && thread.createdAt < cutoff) {
                     continue;
                 }
-                const parsed = parseAnnouncement(message);
-                if (parsed) {
-                    games.push(parsed);
+
+                let starterMessage = null;
+                if (typeof thread.fetchStarterMessage === 'function') {
+                    try {
+                        starterMessage = await withDiscordRetries(() => thread.fetchStarterMessage());
+                    } catch {
+                        starterMessage = null;
+                    }
+                }
+
+                if (starterMessage) {
+                    const parsed = parseAnnouncement(starterMessage);
+                    if (parsed) {
+                        games.push(parsed);
+                    }
                 }
             }
 
-            const last = messages[messages.length - 1];
-            if (!last) break;
-            if (cutoff && last.createdAt < cutoff) {
-                break;
-            }
-            before = last.id;
+            return { ok: true, games };
         }
 
-        return { ok: true, games };
+        return { ok: false, status: 422, error: 'Channel is not text-based.' };
+    } catch (error) {
+        return {
+            ok: false,
+            status: Number(error?.status) || 500,
+            error: error?.message || 'Discord fetch failed.',
+        };
     }
-
-    if (channel?.threads?.fetchActive) {
-        const activeThreads = await channel.threads.fetchActive();
-        const archivedThreads = await channel.threads.fetchArchived({ type: 'public' });
-        const threads = [
-            ...activeThreads.threads.values(),
-            ...archivedThreads.threads.values(),
-        ];
-
-        for (const thread of threads) {
-            if (cutoff && thread.createdAt && thread.createdAt < cutoff) {
-                continue;
-            }
-
-            let starterMessage = null;
-            if (typeof thread.fetchStarterMessage === 'function') {
-                try {
-                    starterMessage = await thread.fetchStarterMessage();
-                } catch {
-                    starterMessage = null;
-                }
-            }
-
-            if (starterMessage) {
-                const parsed = parseAnnouncement(starterMessage);
-                if (parsed) {
-                    games.push(parsed);
-                }
-            }
-        }
-
-        return { ok: true, games };
-    }
-
-    return { ok: false, status: 422, error: 'Channel is not text-based.' };
 }
 
 module.exports = {
     isThreadStarterSystemMessage,
     parseAnnouncement,
     scanGameAnnouncements,
+    withDiscordRetries,
 };

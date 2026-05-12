@@ -32,6 +32,7 @@ it('allows owners to create draft characters', function () {
         'user_id' => $user->id,
         'name' => 'Draft Mage',
         'guild_status' => 'draft',
+        'creation_source' => 'website',
     ]);
 });
 

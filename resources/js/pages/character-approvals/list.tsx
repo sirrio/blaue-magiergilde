@@ -46,6 +46,7 @@ type AdminCharacter = Pick<
   | 'character_classes'
   | 'avatar'
   | 'simplified_tracking'
+  | 'creation_source'
 > & {
   adventures: Adventure[]
   dndbeyond_character_id?: number | null
@@ -136,6 +137,33 @@ const resolveAvatarSrc = (avatar?: string | null) => {
   const value = String(avatar ?? '').trim()
   if (!value) return '/images/no-avatar.svg'
   return value.startsWith('http') ? value : `/storage/${value}`
+}
+
+const getCreationSourceBadge = (source?: string | null): { label: string; className: string } | null => {
+  const normalized = String(source ?? '').trim().toLowerCase()
+
+  if (normalized === 'website') {
+    return {
+      label: 'Website',
+      className: 'border-info/30 bg-info/10 text-info',
+    }
+  }
+
+  if (normalized === 'discord') {
+    return {
+      label: 'Discord',
+      className: 'border-secondary/30 bg-secondary/10 text-secondary',
+    }
+  }
+
+  if (normalized === 'admin') {
+    return {
+      label: 'Admin',
+      className: 'border-base-300 bg-base-200/70 text-base-content/80',
+    }
+  }
+
+  return null
 }
 
 const CharacterAvatarPreview = ({ character }: { character: AdminCharacter }) => {
@@ -1209,6 +1237,7 @@ const tierTextClassMap: Record<string, string> = {
                     const isFirstSubmission = Boolean(character.is_first_submission)
                     const dmBubblesSpent = Number(character.dm_bubbles ?? 0)
                     const dmCoinsSpent = Number(character.dm_coins ?? 0)
+                    const creationSourceBadge = getCreationSourceBadge(character.creation_source)
                     const legacyTitle = hasLegacyApproval
                       ? [
                         `Legacy approved as ${legacyMatch?.character_name}`,
@@ -1293,6 +1322,17 @@ const tierTextClassMap: Record<string, string> = {
                               <span className="flex items-center gap-1 rounded-full border border-base-200 bg-base-100/90 px-2 py-0.5 text-base-content/70">
                                 <Shield size={12} />
                                 <span>Admin</span>
+                              </span>
+                            ) : null}
+                            {creationSourceBadge ? (
+                              <span
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                  creationSourceBadge.className,
+                                )}
+                                title="Angelegt über"
+                              >
+                                {creationSourceBadge.label}
                               </span>
                             ) : null}
                             {dmBubblesSpent > 0 ? (

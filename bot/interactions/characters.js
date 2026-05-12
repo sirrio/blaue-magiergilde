@@ -1821,7 +1821,7 @@ async function handle(interaction) {
         state.step = 'classes';
         const classes = await listCharacterClassesForDiscord();
 
-        await interaction.update({
+        await updateCreationMessage(state, {
             embeds: [
                 buildCreationEmbed(3, t('characters.createClassesTitle', {}, state.locale), t('characters.createClassesDescription', {}, state.locale)),
             ],
@@ -1858,7 +1858,7 @@ async function handle(interaction) {
         }
         state.step = 'tier';
 
-        await interaction.update({
+        await updateCreationMessage(state, {
             embeds: [
                 buildCreationEmbed(4, t('characters.createTierTitle', {}, state.locale), t('characters.createTierDescription', {}, state.locale)),
             ],
@@ -1888,7 +1888,7 @@ async function handle(interaction) {
         state.data.faction = interaction.values[0];
         state.step = 'faction';
 
-        await interaction.update({
+        await updateCreationMessage(state, {
             embeds: [
                 buildCreationEmbed(5, t('characters.createFactionTitle', {}, state.locale), t('characters.createFactionDescription', {}, state.locale)),
             ],
@@ -1918,7 +1918,7 @@ async function handle(interaction) {
         state.data.version = interaction.values[0];
         state.step = 'version';
 
-        await interaction.update({
+        await updateCreationMessage(state, {
             embeds: [
                 buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
             ],
@@ -1969,7 +1969,7 @@ async function handle(interaction) {
 
         if (state.step === 'finalize') {
             state.step = 'version';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
                 ],
@@ -1985,7 +1985,7 @@ async function handle(interaction) {
         if (state.step === 'version') {
             if (state.data.isFiller || state.data.startTier === 'bt') {
                 state.step = 'tier';
-                await interaction.update({
+                await updateCreationMessage(state, {
                     embeds: [
                         buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
                     ],
@@ -1999,7 +1999,7 @@ async function handle(interaction) {
             }
 
             state.step = 'faction';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
                 ],
@@ -2014,7 +2014,7 @@ async function handle(interaction) {
 
         if (state.step === 'faction') {
             state.step = 'tier';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
                 ],
@@ -2030,7 +2030,7 @@ async function handle(interaction) {
         if (state.step === 'tier') {
             const classes = await listCharacterClassesForDiscord();
             state.step = 'classes';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
                 ],
@@ -2045,7 +2045,7 @@ async function handle(interaction) {
 
         if (state.step === 'classes') {
             state.step = 'avatar';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [buildAvatarStepEmbed(state)],
                 components: buildCreationStepActionRows(ownerDiscordId, 'avatar'),
                 content: '',
@@ -2055,7 +2055,7 @@ async function handle(interaction) {
 
         if (state.step === 'avatar' || state.step === 'basic') {
             state.step = 'basic';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [buildCreationBasicsEmbed(state)],
                 components: buildCreationBasicsRows(ownerDiscordId),
                 content: '',
@@ -2085,7 +2085,7 @@ async function handle(interaction) {
         if (stepKey === 'avatar') {
             state.step = 'classes';
             const classes = await listCharacterClassesForDiscord();
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(3, 'Choose classes', 'Choose one or more classes.'),
                 ],
@@ -2101,7 +2101,7 @@ async function handle(interaction) {
         if (stepKey === 'classes') {
             const classes = await listCharacterClassesForDiscord();
             if (!Array.isArray(state.data.classIds) || state.data.classIds.length === 0) {
-                await interaction.update({
+                await updateCreationMessage(state, {
                     embeds: [
                     buildCreationEmbed(3, 'Choose classes', 'Please choose at least one class.'),
                     ],
@@ -2115,7 +2115,7 @@ async function handle(interaction) {
             }
 
             state.step = 'tier';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(4, 'Choose starting tier', 'Choose the starting tier or **Filler**.'),
                 ],
@@ -2130,7 +2130,7 @@ async function handle(interaction) {
 
         if (stepKey === 'tier') {
             if (!state.data.startTier) {
-                await interaction.update({
+                await updateCreationMessage(state, {
                     embeds: [
                         buildCreationEmbed(4, 'Choose starting tier', 'Please choose a starting tier or **Filler**.'),
                     ],
@@ -2146,7 +2146,7 @@ async function handle(interaction) {
             if (state.data.startTier === 'bt' || state.data.isFiller) {
                 state.data.faction = 'none';
                 state.step = 'version';
-                await interaction.update({
+                await updateCreationMessage(state, {
                     embeds: [
                         buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
                     ],
@@ -2160,7 +2160,7 @@ async function handle(interaction) {
             }
 
             state.step = 'faction';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(5, 'Choose faction', 'Choose the faction (optional).'),
                 ],
@@ -2175,7 +2175,7 @@ async function handle(interaction) {
 
         if (stepKey === 'faction') {
             if (!state.data.faction) {
-                await interaction.update({
+                await updateCreationMessage(state, {
                     embeds: [
                         buildCreationEmbed(5, 'Choose faction', 'Please choose a faction.'),
                     ],
@@ -2189,7 +2189,7 @@ async function handle(interaction) {
             }
 
             state.step = 'version';
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(6, 'Choose version', 'Choose the ruleset version.'),
                 ],
@@ -2204,7 +2204,7 @@ async function handle(interaction) {
 
         if (stepKey === 'version') {
             if (!state.data.version) {
-                await interaction.update({
+                await updateCreationMessage(state, {
                     embeds: [
                         buildCreationEmbed(6, 'Choose version', 'Please choose a ruleset version.'),
                     ],
@@ -2220,7 +2220,7 @@ async function handle(interaction) {
             state.step = 'finalize';
             state.data.guildStatus = 'draft';
             const summary = await buildCreationSummaryEmbed(state);
-            await interaction.update({
+            await updateCreationMessage(state, {
                 embeds: [
                     buildCreationEmbed(7, 'Finalize', 'Please confirm the details.'),
                     summary,

@@ -10,6 +10,7 @@ const originalLevelProgressionModule = require.cache[levelProgressionPath];
 
 let userQueryStep = 0;
 let insertedAvatarParam = 'not-set';
+let insertedCreationSourceParam = 'not-set';
 
 const fakeConnection = {
     async beginTransaction() {
@@ -31,6 +32,7 @@ const fakeConnection = {
 
         if (sql.includes('INSERT INTO characters')) {
             insertedAvatarParam = params[7];
+            insertedCreationSourceParam = params[16];
             return [{ insertId: 777 }];
         }
 
@@ -115,6 +117,7 @@ Promise.resolve()
         assert.equal(result.ok, true);
         assert.equal(result.id, 777);
         assert.equal(insertedAvatarParam, null);
+        assert.equal(insertedCreationSourceParam, 'discord');
 
         console.log('app-db-character-avatar-normalization.test.js passed');
     })

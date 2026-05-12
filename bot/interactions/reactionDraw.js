@@ -25,6 +25,37 @@ function cleanupExpiredSessions() {
     }
 }
 
+async function updateInteractionSurface(interaction, payload) {
+    if (interaction?.message?.editable) {
+        try {
+            await interaction.message.edit(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (interaction?.deferred || interaction?.replied) {
+        try {
+            await interaction.editReply(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    if (interaction?.isMessageComponent?.()) {
+        try {
+            await interaction.update(payload);
+            return true;
+        } catch {
+            // fall through
+        }
+    }
+
+    return false;
+}
+
 function parseEmojiInput(input) {
     const raw = String(input || '').trim();
     const customMatch = raw.match(/^<a?:([^:>]+):(\d+)>$/);
@@ -902,7 +933,7 @@ async function handle(interaction) {
         session.createdAt = Date.now();
         drawSessions.set(parsed.sessionId, session);
 
-        await interaction.update({
+        await updateInteractionSurface(interaction, {
             content: '',
             embeds: buildPreviewEmbeds(session),
             components: buildPreviewComponents(session),
@@ -912,7 +943,7 @@ async function handle(interaction) {
 
     if (parsed.action === 'cancel') {
         drawSessions.delete(parsed.sessionId);
-        await interaction.update({
+        await updateInteractionSurface(interaction, {
             content: '',
             embeds: [buildInfoEmbed(
                 t('reactionDraw.cancelledTitle', {}, session.locale),
@@ -928,7 +959,7 @@ async function handle(interaction) {
         session.createdAt = Date.now();
         drawSessions.set(parsed.sessionId, session);
 
-        await interaction.update({
+        await updateInteractionSurface(interaction, {
             content: '',
             embeds: buildPreviewEmbeds(session),
             components: buildPreviewComponents(session),
@@ -941,7 +972,7 @@ async function handle(interaction) {
         drawSessions.delete(parsed.sessionId);
 
         if (!posted.ok) {
-            await interaction.update({
+            await updateInteractionSurface(interaction, {
                 content: '',
                 embeds: [buildErrorEmbed(
                     t('reactionDraw.postFailedTitle', {}, session.locale),
@@ -952,7 +983,7 @@ async function handle(interaction) {
             return true;
         }
 
-        await interaction.update({
+        await updateInteractionSurface(interaction, {
             content: '',
             embeds: [buildSuccessEmbed(
                 t('reactionDraw.confirmedTitle', {}, session.locale),
@@ -986,4 +1017,5 @@ module.exports = {
     buildCancelCustomId,
     parseActionCustomId,
     parseFixedCustomId,
+    updateInteractionSurface,
 };

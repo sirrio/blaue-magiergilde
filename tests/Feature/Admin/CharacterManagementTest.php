@@ -36,6 +36,7 @@ it('allows admins to create characters for users', function () {
     expect($character)->not->toBeNull();
     expect($character->admin_managed)->toBeTrue();
     expect($character->guild_status)->toBe('pending');
+    expect($character->creation_source)->toBe('admin');
     expect($character->characterClasses->pluck('id')->all())->toBe([$class->id]);
 });
 

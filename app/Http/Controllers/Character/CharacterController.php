@@ -82,6 +82,7 @@ class CharacterController extends Controller
         $character->bubble_shop_spend = $request->integer('bubble_shop_spend', 0);
         $bubbleShop->syncLegacySpend($character, $character->bubble_shop_spend);
         $character->user_id = Auth::user()->getAuthIdentifier();
+        $character->creation_source = 'website';
         $character->simplified_tracking = (bool) (Auth::user()?->simplified_tracking ?? false);
         $character->start_tier = $request->start_tier;
         $character->external_link = $request->external_link;

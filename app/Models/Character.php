@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property mixed $faction
  * @property mixed $notes
  * @property bool $admin_managed
+ * @property string|null $creation_source
  */
 class Character extends Model
 {

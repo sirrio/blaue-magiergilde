@@ -194,6 +194,7 @@ class CharacterApprovalNotificationService
             'character_dm_bubbles' => $character->dm_bubbles,
             'character_dm_coins' => $character->dm_coins,
             'character_shop_spend' => $character->bubble_shop_spend,
+            'character_creation_source' => $character->creation_source,
             'character_classes' => $classes,
             'character_avatar_url' => $avatarUrl,
             'external_link' => $this->sanitizeExternalLink($character->external_link),

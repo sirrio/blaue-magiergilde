@@ -85,6 +85,20 @@ it('includes spent dm bubbles and coins in character approvals payload', functio
             ->where('characters.0.dm_coins', 2));
 });
 
+it('includes character creation source in character approvals payload', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $user = User::factory()->create();
+
+    Character::factory()->for($user)->create([
+        'creation_source' => 'discord',
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/admin/character-approvals')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('characters.0.creation_source', 'discord'));
+});
+
 it('includes users without characters in empty users list', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     Character::factory()->for($admin)->create();
