@@ -1101,10 +1101,21 @@ async function finalizeCharacterCreation(state) {
         return;
     }
 
+    const interactionUser = state?.activeInteraction?.user || state?.promptInteraction?.user;
+    if (!interactionUser) {
+        await updateCreationMessage(state, {
+            content: t('characters.createFailed', {}, state.locale),
+            embeds: [],
+            components: [],
+        });
+        clearCreationState(state.userId);
+        return;
+    }
+
     const isRemoteAvatar = Boolean(data.avatar && isHttpUrl(data.avatar));
     const initialAvatar = isRemoteAvatar ? null : data.avatar;
 
-    const result = await createCharacterForDiscord(state.promptInteraction.user, {
+    const result = await createCharacterForDiscord(interactionUser, {
         name: data.name,
         startTier: data.startTier,
         externalLink: data.externalLink,
@@ -1139,7 +1150,7 @@ async function finalizeCharacterCreation(state) {
         await syncCharacterApprovalAnnouncement(result.id);
     }
 
-    const character = await findCharacterForDiscord(state.promptInteraction.user, result.id);
+    const character = await findCharacterForDiscord(interactionUser, result.id);
     if (!character) {
         await updateCreationMessage(state, {
             content: t('characters.createSuccessFallback', {}, state.locale),
@@ -1150,7 +1161,7 @@ async function finalizeCharacterCreation(state) {
     }
 
     await updateCreationMessage(state, {
-        ...(await buildCharacterCardPayloadForInteraction(interaction.user, character, ownerDiscordId)),
+        ...(await buildCharacterCardPayloadForInteraction(interactionUser, character, ownerDiscordId)),
         content: '',
     });
 }
@@ -1302,12 +1313,25 @@ async function updateDowntimeMessage(state, payload) {
         }
     }
 
-    if (state?.promptInteraction?.isRepliable?.()) {
-        await state.promptInteraction.editReply(payload);
-        if (isModalSubmit && (activeInteraction?.deferred || activeInteraction?.replied)) {
-            await activeInteraction.deleteReply().catch(() => undefined);
+    if (state?.promptInteraction?.isMessageComponent?.()) {
+        try {
+            await state.promptInteraction.update(payload);
+            return true;
+        } catch {
+            // fall through
         }
-        return true;
+    }
+
+    if (state?.promptInteraction?.isRepliable?.()) {
+        try {
+            await state.promptInteraction.editReply(payload);
+            if (isModalSubmit && (activeInteraction?.deferred || activeInteraction?.replied)) {
+                await activeInteraction.deleteReply().catch(() => undefined);
+            }
+            return true;
+        } catch {
+            // fall through
+        }
     }
 
     return false;
@@ -5610,4 +5634,6 @@ module.exports = {
     handleAvatarUpdateMessage,
     storeCharacterAvatar,
     buildCreationStepPayload,
+    finalizeCharacterCreation,
+    updateDowntimeMessage,
 };
