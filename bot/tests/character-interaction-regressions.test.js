@@ -50,7 +50,7 @@ require.cache[appDbPath] = {
             guild_status: 'draft',
         }),
         updateCharacterForDiscord: async () => ({ ok: false }),
-        listCharacterClassesForDiscord: async () => [],
+        listCharacterClassesForDiscord: async () => [{ id: 1, name: 'Wizard', guild_enabled: 1 }],
         syncCharacterClassesForDiscord: async () => ({ ok: false }),
         softDeleteCharacterForDiscord: async () => ({ ok: false }),
         listAdventuresForDiscord: async () => [],
@@ -93,6 +93,11 @@ require.cache[characterViewsPath] = {
             embeds: [{ data: { title: character.name } }],
             components: [{ ownerDiscordId }],
         }),
+        buildClassesRow: () => ({ type: 'classes-row' }),
+        buildCreationEmbed: (step, title, description) => ({ step, title, description }),
+        buildCreationStepActionRows: () => [{ type: 'action-row' }],
+        buildStartTierRow: () => ({ type: 'tier-row' }),
+        getStartTierSelection: state => state?.data?.isFiller ? 'filler' : state?.data?.startTier,
         isHttpUrl: value => typeof value === 'string' && /^https?:\/\//.test(value),
     },
 };
@@ -183,10 +188,67 @@ async function testUpdateDowntimeMessageSwallowsExpiredReplyToken() {
     assert.equal(result, false);
 }
 
+async function testCreationClassAndTierSelectionsDeferImmediately() {
+    const { handle } = require('../interactions/characters');
+    const creationState = {
+        userId: 'u1',
+        ownerDiscordId: 'u1',
+        locale: 'de',
+        data: {
+            classIds: [],
+            startTier: 'bt',
+            isFiller: false,
+            version: '2024',
+            faction: 'none',
+        },
+        step: 'classes',
+        promptMessage: {
+            editable: true,
+            edit: async () => undefined,
+        },
+    };
+
+    state.pendingCharacterCreations.set('u1', creationState);
+
+    const makeSelectInteraction = (customId, values) => {
+        let deferCount = 0;
+        return {
+            customId,
+            values,
+            user: { id: 'u1' },
+            message: creationState.promptMessage,
+            isStringSelectMenu: () => true,
+            isButton: () => false,
+            isModalSubmit: () => false,
+            isMessageComponent: () => true,
+            isRepliable: () => true,
+            deferUpdate: async () => {
+                deferCount += 1;
+            },
+            get deferCount() {
+                return deferCount;
+            },
+        };
+    };
+
+    const classInteraction = makeSelectInteraction('charactersCreate_classes_u1', ['1']);
+    await handle(classInteraction);
+
+    assert.equal(classInteraction.deferCount, 1);
+    assert.deepEqual(creationState.data.classIds, [1]);
+
+    const tierInteraction = makeSelectInteraction('charactersCreate_tier_u1', ['lt']);
+    await handle(tierInteraction);
+
+    assert.equal(tierInteraction.deferCount, 1);
+    assert.equal(creationState.data.startTier, 'lt');
+}
+
 async function run() {
     try {
         await testFinalizeCharacterCreationUsesStateInteractionUser();
         await testUpdateDowntimeMessageSwallowsExpiredReplyToken();
+        await testCreationClassAndTierSelectionsDeferImmediately();
         console.log('character-interaction-regressions.test.js passed');
     } finally {
         state.pendingCharacterCreations.clear();

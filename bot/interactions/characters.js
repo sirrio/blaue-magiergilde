@@ -1817,6 +1817,7 @@ async function handle(interaction) {
         }
 
         ensurePromptMessage(state, interaction);
+        await interaction.deferUpdate().catch(() => undefined);
         state.data.classIds = interaction.values.map(value => Number(value)).filter(value => Number.isFinite(value));
         state.step = 'classes';
         const classes = await listCharacterClassesForDiscord();
@@ -1848,6 +1849,7 @@ async function handle(interaction) {
         }
 
         ensurePromptMessage(state, interaction);
+        await interaction.deferUpdate().catch(() => undefined);
         const value = interaction.values[0];
         if (value === 'filler') {
             state.data.isFiller = true;
