@@ -454,6 +454,7 @@ export interface Character {
   bubble_shop_legacy_spend?: number
   bubble_shop_purchases?: CharacterBubbleShopPurchase[]
   faction_rank?: number
+  creation_source?: 'website' | 'discord' | 'admin' | string | null
   manual_adventures_count?: number | null
   manual_faction_rank?: number | null
   progression_version_id?: number | null

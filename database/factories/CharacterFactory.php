@@ -36,6 +36,7 @@ class CharacterFactory extends Factory
             ]),
             'notes' => $this->faker->sentence(),
             'position' => $this->faker->numberBetween(0, 10),
+            'creation_source' => $this->faker->randomElement(['website', 'discord', 'admin', null]),
             'progression_version_id' => LevelProgression::activeVersionId(),
             'simplified_tracking' => false,
             'avatar_masked' => true,

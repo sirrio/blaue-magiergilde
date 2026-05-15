@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GameAnnouncement;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -11,12 +12,22 @@ class GameAnnouncementController extends Controller
 {
     public function index(Request $request): Response
     {
-        $perPageOptions = [50, 100, 250];
-        $validated = $request->validate([
-            'per_page' => ['nullable', 'integer', 'in:'.implode(',', $perPageOptions)],
+        return $this->renderList($request, 'upcoming');
+    }
+
+    public function archive(Request $request): Response
+    {
+        return $this->renderList($request, 'archive');
+    }
+
+    private function renderList(Request $request, string $mode): Response
+    {
+        $request->validate([
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
-        $perPage = (int) ($validated['per_page'] ?? 100);
+        $perPage = $mode === 'archive' ? 20 : 200;
+
+        $now = now();
 
         $gamesPaginator = GameAnnouncement::query()
             ->select([
@@ -34,7 +45,14 @@ class GameAnnouncementController extends Controller
                 'posted_at',
                 'confidence',
             ])
-            ->orderByDesc('starts_at')
+            ->when($mode === 'upcoming', function (Builder $query) use ($now): void {
+                $query->where(function (Builder $sub) use ($now): void {
+                    $sub->whereNull('starts_at')->orWhere('starts_at', '>=', $now);
+                })->orderBy('starts_at');
+            })
+            ->when($mode === 'archive', function (Builder $query) use ($now): void {
+                $query->where('starts_at', '<', $now)->orderByDesc('starts_at');
+            })
             ->orderByDesc('posted_at')
             ->paginate($perPage)
             ->withQueryString();
@@ -62,6 +80,7 @@ class GameAnnouncementController extends Controller
 
         return Inertia::render('games/index', [
             'games' => $games,
+            'mode' => $mode,
             'pagination' => [
                 'currentPage' => $gamesPaginator->currentPage(),
                 'lastPage' => $gamesPaginator->lastPage(),
@@ -69,7 +88,6 @@ class GameAnnouncementController extends Controller
                 'total' => $gamesPaginator->total(),
                 'hasMorePages' => $gamesPaginator->hasMorePages(),
             ],
-            'perPageOptions' => $perPageOptions,
             'lastSyncedAt' => GameAnnouncement::query()->max('updated_at'),
         ]);
     }

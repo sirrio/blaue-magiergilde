@@ -777,8 +777,21 @@ async function relayUserMessageToThread(ticket, message, existingThread = null) 
 
     const locale = ticket.locale || await resolveLocaleForDiscordId(ticket.user_discord_id);
     const content = buildUserRelayContent(message, locale);
-    await thread.send({ content });
-    return { ok: true, thread };
+    try {
+        await thread.send({ content });
+        return { ok: true, thread };
+    } catch (error) {
+        const code = error?.code;
+        const status = error?.status;
+        console.warn('[bot] Support ticket relay to thread failed.', {
+            ticketId: ticket?.id ?? null,
+            threadId: ticket?.thread_id ?? null,
+            code,
+            status,
+            error: error?.message || String(error),
+        });
+        return { ok: false, thread };
+    }
 }
 
 async function relayStaffMessageToUser(ticket, message) {
@@ -1366,6 +1379,7 @@ async function handleSupportTicketMessage(message) {
 module.exports = {
     handleSupportTicketInteraction,
     handleSupportTicketMessage,
+    relayUserMessageToThread,
     isTicketCloseCommand,
     isTicketClaimCommand,
     isTicketUnclaimCommand,

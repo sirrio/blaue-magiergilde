@@ -108,6 +108,54 @@
     color: #1f2937;
   }
 
+  .bg-tier-bt {
+    background-color: #cd7f32;
+  }
+
+  .bg-tier-lt {
+    background-color: #c0c0c0;
+  }
+
+  .bg-tier-ht {
+    background-color: #d4af37;
+  }
+
+  .bg-tier-et {
+    background-color: #8b5cf6;
+  }
+
+  .bg-tier-bt\/10 {
+    background-color: rgb(205 127 50 / 0.1);
+  }
+
+  .bg-tier-lt\/10 {
+    background-color: rgb(192 192 192 / 0.15);
+  }
+
+  .bg-tier-ht\/15 {
+    background-color: rgb(212 175 55 / 0.15);
+  }
+
+  .bg-tier-et\/15 {
+    background-color: rgb(139 92 246 / 0.15);
+  }
+
+  .border-tier-bt {
+    border-color: #cd7f32;
+  }
+
+  .border-tier-lt {
+    border-color: #c0c0c0;
+  }
+
+  .border-tier-ht {
+    border-color: #d4af37;
+  }
+
+  .border-tier-et {
+    border-color: #8b5cf6;
+  }
+
   .torn-mask {
     clip-path: polygon(
       0 0,

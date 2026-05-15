@@ -1381,9 +1381,9 @@ async function createCharacterForDiscord(
         const [insertCharacter] = await connection.execute(
             `
             INSERT INTO characters
-                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, bubble_shop_legacy_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, progression_version_id, created_at, updated_at)
+                    (name, start_tier, dm_bubbles, dm_coins, bubble_shop_spend, bubble_shop_legacy_spend, external_link, avatar, faction, version, is_filler, user_id, guild_status, registration_note, simplified_tracking, progression_version_id, creation_source, created_at, updated_at)
             VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 safeName,
@@ -1402,6 +1402,7 @@ async function createCharacterForDiscord(
                 null,
                 accountSimplifiedTracking ? 1 : 0,
                 progressionVersionId,
+                'discord',
                 createdAt,
                 createdAt,
             ],

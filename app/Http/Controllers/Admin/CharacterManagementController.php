@@ -37,6 +37,7 @@ class CharacterManagementController extends Controller
         $character->bubble_shop_spend = $request->integer('bubble_shop_spend');
         $bubbleShop->syncLegacySpend($character, $character->bubble_shop_spend);
         $character->user_id = $user->id;
+        $character->creation_source = 'admin';
         $character->start_tier = $request->string('start_tier')->toString();
         $character->external_link = $request->string('external_link')->toString();
         $character->guild_status = $request->input('guild_status', 'pending');

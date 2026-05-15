@@ -12,6 +12,7 @@ const payload = {
     character_dm_bubbles: 0,
     character_dm_coins: 0,
     character_shop_spend: 0,
+    character_creation_source: 'discord',
     character_registration_note: 'Please review this with custom homebrew note.',
     character_review_note: 'Please provide a proper DnDBeyond link before approval.',
     character_avatar_url: 'https://example.test/avatars/character.png',
@@ -40,6 +41,9 @@ assert.ok(userField?.value.includes('<@123456789012345678>'));
 
 const firstSubmissionField = embedData.fields.find((field) => field.name === 'Erstanmeldung');
 assert.equal(firstSubmissionField?.value, 'Ja');
+
+const creationSourceField = embedData.fields.find((field) => field.name === 'Angelegt über');
+assert.equal(creationSourceField?.value, 'Discord');
 
 const registrationField = embedData.fields.find((field) => field.name === 'Registrierungsnotizen');
 assert.equal(registrationField?.value, 'Please review this with custom homebrew note.');

@@ -1,17 +1,24 @@
 import AppLayout from '@/layouts/app-layout'
 import LogoTier from '@/components/logo-tier'
 import DiscordIcon from '@/components/discord-icon'
-import { Card, CardBody } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { List, ListRow } from '@/components/ui/list'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
 import type { GameAnnouncement, PageProps } from '@/types'
-import { Head, router, usePage } from '@inertiajs/react'
-import { CalendarRange, LayoutGrid, List as ListIcon, SquareArrowOutUpRight } from 'lucide-react'
+import { Head, Link, router, usePage } from '@inertiajs/react'
+import {
+  Archive,
+  CalendarClock,
+  LayoutGrid,
+  List as ListIcon,
+  SquareArrowOutUpRight,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 interface Props {
   games: GameAnnouncement[]
+  mode: 'upcoming' | 'archive'
   pagination: {
     currentPage: number
     lastPage: number
@@ -19,16 +26,32 @@ interface Props {
     total: number
     hasMorePages: boolean
   }
-  perPageOptions: number[]
   lastSyncedAt?: string | null
 }
 
 const tierOptions = ['bt', 'lt', 'ht', 'et'] as const
+
+const parseTierList = (tier: string | null | undefined): string[] => {
+  return String(tier || '')
+    .toLowerCase()
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
 const timeZoneLabel = 'Europe/Berlin'
+
+const tierAccent: Record<string, { border: string; text: string; soft: string }> = {
+  bt: { border: 'border-tier-bt', text: 'text-tier-bt', soft: 'bg-tier-bt/10' },
+  lt: { border: 'border-tier-lt', text: 'text-tier-lt', soft: 'bg-tier-lt/10' },
+  ht: { border: 'border-tier-ht', text: 'text-tier-ht', soft: 'bg-tier-ht/15' },
+  et: { border: 'border-tier-et', text: 'text-tier-et', soft: 'bg-tier-et/15' },
+}
+
+const monthShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+const weekdayShort = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
 const normalizeGameDateValue = (value: string) => {
   if (!value.includes('T')) return value
-
   let normalized = value.replace('T', ' ')
   normalized = normalized.replace(/\.\d+/, '')
   normalized = normalized.replace(/Z$/, '')
@@ -63,13 +86,6 @@ const formatGameDate = (value: string | null | undefined, includeTime: boolean) 
   return date
 }
 
-const formatCompactDate = (value: string | null | undefined) => {
-  const parts = parseGameDateParts(value)
-  if (!parts) return null
-  const padded = (item: number) => String(item).padStart(2, '0')
-  return `${padded(parts.day)}.${padded(parts.month)}`
-}
-
 const buildDateFromParts = (parts: ReturnType<typeof parseGameDateParts>) => {
   if (!parts) return null
   const hour = parts.hour ?? 12
@@ -82,38 +98,103 @@ const buildDateKey = (date: Date) => {
   return `${date.getFullYear()}-${padded(date.getMonth() + 1)}-${padded(date.getDate())}`
 }
 
-const buildDateLabel = (date: Date) => {
-  return {
-    weekday: date.toLocaleDateString(undefined, { weekday: 'short' }),
-    month: date.toLocaleDateString(undefined, { month: 'short' }),
-    day: String(date.getDate()).padStart(2, '0'),
-    year: String(date.getFullYear()),
-  }
-}
-
-const buildWeekBounds = (value: Date) => {
-  const start = new Date(value.getFullYear(), value.getMonth(), value.getDate())
-  const weekday = (start.getDay() + 6) % 7
-  start.setDate(start.getDate() - weekday)
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
-  return { start, end }
-}
-
 const getConfidenceColor = (confidence: number) => {
   if (confidence >= 0.85) return 'bg-success'
   if (confidence >= 0.6) return 'bg-warning'
   return 'bg-error'
 }
 
-export default function GamesIndex({ games, pagination, perPageOptions, lastSyncedAt }: Props) {
+const STOP_WORDS = new Set([
+  'ich', 'du', 'wir', 'ihr', 'sie', 'er', 'es',
+  'um', 'am', 'im', 'an', 'auf', 'bei', 'zu', 'zur', 'zum',
+  'und', 'oder', 'aber', 'denn', 'doch',
+  'der', 'die', 'das', 'den', 'dem', 'des',
+  'ein', 'eine', 'einen', 'einem', 'einer',
+  'mit', 'für', 'fur', 'von', 'vom', 'bis', 'so',
+  'noch', 'jetzt', 'mal', 'mehr',
+])
+
+const cleanContentForDisplay = (content: string | null | undefined): string => {
+  let str = String(content || '')
+  if (!str) return ''
+  str = str
+    .replace(/<a?:[A-Za-z0-9_]+:\d+>/g, ' ')
+    .replace(/:MG_[A-Z0-9_]+~?\d*:/gi, ' ')
+    .replace(/<t:\d{9,12}(?::[tTdDfFR])?>/g, ' ')
+    .replace(/<@[!&]?\d+>/g, ' ')
+    .replace(/<#\d+>/g, ' ')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/(?<!\*)\*(?!\*)/g, ' ')
+    .replace(/(?<![_a-zA-Z0-9])_(?![_a-zA-Z0-9])/g, ' ')
+    .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
+    .replace(/\b\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?\b/g, ' ')
+    .replace(/\b\d{1,2}\s*[.:h]\s*\d{2}\s*(?:uhr|Uhr)?\b/g, ' ')
+    .replace(/\b\d{1,2}\s*(?:uhr|Uhr)\b/g, ' ')
+    .replace(/\b(?:mo|di|mi|do|fr|sa|so)\b\.?,?/gi, ' ')
+    .replace(/\b(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b,?/gi, ' ')
+    .replace(/\b(?:heute|morgen|gestern|übermorgen|uebermorgen)\b/gi, ' ')
+    .replace(/\b(?:ca\.?|circa|etwa|gegen|ungefähr|ungefaehr|approx\.?)\b/gi, ' ')
+    .replace(/\(\s*[+\-±~]+\s*\)/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[\s|·•–—-]{2,}/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  for (const q of ['"', '“', '”', '„', '‟']) {
+    const count = (str.match(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length
+    if (count === 1) str = str.split(q).join('').trim()
+  }
+  return str.replace(/^[\s·•|–—\-,.:;*_/\\]+|[\s·•|–—\-,.:;*_/\\]+$/g, '').trim()
+}
+
+const isLabelMeaningful = (label: string): boolean => {
+  if (!label || label.length < 4) return false
+  const alnum = label.replace(/[^\p{L}\p{N}]+/gu, '')
+  if (alnum.length < 3) return false
+  if (STOP_WORDS.has(label.toLowerCase())) return false
+  return true
+}
+
+const resolveGameLabel = (
+  title: string | null | undefined,
+  content: string | null | undefined,
+  maxLength = 80,
+): string => {
+  const trimmedTitle = String(title || '').trim()
+  if (trimmedTitle) {
+    return trimmedTitle.length > maxLength ? `${trimmedTitle.slice(0, maxLength - 1)}…` : trimmedTitle
+  }
+  const cleaned = cleanContentForDisplay(content)
+  if (isLabelMeaningful(cleaned)) {
+    return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1)}…` : cleaned
+  }
+  return 'Untitled game'
+}
+
+const formatRelative = (date: Date, now: Date) => {
+  const diffMs = date.getTime() - now.getTime()
+  const future = diffMs >= 0
+  const absMin = Math.round(Math.abs(diffMs) / 60000)
+  if (absMin < 60) return future ? `in ${absMin} min` : `vor ${absMin} min`
+  const absH = Math.round(absMin / 60)
+  if (absH < 24) return future ? `in ${absH} h` : `vor ${absH} h`
+  const absD = Math.round(absH / 24)
+  if (absD < 14) return future ? `in ${absD} Tagen` : `vor ${absD} Tagen`
+  const absW = Math.round(absD / 7)
+  return future ? `in ${absW} Wochen` : `vor ${absW} Wochen`
+}
+
+export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Props) {
   const getInitials = useInitials()
   const { features } = usePage<PageProps>().props
   const [search, setSearch] = useState('')
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
-  const [weekFilter, setWeekFilter] = useState<'all' | 'this_week' | 'next_week' | 'last_week'>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
-  const calendarEnabled = features?.games_calendar ?? true
+  const calendarEnabled = (features?.games_calendar ?? true) && mode === 'upcoming'
   const activeViewMode = calendarEnabled ? viewMode : 'list'
+  const isArchive = mode === 'archive'
   const todayKey = buildDateKey(new Date())
 
   const enrichedGames = useMemo(() => {
@@ -122,7 +203,7 @@ export default function GamesIndex({ games, pagination, perPageOptions, lastSync
       const startsDate = buildDateFromParts(startsParts)
       const authorName = game.discord_author_name?.trim() || 'Unknown'
       const avatarUrl = game.discord_author_avatar_url?.trim() || null
-      const title = game.title?.trim() || 'Untitled game'
+      const title = resolveGameLabel(game.title, game.content, 80)
       const timeLabel =
         startsParts && startsParts.hour !== null && startsParts.minute !== null
           ? `${String(startsParts.hour).padStart(2, '0')}:${String(startsParts.minute).padStart(2, '0')}`
@@ -146,108 +227,26 @@ export default function GamesIndex({ games, pagination, perPageOptions, lastSync
         timeLabel,
         discordUrl,
         discordAppUrl,
+        tierList: parseTierList(game.tier),
       }
     })
   }, [games])
 
-  const { weekStart, weekEnd, nextWeekStart, nextWeekEnd, lastWeekStart, lastWeekEnd } = useMemo(() => {
-    const { start, end } = buildWeekBounds(new Date())
-    const nextStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)
-    const nextEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 7)
-    const lastStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7)
-    const lastEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 7)
-    return {
-      weekStart: start,
-      weekEnd: end,
-      nextWeekStart: nextStart,
-      nextWeekEnd: nextEnd,
-      lastWeekStart: lastStart,
-      lastWeekEnd: lastEnd,
-    }
-  }, [])
+  const now = useMemo(() => new Date(), [])
 
   const filteredGames = useMemo(() => {
     const searchTerm = search.trim().toLowerCase()
     return enrichedGames.filter((game) => {
-      const tierKey = game.tier?.toLowerCase() ?? ''
-      const matchesTier = selectedTiers.length === 0 || (tierKey && selectedTiers.includes(tierKey))
+      const matchesTier =
+        selectedTiers.length === 0 ||
+        game.tierList.some((tier) => selectedTiers.includes(tier))
       if (!matchesTier) return false
-
-      if (weekFilter !== 'all') {
-        if (!game.startsDate) return false
-        if (weekFilter === 'this_week' && (game.startsDate < weekStart || game.startsDate >= weekEnd)) {
-          return false
-        }
-        if (
-          weekFilter === 'next_week' &&
-          (game.startsDate < nextWeekStart || game.startsDate >= nextWeekEnd)
-        ) {
-          return false
-        }
-        if (
-          weekFilter === 'last_week' &&
-          (game.startsDate < lastWeekStart || game.startsDate >= lastWeekEnd)
-        ) {
-          return false
-        }
-      }
 
       if (!searchTerm) return true
       const haystack = `${game.title} ${game.content ?? ''} ${game.authorName}`.toLowerCase()
       return haystack.includes(searchTerm)
     })
-  }, [
-    enrichedGames,
-    lastWeekEnd,
-    lastWeekStart,
-    nextWeekEnd,
-    nextWeekStart,
-    search,
-    selectedTiers,
-    weekEnd,
-    weekFilter,
-    weekStart,
-  ])
-
-  const sortedGames = useMemo(() => {
-    const items = [...filteredGames]
-    items.sort((a, b) => {
-      const aTime = a.startsDate?.getTime()
-      const bTime = b.startsDate?.getTime()
-      if (aTime == null && bTime == null) return 0
-      if (aTime == null) return 1
-      if (bTime == null) return -1
-      return bTime - aTime
-    })
-    return items
-  }, [filteredGames])
-
-  const buildGroupedGames = (list: typeof filteredGames) => {
-    const groups = new Map<
-      string,
-      {
-        key: string
-        label: ReturnType<typeof buildDateLabel> | null
-        isToday: boolean
-        entries: typeof filteredGames
-      }
-    >()
-
-    list.forEach((game) => {
-      const dateKey = game.startsDate ? buildDateKey(game.startsDate) : 'unknown'
-      if (!groups.has(dateKey)) {
-        groups.set(dateKey, {
-          key: dateKey,
-          label: game.startsDate ? buildDateLabel(game.startsDate) : null,
-          isToday: dateKey === todayKey,
-          entries: [],
-        })
-      }
-      groups.get(dateKey)?.entries.push(game)
-    })
-
-    return Array.from(groups.values())
-  }
+  }, [enrichedGames, search, selectedTiers])
 
   const calendarData = useMemo(() => {
     const baseDate = filteredGames.find((game) => game.startsDate)?.startsDate ?? new Date()
@@ -282,380 +281,369 @@ export default function GamesIndex({ games, pagination, perPageOptions, lastSync
     }
   }, [filteredGames])
 
-  const activeFilters = [
-    search.trim() ? `Search: ${search.trim()}` : null,
-    selectedTiers.length ? `Tier: ${selectedTiers.map((tier) => tier.toUpperCase()).join(', ')}` : null,
-    weekFilter === 'this_week'
-      ? 'Week: This'
-      : weekFilter === 'next_week'
-        ? 'Week: Next'
-        : weekFilter === 'last_week'
-          ? 'Week: Last'
-          : null,
-  ].filter(Boolean) as string[]
-
-  const navigateToPage = (page: number, perPage: number) => {
+  const navigateToPage = (page: number) => {
     router.get(
-      route('games.index'),
-      {
-        page,
-        per_page: perPage,
-      },
-      {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-      },
+      route(isArchive ? 'games.archive' : 'games.index'),
+      { page },
+      { preserveState: true, preserveScroll: true, replace: true },
+    )
+  }
+
+  const renderGameRow = (game: (typeof filteredGames)[number]) => {
+    const tierKeys = game.tierList
+    const primaryAccent = tierKeys[0] ? tierAccent[tierKeys[0]] : undefined
+    const confidence = Number(game.confidence ?? 0)
+    const confidenceColor = getConfidenceColor(confidence)
+    const isPast = game.startsDate ? game.startsDate < now : false
+    const isToday = game.startsDate ? buildDateKey(game.startsDate) === todayKey : false
+    const relative = game.startsDate ? formatRelative(game.startsDate, now) : null
+
+    const day = game.startsParts ? String(game.startsParts.day).padStart(2, '0') : '—'
+    const monthLabel = game.startsParts ? monthShort[game.startsParts.month - 1] : ''
+    const weekdayLabel = game.startsDate ? weekdayShort[game.startsDate.getDay()] : ''
+
+    return (
+      <ListRow
+        key={game.discord_message_id}
+        className={cn('gap-3', isPast && !isArchive && 'opacity-70')}
+      >
+        <div
+          className={cn(
+            'flex w-14 shrink-0 flex-col items-center justify-center rounded-box border-l-4 px-1 py-1 text-center leading-tight',
+            isToday
+              ? 'bg-primary text-primary-content'
+              : isPast
+                ? 'bg-base-200/60 text-base-content/60'
+                : 'bg-base-200 text-base-content/80',
+            primaryAccent ? primaryAccent.border : 'border-base-300',
+          )}
+        >
+          <span className="text-[10px] uppercase tracking-wide opacity-80">{weekdayLabel}</span>
+          <span className="text-xl font-bold leading-none tabular-nums">{day}</span>
+          <span className="text-[10px] uppercase tracking-wide opacity-80">{monthLabel}</span>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {isToday && !isArchive ? (
+              <span className="badge badge-primary badge-sm">Heute</span>
+            ) : null}
+            {tierKeys.map((tk) => {
+              const acc = tierAccent[tk]
+              return (
+                <span
+                  key={tk}
+                  className={cn(
+                    'badge badge-sm gap-1 border-0',
+                    acc ? acc.soft : 'bg-base-200',
+                    acc ? acc.text : 'text-base-content/70',
+                  )}
+                >
+                  <LogoTier tier={tk} width={10} />
+                  {tk.toUpperCase()}
+                </span>
+              )
+            })}
+            <h3 className="min-w-0 truncate text-base font-semibold leading-snug" title={game.content ?? undefined}>
+              {game.title}
+            </h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/60">
+            {game.timeLabel ? (
+              <span className="font-medium tabular-nums text-base-content/80">{game.timeLabel}</span>
+            ) : (
+              <span className="italic text-base-content/40">Zeit unbekannt</span>
+            )}
+            {relative ? (
+              <>
+                <span className="text-base-content/30">·</span>
+                <span>{relative}</span>
+              </>
+            ) : null}
+            <span className="text-base-content/30">·</span>
+            <div className="flex items-center gap-1.5">
+              <div className="avatar">
+                <div className="w-4 rounded-full bg-base-200">
+                  {game.avatarUrl ? (
+                    <img src={game.avatarUrl} alt={game.authorName} />
+                  ) : (
+                    <span className="text-[9px] font-semibold text-base-content/70">
+                      {getInitials(game.authorName)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span>{game.authorName}</span>
+            </div>
+            <span
+              className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
+              title={`Parse confidence: ${confidence.toFixed(2)}`}
+            />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {game.discordAppUrl ? (
+            <a
+              href={game.discordAppUrl}
+              className="btn btn-ghost btn-sm px-2"
+              title="Open in Discord app"
+            >
+              <DiscordIcon width={16} />
+            </a>
+          ) : null}
+          {game.discordUrl ? (
+            <a
+              href={game.discordUrl}
+              className="btn btn-ghost btn-sm px-2"
+              title="Open in browser"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <SquareArrowOutUpRight size={14} />
+            </a>
+          ) : null}
+        </div>
+      </ListRow>
     )
   }
 
   return (
     <AppLayout>
-      <Head title="Games" />
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-4 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Games</h1>
-            <p className="text-sm text-base-content/70">Recent announcements from Discord.</p>
-            <p className="text-[11px] text-base-content/60">
-              {pagination.total} entries
-              {pagination.lastPage > 1 ? ` · Page ${pagination.currentPage}/${pagination.lastPage}` : ''}
+      <Head title={isArchive ? 'Games · Archiv' : 'Games'} />
+      <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
+        <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-bold">{isArchive ? 'Archiv' : 'Games'}</h1>
+            <p className="text-sm text-base-content/70">
+              {isArchive
+                ? 'Vergangene Spielankündigungen.'
+                : 'Kommende Spielankündigungen aus Discord.'}
+            </p>
+            <p className="text-xs text-base-content/60">
+              {pagination.total} Einträge
+              {pagination.lastPage > 1 ? ` · Seite ${pagination.currentPage}/${pagination.lastPage}` : ''}
               {lastSyncedAt
                 ? (() => {
                     const formatted = formatGameDate(lastSyncedAt, true)
-                    return formatted ? ` · Last sync ${formatted}` : ''
+                    return formatted ? ` · Letzter Sync ${formatted}` : ''
                   })()
                 : ''}
+              {` · Zeitzone ${timeZoneLabel}`}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1 text-[10px] text-base-content/60">
-            <span>Timezone: {timeZoneLabel}</span>
+          <div className="flex items-center gap-2">
             {calendarEnabled ? (
-              <div role="tablist" className="tabs tabs-box tabs-xs">
+              <div role="tablist" className="tabs tabs-border">
                 <button
                   role="tab"
                   type="button"
-                  className={cn('tab', viewMode === 'list' && 'tab-active')}
+                  className={cn('tab gap-1.5', viewMode === 'list' && 'tab-active')}
                   onClick={() => setViewMode('list')}
                 >
-                  <ListIcon size={12} />
-                  List
+                  <ListIcon size={14} />
+                  Liste
                 </button>
                 <button
                   role="tab"
                   type="button"
-                  className={cn('tab', viewMode === 'calendar' && 'tab-active')}
+                  className={cn('tab gap-1.5', viewMode === 'calendar' && 'tab-active')}
                   onClick={() => setViewMode('calendar')}
                 >
-                  <LayoutGrid size={12} />
-                  Calendar
+                  <LayoutGrid size={14} />
+                  Kalender
                 </button>
               </div>
             ) : null}
+            <Link
+              href={route(isArchive ? 'games.index' : 'games.archive')}
+              className="btn btn-sm btn-ghost gap-1.5"
+            >
+              {isArchive ? (
+                <>
+                  <CalendarClock size={14} />
+                  Kommend
+                </>
+              ) : (
+                <>
+                  <Archive size={14} />
+                  Archiv
+                </>
+              )}
+            </Link>
+          </div>
+        </section>
+
+        <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-4">
+          <Input
+            type="search"
+            placeholder="Suchen nach Titel, Autor, Inhalt..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          >
+            Suche
+          </Input>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="text-base-content/60">Tier:</span>
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  className={cn('btn btn-xs', selectedTiers.length === 0 ? 'btn-primary' : 'btn-ghost')}
+                  onClick={() => setSelectedTiers([])}
+                >
+                  Alle
+                </button>
+                {tierOptions.map((tier) => {
+                  const isActive = selectedTiers.includes(tier)
+                  const accent = tierAccent[tier]
+                  return (
+                    <button
+                      key={tier}
+                      type="button"
+                      className={cn(
+                        'btn btn-xs gap-1',
+                        isActive ? 'btn-primary' : 'btn-ghost',
+                        !isActive && accent && accent.text,
+                      )}
+                      onClick={() =>
+                        setSelectedTiers((current) =>
+                          isActive ? current.filter((entry) => entry !== tier) : [...current, tier],
+                        )
+                      }
+                    >
+                      <LogoTier tier={tier} width={14} />
+                      {tier.toUpperCase()}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/50">
+            <span>
+              {filteredGames.length} von {games.length} auf dieser Seite
+            </span>
           </div>
         </div>
 
-        <Card>
-          <CardBody className="gap-1.5">
-            <div className="rounded-box border border-base-200 bg-base-100 p-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-base-content/60">
-                <span className="badge badge-ghost badge-xs">
-                  {filteredGames.length} of {games.length} on this page
-                </span>
-                {activeFilters.length === 0 ? (
-                  <span className="text-base-content/50">No filters</span>
-                ) : (
-                    activeFilters.map((filter) => (
-                      <span key={filter} className="badge badge-ghost badge-xs">
-                        {filter}
-                      </span>
-                    ))
-                  )}
-              </div>
-              <div className="mt-1.5 grid gap-1.5 lg:grid-cols-[1fr,auto]">
-                <Input
-                  type="search"
-                  placeholder="Search by title, author, or content..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  hideLabel
-                  inputClassName="input-xs text-[11px]"
-                >
-                  Search
-                </Input>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-base-content/60">Page size:</span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {perPageOptions.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        className={cn('btn btn-xs', pagination.perPage === option ? 'btn-primary' : 'btn-ghost')}
-                        onClick={() => navigateToPage(1, option)}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-base-content/60">Tier:</span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <button
-                      type="button"
-                      className={cn('btn btn-xs', selectedTiers.length === 0 ? 'btn-primary' : 'btn-ghost')}
-                      onClick={() => setSelectedTiers([])}
-                    >
-                      All
-                    </button>
-                    {tierOptions.map((tier) => {
-                      const isActive = selectedTiers.includes(tier)
-                      return (
-                        <button
-                          key={tier}
-                          type="button"
-                          className={cn('btn btn-xs', isActive ? 'btn-primary' : 'btn-ghost')}
-                          onClick={() =>
-                            setSelectedTiers((current) =>
-                              isActive ? current.filter((entry) => entry !== tier) : [...current, tier],
-                            )
-                          }
-                        >
-                          <LogoTier tier={tier} width={12} />
-                          {tier.toUpperCase()}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-base-content/60">Week:</span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {[
-                      { value: 'all', label: 'All' },
-                      { value: 'next_week', label: 'Next' },
-                      { value: 'this_week', label: 'This' },
-                      { value: 'last_week', label: 'Last' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={cn(
-                          'btn btn-xs',
-                          weekFilter === option.value ? 'btn-primary' : 'btn-ghost',
-                        )}
-                        onClick={() => setWeekFilter(option.value as typeof weekFilter)}
-                      >
-                        <CalendarRange size={12} />
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            {games.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-6 text-center text-sm text-base-content/70">
-                No announcements found yet.
-              </div>
-            ) : filteredGames.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-6 text-center text-sm text-base-content/70">
-                No announcements match your filters.
-              </div>
-            ) : (
-              <>
-                {activeViewMode === 'calendar' ? (
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">Calendar · {calendarData.monthLabel}</h3>
-                      <span className="text-[11px] text-base-content/60">Showing {filteredGames.length} games</span>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1 text-[10px] text-base-content/50">
-                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                        <div key={day} className="text-center uppercase tracking-wide">
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-1">
-                      {calendarData.weeks.flatMap((week, weekIndex) =>
-                        week.map(({ date, key }) => {
-                          const dayGames = calendarData.gamesByDate.get(key) ?? []
-                          const isCurrentMonth = date.getMonth() === calendarData.monthIndex
-                          return (
-                            <div
-                              key={`${key}-${weekIndex}`}
-                              className={cn(
-                                'min-h-[64px] rounded-box border border-base-200 bg-base-100 p-1 text-[9px]',
-                                !isCurrentMonth && 'bg-base-200/40 text-base-content/40',
-                              )}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-semibold">{date.getDate()}</span>
-                                {dayGames.length ? (
-                                  <span className="badge badge-ghost badge-xs">{dayGames.length}</span>
-                                ) : null}
-                              </div>
-                              <div className="mt-1 flex flex-col gap-1">
-                                {dayGames.slice(0, 2).map((game) => (
-                                  <div key={game.discord_message_id} className="flex items-center gap-1">
-                                    {game.tier ? <LogoTier tier={game.tier.toLowerCase()} width={12} /> : null}
-                                    <span className="text-base-content/70">{game.timeLabel ?? 'Unknown time'}</span>
-                                    <span className="line-clamp-1">{game.title}</span>
-                                  </div>
-                                ))}
-                                {dayGames.length > 2 ? (
-                                  <span className="text-[10px] text-base-content/50">
-                                    +{dayGames.length - 2} more
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          )
-                        }),
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {buildGroupedGames(sortedGames).map((group) => {
-                      return (
-                          <div key={group.key} className="grid gap-1.5 md:grid-cols-[auto,1fr]">
-                              <div
-                                className={cn(
-                                  'flex min-w-[88px] items-center justify-center rounded-md px-1.5 py-0.5 text-center text-[11px] leading-tight',
-                                  group.isToday
-                                    ? 'bg-primary text-primary-content shadow-sm'
-                                    : 'bg-primary/10 text-base-content/80',
-                                )}
-                              >
-                                {group.label ? (
-                                  <span className="text-[11px] uppercase tracking-wide">
-                                    {group.label.weekday} {group.label.day} {group.label.month} {group.label.year}
-                                  </span>
-                                ) : (
-                                  <span className="text-[11px] text-base-content/60">Unknown date</span>
-                                )}
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                {group.entries.map((game) => {
-                                  const now = new Date()
-                                  const tierKey = game.tier?.toLowerCase() ?? ''
-                                  const startsDate = formatCompactDate(game.starts_at)
-                                  const postedDate = formatCompactDate(game.posted_at)
-                                  const confidence = Number(game.confidence ?? 0)
-                                  const confidenceColor = getConfidenceColor(confidence)
-                                  const dateLine = startsDate
-                                    ? game.timeLabel
-                                      ? `${startsDate} · ${game.timeLabel}`
-                                      : startsDate
-                                    : 'Unknown time'
-                                  const isPast = game.startsDate ? game.startsDate < now : true
-
-                                  return (
-                                    <div
-                                      key={game.discord_message_id}
-                                      className={cn(
-                                        'group flex flex-col gap-1 rounded-box border border-base-200 bg-base-100/80 px-2 py-1 text-[11px] shadow-sm transition hover:border-base-300 hover:bg-base-100',
-                                        isPast && 'opacity-60 grayscale-[0.2]',
-                                      )}
-                                      title={game.content ?? undefined}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            {tierKey ? (
-                                              <span className="flex items-center">
-                                                <LogoTier tier={tierKey} width={12} />
-                                              </span>
-                                            ) : null}
-                                            <span className="text-[12px] font-semibold">{game.title}</span>
-                                          </div>
-                                          <div className="flex flex-wrap items-center gap-1 text-[10px] text-base-content/60">
-                                            <span>{dateLine}</span>
-                                            {postedDate ? <span>· posted {postedDate}</span> : null}
-                                            <span className="text-base-content/40">·</span>
-                                            <div className="flex items-center gap-1">
-                                              <div className="avatar">
-                                                <div className="w-4 rounded-full bg-base-200">
-                                                  {game.avatarUrl ? (
-                                                    <img src={game.avatarUrl} alt={game.authorName} />
-                                                  ) : (
-                                                    <span className="text-[10px] font-semibold text-base-content/70">
-                                                      {getInitials(game.authorName)}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
-                                              <span className="text-base-content/70">{game.authorName}</span>
-                                            </div>
-                                            <span
-                                              className={cn('h-1.5 w-1.5 rounded-full', confidenceColor)}
-                                              title={`Parse confidence: ${confidence.toFixed(2)}`}
-                                            />
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          {game.discordAppUrl ? (
-                                            <a
-                                              href={game.discordAppUrl}
-                                              className="btn btn-ghost btn-xs px-1"
-                                              title="Open in Discord app"
-                                            >
-                                              <DiscordIcon width={14} />
-                                            </a>
-                                          ) : null}
-                                          {game.discordUrl ? (
-                                            <a
-                                              href={game.discordUrl}
-                                              className="btn btn-ghost btn-xs px-1"
-                                              title="Open in browser"
-                                              target="_blank"
-                                              rel="noreferrer"
-                                            >
-                                              <SquareArrowOutUpRight size={12} />
-                                            </a>
-                                          ) : null}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-            {pagination.lastPage > 1 ? (
-              <div className="mt-1 flex flex-wrap items-center justify-end gap-1 border-t border-base-200/80 pt-1">
-                <button
-                  type="button"
-                  className="btn btn-xs btn-ghost"
-                  disabled={pagination.currentPage <= 1}
-                  onClick={() => navigateToPage(pagination.currentPage - 1, pagination.perPage)}
-                >
-                  Previous
-                </button>
-                <span className="px-1 text-[11px] text-base-content/60">
-                  Page {pagination.currentPage} / {pagination.lastPage}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-xs btn-ghost"
-                  disabled={!pagination.hasMorePages}
-                  onClick={() => navigateToPage(pagination.currentPage + 1, pagination.perPage)}
-                >
-                  Next
-                </button>
+        {games.length === 0 ? (
+          <div className="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center text-sm text-base-content/70">
+            {isArchive
+              ? 'Noch keine vergangenen Ankündigungen im Archiv.'
+              : 'Aktuell keine kommenden Spiele angekündigt.'}
+            {!isArchive ? (
+              <div className="mt-3">
+                <Link href={route('games.archive')} className="btn btn-sm btn-ghost gap-1.5">
+                  <Archive size={14} />
+                  Archiv ansehen
+                </Link>
               </div>
             ) : null}
-          </CardBody>
-        </Card>
+          </div>
+        ) : filteredGames.length === 0 ? (
+          <div className="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center text-sm text-base-content/70">
+            Keine Ankündigungen passen zu den Filtern.
+          </div>
+        ) : activeViewMode === 'calendar' ? (
+          <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Kalender · {calendarData.monthLabel}</h3>
+              <span className="text-xs text-base-content/60">{filteredGames.length} Spiele</span>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-[10px] uppercase tracking-wide text-base-content/50">
+              {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
+                <div key={day} className="text-center">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarData.weeks.flatMap((week, weekIndex) =>
+                week.map(({ date, key }) => {
+                  const dayGames = calendarData.gamesByDate.get(key) ?? []
+                  const isCurrentMonth = date.getMonth() === calendarData.monthIndex
+                  const isToday = key === todayKey
+                  return (
+                    <div
+                      key={`${key}-${weekIndex}`}
+                      className={cn(
+                        'min-h-[80px] rounded-box border bg-base-100 p-1.5 text-[10px]',
+                        isToday ? 'border-primary' : 'border-base-200',
+                        !isCurrentMonth && 'bg-base-200/40 text-base-content/40',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={cn('font-semibold', isToday && 'text-primary')}>
+                          {date.getDate()}
+                        </span>
+                        {dayGames.length ? (
+                          <span className="badge badge-ghost badge-xs">{dayGames.length}</span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex flex-col gap-1">
+                        {dayGames.slice(0, 3).map((game) => {
+                          const tiers = game.tierList
+                          const acc = tiers[0] ? tierAccent[tiers[0]] : undefined
+                          return (
+                            <div
+                              key={game.discord_message_id}
+                              className={cn(
+                                'flex items-center gap-1 truncate rounded px-1 py-0.5',
+                                acc ? acc.soft : 'bg-base-200',
+                              )}
+                            >
+                              {tiers.length ? (
+                                <span className="flex items-center gap-0.5">
+                                  {tiers.map((tk) => (
+                                    <LogoTier key={tk} tier={tk} width={10} />
+                                  ))}
+                                </span>
+                              ) : null}
+                              <span className="tabular-nums text-base-content/70">
+                                {game.timeLabel ?? '—'}
+                              </span>
+                              <span className="truncate">{game.title}</span>
+                            </div>
+                          )
+                        })}
+                        {dayGames.length > 3 ? (
+                          <span className="text-base-content/50">+{dayGames.length - 3} mehr</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                }),
+              )}
+            </div>
+          </div>
+        ) : (
+          <List>{filteredGames.map((game) => renderGameRow(game))}</List>
+        )}
+
+        {pagination.lastPage > 1 ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-base-200/80 pt-3">
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              disabled={pagination.currentPage <= 1}
+              onClick={() => navigateToPage(pagination.currentPage - 1)}
+            >
+              Zurück
+            </button>
+            <span className="px-1 text-xs text-base-content/60">
+              Seite {pagination.currentPage} / {pagination.lastPage}
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              disabled={!pagination.hasMorePages}
+              onClick={() => navigateToPage(pagination.currentPage + 1)}
+            >
+              Weiter
+            </button>
+          </div>
+        ) : null}
       </div>
     </AppLayout>
   )

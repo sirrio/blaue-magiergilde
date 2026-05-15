@@ -9,7 +9,10 @@ it('renders the games index for authenticated users', function () {
     $response = $this->actingAs($user)->get(route('games.index'));
 
     $response->assertSuccessful();
-    $response->assertInertia(fn ($page) => $page->component('games/index'));
+    $response->assertInertia(fn ($page) => $page
+        ->component('games/index')
+        ->where('mode', 'upcoming')
+    );
 });
 
 it('shows the latest sync timestamp when announcements exist', function () {
@@ -27,36 +30,48 @@ it('shows the latest sync timestamp when announcements exist', function () {
     );
 });
 
-it('paginates game announcements by default', function () {
+it('only returns upcoming announcements on the index endpoint', function () {
     $user = User::factory()->create();
-    GameAnnouncement::factory()->count(130)->create();
+
+    GameAnnouncement::factory()->count(5)->create([
+        'starts_at' => now()->subDays(3),
+    ]);
+    GameAnnouncement::factory()->count(8)->create([
+        'starts_at' => now()->addDays(3),
+    ]);
 
     $response = $this->actingAs($user)->get(route('games.index'));
 
     $response->assertSuccessful();
     $response->assertInertia(fn ($page) => $page
         ->component('games/index')
-        ->has('games', 100)
-        ->where('pagination.currentPage', 1)
-        ->where('pagination.lastPage', 2)
-        ->where('pagination.perPage', 100)
-        ->where('pagination.total', 130)
+        ->where('mode', 'upcoming')
+        ->has('games', 8)
+        ->where('pagination.perPage', 200)
+        ->where('pagination.total', 8)
     );
 });
 
-it('allows changing the game announcement page size', function () {
+it('returns past announcements on the archive endpoint with a fixed page size of 20', function () {
     $user = User::factory()->create();
-    GameAnnouncement::factory()->count(130)->create();
 
-    $response = $this->actingAs($user)->get(route('games.index', ['per_page' => 50]));
+    GameAnnouncement::factory()->count(25)->create([
+        'starts_at' => now()->subDays(3),
+    ]);
+    GameAnnouncement::factory()->count(4)->create([
+        'starts_at' => now()->addDays(3),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('games.archive'));
 
     $response->assertSuccessful();
     $response->assertInertia(fn ($page) => $page
         ->component('games/index')
-        ->has('games', 50)
+        ->where('mode', 'archive')
+        ->has('games', 20)
         ->where('pagination.currentPage', 1)
-        ->where('pagination.lastPage', 3)
-        ->where('pagination.perPage', 50)
-        ->where('pagination.total', 130)
+        ->where('pagination.lastPage', 2)
+        ->where('pagination.perPage', 20)
+        ->where('pagination.total', 25)
     );
 });
