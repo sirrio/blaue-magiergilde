@@ -18,17 +18,17 @@ function toSqlDateTime(value) {
 async function fetchGameSyncSettings() {
     try {
         const [rows] = await db.execute(
-            'SELECT games_channel_id, games_scan_years, games_scan_interval_minutes FROM discord_bot_settings ORDER BY id LIMIT 1',
+            'SELECT games_channel_id, games_scan_months, games_scan_interval_minutes FROM discord_bot_settings ORDER BY id LIMIT 1',
         );
         const row = rows?.[0] ?? {};
         const channelId = resolveChannelId(row.games_channel_id);
-        const rawYears = Number(row.games_scan_years);
-        const scanYears = Number.isFinite(rawYears) && rawYears > 0 ? rawYears : 10;
+        const rawMonths = Number(row.games_scan_months);
+        const scanMonths = Number.isFinite(rawMonths) && rawMonths > 0 ? rawMonths : 3;
         const rawMinutes = Number(row.games_scan_interval_minutes);
-        const scanIntervalMinutes = Number.isFinite(rawMinutes) && rawMinutes > 0 ? rawMinutes : 60;
-        return { channelId, scanYears, scanIntervalMinutes };
+        const scanIntervalMinutes = Number.isFinite(rawMinutes) && rawMinutes > 0 ? rawMinutes : 5;
+        return { channelId, scanMonths, scanIntervalMinutes };
     } catch {
-        return { channelId: '', scanYears: 10, scanIntervalMinutes: 60 };
+        return { channelId: '', scanMonths: 3, scanIntervalMinutes: 5 };
     }
 }
 
@@ -60,13 +60,13 @@ async function pruneStaleAnnouncements({ channelId, sinceSql, seenMessageIds }) 
 }
 
 async function syncGameAnnouncements(client) {
-    const { channelId, scanYears } = await fetchGameSyncSettings();
+    const { channelId, scanMonths } = await fetchGameSyncSettings();
     if (!channelId) {
         console.warn('[bot] Game sync skipped: games channel not configured.');
         return;
     }
 
-    const since = getGamesScanSinceDate({ years: scanYears });
+    const since = getGamesScanSinceDate({ months: scanMonths });
     const sinceSql = toSqlDateTime(since);
 
     const result = await scanGameAnnouncements(client, {

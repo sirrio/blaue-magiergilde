@@ -145,8 +145,8 @@ class GameSettingsController extends Controller
                 'games_channel_id' => $settings->games_channel_id,
                 'games_channel_name' => $settings->games_channel_name,
                 'games_channel_guild_id' => $settings->games_channel_guild_id,
-                'games_scan_years' => $settings->games_scan_years ?? 10,
-                'games_scan_interval_minutes' => $settings->games_scan_interval_minutes ?? 60,
+                'games_scan_months' => $settings->games_scan_months ?? 3,
+                'games_scan_interval_minutes' => $settings->games_scan_interval_minutes ?? 5,
             ],
             'stats' => [
                 'monthly' => $monthly,
