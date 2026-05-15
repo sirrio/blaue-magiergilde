@@ -93,7 +93,6 @@ class HandleInertiaRequests extends Middleware
                 return ['name' => $manager->getImpersonator()?->name];
             })(),
             'features' => [
-                'games_calendar' => config('features.games_calendar'),
                 'rooms' => config('features.rooms'),
                 'character_status_switch' => config('features.character_status_switch'),
                 /** TODO: remove this temporary beta flag once level curve upgrades are released for everyone. */

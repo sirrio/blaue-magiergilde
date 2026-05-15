@@ -138,9 +138,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const compendiumLabel = t('nav.compendium')
   const handbookLabel = t('nav.guildHandbook')
   const filteredMenuLinks = menuLinks.filter((menuLink) => {
-    if (menuLink.route === 'games.index') {
-      return features?.games_calendar ?? true
-    }
     if (menuLink.route === 'rooms.index') {
       return features?.rooms ?? true
     }

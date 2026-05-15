@@ -204,10 +204,10 @@ function buildGamesEmbed(games, { tierEmojis } = {}) {
     const resolvedTiers = tierEmojis || { ...TIER_FALLBACK };
     const embed = new EmbedBuilder()
         .setColor(0x4f46e5)
-        .setTitle('Kommende Spiele');
+        .setTitle('Anstehende Spiele');
 
     if (!games.length) {
-        embed.setDescription('Aktuell sind keine kommenden Spiele angekündigt.');
+        embed.setDescription('Aktuell sind keine anstehenden Spiele angekündigt.');
         const url = publicGamesUrl();
         if (url) embed.setURL(url);
         return embed;

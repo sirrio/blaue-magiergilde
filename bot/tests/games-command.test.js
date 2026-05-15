@@ -79,7 +79,7 @@ const games = [
 const embed = buildGamesEmbed(games);
 const json = embed.toJSON();
 
-assert.equal(json.title, 'Kommende Spiele');
+assert.equal(json.title, 'Anstehende Spiele');
 assert.ok(Array.isArray(json.fields));
 // Three distinct dates → three fields.
 assert.equal(json.fields.length, 3);
@@ -135,7 +135,7 @@ assert.equal(fallbackOnly.bt, '🟫');
 // Empty list path
 const emptyEmbed = buildGamesEmbed([]);
 const emptyJson = emptyEmbed.toJSON();
-assert.match(emptyJson.description, /keine kommenden Spiele/i);
+assert.match(emptyJson.description, /keine anstehenden Spiele/i);
 
 console.log('games-command.test.js passed');
 // Suppress reference to `fixed` to keep linting noise-free if applied.
