@@ -134,52 +134,69 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium">Scan window</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    className="input input-sm input-bordered w-24"
-                    type="number"
-                    min={1}
-                    max={24}
-                    value={form.data.games_scan_months}
-                    onChange={(event) => {
-                      const value = Number(event.target.value)
-                      const clamped = Number.isFinite(value) ? Math.min(24, Math.max(1, value)) : 1
-                      form.setData('games_scan_months', clamped)
-                    }}
-                  />
-                  <span className="text-xs text-base-content/70">months</span>
+            <div className="rounded-xl border border-base-200 bg-base-50/40 p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                Scan behavior
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="games_scan_months" className="text-sm font-medium">
+                    Scan window
+                  </label>
+                  <div className="join">
+                    <input
+                      id="games_scan_months"
+                      className="input input-sm input-bordered join-item w-24"
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={form.data.games_scan_months}
+                      onChange={(event) => {
+                        const value = Number(event.target.value)
+                        const clamped = Number.isFinite(value)
+                          ? Math.min(24, Math.max(1, value))
+                          : 1
+                        form.setData('games_scan_months', clamped)
+                      }}
+                    />
+                    <span className="join-item inline-flex items-center bg-base-200 px-3 text-xs text-base-content/70">
+                      months
+                    </span>
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    How far back the bot scans for announcements (1–24 months).
+                  </p>
                 </div>
-              </label>
-              <span className="text-xs text-base-content/60">
-                Controls how far back the bot scans for announcements (1–24 months).
-              </span>
-            </div>
 
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium">Scan interval</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    className="input input-sm input-bordered w-28"
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={form.data.games_scan_interval_minutes}
-                    onChange={(event) => {
-                      const value = Number(event.target.value)
-                      const clamped = Number.isFinite(value) ? Math.min(1440, Math.max(1, value)) : 1
-                      form.setData('games_scan_interval_minutes', clamped)
-                    }}
-                  />
-                  <span className="text-xs text-base-content/70">minutes</span>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="games_scan_interval_minutes" className="text-sm font-medium">
+                    Scan interval
+                  </label>
+                  <div className="join">
+                    <input
+                      id="games_scan_interval_minutes"
+                      className="input input-sm input-bordered join-item w-28"
+                      type="number"
+                      min={1}
+                      max={1440}
+                      value={form.data.games_scan_interval_minutes}
+                      onChange={(event) => {
+                        const value = Number(event.target.value)
+                        const clamped = Number.isFinite(value)
+                          ? Math.min(1440, Math.max(1, value))
+                          : 1
+                        form.setData('games_scan_interval_minutes', clamped)
+                      }}
+                    />
+                    <span className="join-item inline-flex items-center bg-base-200 px-3 text-xs text-base-content/70">
+                      minutes
+                    </span>
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    How often the bot refreshes announcements (1–1440 minutes).
+                  </p>
                 </div>
-              </label>
-              <span className="text-xs text-base-content/60">
-                How often the bot refreshes announcements (1–1440 minutes).
-              </span>
+              </div>
             </div>
 
             {form.errors.games_channel_id ? (
