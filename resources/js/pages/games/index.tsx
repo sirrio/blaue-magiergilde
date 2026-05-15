@@ -10,15 +10,16 @@ import { Head, Link, router } from '@inertiajs/react'
 import {
   Archive,
   CalendarClock,
-  LayoutGrid,
-  List as ListIcon,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   SquareArrowOutUpRight,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 interface Props {
   games: GameAnnouncement[]
-  mode: 'upcoming' | 'archive'
+  mode: 'upcoming' | 'archive' | 'calendar'
   pagination: {
     currentPage: number
     lastPage: number
@@ -190,11 +191,12 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
   const getInitials = useInitials()
   const [search, setSearch] = useState('')
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const isArchive = mode === 'archive'
-  // Calendar view only makes sense for upcoming games; archive stays in list view.
-  const calendarAvailable = !isArchive
-  const activeViewMode = calendarAvailable ? viewMode : 'list'
+  const isCalendar = mode === 'calendar'
+  const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() }
+  })
   const todayKey = buildDateKey(new Date())
 
   const enrichedGames = useMemo(() => {
@@ -249,9 +251,8 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
   }, [enrichedGames, search, selectedTiers])
 
   const calendarData = useMemo(() => {
-    const baseDate = filteredGames.find((game) => game.startsDate)?.startsDate ?? new Date()
-    const year = baseDate.getFullYear()
-    const month = baseDate.getMonth()
+    const { year, month } = calendarCursor
+    const baseDate = new Date(year, month, 1)
     const firstOfMonth = new Date(year, month, 1)
     const offset = (firstOfMonth.getDay() + 6) % 7
     const startDate = new Date(year, month, 1 - offset)
@@ -279,14 +280,24 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
       monthIndex: month,
       gamesByDate,
     }
-  }, [filteredGames])
+  }, [filteredGames, calendarCursor])
+
+  const modeRouteName =
+    mode === 'archive' ? 'games.archive' : mode === 'calendar' ? 'games.calendar' : 'games.index'
 
   const navigateToPage = (page: number) => {
     router.get(
-      route(isArchive ? 'games.archive' : 'games.index'),
+      route(modeRouteName),
       { page },
       { preserveState: true, preserveScroll: true, replace: true },
     )
+  }
+
+  const shiftCalendarMonth = (delta: number) => {
+    setCalendarCursor((prev) => {
+      const date = new Date(prev.year, prev.month + delta, 1)
+      return { year: date.getFullYear(), month: date.getMonth() }
+    })
   }
 
   const renderGameRow = (game: (typeof filteredGames)[number]) => {
@@ -408,21 +419,35 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
     )
   }
 
+  const pageTitle = isCalendar ? 'Kalender' : isArchive ? 'Archiv' : 'Games'
+  const pageDescription = isCalendar
+    ? 'Alle Spielankündigungen als Kalender.'
+    : isArchive
+      ? 'Vergangene Spielankündigungen.'
+      : 'Kommende Spielankündigungen aus Discord.'
+
+  const modeNavItems: Array<{
+    name: 'upcoming' | 'calendar' | 'archive'
+    route: string
+    label: string
+    icon: typeof CalendarClock
+  }> = [
+    { name: 'upcoming', route: 'games.index', label: 'Kommend', icon: CalendarClock },
+    { name: 'calendar', route: 'games.calendar', label: 'Kalender', icon: CalendarDays },
+    { name: 'archive', route: 'games.archive', label: 'Archiv', icon: Archive },
+  ]
+
   return (
     <AppLayout>
-      <Head title={isArchive ? 'Games · Archiv' : 'Games'} />
+      <Head title={`Games · ${pageTitle}`} />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">{isArchive ? 'Archiv' : 'Games'}</h1>
-            <p className="text-sm text-base-content/70">
-              {isArchive
-                ? 'Vergangene Spielankündigungen.'
-                : 'Kommende Spielankündigungen aus Discord.'}
-            </p>
+            <h1 className="text-2xl font-bold">{pageTitle}</h1>
+            <p className="text-sm text-base-content/70">{pageDescription}</p>
             <p className="text-xs text-base-content/60">
               {pagination.total} Einträge
-              {pagination.lastPage > 1 ? ` · Seite ${pagination.currentPage}/${pagination.lastPage}` : ''}
+              {!isCalendar && pagination.lastPage > 1 ? ` · Seite ${pagination.currentPage}/${pagination.lastPage}` : ''}
               {lastSyncedAt
                 ? (() => {
                     const formatted = formatGameDate(lastSyncedAt, true)
@@ -432,45 +457,22 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
               {` · Zeitzone ${timeZoneLabel}`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {calendarAvailable ? (
-              <div role="tablist" className="tabs tabs-border">
-                <button
+          <div role="tablist" className="tabs tabs-border">
+            {modeNavItems.map((item) => {
+              const Icon = item.icon
+              const isActive = mode === item.name
+              return (
+                <Link
+                  key={item.name}
+                  href={route(item.route)}
                   role="tab"
-                  type="button"
-                  className={cn('tab gap-1.5', viewMode === 'list' && 'tab-active')}
-                  onClick={() => setViewMode('list')}
+                  className={cn('tab gap-1.5', isActive && 'tab-active')}
                 >
-                  <ListIcon size={14} />
-                  Liste
-                </button>
-                <button
-                  role="tab"
-                  type="button"
-                  className={cn('tab gap-1.5', viewMode === 'calendar' && 'tab-active')}
-                  onClick={() => setViewMode('calendar')}
-                >
-                  <LayoutGrid size={14} />
-                  Kalender
-                </button>
-              </div>
-            ) : null}
-            <Link
-              href={route(isArchive ? 'games.index' : 'games.archive')}
-              className="btn btn-sm btn-ghost gap-1.5"
-            >
-              {isArchive ? (
-                <>
-                  <CalendarClock size={14} />
-                  Kommend
-                </>
-              ) : (
-                <>
-                  <Archive size={14} />
-                  Archiv
-                </>
-              )}
-            </Link>
+                  <Icon size={14} />
+                  {item.label}
+                </Link>
+              )
+            })}
           </div>
         </section>
 
@@ -522,7 +524,11 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/50">
             <span>
-              {filteredGames.length} von {games.length} auf dieser Seite
+              {isCalendar
+                ? selectedTiers.length || search.trim()
+                  ? `${filteredGames.length} von ${games.length} Spielen`
+                  : `${games.length} Spiele insgesamt`
+                : `${filteredGames.length} von ${games.length} auf dieser Seite`}
             </span>
           </div>
         </div>
@@ -545,11 +551,38 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
           <div className="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center text-sm text-base-content/70">
             Keine Ankündigungen passen zu den Filtern.
           </div>
-        ) : activeViewMode === 'calendar' ? (
+        ) : isCalendar ? (
           <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Kalender · {calendarData.monthLabel}</h3>
-              <span className="text-xs text-base-content/60">{filteredGames.length} Spiele</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm px-2"
+                  onClick={() => shiftCalendarMonth(-1)}
+                  title="Vorheriger Monat"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <h3 className="text-sm font-semibold capitalize">{calendarData.monthLabel}</h3>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm px-2"
+                  onClick={() => shiftCalendarMonth(1)}
+                  title="Nächster Monat"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => {
+                    const now = new Date()
+                    setCalendarCursor({ year: now.getFullYear(), month: now.getMonth() })
+                  }}
+                >
+                  Heute
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-7 gap-1 text-[10px] uppercase tracking-wide text-base-content/50">
               {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
@@ -621,7 +654,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
           <List>{filteredGames.map((game) => renderGameRow(game))}</List>
         )}
 
-        {pagination.lastPage > 1 ? (
+        {!isCalendar && pagination.lastPage > 1 ? (
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-base-200/80 pt-3">
             <button
               type="button"

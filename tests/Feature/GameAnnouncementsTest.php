@@ -52,6 +52,30 @@ it('only returns upcoming announcements on the index endpoint', function () {
     );
 });
 
+it('returns all announcements with start time on the calendar endpoint', function () {
+    $user = User::factory()->create();
+
+    GameAnnouncement::factory()->count(3)->create([
+        'starts_at' => now()->subDays(3),
+    ]);
+    GameAnnouncement::factory()->count(5)->create([
+        'starts_at' => now()->addDays(3),
+    ]);
+    GameAnnouncement::factory()->count(2)->create([
+        'starts_at' => null,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('games.calendar'));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn ($page) => $page
+        ->component('games/index')
+        ->where('mode', 'calendar')
+        ->has('games', 8)
+        ->where('pagination.total', 8)
+    );
+});
+
 it('returns past announcements on the archive endpoint with a fixed page size of 20', function () {
     $user = User::factory()->create();
 
