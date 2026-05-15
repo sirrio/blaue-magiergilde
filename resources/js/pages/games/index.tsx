@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { useInitials } from '@/hooks/use-initials'
 import { cn } from '@/lib/utils'
-import type { GameAnnouncement, PageProps } from '@/types'
-import { Head, Link, router, usePage } from '@inertiajs/react'
+import type { GameAnnouncement } from '@/types'
+import { Head, Link, router } from '@inertiajs/react'
 import {
   Archive,
   CalendarClock,
@@ -188,13 +188,13 @@ const formatRelative = (date: Date, now: Date) => {
 
 export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Props) {
   const getInitials = useInitials()
-  const { features } = usePage<PageProps>().props
   const [search, setSearch] = useState('')
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
-  const calendarEnabled = (features?.games_calendar ?? true) && mode === 'upcoming'
-  const activeViewMode = calendarEnabled ? viewMode : 'list'
   const isArchive = mode === 'archive'
+  // Calendar view only makes sense for upcoming games; archive stays in list view.
+  const calendarAvailable = !isArchive
+  const activeViewMode = calendarAvailable ? viewMode : 'list'
   const todayKey = buildDateKey(new Date())
 
   const enrichedGames = useMemo(() => {
@@ -433,7 +433,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {calendarEnabled ? (
+            {calendarAvailable ? (
               <div role="tablist" className="tabs tabs-border">
                 <button
                   role="tab"

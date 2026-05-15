@@ -7,7 +7,6 @@ $levelCurveUpgradeUserIds = collect(explode(',', (string) env('FEATURE_LEVEL_CUR
     ->all();
 
 return [
-    'games_calendar' => env('FEATURE_GAMES_CALENDAR', true),
     'rooms' => env('FEATURE_ROOMS', true),
     'character_status_switch' => env('FEATURE_CHARACTER_STATUS_SWITCH', true),
     /** TODO: remove this temporary beta allowlist once level curve upgrades are released for everyone. */
