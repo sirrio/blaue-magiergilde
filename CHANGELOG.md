@@ -15,6 +15,7 @@ Alle nennenswerten Änderungen an der Magiergilden-Seite und am Bot werden hier 
 
 ### Bot
 
+- **Neu: Sticky Spieleübersicht im Games-Channel** — Der Bot hängt eine kompakte Zusammenfassungs-Nachricht („📅 X anstehende Spiele – klick unten für die Liste.") immer ans Ende des Games-Channels. Beim Klick auf den Button „Spiele anzeigen" sieht der Aufrufende ephemeral dieselbe Liste wie über `/mg-games`. Update-Trigger: jede neue Nachricht im Channel (inkl. neuer Ankündigung, die der Bot inline parst und in die DB schreibt) sowie der reguläre Sync-Loop. Reposts sind auf 5 Sekunden gedebounced, damit kurze Burst-Posts nur einen einzigen Repost erzeugen.
 - **Neu: `/mg-games` Slash-Command** — Zeigt die nächsten 20 angekündigten Spiele direkt in Discord (ephemeral). Gruppiert nach Tag, mit nativen Discord-Timestamps (`<t:UNIX:R>` zeigt automatisch „in 5 Stunden" o. ä. in der Locale jedes Nutzers), klickbarem Link zum Original-Post und Footer-Link zur Web-Übersicht. Funktioniert in Servern und Bot-DMs.
 - **Fix: Bot-Charakter-Erstellung** — Mehrere Race-Conditions und hängende Interaktionen beim Erstellen eines Charakters über den Bot wurden behoben.
 - **Fix: Interaction-Fehlerpfade** — Bot-Interaktionen, die in einen Fehlerzustand laufen, antworten jetzt zuverlässig statt stumm zu bleiben.
