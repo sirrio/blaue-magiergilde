@@ -27,7 +27,12 @@ async function withDiscordRetries(operation, retries = 2) {
 
 function isThreadStarterSystemMessage(message) {
     const messageType = message?.type;
-    if (messageType === MessageType.ThreadStarterMessage) {
+    if (messageType === MessageType.ThreadStarterMessage
+        || messageType === MessageType.ThreadCreated) {
+        return true;
+    }
+
+    if (message?.system === true && message?.thread) {
         return true;
     }
 
@@ -36,19 +41,30 @@ function isThreadStarterSystemMessage(message) {
         || content.includes('has started a thread:');
 }
 
-function extractTier(rawContent) {
+const TIER_ORDER = ['bt', 'lt', 'ht', 'et'];
+
+function extractTiers(rawContent) {
     const content = String(rawContent || '');
-    const emojiMatch = content.match(/:MG_?(BT|LT|HT|ET)(?:~?\d+)?/i);
-    if (emojiMatch) {
-        return emojiMatch[1].toLowerCase();
+    const seen = new Set();
+
+    const emojiRe = /:MG_?(BT|LT|HT|ET)(?:~?\d+)?/gi;
+    let match;
+    while ((match = emojiRe.exec(content)) !== null) {
+        seen.add(match[1].toLowerCase());
     }
 
-    const textMatch = content.match(/\b(BT|LT|HT|ET)\b/i);
-    if (textMatch) {
-        return textMatch[1].toLowerCase();
+    if (seen.size === 0) {
+        const textRe = /\b(BT|LT|HT|ET)\b/gi;
+        while ((match = textRe.exec(content)) !== null) {
+            seen.add(match[1].toLowerCase());
+        }
     }
 
-    return null;
+    return TIER_ORDER.filter((tier) => seen.has(tier));
+}
+
+function extractTier(rawContent) {
+    return extractTiers(rawContent)[0] || null;
 }
 
 function extractTitle(rawContent) {
@@ -489,7 +505,8 @@ function parseAnnouncement(message) {
     }
 
     const content = message?.content ?? '';
-    const tier = extractTier(content);
+    const tiers = extractTiers(content);
+    const tier = tiers.length ? tiers.join(',') : null;
     const fallbackDate = message?.createdAt ?? null;
     const timestampParts = extractDiscordTimestamp(content);
     const dateParts = timestampParts?.dateParts || extractDate(content, fallbackDate);
@@ -504,7 +521,7 @@ function parseAnnouncement(message) {
             ? message.author.displayAvatarURL({ extension: 'png', size: 128 })
             : null;
 
-    if (!tier || !startsAt) {
+    if (!tiers.length || !startsAt) {
         return null;
     }
 
@@ -629,4 +646,6 @@ module.exports = {
     parseAnnouncement,
     scanGameAnnouncements,
     withDiscordRetries,
+    extractTier,
+    extractTiers,
 };

@@ -31,6 +31,33 @@ async function fetchGameSyncSettings() {
     }
 }
 
+async function pruneStaleAnnouncements({ channelId, sinceSql, seenMessageIds }) {
+    if (!channelId || !sinceSql) return;
+
+    if (!seenMessageIds.length) {
+        const [info] = await db.execute(
+            'DELETE FROM game_announcements WHERE discord_channel_id = ? AND posted_at >= ?',
+            [String(channelId), sinceSql],
+        );
+        if (info?.affectedRows) {
+            console.log(`[bot] Game sync: pruned ${info.affectedRows} stale announcement(s).`);
+        }
+        return;
+    }
+
+    const placeholders = seenMessageIds.map(() => '?').join(', ');
+    const [info] = await db.execute(
+        `DELETE FROM game_announcements
+         WHERE discord_channel_id = ?
+           AND posted_at >= ?
+           AND discord_message_id NOT IN (${placeholders})`,
+        [String(channelId), sinceSql, ...seenMessageIds],
+    );
+    if (info?.affectedRows) {
+        console.log(`[bot] Game sync: pruned ${info.affectedRows} stale announcement(s).`);
+    }
+}
+
 async function syncGameAnnouncements(client) {
     const { channelId, scanYears } = await fetchGameSyncSettings();
     if (!channelId) {
@@ -39,6 +66,7 @@ async function syncGameAnnouncements(client) {
     }
 
     const since = getGamesScanSinceDate({ years: scanYears });
+    const sinceSql = toSqlDateTime(since);
 
     const result = await scanGameAnnouncements(client, {
         channelId,
@@ -50,9 +78,9 @@ async function syncGameAnnouncements(client) {
         return;
     }
 
-    if (!result.games.length) {
-        return;
-    }
+    const seenMessageIds = result.games
+        .filter(game => game && game.discord_message_id)
+        .map(game => String(game.discord_message_id));
 
     const timestamp = nowSql();
     const rows = result.games
@@ -74,6 +102,8 @@ async function syncGameAnnouncements(client) {
             created_at: timestamp,
             updated_at: timestamp,
         }));
+
+    await pruneStaleAnnouncements({ channelId, sinceSql, seenMessageIds });
 
     if (!rows.length) {
         return;

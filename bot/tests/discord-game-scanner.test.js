@@ -204,4 +204,50 @@ const threadStarterTextFallbackCheck = parseAnnouncement(
 );
 assert.equal(threadStarterTextFallbackCheck, null);
 
+// ThreadCreated system message in parent channel: content is the (truncated) thread name,
+// which by default mirrors the original announcement content and would otherwise re-parse as a duplicate.
+const threadCreatedCheck = parseAnnouncement({
+    ...makeMessage(
+        ':MG_HT: - So, 17.05.2026 - 18:00 Uhr - "',
+        new Date('2026-05-14T14:37:18Z'),
+    ),
+    type: MessageType.ThreadCreated,
+});
+assert.equal(threadCreatedCheck, null);
+
+// Multi-tier announcements: parser collects all tiers in canonical BT,LT,HT,ET order.
+const multiTierEmoji = parseAnnouncement(
+    makeMessage(
+        ':MG_LT: ODER :MG_HT: - Fr. 22.05.2026 - 18:00 - Experiment',
+        new Date('2026-05-22T12:00:00Z'),
+    ),
+);
+assert.equal(multiTierEmoji.tier, 'lt,ht');
+
+const multiTierThreeOf = parseAnnouncement(
+    makeMessage(
+        '<:MG_BT:1> <:MG_LT:2> <:MG_HT:3> Do. 23.04.2026 - 19:00',
+        new Date('2026-04-20T12:00:00Z'),
+    ),
+);
+assert.equal(multiTierThreeOf.tier, 'bt,lt,ht');
+
+const repeatedTierStaysUnique = parseAnnouncement(
+    makeMessage(
+        ':MG_LT: ODER :MG_LT: - 22.05.2026 - 18:00',
+        new Date('2026-05-22T12:00:00Z'),
+    ),
+);
+assert.equal(repeatedTierStaysUnique.tier, 'lt');
+
+const threadCreatedSystemFlagCheck = parseAnnouncement({
+    ...makeMessage(
+        ':MG_HT: - So, 17.05.2026 - 18:00 Uhr - "',
+        new Date('2026-05-14T14:37:18Z'),
+    ),
+    system: true,
+    thread: { id: 'thread-id' },
+});
+assert.equal(threadCreatedSystemFlagCheck, null);
+
 console.log('discord-game-scanner.test.js passed');
