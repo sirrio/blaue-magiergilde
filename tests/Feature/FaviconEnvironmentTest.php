@@ -4,6 +4,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    // The favicon view is rendered by Inertia which evaluates `@vite` in the
+    // blade template. Tests below rebind `app['env']` away from 'testing',
+    // which causes `runningUnitTests()` to return false and Vite to try
+    // resolving the production manifest. Stub Vite for these tests instead.
+    $this->withoutVite();
+});
+
 it('uses an environment specific favicon outside production', function (string $environment, string $encodedColor) {
     app()->instance('env', $environment);
 
