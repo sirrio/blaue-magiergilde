@@ -1,5 +1,6 @@
 const { handleCreationAvatarMessage, handleAvatarUpdateMessage } = require('../interactions/characters');
 const { handleSupportTicketMessage } = require('../supportTickets');
+const { handleGamesChannelMessage } = require('../gamesChannelListener');
 const { pendingCharacterCreations, pendingCharacterAvatarUpdates } = require('../state');
 const { reportBotError } = require('../utils/reportError');
 
@@ -34,6 +35,11 @@ module.exports = {
             if (hasPendingAvatarFlow(message)) {
                 return;
             }
+
+            // Games channel listener: parses new announcements and triggers
+            // the sticky summary repost. Runs in parallel to support ticket handling
+            // because the configured channels do not overlap in practice.
+            await handleGamesChannelMessage(message);
 
             await handleSupportTicketMessage(message);
         } catch (error) {
