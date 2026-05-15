@@ -1,7 +1,7 @@
-function getGamesScanSinceDate({ referenceDate = new Date(), years = 10 } = {}) {
-    const normalizedYears = Number.isFinite(years) ? Math.min(25, Math.max(1, years)) : 10;
+function getGamesScanSinceDate({ referenceDate = new Date(), months = 3 } = {}) {
+    const normalizedMonths = Number.isFinite(months) ? Math.min(24, Math.max(1, months)) : 3;
     const since = new Date(referenceDate);
-    since.setFullYear(since.getFullYear() - normalizedYears);
+    since.setMonth(since.getMonth() - normalizedMonths);
     return since;
 }
 

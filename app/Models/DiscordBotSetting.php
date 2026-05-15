@@ -16,7 +16,7 @@ class DiscordBotSetting extends Model
         'games_channel_id',
         'games_channel_name',
         'games_channel_guild_id',
-        'games_scan_years',
+        'games_scan_months',
         'games_scan_interval_minutes',
         'support_ticket_channel_id',
         'support_ticket_channel_name',
@@ -24,7 +24,7 @@ class DiscordBotSetting extends Model
     ];
 
     protected $casts = [
-        'games_scan_years' => 'integer',
+        'games_scan_months' => 'integer',
         'games_scan_interval_minutes' => 'integer',
     ];
 
@@ -36,8 +36,8 @@ class DiscordBotSetting extends Model
         }
 
         return static::query()->create([
-            'games_scan_years' => 10,
-            'games_scan_interval_minutes' => 60,
+            'games_scan_months' => 3,
+            'games_scan_interval_minutes' => 5,
         ]);
     }
 }

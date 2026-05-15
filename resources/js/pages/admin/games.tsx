@@ -23,7 +23,7 @@ type GamesSettingsProps = {
     | 'games_channel_id'
     | 'games_channel_name'
     | 'games_channel_guild_id'
-    | 'games_scan_years'
+    | 'games_scan_months'
     | 'games_scan_interval_minutes'
   >
   stats: {
@@ -52,8 +52,8 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
     games_channel_id: discordBotSettings.games_channel_id ?? '',
     games_channel_name: discordBotSettings.games_channel_name ?? '',
     games_channel_guild_id: discordBotSettings.games_channel_guild_id ?? '',
-    games_scan_years: discordBotSettings.games_scan_years ?? 10,
-    games_scan_interval_minutes: discordBotSettings.games_scan_interval_minutes ?? 60,
+    games_scan_months: discordBotSettings.games_scan_months ?? 3,
+    games_scan_interval_minutes: discordBotSettings.games_scan_interval_minutes ?? 5,
   })
 
   const channelLabel = useMemo(() => {
@@ -142,19 +142,19 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
                     className="input input-sm input-bordered w-24"
                     type="number"
                     min={1}
-                    max={25}
-                    value={form.data.games_scan_years}
+                    max={24}
+                    value={form.data.games_scan_months}
                     onChange={(event) => {
                       const value = Number(event.target.value)
-                      const clamped = Number.isFinite(value) ? Math.min(25, Math.max(1, value)) : 1
-                      form.setData('games_scan_years', clamped)
+                      const clamped = Number.isFinite(value) ? Math.min(24, Math.max(1, value)) : 1
+                      form.setData('games_scan_months', clamped)
                     }}
                   />
-                  <span className="text-xs text-base-content/70">years</span>
+                  <span className="text-xs text-base-content/70">months</span>
                 </div>
               </label>
               <span className="text-xs text-base-content/60">
-                Controls how far back the bot scans for announcements (1–25 years).
+                Controls how far back the bot scans for announcements (1–24 months).
               </span>
             </div>
 
@@ -185,8 +185,8 @@ export default function GamesSettings({ discordBotSettings, stats }: GamesSettin
             {form.errors.games_channel_id ? (
               <span className="text-sm text-error">{form.errors.games_channel_id}</span>
             ) : null}
-            {form.errors.games_scan_years ? (
-              <span className="text-sm text-error">{form.errors.games_scan_years}</span>
+            {form.errors.games_scan_months ? (
+              <span className="text-sm text-error">{form.errors.games_scan_months}</span>
             ) : null}
             {form.errors.games_scan_interval_minutes ? (
               <span className="text-sm text-error">{form.errors.games_scan_interval_minutes}</span>
