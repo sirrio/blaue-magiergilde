@@ -39,8 +39,10 @@ const multiTierGame = {
     starts_at: new Date('2026-05-22T18:00:00'),
 };
 const multiTierEmbed = buildGamesEmbed([multiTierGame]).toJSON();
-assert.match(multiTierEmbed.fields[0].value, /🟫|⬜|🟨|🟪/); // contains tier emojis
-assert.match(multiTierEmbed.fields[0].value, /LT.*HT/); // both labels present in order
+// Multi-tier embed line contains at least one unicode tier emoji and both
+// tier codes appear in canonical order (LT before HT).
+assert.match(multiTierEmbed.fields[0].value, /🟫|⬜|🟨|🟪/);
+assert.match(multiTierEmbed.fields[0].value, /LT.*HT/);
 
 const fixed = new Date('2026-05-15T14:00:00');
 

@@ -86,28 +86,32 @@ function cleanContentForDisplay(content) {
     let str = String(content || '');
     if (!str) return '';
 
+    // Strip Discord markup: custom emojis, shortcode tier emojis, dynamic timestamps,
+    // user/role/channel mentions. Then unwrap strikethrough and bold markers.
+    // Then strip date and time fragments in common German notations. Finally collapse
+    // separator runs and whitespace.
     str = str
-        .replace(/<a?:[A-Za-z0-9_]+:\d+>/g, ' ')         // custom emojis <:NAME:ID>
-        .replace(/:MG_[A-Z0-9_]+~?\d*:/gi, ' ')          // shortcode tier emojis
-        .replace(/<t:\d{9,12}(?::[tTdDfFR])?>/g, ' ')    // discord timestamps
-        .replace(/<@[!&]?\d+>/g, ' ')                    // user/role mentions
-        .replace(/<#\d+>/g, ' ')                         // channel mentions
-        .replace(/~~([^~]+)~~/g, '$1')                   // unwrap strikethrough
-        .replace(/\*\*([^*]+)\*\*/g, '$1')               // unwrap bold
-        .replace(/__([^_]+)__/g, '$1')                   // unwrap bold (alt)
-        .replace(/(?<!\*)\*(?!\*)/g, ' ')                // strip stray asterisks
-        .replace(/(?<![_a-zA-Z0-9])_(?![_a-zA-Z0-9])/g, ' ') // strip stray underscores
-        .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')      // ISO dates
-        .replace(/\b\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?\b/g, ' ') // dd.mm[.yyyy]
-        .replace(/\b\d{1,2}\s*[.:h]\s*\d{2}\s*(?:uhr|Uhr)?\b/g, ' ') // 18:00, 18.00, 18h00
-        .replace(/\b\d{1,2}\s*(?:uhr|Uhr)\b/g, ' ')      // 18 Uhr
-        .replace(/\b(?:mo|di|mi|do|fr|sa|so)\b\.?,?/gi, ' ') // weekday short
+        .replace(/<a?:[A-Za-z0-9_]+:\d+>/g, ' ')
+        .replace(/:MG_[A-Z0-9_]+~?\d*:/gi, ' ')
+        .replace(/<t:\d{9,12}(?::[tTdDfFR])?>/g, ' ')
+        .replace(/<@[!&]?\d+>/g, ' ')
+        .replace(/<#\d+>/g, ' ')
+        .replace(/~~([^~]+)~~/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/(?<!\*)\*(?!\*)/g, ' ')
+        .replace(/(?<![_a-zA-Z0-9])_(?![_a-zA-Z0-9])/g, ' ')
+        .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
+        .replace(/\b\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4})?\b/g, ' ')
+        .replace(/\b\d{1,2}\s*[.:h]\s*\d{2}\s*(?:uhr|Uhr)?\b/g, ' ')
+        .replace(/\b\d{1,2}\s*(?:uhr|Uhr)\b/g, ' ')
+        .replace(/\b(?:mo|di|mi|do|fr|sa|so)\b\.?,?/gi, ' ')
         .replace(/\b(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b,?/gi, ' ')
         .replace(/\b(?:heute|morgen|gestern|übermorgen|uebermorgen)\b/gi, ' ')
         .replace(/\b(?:ca\.?|circa|etwa|gegen|ungefähr|ungefaehr|approx\.?)\b/gi, ' ')
-        .replace(/\(\s*[+\-±~]+\s*\)/g, ' ')             // (+-), (~), (±)
+        .replace(/\(\s*[+\-±~]+\s*\)/g, ' ')
         .replace(/[\r\n]+/g, ' ')
-        .replace(/[\s|·•–—-]{2,}/g, ' ')                 // collapse separators
+        .replace(/[\s|·•–—-]{2,}/g, ' ')
         .replace(/\s{2,}/g, ' ')
         .trim();
 
@@ -120,6 +124,7 @@ function cleanContentForDisplay(content) {
         }
     }
     // Final trim: strip leading/trailing separators & punctuation noise.
+    // Final trim: strip leading/trailing separator and punctuation noise.
     str = str.replace(/^[\s·•|–—\-,.:;*_/\\]+|[\s·•|–—\-,.:;*_/\\]+$/g, '').trim();
 
     return str;
