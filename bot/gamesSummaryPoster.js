@@ -72,6 +72,18 @@ function buildSummaryComponents() {
     return [new ActionRowBuilder().addComponents(button)];
 }
 
+async function isSummaryStillAtBottom(channel, summaryMessageId) {
+    if (!summaryMessageId) return false;
+    try {
+        const latest = await channel.messages.fetch({ limit: 1 });
+        const latestMessage = latest?.first?.();
+        return Boolean(latestMessage && String(latestMessage.id) === String(summaryMessageId));
+    } catch (error) {
+        console.warn('[bot] Games summary: could not check channel tail:', error?.message || error);
+        return false;
+    }
+}
+
 async function repostSummary(client) {
     const { channelId, summaryMessageId } = await fetchSummarySettings();
     if (!channelId) return;
@@ -93,13 +105,27 @@ async function repostSummary(client) {
         return;
     }
 
+    const content = buildSummaryContent(games.length);
+    const components = buildSummaryComponents();
+
+    // If the previous summary is still the latest message in the channel, just edit
+    // it in place. Saves an API round-trip and avoids the brief gap from delete+post.
+    if (await isSummaryStillAtBottom(channel, summaryMessageId)) {
+        try {
+            const existing = await channel.messages.fetch(summaryMessageId);
+            await existing.edit({ content, components });
+            return;
+        } catch (error) {
+            if (error?.code !== 10008) {
+                console.warn('[bot] Games summary: edit failed, falling back to repost:', error?.message || error);
+            }
+        }
+    }
+
     await deleteSummaryMessage(channel, summaryMessageId);
 
     try {
-        const message = await channel.send({
-            content: buildSummaryContent(games.length),
-            components: buildSummaryComponents(),
-        });
+        const message = await channel.send({ content, components });
         await persistSummaryMessageId(message.id);
     } catch (error) {
         console.warn('[bot] Games summary: failed to post:', error?.message || error);
