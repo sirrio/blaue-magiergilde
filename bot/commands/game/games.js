@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 const db = require('../../db');
 const { commandName } = require('../../commandConfig');
+const { dateToBerlinUnixSeconds } = require('../../utils/berlinTime');
 
 const TIER_FALLBACK = {
     bt: '🟫',
@@ -73,7 +74,10 @@ function formatDayHeading(date, todayKey) {
 }
 
 function unixSeconds(date) {
-    return Math.floor(date.getTime() / 1000);
+    // The wall-clock parts stored in DB are Europe/Berlin local time, regardless
+    // of the bot host's process timezone. Interpret them as Berlin local so the
+    // resulting Discord <t:UNIX:...> token renders the correct moment.
+    return dateToBerlinUnixSeconds(date);
 }
 
 function truncate(value, max) {
