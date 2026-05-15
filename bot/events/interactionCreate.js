@@ -10,6 +10,7 @@ function interactionModules() {
         appJoin: require('../interactions/appJoin'),
         characterApproval: require('../interactions/characterApproval'),
         characters: require('../interactions/characters'),
+        gamesSummary: require('../interactions/gamesSummary'),
         hiddenBid: require('../interactions/hiddenBid'),
         newGame: require('../interactions/newGame'),
         reactionDraw: require('../interactions/reactionDraw'),
@@ -34,6 +35,7 @@ module.exports = {
                 appJoin,
                 characterApproval,
                 characters,
+                gamesSummary,
                 hiddenBid,
                 newGame,
                 reactionDraw,
@@ -44,6 +46,7 @@ module.exports = {
             if (await appJoin.handle(interaction)) return;
             if (await characterApproval.handle(interaction)) return;
             if (await characters.handle(interaction)) return;
+            if (await gamesSummary.handle(interaction)) return;
             if (await hiddenBid.handle(interaction)) return;
             if (await newGame.handle(interaction)) return;
             if (await reactionDraw.handle(interaction)) return;

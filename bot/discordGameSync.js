@@ -2,6 +2,7 @@ const db = require('./db');
 const { scanGameAnnouncements } = require('./discordGameScanner');
 const { getGamesScanSinceDate } = require('./gameScanWindow');
 const { resolveChannelId } = require('./channelOverride');
+const { requestSummaryRepost } = require('./gamesSummaryPoster');
 
 function nowSql() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -106,6 +107,9 @@ async function syncGameAnnouncements(client) {
     await pruneStaleAnnouncements({ channelId, sinceSql, seenMessageIds });
 
     if (!rows.length) {
+        if (client) {
+            requestSummaryRepost(client);
+        }
         return;
     }
 
@@ -166,6 +170,10 @@ async function syncGameAnnouncements(client) {
     `;
 
     await db.execute(sql, values);
+
+    if (client) {
+        requestSummaryRepost(client);
+    }
 }
 
 function startGameAnnouncementSync(client) {
