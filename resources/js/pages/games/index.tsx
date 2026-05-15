@@ -4,6 +4,7 @@ import DiscordIcon from '@/components/discord-icon'
 import { Input } from '@/components/ui/input'
 import { List, ListRow } from '@/components/ui/list'
 import { useInitials } from '@/hooks/use-initials'
+import { useTranslate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { GameAnnouncement } from '@/types'
 import { Head, Link, router } from '@inertiajs/react'
@@ -48,8 +49,6 @@ const tierAccent: Record<string, { border: string; text: string; soft: string }>
   et: { border: 'border-tier-et', text: 'text-tier-et', soft: 'bg-tier-et/15' },
 }
 
-const monthShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-const weekdayShort = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
 const normalizeGameDateValue = (value: string) => {
   if (!value.includes('T')) return value
@@ -162,6 +161,7 @@ const resolveGameLabel = (
   title: string | null | undefined,
   content: string | null | undefined,
   maxLength = 80,
+  fallback = 'Untitled game',
 ): string => {
   const trimmedTitle = String(title || '').trim()
   if (trimmedTitle) {
@@ -171,24 +171,38 @@ const resolveGameLabel = (
   if (isLabelMeaningful(cleaned)) {
     return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1)}…` : cleaned
   }
-  return 'Untitled game'
+  return fallback
 }
 
-const formatRelative = (date: Date, now: Date) => {
+const formatRelative = (
+  date: Date,
+  now: Date,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) => {
   const diffMs = date.getTime() - now.getTime()
   const future = diffMs >= 0
   const absMin = Math.round(Math.abs(diffMs) / 60000)
-  if (absMin < 60) return future ? `in ${absMin} min` : `vor ${absMin} min`
+  if (absMin < 60) {
+    return t(future ? 'games.relativeInMinutes' : 'games.relativeAgoMinutes', { value: absMin })
+  }
   const absH = Math.round(absMin / 60)
-  if (absH < 24) return future ? `in ${absH} h` : `vor ${absH} h`
+  if (absH < 24) {
+    return t(future ? 'games.relativeInHours' : 'games.relativeAgoHours', { value: absH })
+  }
   const absD = Math.round(absH / 24)
-  if (absD < 14) return future ? `in ${absD} Tagen` : `vor ${absD} Tagen`
+  if (absD < 14) {
+    return t(future ? 'games.relativeInDays' : 'games.relativeAgoDays', { value: absD })
+  }
   const absW = Math.round(absD / 7)
-  return future ? `in ${absW} Wochen` : `vor ${absW} Wochen`
+  return t(future ? 'games.relativeInWeeks' : 'games.relativeAgoWeeks', { value: absW })
 }
 
 export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Props) {
   const getInitials = useInitials()
+  const t = useTranslate()
+  const monthShort = useMemo(() => t('games.monthShort').split(','), [t])
+  const weekdayShort = useMemo(() => t('games.weekdayShort').split(','), [t])
+  const weekdayShortMon = useMemo(() => t('games.weekdayShortMon').split(','), [t])
   const [search, setSearch] = useState('')
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
   const isArchive = mode === 'archive'
@@ -203,9 +217,9 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
     return games.map((game) => {
       const startsParts = parseGameDateParts(game.starts_at)
       const startsDate = buildDateFromParts(startsParts)
-      const authorName = game.discord_author_name?.trim() || 'Unknown'
+      const authorName = game.discord_author_name?.trim() || t('games.unknownAuthor')
       const avatarUrl = game.discord_author_avatar_url?.trim() || null
-      const title = resolveGameLabel(game.title, game.content, 80)
+      const title = resolveGameLabel(game.title, game.content, 80, t('games.untitledGame'))
       const timeLabel =
         startsParts && startsParts.hour !== null && startsParts.minute !== null
           ? `${String(startsParts.hour).padStart(2, '0')}:${String(startsParts.minute).padStart(2, '0')}`
@@ -307,7 +321,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
     const confidenceColor = getConfidenceColor(confidence)
     const isPast = game.startsDate ? game.startsDate < now : false
     const isToday = game.startsDate ? buildDateKey(game.startsDate) === todayKey : false
-    const relative = game.startsDate ? formatRelative(game.startsDate, now) : null
+    const relative = game.startsDate ? formatRelative(game.startsDate, now, t) : null
 
     const day = game.startsParts ? String(game.startsParts.day).padStart(2, '0') : '—'
     const monthLabel = game.startsParts ? monthShort[game.startsParts.month - 1] : ''
@@ -363,7 +377,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
             {game.timeLabel ? (
               <span className="font-medium tabular-nums text-base-content/80">{game.timeLabel}</span>
             ) : (
-              <span className="italic text-base-content/40">Zeit unbekannt</span>
+              <span className="italic text-base-content/40">{t('games.unknownTime')}</span>
             )}
             {relative ? (
               <>
@@ -398,7 +412,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
             <a
               href={game.discordAppUrl}
               className="btn btn-ghost btn-sm px-2"
-              title="Open in Discord app"
+              title={t('games.openInDiscordApp')}
             >
               <DiscordIcon width={16} />
             </a>
@@ -407,7 +421,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
             <a
               href={game.discordUrl}
               className="btn btn-ghost btn-sm px-2"
-              title="Open in browser"
+              title={t('games.openInBrowser')}
               target="_blank"
               rel="noreferrer"
             >
@@ -419,12 +433,16 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
     )
   }
 
-  const pageTitle = isCalendar ? 'Kalender' : isArchive ? 'Archiv' : 'Games'
-  const pageDescription = isCalendar
-    ? 'Alle Spielankündigungen als Kalender.'
+  const pageTitle = isCalendar
+    ? t('games.titleCalendar')
     : isArchive
-      ? 'Vergangene Spielankündigungen.'
-      : 'Kommende Spielankündigungen aus Discord.'
+      ? t('games.titleArchive')
+      : t('games.titleUpcoming')
+  const pageDescription = isCalendar
+    ? t('games.descriptionCalendar')
+    : isArchive
+      ? t('games.descriptionArchive')
+      : t('games.descriptionUpcoming')
 
   const modeNavItems: Array<{
     name: 'upcoming' | 'calendar' | 'archive'
@@ -432,29 +450,31 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
     label: string
     icon: typeof CalendarClock
   }> = [
-    { name: 'upcoming', route: 'games.index', label: 'Kommend', icon: CalendarClock },
-    { name: 'calendar', route: 'games.calendar', label: 'Kalender', icon: CalendarDays },
-    { name: 'archive', route: 'games.archive', label: 'Archiv', icon: Archive },
+    { name: 'upcoming', route: 'games.index', label: t('games.tabUpcoming'), icon: CalendarClock },
+    { name: 'calendar', route: 'games.calendar', label: t('games.tabCalendar'), icon: CalendarDays },
+    { name: 'archive', route: 'games.archive', label: t('games.tabArchive'), icon: Archive },
   ]
 
   return (
     <AppLayout>
-      <Head title={`Games · ${pageTitle}`} />
+      <Head title={t('games.docTitle', { section: pageTitle })} />
       <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold">{pageTitle}</h1>
             <p className="text-sm text-base-content/70">{pageDescription}</p>
             <p className="text-xs text-base-content/60">
-              {pagination.total} Einträge
-              {!isCalendar && pagination.lastPage > 1 ? ` · Seite ${pagination.currentPage}/${pagination.lastPage}` : ''}
+              {t('games.entries', { count: pagination.total })}
+              {!isCalendar && pagination.lastPage > 1
+                ? ` · ${t('games.page', { current: pagination.currentPage, last: pagination.lastPage })}`
+                : ''}
               {lastSyncedAt
                 ? (() => {
                     const formatted = formatGameDate(lastSyncedAt, true)
-                    return formatted ? ` · Letzter Sync ${formatted}` : ''
+                    return formatted ? ` · ${t('games.lastSync', { at: formatted })}` : ''
                   })()
                 : ''}
-              {` · Zeitzone ${timeZoneLabel}`}
+              {` · ${t('games.timezone', { tz: timeZoneLabel })}`}
             </p>
           </div>
           <div role="tablist" className="tabs tabs-border">
@@ -479,22 +499,22 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
         <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-4">
           <Input
             type="search"
-            placeholder="Suchen nach Titel, Autor, Inhalt..."
+            placeholder={t('games.searchPlaceholder')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           >
-            Suche
+            {t('common.search')}
           </Input>
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <div className="flex items-center gap-2 whitespace-nowrap">
-              <span className="text-base-content/60">Tier:</span>
+              <span className="text-base-content/60">{t('games.tier')}</span>
               <div className="flex flex-wrap items-center gap-1">
                 <button
                   type="button"
                   className={cn('btn btn-xs', selectedTiers.length === 0 ? 'btn-primary' : 'btn-ghost')}
                   onClick={() => setSelectedTiers([])}
                 >
-                  Alle
+                  {t('games.allTiers')}
                 </button>
                 {tierOptions.map((tier) => {
                   const isActive = selectedTiers.includes(tier)
@@ -526,30 +546,28 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
             <span>
               {isCalendar
                 ? selectedTiers.length || search.trim()
-                  ? `${filteredGames.length} von ${games.length} Spielen`
-                  : `${games.length} Spiele insgesamt`
-                : `${filteredGames.length} von ${games.length} auf dieser Seite`}
+                  ? t('games.countOfGames', { filtered: filteredGames.length, total: games.length })
+                  : t('games.countTotal', { total: games.length })
+                : t('games.countOfPage', { filtered: filteredGames.length, total: games.length })}
             </span>
           </div>
         </div>
 
         {games.length === 0 ? (
           <div className="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center text-sm text-base-content/70">
-            {isArchive
-              ? 'Noch keine vergangenen Ankündigungen im Archiv.'
-              : 'Aktuell keine kommenden Spiele angekündigt.'}
+            {isArchive ? t('games.emptyArchive') : t('games.emptyUpcoming')}
             {!isArchive ? (
               <div className="mt-3">
                 <Link href={route('games.archive')} className="btn btn-sm btn-ghost gap-1.5">
                   <Archive size={14} />
-                  Archiv ansehen
+                  {t('games.viewArchive')}
                 </Link>
               </div>
             ) : null}
           </div>
         ) : filteredGames.length === 0 ? (
           <div className="rounded-box border border-dashed border-base-300 bg-base-100 p-10 text-center text-sm text-base-content/70">
-            Keine Ankündigungen passen zu den Filtern.
+            {t('games.noFilterMatches')}
           </div>
         ) : isCalendar ? (
           <div className="space-y-3 rounded-box border border-base-200 bg-base-100 p-4">
@@ -559,7 +577,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
                   type="button"
                   className="btn btn-ghost btn-sm px-2"
                   onClick={() => shiftCalendarMonth(-1)}
-                  title="Vorheriger Monat"
+                  title={t('games.previousMonth')}
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -568,7 +586,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
                   type="button"
                   className="btn btn-ghost btn-sm px-2"
                   onClick={() => shiftCalendarMonth(1)}
-                  title="Nächster Monat"
+                  title={t('games.nextMonth')}
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -580,12 +598,12 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
                     setCalendarCursor({ year: now.getFullYear(), month: now.getMonth() })
                   }}
                 >
-                  Heute
+                  {t('games.today')}
                 </button>
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1 text-[10px] uppercase tracking-wide text-base-content/50">
-              {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
+              {weekdayShortMon.map((day) => (
                 <div key={day} className="text-center">
                   {day}
                 </div>
@@ -641,7 +659,9 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
                           )
                         })}
                         {dayGames.length > 3 ? (
-                          <span className="text-base-content/50">+{dayGames.length - 3} mehr</span>
+                          <span className="text-base-content/50">
+                            {t('games.moreOnDay', { count: dayGames.length - 3 })}
+                          </span>
                         ) : null}
                       </div>
                     </div>
@@ -662,10 +682,10 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
               disabled={pagination.currentPage <= 1}
               onClick={() => navigateToPage(pagination.currentPage - 1)}
             >
-              Zurück
+              {t('games.paginationPrev')}
             </button>
             <span className="px-1 text-xs text-base-content/60">
-              Seite {pagination.currentPage} / {pagination.lastPage}
+              {t('games.page', { current: pagination.currentPage, last: pagination.lastPage })}
             </span>
             <button
               type="button"
@@ -673,7 +693,7 @@ export default function GamesIndex({ games, mode, pagination, lastSyncedAt }: Pr
               disabled={!pagination.hasMorePages}
               onClick={() => navigateToPage(pagination.currentPage + 1)}
             >
-              Weiter
+              {t('games.paginationNext')}
             </button>
           </div>
         ) : null}
